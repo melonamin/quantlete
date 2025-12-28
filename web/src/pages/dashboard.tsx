@@ -5,6 +5,9 @@ import {
   RecentActivities,
   WeeklyStats,
   SportBreakdown,
+  MonthlyChart,
+  SportChart,
+  ActivityCalendar,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -116,11 +119,24 @@ export function DashboardPage() {
           isLoading={isLoading}
         />
 
+        {/* Monthly Chart - spans 2 columns */}
+        <div className="lg:col-span-2">
+          <MonthlyChart />
+        </div>
+
         {/* Sport Breakdown */}
         <SportBreakdown
           stats={dashboard?.sport_type_stats}
           isLoading={isLoading}
         />
+
+        {/* Sport Distribution Chart */}
+        <SportChart />
+
+        {/* Activity Calendar - spans full width */}
+        <div className="md:col-span-2 lg:col-span-3">
+          <ActivityCalendar />
+        </div>
       </div>
     </div>
   )

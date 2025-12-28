@@ -14,7 +14,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 3 | Frontend Foundation | React shell, routing, shadcn setup | ✓ |
 | 4 | Activities Feature | Activity list, filters, detail view | ✓ |
 | 5 | Dashboard | Widget system, core widgets | ✓ |
-| 6 | Charts & Visualizations | ECharts integration, all chart types | |
+| 6 | Charts & Visualizations | ECharts integration, all chart types | ✓ |
 | 7 | Maps & Heatmap | Leaflet integration, route visualization | |
 | 8 | Advanced Features | Segments, gear, maintenance, calendar | |
 | 9 | Analytics | Eddington, best efforts, training load | |
@@ -454,72 +454,75 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 6: Charts & Visualizations
+## Phase 6: Charts & Visualizations ✓
 
-**Goal:** All ECharts-based visualizations working.
+**Goal:** ECharts-based visualizations for dashboard and analytics.
 
 ### 6.1 ECharts Infrastructure
-- [ ] Create `web/src/components/charts/echarts-wrapper.tsx`:
-  - [ ] Lazy loading
-  - [ ] Theme integration
-  - [ ] Resize handling
-  - [ ] Loading state
-- [ ] Create chart theme configuration
-- [ ] Create base chart option builders
+- [x] Create `web/src/components/charts/echarts-wrapper.tsx`:
+  - [x] Tree-shaking with selective component imports
+  - [x] Resize handling with event listener
+  - [x] Loading state with skeleton
+- [x] Create chart color constants
+- [x] Create default grid/tooltip configurations
 
 ### 6.2 Line Charts
-- [ ] Create `web/src/components/charts/line-chart.tsx`:
-  - [ ] Generic line chart component
-- [ ] Create monthly stats chart (multi-year overlay)
-- [ ] Create yearly stats chart
-- [ ] Create FTP history chart
-- [ ] Create weight history chart
-- [ ] Create training load chart
-- [ ] Create Eddington history chart
+- [x] Create `web/src/components/charts/line-chart.tsx`:
+  - [x] Generic line chart component
+  - [x] Area style option
+  - [x] Multi-series support
+  - [x] Data zoom support
+- [ ] Create FTP history chart (deferred)
+- [ ] Create weight history chart (deferred)
+- [ ] Create training load chart (deferred)
+- [ ] Create Eddington history chart (deferred)
 
 ### 6.3 Bar Charts
-- [ ] Create `web/src/components/charts/bar-chart.tsx`:
-  - [ ] Generic bar chart component
-- [ ] Create Eddington distribution chart
-- [ ] Create heart rate zone chart (stacked)
-- [ ] Create power zone chart (stacked)
-- [ ] Create best effort bars
+- [x] Create `web/src/components/charts/bar-chart.tsx`:
+  - [x] Generic bar chart component
+  - [x] Horizontal option
+  - [x] Value labels option
+- [x] Create stacked bar chart variant
+- [ ] Create heart rate zone chart (deferred - needs stream data)
+- [ ] Create power zone chart (deferred - needs stream data)
 
 ### 6.4 Pie/Donut Charts
-- [ ] Create `web/src/components/charts/pie-chart.tsx`:
-  - [ ] Generic pie/donut component
-- [ ] Create weekday distribution chart
-- [ ] Create daytime distribution chart
-- [ ] Create gear usage chart
-- [ ] Create sport type distribution chart
+- [x] Create sport type distribution chart (donut style)
+  - [x] Activity count mode
+  - [x] Distance mode
+  - [x] Sport-specific colors
 
 ### 6.5 Calendar Heatmap
-- [ ] Create `web/src/components/charts/calendar-heatmap.tsx`:
-  - [ ] GitHub-style activity grid
-  - [ ] Intensity coloring
-  - [ ] Tooltips
+- [x] Create `ActivityCalendarChart`:
+  - [x] GitHub-style activity grid
+  - [x] Intensity coloring based on activity count
+  - [x] Tooltips with date and count
 
 ### 6.6 Activity Stream Charts
-- [ ] Create combined stream profile chart:
-  - [ ] Heart rate line
-  - [ ] Power line
-  - [ ] Cadence line
-  - [ ] Elevation area
-  - [ ] Sync X-axis (time/distance toggle)
-- [ ] Create elevation profile chart
-- [ ] Create power curve chart (best efforts)
+- [ ] Create combined stream profile chart (deferred - needs stream data)
+- [ ] Create elevation profile chart (deferred - needs stream data)
+- [ ] Create power curve chart (deferred - needs stream data)
 
 ### 6.7 Dashboard Chart Widgets
-- [ ] Create `peak-power-outputs.tsx` widget
-- [ ] Create `heart-rate-zones.tsx` widget
-- [ ] Create `activity-grid.tsx` widget
-- [ ] Create `monthly-stats.tsx` widget (chart version)
-- [ ] Create `training-load.tsx` widget
-- [ ] Create `weekday-stats.tsx` widget
-- [ ] Create `daytime-stats.tsx` widget
-- [ ] Create `gear-stats.tsx` widget
-- [ ] Create `ftp-history.tsx` widget
-- [ ] Create `weight-history.tsx` widget
+- [x] Create `MonthlyChart` widget:
+  - [x] Year selector
+  - [x] Metric toggle (distance/count/time)
+- [x] Create `SportChart` widget:
+  - [x] Metric toggle (count/distance)
+- [x] Create `ActivityCalendar` widget:
+  - [x] Year navigation
+- [ ] Create `peak-power-outputs.tsx` widget (deferred - needs stream data)
+- [ ] Create `heart-rate-zones.tsx` widget (deferred - needs stream data)
+- [ ] Create `training-load.tsx` widget (deferred)
+
+### 6.8 Chart Data API Endpoints
+- [x] Implement `GET /api/v1/dashboard/monthly`:
+  - [x] Monthly aggregated stats
+  - [x] Optional year filter
+- [x] Implement `GET /api/v1/dashboard/yearly`:
+  - [x] Yearly aggregated stats
+- [x] Implement `GET /api/v1/dashboard/calendar`:
+  - [x] Daily activity counts for calendar heatmap
 
 ---
 

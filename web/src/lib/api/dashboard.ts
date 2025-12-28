@@ -52,6 +52,28 @@ export interface DashboardData {
   sport_type_stats: SportTypeStat[]
 }
 
+export interface MonthlyStat {
+  month: string // YYYY-MM
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface YearlyStat {
+  year: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface CalendarDay {
+  date: string // YYYY-MM-DD
+  activity_count: number
+  total_distance: number
+}
+
 // Query keys
 export const dashboardKeys = {
   all: ['dashboard'] as const,
@@ -60,6 +82,9 @@ export const dashboardKeys = {
   weekly: () => [...dashboardKeys.all, 'weekly'] as const,
   recent: (limit?: number) => [...dashboardKeys.all, 'recent', limit] as const,
   sports: () => [...dashboardKeys.all, 'sports'] as const,
+  monthly: (year?: number) => [...dashboardKeys.all, 'monthly', year] as const,
+  yearly: () => [...dashboardKeys.all, 'yearly'] as const,
+  calendar: (year: number) => [...dashboardKeys.all, 'calendar', year] as const,
 }
 
 // Hooks
@@ -95,5 +120,26 @@ export function useSportTypeStats() {
   return useQuery({
     queryKey: dashboardKeys.sports(),
     queryFn: () => get<SportTypeStat[]>('/dashboard/sports'),
+  })
+}
+
+export function useMonthlyStats(year?: number) {
+  return useQuery({
+    queryKey: dashboardKeys.monthly(year),
+    queryFn: () => get<MonthlyStat[]>(year ? `/dashboard/monthly?year=${year}` : '/dashboard/monthly'),
+  })
+}
+
+export function useYearlyStats() {
+  return useQuery({
+    queryKey: dashboardKeys.yearly(),
+    queryFn: () => get<YearlyStat[]>('/dashboard/yearly'),
+  })
+}
+
+export function useCalendarData(year: number) {
+  return useQuery({
+    queryKey: dashboardKeys.calendar(year),
+    queryFn: () => get<CalendarDay[]>(`/dashboard/calendar?year=${year}`),
   })
 }

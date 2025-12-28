@@ -238,3 +238,130 @@ func (r *StatsRepository) GetStatsBySportType(ctx context.Context, athleteID int
 
 	return stats, rows.Err()
 }
+
+// MonthlyStat represents statistics for a single month.
+type MonthlyStat struct {
+	Month          string  `json:"month"` // YYYY-MM format
+	ActivityCount  int     `json:"activity_count"`
+	TotalDistance  float64 `json:"total_distance"`
+	TotalTime      int     `json:"total_time"`
+	TotalElevation float64 `json:"total_elevation"`
+}
+
+// GetMonthlyStats returns statistics grouped by month for a given year (or all years if year is 0).
+func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, year int) ([]MonthlyStat, error) {
+	query := `
+		SELECT
+			strftime(start_date, '%Y-%m') as month,
+			COUNT(*) as activity_count,
+			COALESCE(SUM(distance), 0) as total_distance,
+			COALESCE(SUM(moving_time), 0) as total_time,
+			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
+		FROM activities
+		WHERE athlete_id = ?
+	`
+	args := []interface{}{athleteID}
+
+	if year > 0 {
+		query += ` AND strftime(start_date, '%Y') = ?`
+		args = append(args, year)
+	}
+
+	query += `
+		GROUP BY month
+		ORDER BY month ASC
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var monthly []MonthlyStat
+	for rows.Next() {
+		var s MonthlyStat
+		if err := rows.Scan(&s.Month, &s.ActivityCount, &s.TotalDistance, &s.TotalTime, &s.TotalElevation); err != nil {
+			return nil, err
+		}
+		monthly = append(monthly, s)
+	}
+
+	return monthly, rows.Err()
+}
+
+// CalendarDay represents activity data for a single day.
+type CalendarDay struct {
+	Date          string  `json:"date"` // YYYY-MM-DD format
+	ActivityCount int     `json:"activity_count"`
+	TotalDistance float64 `json:"total_distance"`
+}
+
+// GetCalendarData returns daily activity counts for a given year.
+func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, year int) ([]CalendarDay, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			strftime(start_date, '%Y-%m-%d') as date,
+			COUNT(*) as activity_count,
+			COALESCE(SUM(distance), 0) as total_distance
+		FROM activities
+		WHERE athlete_id = ? AND strftime(start_date, '%Y') = ?
+		GROUP BY date
+		ORDER BY date ASC
+	`, athleteID, year)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var days []CalendarDay
+	for rows.Next() {
+		var d CalendarDay
+		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance); err != nil {
+			return nil, err
+		}
+		days = append(days, d)
+	}
+
+	return days, rows.Err()
+}
+
+// YearStat represents statistics for a single year.
+type YearStat struct {
+	Year           int     `json:"year"`
+	ActivityCount  int     `json:"activity_count"`
+	TotalDistance  float64 `json:"total_distance"`
+	TotalTime      int     `json:"total_time"`
+	TotalElevation float64 `json:"total_elevation"`
+}
+
+// GetYearlyStats returns statistics grouped by year.
+func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) ([]YearStat, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			CAST(strftime(start_date, '%Y') AS INTEGER) as year,
+			COUNT(*) as activity_count,
+			COALESCE(SUM(distance), 0) as total_distance,
+			COALESCE(SUM(moving_time), 0) as total_time,
+			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
+		FROM activities
+		WHERE athlete_id = ?
+		GROUP BY year
+		ORDER BY year DESC
+	`, athleteID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var yearly []YearStat
+	for rows.Next() {
+		var s YearStat
+		if err := rows.Scan(&s.Year, &s.ActivityCount, &s.TotalDistance, &s.TotalTime, &s.TotalElevation); err != nil {
+			return nil, err
+		}
+		yearly = append(yearly, s)
+	}
+
+	return yearly, rows.Err()
+}

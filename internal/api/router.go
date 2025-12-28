@@ -111,6 +111,9 @@ func (r *Router) mountRoutes() {
 			router.Get("/weekly", r.dashboardHandler.GetWeeklyStats)
 			router.Get("/recent", r.dashboardHandler.GetRecentActivities)
 			router.Get("/sports", r.dashboardHandler.GetSportTypeStats)
+			router.Get("/monthly", r.dashboardHandler.GetMonthlyStats)
+			router.Get("/yearly", r.dashboardHandler.GetYearlyStats)
+			router.Get("/calendar", r.dashboardHandler.GetCalendarData)
 		})
 	})
 

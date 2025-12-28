@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
@@ -149,4 +150,69 @@ func (h *DashboardHandler) GetSportTypeStats(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusOK, stats)
+}
+
+// GetMonthlyStats handles GET /api/v1/dashboard/monthly
+func (h *DashboardHandler) GetMonthlyStats(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	year := 0
+	if y := r.URL.Query().Get("year"); y != "" {
+		if parsed, err := strconv.Atoi(y); err == nil && parsed > 2000 && parsed < 2100 {
+			year = parsed
+		}
+	}
+
+	stats, err := h.stats.GetMonthlyStats(r.Context(), athlete.ID, year)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get monthly stats"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// GetYearlyStats handles GET /api/v1/dashboard/yearly
+func (h *DashboardHandler) GetYearlyStats(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	stats, err := h.stats.GetYearlyStats(r.Context(), athlete.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get yearly stats"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// GetCalendarData handles GET /api/v1/dashboard/calendar
+func (h *DashboardHandler) GetCalendarData(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	year := time.Now().Year()
+	if y := r.URL.Query().Get("year"); y != "" {
+		if parsed, err := strconv.Atoi(y); err == nil && parsed > 2000 && parsed < 2100 {
+			year = parsed
+		}
+	}
+
+	data, err := h.stats.GetCalendarData(r.Context(), athlete.ID, year)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar data"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, data)
 }
