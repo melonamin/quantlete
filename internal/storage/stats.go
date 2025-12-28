@@ -483,3 +483,102 @@ func joinStrings(strs []string, sep string) string {
 	}
 	return result
 }
+
+// EddingtonResult contains the Eddington number calculation result.
+type EddingtonResult struct {
+	Number       int              `json:"number"`
+	Distribution []EddingtonDay   `json:"distribution"`
+	NextSteps    []EddingtonStep  `json:"next_steps"`
+}
+
+// EddingtonDay represents a day's distance for Eddington calculation.
+type EddingtonDay struct {
+	Date     string  `json:"date"`
+	Distance float64 `json:"distance"` // in km
+}
+
+// EddingtonStep shows how many rides needed to reach the next Eddington number.
+type EddingtonStep struct {
+	Target     int `json:"target"`
+	RidesNeeded int `json:"rides_needed"`
+}
+
+// GetEddingtonData returns data for Eddington number calculation.
+func (r *StatsRepository) GetEddingtonData(ctx context.Context, athleteID int64, sportTypes []string) (*EddingtonResult, error) {
+	query := `
+		SELECT
+			strftime(start_date, '%Y-%m-%d') as date,
+			SUM(distance) / 1000.0 as distance_km
+		FROM activities
+		WHERE athlete_id = ?
+	`
+	args := []interface{}{athleteID}
+
+	if len(sportTypes) > 0 {
+		placeholders := make([]string, len(sportTypes))
+		for i, st := range sportTypes {
+			placeholders[i] = "?"
+			args = append(args, st)
+		}
+		query += " AND sport_type IN (" + joinStrings(placeholders, ",") + ")"
+	}
+
+	query += `
+		GROUP BY date
+		HAVING distance_km > 0
+		ORDER BY distance_km DESC
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var days []EddingtonDay
+	for rows.Next() {
+		var d EddingtonDay
+		if err := rows.Scan(&d.Date, &d.Distance); err != nil {
+			return nil, err
+		}
+		days = append(days, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Calculate Eddington number
+	eddington := 0
+	for i, d := range days {
+		// i+1 is the count of days with distance >= d.Distance
+		if d.Distance >= float64(i+1) {
+			eddington = i + 1
+		} else {
+			break
+		}
+	}
+
+	// Calculate next steps (how many rides needed for next 5 numbers)
+	var nextSteps []EddingtonStep
+	for target := eddington + 1; target <= eddington+5; target++ {
+		count := 0
+		for _, d := range days {
+			if d.Distance >= float64(target) {
+				count++
+			}
+		}
+		ridesNeeded := target - count
+		if ridesNeeded > 0 {
+			nextSteps = append(nextSteps, EddingtonStep{
+				Target:      target,
+				RidesNeeded: ridesNeeded,
+			})
+		}
+	}
+
+	return &EddingtonResult{
+		Number:       eddington,
+		Distribution: days,
+		NextSteps:    nextSteps,
+	}, nil
+}

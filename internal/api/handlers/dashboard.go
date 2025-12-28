@@ -275,6 +275,29 @@ func (h *DashboardHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// GetEddingtonData handles GET /api/v1/stats/eddington
+func (h *DashboardHandler) GetEddingtonData(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	// Parse sport types filter
+	var sportTypes []string
+	if st := r.URL.Query().Get("sport_type"); st != "" {
+		sportTypes = strings.Split(st, ",")
+	}
+
+	result, err := h.stats.GetEddingtonData(r.Context(), athlete.ID, sportTypes)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get eddington data"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 // GetCalendarActivities handles GET /api/v1/dashboard/calendar/activities
 func (h *DashboardHandler) GetCalendarActivities(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()

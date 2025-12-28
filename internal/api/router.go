@@ -121,9 +121,10 @@ func (r *Router) mountRoutes() {
 			router.Get("/calendar/activities", r.dashboardHandler.GetCalendarActivities)
 		})
 
-		// Stats routes (heatmap, etc.)
+		// Stats routes (heatmap, eddington, etc.)
 		router.Route("/stats", func(router chi.Router) {
 			router.Get("/heatmap", r.dashboardHandler.GetHeatmapData)
+			router.Get("/eddington", r.dashboardHandler.GetEddingtonData)
 		})
 
 		// Gear routes

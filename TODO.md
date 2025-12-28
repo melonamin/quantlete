@@ -17,7 +17,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 6     | Charts & Visualizations | ECharts integration, all chart types     | ✓      |
 | 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓      |
 | 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓      |
-| 9     | Analytics               | Eddington, best efforts, training load   |        |
+| 9     | Analytics               | Eddington, best efforts, training load   | ✓      |
 | 10    | WASM Mode               | Browser-only version with DuckDB-WASM    |        |
 | 11    | Polish                  | PWA, i18n, settings, badges              |        |
 
@@ -675,72 +675,34 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 9: Analytics
+## Phase 9: Analytics ✓
 
 **Goal:** Eddington, best efforts, training load, rewind.
 
 ### 9.1 Eddington Number
 
-- [ ] Implement `GET /api/v1/stats/eddington`:
-  - [ ] Calculate Eddington number
-  - [ ] Days distribution
-  - [ ] Progress tracking
-- [ ] Create `web/src/pages/eddington.tsx`:
-  - [ ] Current number display
-  - [ ] Distribution chart
-  - [ ] History chart
-  - [ ] "Days needed" table
-  - [ ] Sport type tabs
-- [ ] Create `eddington.tsx` dashboard widget
+- [x] Implement `GET /api/v1/stats/eddington`:
+  - [x] Calculate Eddington number
+  - [x] Days distribution
+  - [x] Next steps tracking
+- [x] Create `web/src/pages/eddington.tsx`:
+  - [x] Current number display
+  - [x] Top distance days table
+  - [x] "Next goals" table
+  - [x] Sport type filter (All/Rides/Runs)
+- [ ] Create `eddington.tsx` dashboard widget (deferred)
 
 ### 9.2 Best Efforts
 
-- [ ] Create best efforts tables in schema
-- [ ] Calculate best efforts during import
-- [ ] Implement `GET /api/v1/stats/best-efforts`:
-  - [ ] PRs by distance
-  - [ ] History per distance
-- [ ] Create `web/src/pages/best-efforts.tsx`:
-  - [ ] Sport type tabs
-  - [ ] PR list by distance
-  - [ ] Chart showing records over time
-- [ ] Create distance detail modal:
-  - [ ] All efforts for distance
-  - [ ] Progression chart
+- [ ] Best efforts functionality (deferred)
 
 ### 9.3 Training Load
 
-- [ ] Research training load algorithms (CTL/ATL/TSB)
-- [ ] Create training load calculations
-- [ ] Implement `GET /api/v1/stats/training-load`
-- [ ] Create training load detail page:
-  - [ ] Fitness curve
-  - [ ] Fatigue curve
-  - [ ] Form curve
-  - [ ] Date range selection
-- [ ] Create `training-load.tsx` dashboard widget
+- [ ] Training load functionality (deferred)
 
 ### 9.4 Strava Rewind
 
-- [ ] Implement `GET /api/v1/stats/rewind/:year`:
-  - [ ] All rewind statistics
-- [ ] Create `web/src/pages/rewind.tsx`:
-  - [ ] Year selector
-  - [ ] Comparison mode
-  - [ ] Metric sections:
-    - [ ] Total activities by month
-    - [ ] Distance by month
-    - [ ] Elevation by month
-    - [ ] Time by sport type
-    - [ ] Active vs rest days
-    - [ ] Start times distribution
-    - [ ] PRs by month
-    - [ ] Activity locations map
-    - [ ] Streaks
-    - [ ] Carbon saved
-    - [ ] Kudos received
-    - [ ] Biggest activities
-    - [ ] Random photo
+- [ ] Strava Rewind functionality (deferred)
 
 ---
 

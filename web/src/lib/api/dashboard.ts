@@ -103,6 +103,22 @@ export interface HeatmapFilters {
   commute?: boolean
 }
 
+export interface EddingtonDay {
+  date: string
+  distance: number // km
+}
+
+export interface EddingtonStep {
+  target: number
+  rides_needed: number
+}
+
+export interface EddingtonResult {
+  number: number
+  distribution: EddingtonDay[]
+  next_steps: EddingtonStep[]
+}
+
 // Query keys
 export const dashboardKeys = {
   all: ['dashboard'] as const,
@@ -116,6 +132,7 @@ export const dashboardKeys = {
   calendar: (year: number) => [...dashboardKeys.all, 'calendar', year] as const,
   calendarActivities: (year: number, month: number) => [...dashboardKeys.all, 'calendarActivities', year, month] as const,
   heatmap: (filters: HeatmapFilters) => [...dashboardKeys.all, 'heatmap', filters] as const,
+  eddington: (sportType?: string) => [...dashboardKeys.all, 'eddington', sportType] as const,
 }
 
 // Hooks
@@ -194,6 +211,16 @@ export function useHeatmapData(filters: HeatmapFilters = {}) {
 
       const queryString = params.toString()
       return get<HeatmapResponse>(`/stats/heatmap${queryString ? `?${queryString}` : ''}`)
+    },
+  })
+}
+
+export function useEddingtonData(sportType?: string) {
+  return useQuery({
+    queryKey: dashboardKeys.eddington(sportType),
+    queryFn: () => {
+      const params = sportType ? `?sport_type=${sportType}` : ''
+      return get<EddingtonResult>(`/stats/eddington${params}`)
     },
   })
 }
