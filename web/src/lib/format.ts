@@ -4,7 +4,7 @@ import type { UnitSystem } from '@/stores/settings'
 const METERS_PER_MILE = 1609.344
 const METERS_PER_FOOT = 0.3048
 
-export function formatDistance(meters: number, unitSystem: UnitSystem): string {
+export function formatDistance(meters: number, unitSystem: UnitSystem = 'metric'): string {
   if (unitSystem === 'imperial') {
     const miles = meters / METERS_PER_MILE
     if (miles < 0.1) {
@@ -20,7 +20,7 @@ export function formatDistance(meters: number, unitSystem: UnitSystem): string {
 }
 
 // Elevation formatting
-export function formatElevation(meters: number, unitSystem: UnitSystem): string {
+export function formatElevation(meters: number, unitSystem: UnitSystem = 'metric'): string {
   if (unitSystem === 'imperial') {
     return `${Math.round(meters / METERS_PER_FOOT)} ft`
   }

@@ -80,3 +80,17 @@ export function getSportIcon(sportType: string) {
 export function formatSportType(sportType: string): string {
   return sportType.replace(/([A-Z])/g, ' $1').trim()
 }
+
+// Hex colors for inline styles (when Tailwind classes aren't suitable)
+export function getSportHexColor(sportType: string): string {
+  const category = getSportCategory(sportType)
+  const colors: Record<SportCategory, string> = {
+    ride: '#f97316', // orange-500
+    run: '#22c55e', // green-500
+    walk: '#a855f7', // purple-500
+    swim: '#3b82f6', // blue-500
+    winter: '#06b6d4', // cyan-500
+    other: '#6b7280', // gray-500
+  }
+  return colors[category]
+}

@@ -1,19 +1,92 @@
-import { useQuery } from '@tanstack/react-query'
-import { Activity, TrendingUp, Clock, Mountain } from 'lucide-react'
-
-interface HealthResponse {
-  status: string
-}
+import { Link } from '@tanstack/react-router'
+import { useDashboard, useAuthStatus } from '@/lib/api'
+import {
+  StatsSummary,
+  RecentActivities,
+  WeeklyStats,
+  SportBreakdown,
+} from '@/components/dashboard'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function DashboardPage() {
-  const { data: health, isLoading, error } = useQuery<HealthResponse>({
-    queryKey: ['health'],
-    queryFn: async () => {
-      const res = await fetch('/api/v1/health')
-      if (!res.ok) throw new Error('Failed to fetch health')
-      return res.json()
-    },
-  })
+  const { data: authStatus } = useAuthStatus()
+  const { data: dashboard, isLoading, error } = useDashboard()
+
+  const isAuthenticated = authStatus?.authenticated
+
+  // Show getting started if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Your activity statistics at a glance</p>
+        </div>
+
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Get Started</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Connect your Strava account to import your activities and view your statistics.
+            </p>
+            <Button asChild className="bg-strava hover:bg-strava/90">
+              <a href="/api/v1/auth/strava">Connect Strava</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Your activity statistics at a glance</p>
+        </div>
+
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-destructive mb-4">Failed to load dashboard data</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show empty state if no activities
+  const hasActivities = dashboard?.stats && dashboard.stats.total_activities > 0
+
+  if (!isLoading && !hasActivities) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Your activity statistics at a glance</p>
+        </div>
+
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>No Activities Yet</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Import your activities from Strava to see your statistics.
+            </p>
+            <Button asChild>
+              <Link to="/settings">Go to Settings</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -23,85 +96,32 @@ export function DashboardPage() {
       </div>
 
       {/* Stats overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          title="Total Activities"
-          value="--"
-          icon={Activity}
-          description="All time"
-        />
-        <StatCard
-          title="Total Distance"
-          value="-- km"
-          icon={TrendingUp}
-          description="All time"
-        />
-        <StatCard
-          title="Total Time"
-          value="-- hours"
-          icon={Clock}
-          description="All time"
-        />
-        <StatCard
-          title="Total Elevation"
-          value="-- m"
-          icon={Mountain}
-          description="All time"
-        />
+      <div className="mb-8">
+        <StatsSummary stats={dashboard?.stats} isLoading={isLoading} />
       </div>
 
-      {/* API Status */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">System Status</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">API:</span>
-          {isLoading ? (
-            <span className="text-sm text-muted-foreground">Checking...</span>
-          ) : error ? (
-            <span className="text-sm text-destructive">Error connecting to API</span>
-          ) : health ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-green-500" />
-              <span className="text-sm text-green-600">{health.status}</span>
-            </span>
-          ) : null}
+      {/* Widgets grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Recent Activities - spans 2 columns on large screens */}
+        <div className="lg:col-span-2">
+          <RecentActivities
+            activities={dashboard?.recent_activities}
+            isLoading={isLoading}
+          />
         </div>
 
-        <div className="mt-4 pt-4 border-t border-border">
-          <h3 className="text-sm font-medium mb-2">Getting Started</h3>
-          <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-            <li>
-              <a href="/api/v1/auth/strava" className="text-strava hover:underline">
-                Authenticate with Strava
-              </a>
-            </li>
-            <li>Import your activities</li>
-            <li>Explore your statistics</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  )
-}
+        {/* Weekly Stats */}
+        <WeeklyStats
+          stats={dashboard?.weekly_stats}
+          isLoading={isLoading}
+        />
 
-interface StatCardProps {
-  title: string
-  value: string
-  icon: React.ComponentType<{ className?: string }>
-  description: string
-}
-
-function StatCard({ title, value, icon: Icon, description }: StatCardProps) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-6">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{title}</span>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        {/* Sport Breakdown */}
+        <SportBreakdown
+          stats={dashboard?.sport_type_stats}
+          isLoading={isLoading}
+        />
       </div>
-      <div className="mt-2">
-        <span className="text-2xl font-bold">{value}</span>
-      </div>
-      <p className="text-xs text-muted-foreground mt-1">{description}</p>
     </div>
   )
 }

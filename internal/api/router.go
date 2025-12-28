@@ -23,6 +23,7 @@ type Router struct {
 	authHandler       *handlers.AuthHandler
 	activitiesHandler *handlers.ActivitiesHandler
 	importHandler     *handlers.ImportHandler
+	dashboardHandler  *handlers.DashboardHandler
 }
 
 // NewRouter creates a new HTTP router with all routes configured.
@@ -51,11 +52,13 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	activityRepo := storage.NewActivityRepository(db)
 	athleteRepo := storage.NewAthleteRepository(db)
 	tokenRepo := storage.NewTokenRepository(db)
+	statsRepo := storage.NewStatsRepository(db)
 
 	// Create handlers
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
 	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, stravaClient)
 	importHandler := handlers.NewImportHandler(imp)
+	dashboardHandler := handlers.NewDashboardHandler(statsRepo, stravaClient)
 
 	router := &Router{
 		Mux:               r,
@@ -65,6 +68,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 		authHandler:       authHandler,
 		activitiesHandler: activitiesHandler,
 		importHandler:     importHandler,
+		dashboardHandler:  dashboardHandler,
 	}
 
 	// Mount routes
@@ -98,6 +102,15 @@ func (r *Router) mountRoutes() {
 			router.Post("/start", r.importHandler.Start)
 			router.Get("/progress", r.importHandler.Progress)
 			router.Post("/cancel", r.importHandler.Cancel)
+		})
+
+		// Dashboard routes
+		router.Route("/dashboard", func(router chi.Router) {
+			router.Get("/", r.dashboardHandler.GetDashboard)
+			router.Get("/stats", r.dashboardHandler.GetStats)
+			router.Get("/weekly", r.dashboardHandler.GetWeeklyStats)
+			router.Get("/recent", r.dashboardHandler.GetRecentActivities)
+			router.Get("/sports", r.dashboardHandler.GetSportTypeStats)
 		})
 	})
 

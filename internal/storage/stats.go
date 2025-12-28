@@ -1,0 +1,240 @@
+package storage
+
+import (
+	"context"
+	"time"
+)
+
+// DashboardStats represents aggregated statistics for the dashboard.
+type DashboardStats struct {
+	TotalActivities    int     `json:"total_activities"`
+	TotalDistance      float64 `json:"total_distance"`       // meters
+	TotalMovingTime    int     `json:"total_moving_time"`    // seconds
+	TotalElevationGain float64 `json:"total_elevation_gain"` // meters
+	TotalCalories      float64 `json:"total_calories"`
+
+	// This year
+	YearActivities    int     `json:"year_activities"`
+	YearDistance      float64 `json:"year_distance"`
+	YearMovingTime    int     `json:"year_moving_time"`
+	YearElevationGain float64 `json:"year_elevation_gain"`
+
+	// This month
+	MonthActivities    int     `json:"month_activities"`
+	MonthDistance      float64 `json:"month_distance"`
+	MonthMovingTime    int     `json:"month_moving_time"`
+	MonthElevationGain float64 `json:"month_elevation_gain"`
+}
+
+// WeeklyStat represents statistics for a single sport type in the current week.
+type WeeklyStat struct {
+	SportType      string  `json:"sport_type"`
+	ActivityCount  int     `json:"activity_count"`
+	TotalDistance  float64 `json:"total_distance"`
+	TotalTime      int     `json:"total_time"`
+	TotalElevation float64 `json:"total_elevation"`
+}
+
+// RecentActivity represents a simplified activity for the dashboard.
+type RecentActivity struct {
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	SportType      string    `json:"sport_type"`
+	StartDate      time.Time `json:"start_date"`
+	Distance       float64   `json:"distance"`
+	MovingTime     int       `json:"moving_time"`
+	ElevationGain  float64   `json:"elevation_gain"`
+	SummaryPolyline string   `json:"summary_polyline,omitempty"`
+}
+
+// StatsRepository handles statistics queries.
+type StatsRepository struct {
+	db *DB
+}
+
+// NewStatsRepository creates a new stats repository.
+func NewStatsRepository(db *DB) *StatsRepository {
+	return &StatsRepository{db: db}
+}
+
+// GetDashboardStats returns aggregated statistics for the dashboard.
+func (r *StatsRepository) GetDashboardStats(ctx context.Context, athleteID int64) (*DashboardStats, error) {
+	now := time.Now()
+	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
+	stats := &DashboardStats{}
+
+	// Total stats
+	err := r.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(distance), 0),
+			COALESCE(SUM(moving_time), 0),
+			COALESCE(SUM(total_elevation_gain), 0),
+			COALESCE(SUM(calories), 0)
+		FROM activities
+		WHERE athlete_id = ?
+	`, athleteID).Scan(
+		&stats.TotalActivities,
+		&stats.TotalDistance,
+		&stats.TotalMovingTime,
+		&stats.TotalElevationGain,
+		&stats.TotalCalories,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Year stats
+	err = r.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(distance), 0),
+			COALESCE(SUM(moving_time), 0),
+			COALESCE(SUM(total_elevation_gain), 0)
+		FROM activities
+		WHERE athlete_id = ? AND start_date >= ?
+	`, athleteID, yearStart).Scan(
+		&stats.YearActivities,
+		&stats.YearDistance,
+		&stats.YearMovingTime,
+		&stats.YearElevationGain,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Month stats
+	err = r.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(distance), 0),
+			COALESCE(SUM(moving_time), 0),
+			COALESCE(SUM(total_elevation_gain), 0)
+		FROM activities
+		WHERE athlete_id = ? AND start_date >= ?
+	`, athleteID, monthStart).Scan(
+		&stats.MonthActivities,
+		&stats.MonthDistance,
+		&stats.MonthMovingTime,
+		&stats.MonthElevationGain,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+// GetWeeklyStats returns statistics grouped by sport type for the current week.
+func (r *StatsRepository) GetWeeklyStats(ctx context.Context, athleteID int64) ([]WeeklyStat, error) {
+	now := time.Now()
+	// Get start of week (Monday)
+	weekday := int(now.Weekday())
+	if weekday == 0 {
+		weekday = 7 // Sunday = 7
+	}
+	weekStart := time.Date(now.Year(), now.Month(), now.Day()-weekday+1, 0, 0, 0, 0, now.Location())
+
+	rows, err := r.db.Query(`
+		SELECT
+			sport_type,
+			COUNT(*) as activity_count,
+			COALESCE(SUM(distance), 0) as total_distance,
+			COALESCE(SUM(moving_time), 0) as total_time,
+			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
+		FROM activities
+		WHERE athlete_id = ? AND start_date >= ?
+		GROUP BY sport_type
+		ORDER BY total_distance DESC
+	`, athleteID, weekStart)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var stats []WeeklyStat
+	for rows.Next() {
+		var s WeeklyStat
+		if err := rows.Scan(&s.SportType, &s.ActivityCount, &s.TotalDistance, &s.TotalTime, &s.TotalElevation); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+
+	return stats, rows.Err()
+}
+
+// GetRecentActivities returns the most recent activities.
+func (r *StatsRepository) GetRecentActivities(ctx context.Context, athleteID int64, limit int) ([]RecentActivity, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			id, name, sport_type, start_date,
+			distance, moving_time, total_elevation_gain,
+			COALESCE(summary_polyline, '')
+		FROM activities
+		WHERE athlete_id = ?
+		ORDER BY start_date DESC
+		LIMIT ?
+	`, athleteID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var activities []RecentActivity
+	for rows.Next() {
+		var a RecentActivity
+		if err := rows.Scan(
+			&a.ID, &a.Name, &a.SportType, &a.StartDate,
+			&a.Distance, &a.MovingTime, &a.ElevationGain,
+			&a.SummaryPolyline,
+		); err != nil {
+			return nil, err
+		}
+		activities = append(activities, a)
+	}
+
+	return activities, rows.Err()
+}
+
+// SportTypeStat represents statistics for a single sport type.
+type SportTypeStat struct {
+	SportType      string  `json:"sport_type"`
+	ActivityCount  int     `json:"activity_count"`
+	TotalDistance  float64 `json:"total_distance"`
+	TotalTime      int     `json:"total_time"`
+	TotalElevation float64 `json:"total_elevation"`
+}
+
+// GetStatsBySportType returns statistics grouped by sport type.
+func (r *StatsRepository) GetStatsBySportType(ctx context.Context, athleteID int64) ([]SportTypeStat, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			sport_type,
+			COUNT(*) as activity_count,
+			COALESCE(SUM(distance), 0) as total_distance,
+			COALESCE(SUM(moving_time), 0) as total_time,
+			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
+		FROM activities
+		WHERE athlete_id = ?
+		GROUP BY sport_type
+		ORDER BY activity_count DESC
+	`, athleteID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var stats []SportTypeStat
+	for rows.Next() {
+		var s SportTypeStat
+		if err := rows.Scan(&s.SportType, &s.ActivityCount, &s.TotalDistance, &s.TotalTime, &s.TotalElevation); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+
+	return stats, rows.Err()
+}

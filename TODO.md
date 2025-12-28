@@ -13,7 +13,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 2 | Database & Storage | DuckDB schema, activity storage | ✓ |
 | 3 | Frontend Foundation | React shell, routing, shadcn setup | ✓ |
 | 4 | Activities Feature | Activity list, filters, detail view | ✓ |
-| 5 | Dashboard | Widget system, core widgets | |
+| 5 | Dashboard | Widget system, core widgets | ✓ |
 | 6 | Charts & Visualizations | ECharts integration, all chart types | |
 | 7 | Maps & Heatmap | Leaflet integration, route visualization | |
 | 8 | Advanced Features | Segments, gear, maintenance, calendar | |
@@ -388,55 +388,69 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 5: Dashboard
+## Phase 5: Dashboard ✓
 
 **Goal:** Configurable widget-based dashboard.
 
 ### 5.1 Dashboard Infrastructure
-- [ ] Implement `GET /api/v1/dashboard/stats`:
-  - [ ] Aggregated statistics
-- [ ] Implement `GET /api/v1/dashboard/weekly`:
-  - [ ] Current week stats by sport
+- [x] Implement `GET /api/v1/dashboard`:
+  - [x] Combined dashboard data endpoint
+- [x] Implement `GET /api/v1/dashboard/stats`:
+  - [x] Aggregated statistics (total, year, month)
+- [x] Implement `GET /api/v1/dashboard/weekly`:
+  - [x] Current week stats by sport
+- [x] Implement `GET /api/v1/dashboard/recent`:
+  - [x] Recent activities list
+- [x] Implement `GET /api/v1/dashboard/sports`:
+  - [x] Stats by sport type
 - [ ] Implement `GET /api/v1/dashboard/config`:
-  - [ ] Widget configuration
+  - [ ] Widget configuration (deferred)
 - [ ] Implement `PUT /api/v1/dashboard/config`:
-  - [ ] Update widget configuration
-- [ ] Create `internal/storage/stats.go`:
-  - [ ] Aggregation queries
+  - [ ] Update widget configuration (deferred)
+- [x] Create `internal/storage/stats.go`:
+  - [x] Aggregation queries
 
 ### 5.2 Widget System
+- [x] Create `web/src/components/dashboard/widget-wrapper.tsx`:
+  - [x] Card container
+  - [x] Title, action buttons
+  - [x] Loading state
 - [ ] Create `web/src/components/dashboard/widget-grid.tsx`:
-  - [ ] CSS Grid layout
+  - [ ] CSS Grid layout (using basic grid for now)
   - [ ] Widget sizing (33%, 50%, 66%, 100%)
   - [ ] Responsive behavior
-- [ ] Create `web/src/components/dashboard/widget-wrapper.tsx`:
-  - [ ] Card container
-  - [ ] Title, action buttons
-  - [ ] Loading state
-  - [ ] Error state
 - [ ] Create `web/src/stores/dashboard.ts`:
-  - [ ] Widget order
-  - [ ] Widget configuration
-  - [ ] Persist to API
+  - [ ] Widget order (deferred)
+  - [ ] Widget configuration (deferred)
+  - [ ] Persist to API (deferred)
 
 ### 5.3 Core Widgets (Text/Stats)
-- [ ] Create `most-recent-activities.tsx`:
-  - [ ] N recent activities
-  - [ ] "View all" link
-- [ ] Create `intro-text.tsx`:
-  - [ ] Total stats summary
-- [ ] Create `weekly-stats.tsx`:
-  - [ ] Current week by sport type
+- [x] Create `stats-summary.tsx`:
+  - [x] Key stats cards (activities, distance, time, elevation)
+  - [x] Year/month/total breakdown
+- [x] Create `recent-activities.tsx`:
+  - [x] N recent activities
+  - [x] "View all" link
+- [x] Create `weekly-stats.tsx`:
+  - [x] Current week by sport type
+  - [x] Summary totals
+- [x] Create `sport-breakdown.tsx`:
+  - [x] Sport type distribution
+  - [x] Progress bars with percentages
 - [ ] Create `training-goals.tsx`:
-  - [ ] Progress bars for goals
-  - [ ] Weekly/monthly/yearly/lifetime tabs
+  - [ ] Progress bars for goals (deferred)
+  - [ ] Weekly/monthly/yearly/lifetime tabs (deferred)
 
 ### 5.4 Dashboard Page
-- [ ] Create `web/src/pages/dashboard.tsx`:
-  - [ ] Fetch widget config
-  - [ ] Render widget grid
-  - [ ] Handle loading/error states
-- [ ] Create `web/src/hooks/use-dashboard-stats.ts`
+- [x] Create `web/src/pages/dashboard.tsx`:
+  - [x] Fetch dashboard data
+  - [x] Render widget grid
+  - [x] Handle loading/error states
+  - [x] Handle unauthenticated state
+  - [x] Handle empty state
+- [x] Create `web/src/lib/api/dashboard.ts`:
+  - [x] Dashboard API hooks
+  - [x] TypeScript types
 
 ---
 
