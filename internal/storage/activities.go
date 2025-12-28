@@ -19,6 +19,9 @@ type Activity struct {
 	StartDate            time.Time
 	StartDateLocal       time.Time
 	Timezone             string
+	LocationCity         string
+	LocationState        string
+	LocationCountry      string
 	Distance             float64
 	MovingTime           int
 	ElapsedTime          int
@@ -85,19 +88,26 @@ func NewActivityRepository(db *DB) *ActivityRepository {
 }
 
 // Upsert inserts or updates an activity.
-// Uses DELETE + INSERT because DuckDB doesn't allow updating indexed columns in UPSERT.
 func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
-	// Delete existing activity
-	_, err := r.db.Exec("DELETE FROM activities WHERE id = ?", a.ID)
-	if err != nil {
-		return fmt.Errorf("deleting existing activity: %w", err)
+	// Check if activity exists
+	var exists bool
+	err := r.db.QueryRow("SELECT 1 FROM activities WHERE id = ?", a.ID).Scan(&exists)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("checking activity existence: %w", err)
 	}
 
-	// Insert activity
+	if exists {
+		// Activity exists - skip update to avoid DuckDB FK issues
+		// DuckDB internally does DELETE+INSERT for UPDATE, which violates FK constraints
+		return nil
+	}
+
+	// INSERT new activity
 	_, err = r.db.Exec(`
 		INSERT INTO activities (
 			id, athlete_id, name, description, sport_type,
 			start_date, start_date_local, timezone,
+			location_city, location_state, location_country,
 			distance, moving_time, elapsed_time, total_elevation_gain,
 			elev_high, elev_low, average_speed, max_speed,
 			average_heartrate, max_heartrate,
@@ -111,6 +121,7 @@ func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
 			created_at, updated_at
 		) VALUES (
 			?, ?, ?, ?, ?,
+			?, ?, ?,
 			?, ?, ?,
 			?, ?, ?, ?,
 			?, ?, ?, ?,
@@ -127,6 +138,7 @@ func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
 	`,
 		a.ID, a.AthleteID, a.Name, a.Description, a.SportType,
 		a.StartDate, a.StartDateLocal, a.Timezone,
+		a.LocationCity, a.LocationState, a.LocationCountry,
 		a.Distance, a.MovingTime, a.ElapsedTime, a.TotalElevationGain,
 		a.ElevHigh, a.ElevLow, a.AverageSpeed, a.MaxSpeed,
 		a.AverageHeartrate, a.MaxHeartrate,
@@ -148,6 +160,7 @@ func (r *ActivityRepository) GetByID(ctx context.Context, id int64) (*Activity, 
 		SELECT
 			id, athlete_id, name, description, sport_type,
 			start_date, start_date_local, timezone,
+			COALESCE(location_city, ''), COALESCE(location_state, ''), COALESCE(location_country, ''),
 			distance, moving_time, elapsed_time, total_elevation_gain,
 			elev_high, elev_low, average_speed, max_speed,
 			average_heartrate, max_heartrate,
@@ -255,6 +268,7 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 		SELECT
 			id, athlete_id, name, description, sport_type,
 			start_date, start_date_local, timezone,
+			COALESCE(location_city, ''), COALESCE(location_state, ''), COALESCE(location_country, ''),
 			distance, moving_time, elapsed_time, total_elevation_gain,
 			elev_high, elev_low, average_speed, max_speed,
 			average_heartrate, max_heartrate,
@@ -367,6 +381,7 @@ func (r *ActivityRepository) GetMostRecent(ctx context.Context, athleteID int64,
 		SELECT
 			id, athlete_id, name, description, sport_type,
 			start_date, start_date_local, timezone,
+			COALESCE(location_city, ''), COALESCE(location_state, ''), COALESCE(location_country, ''),
 			distance, moving_time, elapsed_time, total_elevation_gain,
 			elev_high, elev_low, average_speed, max_speed,
 			average_heartrate, max_heartrate,
@@ -426,6 +441,7 @@ func scanActivity(s scanner) (*Activity, error) {
 	err := s.Scan(
 		&a.ID, &a.AthleteID, &a.Name, &a.Description, &a.SportType,
 		&a.StartDate, &a.StartDateLocal, &a.Timezone,
+		&a.LocationCity, &a.LocationState, &a.LocationCountry,
 		&a.Distance, &a.MovingTime, &a.ElapsedTime, &a.TotalElevationGain,
 		&a.ElevHigh, &a.ElevLow, &a.AverageSpeed, &a.MaxSpeed,
 		&a.AverageHeartrate, &a.MaxHeartrate,

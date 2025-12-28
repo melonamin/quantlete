@@ -28,6 +28,9 @@ type Activity struct {
 	StartDate            time.Time       `json:"start_date"`
 	StartDateLocal       time.Time       `json:"start_date_local"`
 	Timezone             string          `json:"timezone"`
+	LocationCity         string          `json:"location_city"`
+	LocationState        string          `json:"location_state"`
+	LocationCountry      string          `json:"location_country"`
 	Distance             float64         `json:"distance"`             // meters
 	MovingTime           int             `json:"moving_time"`          // seconds
 	ElapsedTime          int             `json:"elapsed_time"`         // seconds
@@ -57,6 +60,7 @@ type Activity struct {
 	EndLatlng            []float64       `json:"end_latlng"`
 	Map                  ActivityMap     `json:"map"`
 	SegmentEfforts       []SegmentEffort `json:"segment_efforts,omitempty"`
+	BestEfforts          []BestEffort    `json:"best_efforts,omitempty"`
 	SplitsMetric         []Split         `json:"splits_metric,omitempty"`
 	Laps                 []Lap           `json:"laps,omitempty"`
 }
@@ -98,6 +102,15 @@ type Segment struct {
 	StartLatlng   []float64 `json:"start_latlng"`
 	EndLatlng     []float64 `json:"end_latlng"`
 	Starred       bool      `json:"starred"`
+	Map           struct {
+		Polyline string `json:"polyline"`
+	} `json:"map"`
+	AthleteSegmentStats struct {
+		EffortCount   int        `json:"effort_count"`
+		PRDate        *time.Time `json:"pr_date"`
+		PRElapsedTime int        `json:"pr_elapsed_time"`
+		KOMRank       *int       `json:"kom_rank"`
+	} `json:"athlete_segment_stats"`
 }
 
 // Split represents a split in an activity.

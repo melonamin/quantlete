@@ -14,21 +14,22 @@ export function MonthlyChart() {
   const { data: yearlyStats } = useYearlyStats()
   const { data: monthlyStats, isLoading } = useMonthlyStats(year)
 
-  const availableYears = yearlyStats?.map(s => s.year) ?? [currentYear]
+  const availableYears = yearlyStats?.map((s) => s.year) ?? [currentYear]
 
-  const chartData = monthlyStats?.map(s => ({
-    month: s.month.split('-')[1], // Just month number
-    distance: s.total_distance,
-    count: s.activity_count,
-    time: s.total_time,
-  })) ?? []
+  const chartData =
+    monthlyStats?.map((s) => ({
+      month: s.month.split('-')[1], // Just month number
+      distance: s.total_distance,
+      count: s.activity_count,
+      time: s.total_time,
+    })) ?? []
 
   return (
     <WidgetWrapper
       title="Monthly Activity"
       action={
         <div className="flex gap-1">
-          {availableYears.slice(0, 3).map(y => (
+          {availableYears.slice(0, 3).map((y) => (
             <Button
               key={y}
               variant={year === y ? 'secondary' : 'ghost'}
@@ -68,12 +69,7 @@ export function MonthlyChart() {
           Time
         </Button>
       </div>
-      <MonthlyStatsChart
-        data={chartData}
-        metric={metric}
-        height={200}
-        loading={isLoading}
-      />
+      <MonthlyStatsChart data={chartData} metric={metric} height={200} loading={isLoading} />
     </WidgetWrapper>
   )
 }

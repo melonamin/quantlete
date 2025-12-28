@@ -16,6 +16,9 @@ export interface ImportProgress {
 export interface StartImportRequest {
   full_sync?: boolean
   include_streams?: boolean
+  include_segments?: boolean
+  include_best_efforts?: boolean
+  include_photos?: boolean
 }
 
 export const importKeys = {
@@ -41,8 +44,7 @@ export function useStartImport() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (req: StartImportRequest = {}) =>
-      post<{ message: string }>('/import/start', req),
+    mutationFn: (req: StartImportRequest = {}) => post<{ message: string }>('/import/start', req),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: importKeys.progress })
     },

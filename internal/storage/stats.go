@@ -2,7 +2,10 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/sasha/stata/internal/geo"
 )
 
 // DashboardStats represents aggregated statistics for the dashboard.
@@ -37,14 +40,14 @@ type WeeklyStat struct {
 
 // RecentActivity represents a simplified activity for the dashboard.
 type RecentActivity struct {
-	ID             int64     `json:"id"`
-	Name           string    `json:"name"`
-	SportType      string    `json:"sport_type"`
-	StartDate      time.Time `json:"start_date"`
-	Distance       float64   `json:"distance"`
-	MovingTime     int       `json:"moving_time"`
-	ElevationGain  float64   `json:"elevation_gain"`
-	SummaryPolyline string   `json:"summary_polyline,omitempty"`
+	ID              int64     `json:"id"`
+	Name            string    `json:"name"`
+	SportType       string    `json:"sport_type"`
+	StartDate       time.Time `json:"start_date"`
+	Distance        float64   `json:"distance"`
+	MovingTime      int       `json:"moving_time"`
+	ElevationGain   float64   `json:"elevation_gain"`
+	SummaryPolyline string    `json:"summary_polyline,omitempty"`
 }
 
 // StatsRepository handles statistics queries.
@@ -299,12 +302,13 @@ type CalendarDay struct {
 
 // CalendarActivity represents an activity summary for the calendar view.
 type CalendarActivity struct {
-	ID         int64     `json:"id"`
-	Name       string    `json:"name"`
-	SportType  string    `json:"sport_type"`
-	StartDate  time.Time `json:"start_date"`
-	Distance   float64   `json:"distance"`
-	MovingTime int       `json:"moving_time"`
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	SportType          string    `json:"sport_type"`
+	StartDate          time.Time `json:"start_date"`
+	Distance           float64   `json:"distance"`
+	MovingTime         int       `json:"moving_time"`
+	TotalElevationGain float64   `json:"total_elevation_gain"`
 }
 
 // GetCalendarData returns daily activity counts for a given year.
@@ -339,7 +343,7 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 // GetCalendarActivities returns activities for a specific month.
 func (r *StatsRepository) GetCalendarActivities(ctx context.Context, athleteID int64, year, month int) ([]CalendarActivity, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, sport_type, start_date, distance, moving_time
+		SELECT id, name, sport_type, start_date, distance, moving_time, COALESCE(total_elevation_gain, 0)
 		FROM activities
 		WHERE athlete_id = ?
 		  AND CAST(strftime(start_date, '%Y') AS INTEGER) = ?
@@ -354,13 +358,64 @@ func (r *StatsRepository) GetCalendarActivities(ctx context.Context, athleteID i
 	var activities []CalendarActivity
 	for rows.Next() {
 		var a CalendarActivity
-		if err := rows.Scan(&a.ID, &a.Name, &a.SportType, &a.StartDate, &a.Distance, &a.MovingTime); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.SportType, &a.StartDate, &a.Distance, &a.MovingTime, &a.TotalElevationGain); err != nil {
 			return nil, err
 		}
 		activities = append(activities, a)
 	}
 
 	return activities, rows.Err()
+}
+
+type CalendarMonthSummary struct {
+	Year                int     `json:"year"`
+	Month               int     `json:"month"`
+	ActivityCount       int     `json:"activity_count"`
+	TotalDistance       float64 `json:"total_distance"`
+	TotalElevationGain  float64 `json:"total_elevation_gain"`
+	TotalMovingTime     int     `json:"total_moving_time"`
+	TotalCalories       float64 `json:"total_calories"`
+	WorkoutCount        int     `json:"workout_count"`
+	ChallengesCompleted int     `json:"challenges_completed"`
+}
+
+func (r *StatsRepository) GetCalendarMonthSummary(ctx context.Context, athleteID int64, year, month int) (*CalendarMonthSummary, error) {
+	var s CalendarMonthSummary
+	s.Year = year
+	s.Month = month
+
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*) AS activity_count,
+			COALESCE(SUM(distance), 0) AS total_distance,
+			COALESCE(SUM(total_elevation_gain), 0) AS total_elevation_gain,
+			COALESCE(SUM(moving_time), 0) AS total_moving_time,
+			COALESCE(SUM(calories), 0) AS total_calories,
+			COALESCE(SUM(CASE WHEN workout_type IS NOT NULL AND workout_type != 0 THEN 1 ELSE 0 END), 0) AS workout_count
+		FROM activities
+		WHERE athlete_id = ?
+		  AND CAST(strftime(start_date, '%Y') AS INTEGER) = ?
+		  AND CAST(strftime(start_date, '%m') AS INTEGER) = ?
+	`, athleteID, year, month).Scan(
+		&s.ActivityCount,
+		&s.TotalDistance,
+		&s.TotalElevationGain,
+		&s.TotalMovingTime,
+		&s.TotalCalories,
+		&s.WorkoutCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	monthKey := fmt.Sprintf("%04d-%02d", year, month)
+	_ = r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM challenges
+		WHERE athlete_id = ? AND month = ?
+	`, athleteID, monthKey).Scan(&s.ChallengesCompleted)
+
+	return &s, nil
 }
 
 // YearStat represents statistics for a single year.
@@ -387,6 +442,9 @@ type HeatmapFilters struct {
 	StartAfter  *time.Time
 	StartBefore *time.Time
 	Commute     *bool
+	WorkoutType *int
+	Limit       int // 0 means no limit
+	Offset      int
 }
 
 // GetYearlyStats returns statistics grouped by year.
@@ -453,7 +511,19 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 		args = append(args, *filters.Commute)
 	}
 
+	if filters.WorkoutType != nil {
+		query += " AND workout_type = ?"
+		args = append(args, *filters.WorkoutType)
+	}
+
 	query += " ORDER BY start_date DESC"
+
+	if filters.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", filters.Limit)
+		if filters.Offset > 0 {
+			query += fmt.Sprintf(" OFFSET %d", filters.Offset)
+		}
+	}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -473,6 +543,112 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 	return activities, rows.Err()
 }
 
+// CountHeatmapActivities returns the total count of activities matching the filters.
+func (r *StatsRepository) CountHeatmapActivities(ctx context.Context, athleteID int64, filters HeatmapFilters) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM activities
+		WHERE athlete_id = ? AND summary_polyline IS NOT NULL AND summary_polyline != ''
+	`
+	args := []interface{}{athleteID}
+
+	if len(filters.SportTypes) > 0 {
+		placeholders := make([]string, len(filters.SportTypes))
+		for i, st := range filters.SportTypes {
+			placeholders[i] = "?"
+			args = append(args, st)
+		}
+		query += " AND sport_type IN (" + joinStrings(placeholders, ",") + ")"
+	}
+
+	if filters.StartAfter != nil {
+		query += " AND start_date >= ?"
+		args = append(args, *filters.StartAfter)
+	}
+
+	if filters.StartBefore != nil {
+		query += " AND start_date <= ?"
+		args = append(args, *filters.StartBefore)
+	}
+
+	if filters.Commute != nil {
+		query += " AND commute = ?"
+		args = append(args, *filters.Commute)
+	}
+
+	if filters.WorkoutType != nil {
+		query += " AND workout_type = ?"
+		args = append(args, *filters.WorkoutType)
+	}
+
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+type HeatmapCountryStat struct {
+	Country string `json:"country"`
+	ISO2    string `json:"iso2,omitempty"`
+	Count   int    `json:"count"`
+}
+
+func (r *StatsRepository) GetHeatmapCountries(ctx context.Context, athleteID int64, filters HeatmapFilters) ([]HeatmapCountryStat, error) {
+	query := `
+		SELECT COALESCE(location_country, '') AS country, COUNT(*) AS count
+		FROM activities
+		WHERE athlete_id = ? AND COALESCE(location_country, '') != ''
+	`
+	args := []any{athleteID}
+
+	if len(filters.SportTypes) > 0 {
+		placeholders := make([]string, len(filters.SportTypes))
+		for i, st := range filters.SportTypes {
+			placeholders[i] = "?"
+			args = append(args, st)
+		}
+		query += " AND sport_type IN (" + joinStrings(placeholders, ",") + ")"
+	}
+	if filters.StartAfter != nil {
+		query += " AND start_date >= ?"
+		args = append(args, *filters.StartAfter)
+	}
+	if filters.StartBefore != nil {
+		query += " AND start_date <= ?"
+		args = append(args, *filters.StartBefore)
+	}
+	if filters.Commute != nil {
+		query += " AND commute = ?"
+		args = append(args, *filters.Commute)
+	}
+	if filters.WorkoutType != nil {
+		query += " AND workout_type = ?"
+		args = append(args, *filters.WorkoutType)
+	}
+
+	query += " GROUP BY country ORDER BY count DESC, country ASC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []HeatmapCountryStat
+	for rows.Next() {
+		var c HeatmapCountryStat
+		if err := rows.Scan(&c.Country, &c.Count); err != nil {
+			return nil, err
+		}
+		if iso2, ok := geo.ISO2FromCountry(c.Country); ok {
+			c.ISO2 = iso2
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 func joinStrings(strs []string, sep string) string {
 	if len(strs) == 0 {
 		return ""
@@ -486,9 +662,9 @@ func joinStrings(strs []string, sep string) string {
 
 // EddingtonResult contains the Eddington number calculation result.
 type EddingtonResult struct {
-	Number       int              `json:"number"`
-	Distribution []EddingtonDay   `json:"distribution"`
-	NextSteps    []EddingtonStep  `json:"next_steps"`
+	Number       int             `json:"number"`
+	Distribution []EddingtonDay  `json:"distribution"`
+	NextSteps    []EddingtonStep `json:"next_steps"`
 }
 
 // EddingtonDay represents a day's distance for Eddington calculation.
@@ -499,7 +675,7 @@ type EddingtonDay struct {
 
 // EddingtonStep shows how many rides needed to reach the next Eddington number.
 type EddingtonStep struct {
-	Target     int `json:"target"`
+	Target      int `json:"target"`
 	RidesNeeded int `json:"rides_needed"`
 }
 

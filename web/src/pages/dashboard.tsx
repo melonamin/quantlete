@@ -8,6 +8,16 @@ import {
   MonthlyChart,
   SportChart,
   ActivityCalendar,
+  TrainingGoals,
+  WidgetGrid,
+  PeakPowerOutputs,
+  HeartRateZones,
+  TrainingLoad,
+  DaytimeStats,
+  WeekdayStats,
+  RecentChallenges,
+  ChallengeConsistency,
+  EddingtonWidget,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -103,41 +113,112 @@ export function DashboardPage() {
         <StatsSummary stats={dashboard?.stats} isLoading={isLoading} />
       </div>
 
-      {/* Widgets grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Recent Activities - spans 2 columns on large screens */}
-        <div className="lg:col-span-2">
-          <RecentActivities
-            activities={dashboard?.recent_activities}
-            isLoading={isLoading}
-          />
-        </div>
-
-        {/* Weekly Stats */}
-        <WeeklyStats
-          stats={dashboard?.weekly_stats}
-          isLoading={isLoading}
-        />
-
-        {/* Monthly Chart - spans 2 columns */}
-        <div className="lg:col-span-2">
-          <MonthlyChart />
-        </div>
-
-        {/* Sport Breakdown */}
-        <SportBreakdown
-          stats={dashboard?.sport_type_stats}
-          isLoading={isLoading}
-        />
-
-        {/* Sport Distribution Chart */}
-        <SportChart />
-
-        {/* Activity Calendar - spans full width */}
-        <div className="md:col-span-2 lg:col-span-3">
-          <ActivityCalendar />
-        </div>
-      </div>
+      <WidgetGrid
+        widgets={[
+          {
+            id: 'recent_activities',
+            title: 'Recent Activities',
+            defaultWidth: 8,
+            render: () => (
+              <RecentActivities activities={dashboard?.recent_activities} isLoading={isLoading} />
+            ),
+          },
+          {
+            id: 'weekly_stats',
+            title: 'Weekly Stats',
+            defaultWidth: 4,
+            render: () => <WeeklyStats stats={dashboard?.weekly_stats} isLoading={isLoading} />,
+          },
+          {
+            id: 'monthly_chart',
+            title: 'Monthly Chart',
+            defaultWidth: 8,
+            render: () => <MonthlyChart />,
+          },
+          {
+            id: 'sport_breakdown',
+            title: 'Sport Breakdown',
+            defaultWidth: 4,
+            render: () => (
+              <SportBreakdown stats={dashboard?.sport_type_stats} isLoading={isLoading} />
+            ),
+          },
+          {
+            id: 'sport_chart',
+            title: 'Sport Distribution',
+            defaultWidth: 4,
+            render: () => <SportChart />,
+          },
+          {
+            id: 'training_goals',
+            title: 'Training Goals',
+            defaultWidth: 4,
+            render: () => <TrainingGoals />,
+          },
+          {
+            id: 'activity_calendar',
+            title: 'Activity Calendar',
+            defaultWidth: 12,
+            render: () => <ActivityCalendar />,
+          },
+          {
+            id: 'peak_power_outputs',
+            title: 'Peak Power Outputs',
+            defaultWidth: 4,
+            defaultHidden: true,
+            render: () => <PeakPowerOutputs />,
+          },
+          {
+            id: 'heart_rate_zones',
+            title: 'Heart Rate Zones',
+            defaultWidth: 4,
+            defaultHidden: true,
+            render: () => <HeartRateZones />,
+          },
+          {
+            id: 'training_load',
+            title: 'Training Load',
+            defaultWidth: 8,
+            defaultHidden: true,
+            render: () => <TrainingLoad />,
+          },
+          {
+            id: 'daytime_stats',
+            title: 'Time of Day',
+            defaultWidth: 4,
+            defaultHidden: true,
+            render: () => <DaytimeStats />,
+          },
+          {
+            id: 'weekday_stats',
+            title: 'Weekday',
+            defaultWidth: 4,
+            defaultHidden: true,
+            render: () => <WeekdayStats />,
+          },
+          {
+            id: 'recent_challenges',
+            title: 'Recent Challenges',
+            defaultWidth: 4,
+            defaultHidden: true,
+            render: () => <RecentChallenges />,
+          },
+          {
+            id: 'challenge_consistency',
+            title: 'Challenge Consistency',
+            defaultWidth: 8,
+            defaultHidden: true,
+            render: () => <ChallengeConsistency />,
+          },
+          {
+            id: 'eddington',
+            title: 'Eddington',
+            defaultWidth: 4,
+            defaultHidden: true,
+            render: () => <EddingtonWidget />,
+          },
+        ]}
+      />
     </div>
   )
 }

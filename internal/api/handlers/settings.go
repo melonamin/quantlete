@@ -1,0 +1,62 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/sasha/stata/internal/storage"
+	"github.com/sasha/stata/internal/strava"
+)
+
+type SettingsHandler struct {
+	settings *storage.SettingsRepository
+	strava   *strava.Client
+}
+
+func NewSettingsHandler(settings *storage.SettingsRepository, stravaClient *strava.Client) *SettingsHandler {
+	return &SettingsHandler{settings: settings, strava: stravaClient}
+}
+
+// Get handles GET /api/v1/settings
+func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	s, err := h.settings.Get(r.Context(), athlete.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load settings"})
+		return
+	}
+	writeJSON(w, http.StatusOK, s)
+}
+
+// Update handles PUT /api/v1/settings
+func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	var s storage.AthleteSettings
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		return
+	}
+
+	if err := h.settings.Upsert(r.Context(), athlete.ID, s); err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to save settings"})
+		return
+	}
+
+	// Return normalized settings (defaults applied) rather than echoing input.
+	saved, err := h.settings.Get(r.Context(), athlete.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load settings"})
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
+}

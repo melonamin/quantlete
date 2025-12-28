@@ -72,3 +72,4 @@ CREATE INDEX IF NOT EXISTS idx_activities_commute ON activities(commute);
 -- Composite index for filtered queries
 CREATE INDEX IF NOT EXISTS idx_activities_athlete_sport_date
     ON activities(athlete_id, sport_type, start_date DESC);
+

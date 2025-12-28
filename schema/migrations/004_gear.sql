@@ -17,3 +17,4 @@ CREATE TABLE IF NOT EXISTS gear (
 -- Index for looking up gear by athlete
 CREATE INDEX IF NOT EXISTS idx_gear_athlete_id ON gear(athlete_id);
 CREATE INDEX IF NOT EXISTS idx_gear_retired ON gear(retired);
+

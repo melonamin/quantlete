@@ -1,17 +1,17 @@
 package storage
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/sasha/stata/schema/migrations"
 )
 
-//go:embed schema/*.sql
-var migrationsFS embed.FS
+var migrationsFS = migrations.FS
 
 // Migration represents a single database migration.
 type Migration struct {
@@ -108,7 +108,7 @@ func (db *DB) runMigration(m Migration) error {
 func loadMigrations() ([]Migration, error) {
 	var migrations []Migration
 
-	err := fs.WalkDir(migrationsFS, "schema", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(migrationsFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

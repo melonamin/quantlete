@@ -20,6 +20,9 @@ import (
 func newImportCmd() *cobra.Command {
 	var fullSync bool
 	var includeStreams bool
+	var includeSegments bool
+	var includeBestEfforts bool
+	var includePhotos bool
 
 	cmd := &cobra.Command{
 		Use:   "import",
@@ -30,17 +33,20 @@ This command fetches all activities from your Strava account and stores
 them locally for analysis. It respects Strava's rate limits and can be
 interrupted and resumed.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runImport(fullSync, includeStreams)
+			return runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, includePhotos)
 		},
 	}
 
 	cmd.Flags().BoolVar(&fullSync, "full", false, "Perform a full sync (re-import all activities)")
 	cmd.Flags().BoolVar(&includeStreams, "streams", false, "Include activity stream data (GPS, heartrate, etc.)")
+	cmd.Flags().BoolVar(&includeSegments, "segments", false, "Include segment efforts and segment details (extra API calls)")
+	cmd.Flags().BoolVar(&includeBestEfforts, "best-efforts", false, "Include Strava best efforts (extra API calls)")
+	cmd.Flags().BoolVar(&includePhotos, "photos", false, "Include activity photos (extra API calls)")
 
 	return cmd
 }
 
-func runImport(fullSync, includeStreams bool) error {
+func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, includePhotos bool) error {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -80,6 +86,10 @@ func runImport(fullSync, includeStreams bool) error {
 	tokenRepo := storage.NewTokenRepository(db)
 	gearRepo := storage.NewGearRepository(db)
 	streamRepo := storage.NewStreamRepository(db)
+	segmentRepo := storage.NewSegmentRepository(db)
+	bestEffortsRepo := storage.NewBestEffortsRepository(db)
+	maintenanceRepo := storage.NewMaintenanceRepository(db)
+	photoRepo := storage.NewPhotoRepository(db)
 
 	// Create Strava client
 	stravaClient := strava.NewClient(&cfg.Strava)
@@ -95,7 +105,7 @@ func runImport(fullSync, includeStreams bool) error {
 	}
 
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo)
+	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo)
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -113,13 +123,19 @@ func runImport(fullSync, includeStreams bool) error {
 
 	// Start import
 	opts := importer.ImportOptions{
-		FullSync:       fullSync,
-		IncludeStreams: includeStreams,
+		FullSync:           fullSync,
+		IncludeStreams:     includeStreams,
+		IncludeSegments:    includeSegments,
+		IncludeBestEfforts: includeBestEfforts,
+		IncludePhotos:      includePhotos,
 	}
 
 	slog.Info("Starting import",
 		"full_sync", fullSync,
 		"include_streams", includeStreams,
+		"include_segments", includeSegments,
+		"include_best_efforts", includeBestEfforts,
+		"include_photos", includePhotos,
 	)
 
 	if err := imp.Start(ctx, opts); err != nil {

@@ -9,7 +9,12 @@ import { SegmentsPage } from '@/pages/segments'
 import { GearPage } from '@/pages/gear'
 import { EddingtonPage } from '@/pages/eddington'
 import { BestEffortsPage } from '@/pages/best-efforts'
+import { RewindPage } from '@/pages/rewind'
 import { SettingsPage } from '@/pages/settings'
+import { TrainingLoadPage } from '@/pages/training-load'
+import { PowerPage } from '@/pages/power'
+import { PhotosPage } from '@/pages/photos'
+import { ChallengesPage } from '@/pages/challenges'
 
 // Root route with layout
 const rootRoute = createRootRoute({
@@ -83,11 +88,46 @@ const bestEffortsRoute = createRoute({
   component: BestEffortsPage,
 })
 
+// Rewind
+const rewindRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rewind',
+  component: RewindPage,
+})
+
 // Settings
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: SettingsPage,
+})
+
+// Training Load
+const trainingLoadRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/training-load',
+  component: TrainingLoadPage,
+})
+
+// Power
+const powerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/power',
+  component: PowerPage,
+})
+
+// Photos
+const photosRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/photos',
+  component: PhotosPage,
+})
+
+// Challenges
+const challengesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/challenges',
+  component: ChallengesPage,
 })
 
 // Route tree
@@ -101,6 +141,11 @@ const routeTree = rootRoute.addChildren([
   gearRoute,
   eddingtonRoute,
   bestEffortsRoute,
+  rewindRoute,
+  trainingLoadRoute,
+  powerRoute,
+  photosRoute,
+  challengesRoute,
   settingsRoute,
 ])
 

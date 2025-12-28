@@ -49,9 +49,7 @@ export function decodePolyline(encoded: string): [number, number][] {
 /**
  * Calculates the bounding box for a set of coordinates.
  */
-export function getBounds(
-  points: [number, number][]
-): [[number, number], [number, number]] {
+export function getBounds(points: [number, number][]): [[number, number], [number, number]] {
   if (points.length === 0) {
     return [
       [0, 0],

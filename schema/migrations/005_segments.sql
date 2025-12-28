@@ -43,3 +43,4 @@ CREATE INDEX IF NOT EXISTS idx_segment_efforts_segment_id ON segment_efforts(seg
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_activity_id ON segment_efforts(activity_id);
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_athlete_id ON segment_efforts(athlete_id);
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_pr_rank ON segment_efforts(pr_rank);
+

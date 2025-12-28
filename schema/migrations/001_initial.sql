@@ -32,3 +32,4 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 
 -- Index for token expiry checks
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON auth_tokens(expires_at);
+

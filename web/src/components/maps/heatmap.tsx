@@ -42,15 +42,8 @@ export function Heatmap({
 
   if (activities.length === 0) {
     return (
-      <div
-        className={cn(
-          'flex items-center justify-center bg-muted rounded-lg',
-          className
-        )}
-      >
-        <p className="text-muted-foreground">
-          No activities with GPS data available
-        </p>
+      <div className={cn('flex items-center justify-center bg-muted rounded-lg', className)}>
+        <p className="text-muted-foreground">No activities with GPS data available</p>
       </div>
     )
   }
@@ -63,9 +56,7 @@ export function Heatmap({
             key={route.id}
             positions={route.points}
             pathOptions={{
-              color: colorByActivity
-                ? getSportHexColor(route.sportType)
-                : '#fc4c02',
+              color: colorByActivity ? getSportHexColor(route.sportType) : '#fc4c02',
               weight: strokeWeight,
               opacity: 0.6,
             }}

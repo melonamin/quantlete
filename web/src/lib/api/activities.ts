@@ -8,6 +8,7 @@ export const activityKeys = {
   list: (filters: ActivityFilters) => [...activityKeys.lists(), filters] as const,
   details: () => [...activityKeys.all, 'detail'] as const,
   detail: (id: number) => [...activityKeys.details(), id] as const,
+  streams: (id: number) => [...activityKeys.all, 'streams', id] as const,
 }
 
 export function useActivities(filters: ActivityFilters = {}) {
@@ -34,6 +35,23 @@ export function useActivity(id: number) {
   return useQuery({
     queryKey: activityKeys.detail(id),
     queryFn: () => get<Activity>(`/activities/${id}`),
+    enabled: id > 0,
+  })
+}
+
+export interface ActivityStream {
+  activity_id: number
+  stream_type: string
+  original_size: number
+  resolution: string
+  series_type: string
+  data: unknown
+}
+
+export function useActivityStreams(id: number) {
+  return useQuery({
+    queryKey: activityKeys.streams(id),
+    queryFn: () => get<ActivityStream[]>(`/activities/${id}/streams`),
     enabled: id > 0,
   })
 }

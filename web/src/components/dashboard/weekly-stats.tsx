@@ -64,7 +64,10 @@ export function WeeklyStats({ stats, isLoading }: WeeklyStatsProps) {
                     className="h-8 w-8 rounded flex items-center justify-center"
                     style={{ backgroundColor: getSportHexColor(stat.sport_type) + '20' }}
                   >
-                    <Icon className="h-4 w-4" style={{ color: getSportHexColor(stat.sport_type) }} />
+                    <Icon
+                      className="h-4 w-4"
+                      style={{ color: getSportHexColor(stat.sport_type) }}
+                    />
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-sm">{formatSportType(stat.sport_type)}</p>

@@ -63,11 +63,11 @@ test: test-go test-web
 
 # Run Go tests
 test-go:
-    go test -v ./...
+    go test -v ./cmd/... ./internal/...
 
 # Run Go tests with coverage
 test-go-cover:
-    go test -v -coverprofile=coverage.out ./...
+    go test -v -coverprofile=coverage.out ./cmd/... ./internal/...
     go tool cover -html=coverage.out -o coverage.html
 
 # Run React unit tests
@@ -87,7 +87,7 @@ lint: lint-go lint-web
 
 # Lint Go code
 lint-go:
-    golangci-lint run
+    golangci-lint run ./cmd/... ./internal/...
 
 # Lint React code
 lint-web:
@@ -98,7 +98,7 @@ lint-fix: lint-fix-go lint-fix-web
 
 # Fix Go linting issues
 lint-fix-go:
-    golangci-lint run --fix
+    golangci-lint run --fix ./cmd/... ./internal/...
 
 # Fix React linting issues
 lint-fix-web:
@@ -109,8 +109,8 @@ fmt: fmt-go fmt-web
 
 # Format Go code
 fmt-go:
-    gofmt -w .
-    goimports -w .
+    gofmt -w cmd/ internal/
+    goimports -w cmd/ internal/
 
 # Format React code
 fmt-web:
@@ -121,7 +121,7 @@ fmt-check: fmt-check-go fmt-check-web
 
 # Check Go formatting
 fmt-check-go:
-    @test -z "$(gofmt -l .)" || (echo "Go files need formatting:" && gofmt -l . && exit 1)
+    @test -z "$(gofmt -l cmd/ internal/)" || (echo "Go files need formatting:" && gofmt -l cmd/ internal/ && exit 1)
 
 # Check React formatting
 fmt-check-web:

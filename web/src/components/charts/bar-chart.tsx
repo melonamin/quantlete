@@ -1,5 +1,10 @@
 import type { EChartsOption } from 'echarts'
-import { EChartsWrapper, chartColors, defaultGridConfig, defaultTooltipConfig } from './echarts-wrapper'
+import {
+  EChartsWrapper,
+  chartColors,
+  defaultGridConfig,
+  defaultTooltipConfig,
+} from './echarts-wrapper'
 
 interface BarChartData {
   label: string
@@ -28,13 +33,13 @@ export function BarChart({
 }: BarChartProps) {
   const categoryAxis = {
     type: 'category' as const,
-    data: data.map(d => d.label),
+    data: data.map((d) => d.label),
     axisLine: {
       lineStyle: { color: '#666' },
     },
     axisLabel: {
       color: '#888',
-      rotate: horizontal ? 0 : (data.length > 6 ? 45 : 0),
+      rotate: horizontal ? 0 : data.length > 6 ? 45 : 0,
     },
   }
 
@@ -62,33 +67,30 @@ export function BarChart({
     },
     xAxis: horizontal ? valueAxis : categoryAxis,
     yAxis: horizontal ? categoryAxis : valueAxis,
-    series: [{
-      type: 'bar',
-      data: data.map((d, idx) => ({
-        value: d.value,
-        itemStyle: {
-          color: d.color ?? Object.values(chartColors)[idx % Object.values(chartColors).length],
-          borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
-        },
-      })),
-      barWidth,
-      label: showValues ? {
-        show: true,
-        position: horizontal ? 'right' : 'top',
-        color: '#888',
-        formatter: '{c}',
-      } : undefined,
-    }],
+    series: [
+      {
+        type: 'bar',
+        data: data.map((d, idx) => ({
+          value: d.value,
+          itemStyle: {
+            color: d.color ?? Object.values(chartColors)[idx % Object.values(chartColors).length],
+            borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
+          },
+        })),
+        barWidth,
+        label: showValues
+          ? {
+              show: true,
+              position: horizontal ? 'right' : 'top',
+              color: '#888',
+              formatter: '{c}',
+            }
+          : undefined,
+      },
+    ],
   }
 
-  return (
-    <EChartsWrapper
-      option={option}
-      height={height}
-      loading={loading}
-      className={className}
-    />
-  )
+  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
 }
 
 // Stacked bar chart variant
@@ -147,7 +149,7 @@ export function StackedBarChart({
       axisPointer: { type: 'shadow' },
     },
     legend: {
-      data: series.map(s => s.name),
+      data: series.map((s) => s.name),
       bottom: 0,
     },
     xAxis: horizontal ? valueAxis : categoryAxis,
@@ -163,12 +165,5 @@ export function StackedBarChart({
     })),
   }
 
-  return (
-    <EChartsWrapper
-      option={option}
-      height={height}
-      loading={loading}
-      className={className}
-    />
-  )
+  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
 }

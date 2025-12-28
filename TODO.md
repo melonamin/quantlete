@@ -6,20 +6,20 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ## Overview
 
-| Phase | Focus                   | Deliverable                              | Status |
-| ----- | ----------------------- | ---------------------------------------- | ------ |
-| 0     | Project Setup           | Repository, tooling, CI/CD               | ✓      |
-| 1     | Core Backend            | Go server, Strava OAuth, basic import    | ✓      |
-| 2     | Database & Storage      | DuckDB schema, activity storage          | ✓      |
-| 3     | Frontend Foundation     | React shell, routing, shadcn setup       | ✓      |
-| 4     | Activities Feature      | Activity list, filters, detail view      | ✓      |
-| 5     | Dashboard               | Widget system, core widgets              | ✓      |
-| 6     | Charts & Visualizations | ECharts integration, all chart types     | ✓      |
-| 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓      |
-| 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓      |
-| 9     | Analytics               | Eddington, best efforts, training load   | ✓      |
-| 10    | WASM Mode               | Browser-only version with DuckDB-WASM    |        |
-| 11    | Polish                  | PWA, i18n, settings, badges              |        |
+| Phase | Focus                   | Deliverable                              | Status      |
+| ----- | ----------------------- | ---------------------------------------- | ----------- |
+| 0     | Project Setup           | Repository, tooling, CI/CD               | ✓           |
+| 1     | Core Backend            | Go server, Strava OAuth, basic import    | ✓           |
+| 2     | Database & Storage      | DuckDB schema, activity storage          | ✓           |
+| 3     | Frontend Foundation     | React shell, routing, shadcn setup       | ✓           |
+| 4     | Activities Feature      | Activity list, filters, detail view      | ✓           |
+| 5     | Dashboard               | Widget system, core widgets              | ✓           |
+| 6     | Charts & Visualizations | ECharts integration, all chart types     | ✓           |
+| 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓           |
+| 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓           |
+| 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
+| 10    | WASM Mode               | Browser-only version with DuckDB-WASM    |             |
+| 11    | Polish                  | PWA, i18n, settings, badges              |             |
 
 ---
 
@@ -434,10 +434,14 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Recent activities list
 - [x] Implement `GET /api/v1/dashboard/sports`:
   - [x] Stats by sport type
-- [ ] Implement `GET /api/v1/dashboard/config`:
-  - [ ] Widget configuration (deferred)
-- [ ] Implement `PUT /api/v1/dashboard/config`:
-  - [ ] Update widget configuration (deferred)
+- [x] Implement `GET /api/v1/dashboard/config`:
+  - [x] Return current widget configuration
+  - [x] Widget order list
+  - [x] Per-widget settings
+- [x] Implement `PUT /api/v1/dashboard/config`:
+  - [x] Update widget order
+  - [x] Update widget sizes
+  - [x] Update per-widget configuration
 - [x] Create `internal/storage/stats.go`:
   - [x] Aggregation queries
 
@@ -447,14 +451,17 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Card container
   - [x] Title, action buttons
   - [x] Loading state
-- [ ] Create `web/src/components/dashboard/widget-grid.tsx`:
-  - [ ] CSS Grid layout (using basic grid for now)
-  - [ ] Widget sizing (33%, 50%, 66%, 100%)
-  - [ ] Responsive behavior
-- [ ] Create `web/src/stores/dashboard.ts`:
-  - [ ] Widget order (deferred)
-  - [ ] Widget configuration (deferred)
-  - [ ] Persist to API (deferred)
+- [x] Create `web/src/components/dashboard/widget-grid.tsx`:
+  - [x] CSS Grid layout with drag-and-drop reordering
+  - [x] Widget sizing (33%, 50%, 66%, 100%)
+  - [x] Responsive behavior (stack on mobile)
+  - [x] Widget show/hide toggle
+- [x] Create `web/src/stores/dashboard.ts`:
+  - [x] Widget order state
+  - [x] Widget visibility state
+  - [x] Per-widget configuration state
+  - [x] Persist to API on change
+  - [x] Load from API on mount
 
 ### 5.3 Core Widgets (Text/Stats)
 
@@ -470,9 +477,15 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [x] Create `sport-breakdown.tsx`:
   - [x] Sport type distribution
   - [x] Progress bars with percentages
-- [ ] Create `training-goals.tsx`:
-  - [ ] Progress bars for goals (deferred)
-  - [ ] Weekly/monthly/yearly/lifetime tabs (deferred)
+- [x] Create `training-goals.tsx`:
+  - [x] Goal types: distance, elevation, moving time
+  - [x] Weekly/monthly/yearly/lifetime tabs
+  - [x] Configurable per sport type
+  - [x] Visual progress indicators (horizontal bars)
+  - [x] Percentage completion display
+  - [x] Create `GET /api/v1/goals` endpoint
+  - [x] Create `PUT /api/v1/goals` endpoint
+  - [x] Goal configuration UI
 
 ### 5.4 Dashboard Page
 
@@ -508,10 +521,22 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Area style option
   - [x] Multi-series support
   - [x] Data zoom support
-- [ ] Create FTP history chart (deferred)
-- [ ] Create weight history chart (deferred)
-- [ ] Create training load chart (deferred)
-- [ ] Create Eddington history chart (deferred)
+- [x] Create FTP history chart:
+  - [x] Line chart showing FTP evolution over time
+  - [x] Date-keyed data points
+  - [x] Separate series for cycling/running FTP
+  - [x] Create `GET /api/v1/athlete/ftp` endpoint
+- [x] Create weight history chart:
+  - [x] Line chart showing body weight changes
+  - [x] Date-keyed data points
+  - [x] Create `GET /api/v1/athlete/weight` endpoint
+- [x] Create training load chart:
+  - [x] Fitness and fatigue curves over time
+  - [x] Daily training stress scores
+  - [x] Form (fitness - fatigue) line
+- [x] Create Eddington history chart:
+  - [x] Eddington number progression over time
+  - [x] Show when each new number was achieved
 
 ### 6.3 Bar Charts
 
@@ -520,8 +545,15 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Horizontal option
   - [x] Value labels option
 - [x] Create stacked bar chart variant
-- [ ] Create heart rate zone chart (deferred - needs stream data)
-- [ ] Create power zone chart (deferred - needs stream data)
+- [x] Create heart rate zone chart:
+  - [x] Time distribution across 5 HR zones
+  - [x] Stacked horizontal bars
+  - [x] Configurable zones (relative % or absolute BPM)
+  - [x] Zone colors (Recovery: light blue, Aerobic: green, Tempo: yellow, Threshold: orange, Anaerobic: red)
+- [x] Create power zone chart:
+  - [x] Time spent in each power zone
+  - [x] Stacked horizontal bars
+  - [x] FTP-based zone calculation
 
 ### 6.4 Pie/Donut Charts
 
@@ -529,6 +561,12 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Activity count mode
   - [x] Distance mode
   - [x] Sport-specific colors
+- [x] Create daytime stats chart:
+  - [x] Activity distribution by time of day (morning/afternoon/evening/night)
+  - [x] Donut visualization
+- [x] Create weekday stats chart:
+  - [x] Activity distribution by day of week
+  - [x] Donut visualization
 
 ### 6.5 Calendar Heatmap
 
@@ -539,9 +577,21 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 6.6 Activity Stream Charts
 
-- [ ] Create combined stream profile chart (deferred - needs stream data)
-- [ ] Create elevation profile chart (deferred - needs stream data)
-- [ ] Create power curve chart (deferred - needs stream data)
+- [x] Create combined stream profile chart:
+  - [x] Heart rate over distance/time
+  - [x] Power over distance/time
+  - [x] Cadence over distance/time
+  - [x] Elevation over distance/time
+  - [x] Synchronized tooltips across series
+  - [x] Toggle visibility of each stream
+- [x] Create elevation profile chart:
+  - [x] Elevation vs distance
+  - [x] Gradient coloring option
+  - [x] Min/max/avg elevation stats
+- [x] Create power curve chart:
+  - [x] Best power efforts at different durations
+  - [x] Duration intervals: 5s, 10s, 30s, 1m, 5m, 8m, 20m, 1h
+  - [x] Comparison with previous periods
 
 ### 6.7 Dashboard Chart Widgets
 
@@ -552,9 +602,20 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Metric toggle (count/distance)
 - [x] Create `ActivityCalendar` widget:
   - [x] Year navigation
-- [ ] Create `peak-power-outputs.tsx` widget (deferred - needs stream data)
-- [ ] Create `heart-rate-zones.tsx` widget (deferred - needs stream data)
-- [ ] Create `training-load.tsx` widget (deferred)
+- [x] Create `peak-power-outputs.tsx` widget:
+  - [x] All-time best power outputs
+  - [x] Duration intervals: 5s, 10s, 30s, 1m, 5m, 8m, 20m, 1h
+  - [x] Bar chart visualization
+  - [x] "View details" link to power analysis page
+- [x] Create `heart-rate-zones.tsx` widget:
+  - [x] Time distribution across 5 heart rate zones
+  - [x] Configurable zones (relative % or absolute BPM)
+  - [x] Zone ranges customizable by date and sport type
+  - [x] Horizontal stacked bar visualization
+- [x] Create `training-load.tsx` widget:
+  - [x] Fitness and fatigue tracking over time
+  - [x] Based on activity intensity calculations
+  - [x] "View details" link to training load page
 
 ### 6.8 Chart Data API Endpoints
 
@@ -565,6 +626,15 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Yearly aggregated stats
 - [x] Implement `GET /api/v1/dashboard/calendar`:
   - [x] Daily activity counts for calendar heatmap
+- [x] Implement `GET /api/v1/stats/power`:
+  - [x] Peak power outputs for various durations
+  - [x] Best efforts history
+- [x] Implement `GET /api/v1/stats/hr-zones`:
+  - [x] Time in each heart rate zone
+  - [x] Filterable by date range and sport type
+- [x] Implement `GET /api/v1/stats/training-load`:
+  - [x] Daily training stress scores
+  - [x] Fitness and fatigue calculations
 
 ---
 
@@ -589,7 +659,10 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [x] Create `web/src/components/maps/activity-map.tsx`:
   - [x] Route polyline
   - [x] Start/end markers
-  - [ ] Elevation coloring (deferred)
+  - [x] Elevation coloring:
+    - [x] Color polyline segments by elevation/gradient
+    - [x] Legend showing color scale
+    - [x] Toggle between flat color and elevation mode
   - [x] Fit bounds to route
 - [x] Integrate into activity detail page
 
@@ -597,12 +670,24 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 - [x] Implement `GET /api/v1/stats/heatmap`:
   - [x] Return polylines with filters
-  - [ ] Country statistics (deferred)
+  - [x] Country statistics:
+    - [x] List of countries with activities
+    - [x] Activity count per country
+    - [x] Percentage of world coverage
 - [x] Create `web/src/pages/heatmap.tsx`:
   - [x] Full-screen map
-  - [ ] Filter sidebar (deferred)
+  - [x] Filter sidebar:
+    - [x] Sport type radio buttons
+    - [x] Date range picker (from/to)
+    - [x] Commute filter (yes/no/all)
+    - [x] Workout type filter
+    - [x] Clear filters button
+    - [x] Collapsible on mobile
   - [x] Route count display
-  - [ ] Country coverage stats (deferred)
+  - [x] Country coverage stats:
+    - [x] Number of countries visited
+    - [x] Percentage of world coverage
+    - [x] Country flags display
 - [x] Create `web/src/components/maps/heatmap.tsx`:
   - [x] Multi-polyline rendering
   - [x] Configurable color
@@ -614,14 +699,30 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 7.4 Segment Map
 
-- [ ] Create `web/src/components/maps/segment-map.tsx` (deferred to Phase 8)
+- [x] Create `web/src/components/maps/segment-map.tsx`:
+  - [x] Segment route visualization
+  - [x] Start/end markers
+  - [x] Gradient indicators for climb segments
+  - [x] Fit bounds to segment
 
-### 7.5 Virtual World Maps (Future)
+### 7.5 Virtual World Maps
 
-- [ ] Research Zwift map tiles
-- [ ] Create virtual world tile layers
-- [ ] Detect virtual activities
-- [ ] Show appropriate map
+- [x] Research Zwift map tiles:
+  - [x] Watopia map tiles
+  - [x] London map tiles
+  - [x] New York map tiles
+  - [x] Other Zwift worlds
+- [x] Research Rouvy map integration
+- [x] Research MyWhoosh map integration
+- [x] Create virtual world tile layers:
+  - [x] Custom tile layer per virtual world
+  - [x] Coordinate transformation if needed
+- [x] Detect virtual activities:
+  - [x] Check for VirtualRide/VirtualRun sport types
+  - [x] Identify world from activity metadata
+- [x] Show appropriate map:
+  - [x] Auto-switch to virtual world map for virtual activities
+  - [x] Fall back to real-world map if detection fails
 
 ---
 
@@ -631,11 +732,40 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 8.1 Segments
 
-- [ ] Create `schema/migrations/004_segments.sql` (deferred)
-- [ ] Create `internal/storage/segments.go` (deferred)
-- [ ] Create `internal/strava/segments.go` (deferred)
-- [ ] Implement segment API endpoints (deferred)
-- [ ] Create `web/src/pages/segments.tsx` (deferred)
+- [x] Create `schema/migrations/005_segments.sql`:
+  - [x] Segments table (id, name, distance, avg_grade, max_grade, climb_category, start_latlng, end_latlng, starred, polyline)
+  - [x] Segment efforts table (segment_id, activity_id, elapsed_time, moving_time, start_date, pr_rank, avg_watts, avg_hr)
+  - [x] Indexes for efficient queries
+- [x] Create `internal/storage/segments.go`:
+  - [x] Insert/update segment
+  - [x] Insert segment effort
+  - [x] Get segment by ID
+  - [x] List segments with filters
+  - [x] Get segment efforts
+  - [x] Get best effort per segment
+- [x] Create `internal/strava/segments.go`:
+  - [x] Parse segment data from activity response
+  - [x] Fetch segment details API call
+- [x] Update importer to import segment efforts:
+  - [x] Extract segment_efforts from activity detail
+  - [x] Store segments and efforts
+- [x] Implement segment API endpoints:
+  - [x] `GET /api/v1/segments` - list with filters
+  - [x] `GET /api/v1/segments/:id` - single segment
+  - [x] `GET /api/v1/segments/:id/efforts` - efforts history
+- [x] Create `web/src/pages/segments.tsx`:
+  - [x] Searchable segment list
+  - [x] Filter by sport type (radio buttons)
+  - [x] Filter by country (radio buttons with flags)
+  - [x] Filter by starred/favorite segments
+  - [x] Filter by KOM status
+  - [x] Sortable columns (name, distance, gradient, ride count, last effort)
+  - [x] Display: name, distance, max gradient, climb category, times completed, last effort, best time
+- [x] Create segment detail modal:
+  - [x] Segment map visualization
+  - [x] All personal efforts history
+  - [x] Best time progression chart
+  - [x] Link to Strava segment page
 
 ### 8.2 Gear
 
@@ -646,12 +776,57 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Gear list with stats
   - [x] Active vs retired toggle
   - [x] Per-gear metrics
-- [ ] Create custom gear functionality (deferred)
+- [x] Create custom gear functionality:
+  - [x] User-defined gear not trackable in Strava
+  - [x] Examples: skateboards, kayaks, snowboards
+  - [x] Linked via hashtags in activity titles (#gear-name)
+  - [x] Same statistics as Strava gear
+  - [x] CRUD UI for custom gear
+  - [x] `GET /api/v1/gear/custom` endpoint
+  - [x] `POST /api/v1/gear/custom` endpoint
+  - [x] `PUT /api/v1/gear/custom/:id` endpoint
+  - [x] `DELETE /api/v1/gear/custom/:id` endpoint
+- [x] Create gear statistics charts:
+  - [x] Distance per month per gear (stacked bar)
+  - [x] Distance over time per gear (cumulative line)
+  - [x] Moving time per gear (donut)
+- [x] Add purchase price tracking:
+  - [x] Purchase price field
+  - [x] Relative cost per hour calculation
+  - [x] Relative cost per activity calculation
 
 ### 8.3 Gear Maintenance
 
-- [ ] Create maintenance tables in schema (deferred)
-- [ ] Create maintenance functionality (deferred)
+- [x] Create `schema/migrations/006_maintenance.sql`:
+  - [x] Components table (id, gear_id, name, image_url, created_at)
+  - [x] Maintenance rules table (component_id, type, threshold_value)
+  - [x] Maintenance log table (component_id, activity_id, completed_at)
+- [x] Create `internal/storage/maintenance.go`:
+  - [x] CRUD for components
+  - [x] CRUD for maintenance rules
+  - [x] Log maintenance completion
+  - [x] Calculate component wear status
+- [x] Implement maintenance API endpoints:
+  - [x] `GET /api/v1/gear/:id/components` - list components
+  - [x] `POST /api/v1/gear/:id/components` - add component
+  - [x] `PUT /api/v1/components/:id` - update component
+  - [x] `DELETE /api/v1/components/:id` - remove component
+  - [x] `POST /api/v1/components/:id/maintenance` - log maintenance
+  - [x] `GET /api/v1/maintenance/due` - components needing maintenance
+- [x] Create maintenance UI:
+  - [x] Define components (chain, cassette, brake pads, etc.)
+  - [x] Attach components to specific gear
+  - [x] Set maintenance intervals:
+    - [x] Distance-based (every X km/mi)
+    - [x] Time-based (every X hours used)
+    - [x] Calendar-based (every X days)
+  - [x] Visual progress indicators (linear progress bars)
+  - [x] Component images support
+  - [x] Maintenance history accordion
+- [x] Hashtag-based maintenance tracking:
+  - [x] Detect maintenance hashtags in activity titles
+  - [x] Auto-reset component counters
+  - [x] Log maintenance date and trigger activity
 
 ### 8.4 Calendar
 
@@ -662,16 +837,72 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Color by sport type
 - [x] Create month navigation
 - [x] Create `GET /api/v1/dashboard/calendar/activities` endpoint
-- [ ] Create monthly summary stats (deferred)
-- [ ] Create day detail modal (deferred)
+- [x] Create monthly summary stats:
+  - [x] Total distance
+  - [x] Total elevation
+  - [x] Total time
+  - [x] Number of challenges completed
+  - [x] Total calories
+  - [x] Number of workouts
+  - [x] Header display in calendar page
+- [x] Create day detail modal:
+  - [x] Show all activities for clicked date
+  - [x] Activity name, distance, time, elevation
+  - [x] Link to activity detail
+  - [x] Daily totals
 
 ### 8.5 Photos
 
-- [ ] Photo functionality (deferred)
+- [x] Create `schema/migrations/007_photos.sql`:
+  - [x] Photos table (id, activity_id, url, thumbnail_url, caption, location)
+- [x] Create `internal/strava/photos.go`:
+  - [x] Fetch activity photos API call
+  - [x] Parse photo response
+- [x] Update importer to import photos:
+  - [x] Fetch photos for each activity
+  - [x] Store photo URLs and metadata
+- [x] Implement photo API endpoints:
+  - [x] `GET /api/v1/photos` - list with filters
+  - [x] `GET /api/v1/activities/:id/photos` - activity photos
+- [x] Create `web/src/pages/photos.tsx`:
+  - [x] Masonry-style photo wall (flexbox-based)
+  - [x] Lazy loading for performance
+  - [x] Lightbox slideshow mode (LightGallery integration)
+  - [x] Filter by sport type (multi-select)
+  - [x] Filter by country
+  - [x] Photo count display
+  - [x] Hover overlay with activity name and date
+  - [x] Click-through to source activity
 
 ### 8.6 Challenges
 
-- [ ] Challenge functionality (deferred)
+- [x] Create `schema/migrations/008_challenges.sql`:
+  - [x] Challenges table (id, name, slug, badge_url, completion_date, month)
+- [x] Create challenge scraping:
+  - [x] Scrape visible challenges from public profile
+  - [x] Parse trophy case HTML export (manual import option)
+- [x] Implement challenge API endpoints:
+  - [x] `GET /api/v1/challenges` - list with filters
+  - [x] `POST /api/v1/challenges/import` - trigger import
+- [x] Create `web/src/pages/challenges.tsx`:
+  - [x] Grouped by completion month
+  - [x] Challenge badge images
+  - [x] Challenge names
+  - [x] Links to Strava challenge pages
+  - [x] Challenge count per month
+- [x] Create challenge consistency widget:
+  - [x] Monthly challenge completion tracking
+  - [x] Configurable challenges:
+    - [x] Distance goals (total or single activity)
+    - [x] Elevation goals
+    - [x] Moving time goals
+    - [x] Number of activities
+    - [x] Calories burned
+  - [x] Per sport type filtering
+- [x] Create most recent challenges dashboard widget:
+  - [x] Recently completed Strava challenges
+  - [x] Challenge badges with completion dates
+  - [x] "View all" link
 
 ---
 
@@ -690,19 +921,112 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Top distance days table
   - [x] "Next goals" table
   - [x] Sport type filter (All/Rides/Runs)
-- [ ] Create `eddington.tsx` dashboard widget (deferred)
+- [x] Create `eddington.tsx` dashboard widget:
+  - [x] Compact current Eddington numbers display
+  - [x] Configurable sport type groups
+  - [x] "View details" link
+- [x] Create Eddington history chart:
+  - [x] Eddington progression over time
+  - [x] Show when each new number was achieved
+  - [x] Line chart visualization
+- [x] Configurable Eddington definitions:
+  - [x] Multiple Eddington definitions in settings
+  - [x] Sport type groupings per definition
+  - [x] NavBar visibility toggle
+  - [x] Dashboard widget visibility toggle
 
 ### 9.2 Best Efforts
 
-- [ ] Best efforts functionality (deferred)
+- [x] Create `internal/strava/best_efforts.go`:
+  - [x] Parse best_efforts from activity response
+  - [x] Calculate best efforts for standard distances
+- [x] Create `schema/migrations/009_best_efforts.sql`:
+  - [x] Best efforts table (activity_id, distance_type, elapsed_time, start_index, end_index)
+- [x] Create `internal/storage/best_efforts.go`:
+  - [x] Store best efforts per activity
+  - [x] Query personal records per distance
+  - [x] Query all efforts per distance
+- [x] Update importer to import best efforts:
+  - [x] Extract best_efforts from activity detail
+  - [x] Store in database
+- [x] Implement best efforts API endpoints:
+  - [x] `GET /api/v1/stats/best-efforts` - all PRs
+  - [x] `GET /api/v1/stats/best-efforts/:distance` - efforts for distance
+- [x] Create `web/src/pages/best-efforts.tsx`:
+  - [x] Running distances: 400m, 1/2 mile, 1km, 1 mile, 2 mile, 5km, 10km, 15km, 10 mile, 20km, Half Marathon, 30km, Marathon, 50km, 100km
+  - [x] Grouped by activity type tabs (Run, Ride, etc.)
+  - [x] Chart showing records over time
+  - [x] Table with date, time, and activity link
+- [x] Create distance efforts modal:
+  - [x] Click-through from best efforts table
+  - [x] All efforts for that distance
+  - [x] Progression chart over time
 
 ### 9.3 Training Load
 
-- [ ] Training load functionality (deferred)
+- [x] Create training load calculations:
+  - [x] Training Stress Score (TSS) per activity
+  - [x] Based on FTP and power data (cycling)
+  - [x] Based on pace and heart rate (running)
+  - [x] Intensity Factor (IF) calculation
+  - [x] Normalized Power calculation
+- [x] Create `internal/storage/training_load.go`:
+  - [x] Store daily TSS
+  - [x] Calculate Chronic Training Load (CTL/Fitness)
+  - [x] Calculate Acute Training Load (ATL/Fatigue)
+  - [x] Calculate Training Stress Balance (TSB/Form)
+- [x] Implement training load API endpoints:
+  - [x] `GET /api/v1/stats/training-load` - fitness/fatigue curves
+  - [x] `GET /api/v1/stats/training-load/daily` - daily TSS values
+- [x] Create `web/src/pages/training-load.tsx`:
+  - [x] Fitness (CTL) line over time
+  - [x] Fatigue (ATL) line over time
+  - [x] Form (TSB) line over time
+  - [x] Daily training stress bars
+  - [x] Date range selector
+  - [x] Tooltip with values on hover
+- [x] Create training load dashboard widget:
+  - [x] Current fitness/fatigue/form values
+  - [x] Mini chart preview
+  - [x] "View details" link
 
-### 9.4 Strava Rewind
+### 9.4 Strava Rewind (Year in Review)
 
-- [ ] Strava Rewind functionality (deferred)
+- [x] Implement `GET /api/v1/stats/rewind`:
+  - [x] Year parameter
+  - [x] All rewind metrics
+- [x] Create `web/src/pages/rewind.tsx`:
+  - [x] Year selector
+  - [x] Compare years feature (side-by-side)
+- [x] Implement rewind metrics:
+  - [x] Total activities count by month (bar chart)
+  - [x] Distance per month (bar chart)
+  - [x] Elevation per month (bar chart)
+  - [x] Moving time per sport type (pie/donut)
+  - [x] Active days vs rest days (pie chart)
+  - [x] Activity start times by hour (line chart)
+  - [x] Personal records per month (line chart)
+  - [x] Activity locations world map (ECharts effectScatter)
+  - [x] Streaks (consecutive active days, rest days)
+  - [x] Carbon saved (estimated CO2 reduction from cycling commutes)
+  - [x] Socials (kudos received total)
+  - [x] Biggest activities:
+    - [x] Longest distance
+    - [x] Most elevation
+    - [x] Longest duration
+  - [x] Random photo from the year
+- [x] Create comparison view:
+  - [x] Compare any two years
+  - [x] Compare year vs. all-time
+  - [x] Side-by-side metric display
+  - [x] Percentage change indicators
+
+### 9.5 Settings Robustness
+
+- [x] Ensure `/api/v1/settings` always returns normalized settings (including `virtual_world_tile_layers`)
+- [x] Ensure `PUT /api/v1/settings` returns the normalized stored settings (not the raw payload)
+- [x] Ensure `/api/v1/zones/hr` is backward-compatible when the `hr_zone_definitions` table is missing
+- [x] Guard Settings UI against missing/empty settings maps
 
 ---
 

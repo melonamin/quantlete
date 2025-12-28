@@ -1,5 +1,10 @@
 import type { EChartsOption } from 'echarts'
-import { EChartsWrapper, chartColors, defaultGridConfig, defaultTooltipConfig } from './echarts-wrapper'
+import {
+  EChartsWrapper,
+  chartColors,
+  defaultGridConfig,
+  defaultTooltipConfig,
+} from './echarts-wrapper'
 import { formatDistance } from '@/lib/format'
 
 // Monthly activity summary chart
@@ -27,25 +32,34 @@ export function MonthlyStatsChart({
 }: MonthlyStatsChartProps) {
   const getValue = (d: MonthlyData) => {
     switch (metric) {
-      case 'distance': return d.distance / 1000 // Convert to km
-      case 'count': return d.count
-      case 'time': return d.time / 3600 // Convert to hours
+      case 'distance':
+        return d.distance / 1000 // Convert to km
+      case 'count':
+        return d.count
+      case 'time':
+        return d.time / 3600 // Convert to hours
     }
   }
 
   const getLabel = () => {
     switch (metric) {
-      case 'distance': return 'Distance (km)'
-      case 'count': return 'Activities'
-      case 'time': return 'Time (hours)'
+      case 'distance':
+        return 'Distance (km)'
+      case 'count':
+        return 'Activities'
+      case 'time':
+        return 'Time (hours)'
     }
   }
 
   const formatValue = (value: number) => {
     switch (metric) {
-      case 'distance': return `${value.toFixed(1)} km`
-      case 'count': return `${value} activities`
-      case 'time': return `${value.toFixed(1)} hours`
+      case 'distance':
+        return `${value.toFixed(1)} km`
+      case 'count':
+        return `${value} activities`
+      case 'time':
+        return `${value.toFixed(1)} hours`
     }
   }
 
@@ -63,7 +77,7 @@ export function MonthlyStatsChart({
     },
     xAxis: {
       type: 'category',
-      data: data.map(d => d.month),
+      data: data.map((d) => d.month),
       axisLine: { lineStyle: { color: '#666' } },
       axisLabel: { color: '#888', rotate: 45 },
     },
@@ -76,29 +90,24 @@ export function MonthlyStatsChart({
       axisLabel: { color: '#888' },
       splitLine: { lineStyle: { color: 'rgba(128, 128, 128, 0.2)' } },
     },
-    series: [{
-      type: 'bar',
-      data: data.map(d => getValue(d)),
-      itemStyle: {
-        color: chartColors.primary,
-        borderRadius: [4, 4, 0, 0],
-      },
-      emphasis: {
+    series: [
+      {
+        type: 'bar',
+        data: data.map((d) => getValue(d)),
         itemStyle: {
-          color: chartColors.secondary,
+          color: chartColors.primary,
+          borderRadius: [4, 4, 0, 0],
+        },
+        emphasis: {
+          itemStyle: {
+            color: chartColors.secondary,
+          },
         },
       },
-    }],
+    ],
   }
 
-  return (
-    <EChartsWrapper
-      option={option}
-      height={height}
-      loading={loading}
-      className={className}
-    />
-  )
+  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
 }
 
 // Sport type distribution pie chart
@@ -123,7 +132,7 @@ export function SportDistributionChart({
   loading = false,
   className,
 }: SportDistributionChartProps) {
-  const getValue = (d: SportData) => metric === 'count' ? d.count : d.distance
+  const getValue = (d: SportData) => (metric === 'count' ? d.count : d.distance)
 
   const sportColorMap: Record<string, string> = {
     Ride: chartColors.ride,
@@ -147,9 +156,7 @@ export function SportDistributionChart({
       trigger: 'item',
       formatter: (params: unknown) => {
         const p = params as { name: string; value: number; percent: number }
-        const valueStr = metric === 'count'
-          ? `${p.value} activities`
-          : formatDistance(p.value)
+        const valueStr = metric === 'count' ? `${p.value} activities` : formatDistance(p.value)
         return `${p.name}<br/>${valueStr} (${p.percent.toFixed(1)}%)`
       },
     },
@@ -159,44 +166,41 @@ export function SportDistributionChart({
       top: 'center',
       textStyle: { color: '#888' },
     },
-    series: [{
-      type: 'pie',
-      radius: ['40%', '70%'],
-      center: ['35%', '50%'],
-      avoidLabelOverlap: true,
-      itemStyle: {
-        borderRadius: 4,
-        borderColor: 'transparent',
-        borderWidth: 2,
-      },
-      label: {
-        show: false,
-      },
-      emphasis: {
-        label: {
-          show: true,
-          fontSize: 14,
-          fontWeight: 'bold',
-        },
-      },
-      data: data.map((d, idx) => ({
-        name: d.sport_type.replace(/([A-Z])/g, ' $1').trim(),
-        value: getValue(d),
+    series: [
+      {
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['35%', '50%'],
+        avoidLabelOverlap: true,
         itemStyle: {
-          color: sportColorMap[d.sport_type] ?? Object.values(chartColors)[idx % Object.values(chartColors).length],
+          borderRadius: 4,
+          borderColor: 'transparent',
+          borderWidth: 2,
         },
-      })),
-    }],
+        label: {
+          show: false,
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+          },
+        },
+        data: data.map((d, idx) => ({
+          name: d.sport_type.replace(/([A-Z])/g, ' $1').trim(),
+          value: getValue(d),
+          itemStyle: {
+            color:
+              sportColorMap[d.sport_type] ??
+              Object.values(chartColors)[idx % Object.values(chartColors).length],
+          },
+        })),
+      },
+    ],
   }
 
-  return (
-    <EChartsWrapper
-      option={option}
-      height={height}
-      loading={loading}
-      className={className}
-    />
-  )
+  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
 }
 
 // Activity calendar heatmap
@@ -221,7 +225,7 @@ export function ActivityCalendarChart({
   loading = false,
   className,
 }: ActivityCalendarChartProps) {
-  const maxCount = Math.max(...data.map(d => d.count), 1)
+  const maxCount = Math.max(...data.map((d) => d.count), 1)
 
   const option: EChartsOption = {
     tooltip: {
@@ -264,21 +268,16 @@ export function ActivityCalendarChart({
         show: false,
       },
     },
-    series: [{
-      type: 'heatmap',
-      coordinateSystem: 'calendar',
-      data: data.map(d => [d.date, d.count]),
-    }],
+    series: [
+      {
+        type: 'heatmap',
+        coordinateSystem: 'calendar',
+        data: data.map((d) => [d.date, d.count]),
+      },
+    ],
   }
 
-  return (
-    <EChartsWrapper
-      option={option}
-      height={height}
-      loading={loading}
-      className={className}
-    />
-  )
+  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
 }
 
 // Weekly activity distribution (day of week)
@@ -311,7 +310,7 @@ export function WeekdayDistributionChart({
     },
     xAxis: {
       type: 'category',
-      data: data.map(d => d.day),
+      data: data.map((d) => d.day),
       axisLine: { lineStyle: { color: '#666' } },
       axisLabel: { color: '#888' },
     },
@@ -321,22 +320,17 @@ export function WeekdayDistributionChart({
       axisLabel: { color: '#888' },
       splitLine: { lineStyle: { color: 'rgba(128, 128, 128, 0.2)' } },
     },
-    series: [{
-      type: 'bar',
-      data: data.map(d => d.count),
-      itemStyle: {
-        color: chartColors.primary,
-        borderRadius: [4, 4, 0, 0],
+    series: [
+      {
+        type: 'bar',
+        data: data.map((d) => d.count),
+        itemStyle: {
+          color: chartColors.primary,
+          borderRadius: [4, 4, 0, 0],
+        },
       },
-    }],
+    ],
   }
 
-  return (
-    <EChartsWrapper
-      option={option}
-      height={height}
-      loading={loading}
-      className={className}
-    />
-  )
+  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
 }

@@ -10,11 +10,12 @@ export function SportChart() {
   const [metric, setMetric] = useState<Metric>('count')
   const { data: sportStats, isLoading } = useSportTypeStats()
 
-  const chartData = sportStats?.map(s => ({
-    sport_type: s.sport_type,
-    count: s.activity_count,
-    distance: s.total_distance,
-  })) ?? []
+  const chartData =
+    sportStats?.map((s) => ({
+      sport_type: s.sport_type,
+      count: s.activity_count,
+      distance: s.total_distance,
+    })) ?? []
 
   return (
     <WidgetWrapper
@@ -40,12 +41,7 @@ export function SportChart() {
         </div>
       }
     >
-      <SportDistributionChart
-        data={chartData}
-        metric={metric}
-        height={220}
-        loading={isLoading}
-      />
+      <SportDistributionChart data={chartData} metric={metric} height={220} loading={isLoading} />
     </WidgetWrapper>
   )
 }

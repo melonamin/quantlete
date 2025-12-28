@@ -17,11 +17,7 @@ export class ApiError extends Error {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new ApiError(
-      body?.error || `Request failed: ${response.status}`,
-      response.status,
-      body
-    )
+    throw new ApiError(body?.error || `Request failed: ${response.status}`, response.status, body)
   }
   return response.json()
 }
@@ -60,6 +56,32 @@ export async function post<T>(endpoint: string, data?: unknown): Promise<T> {
       'Content-Type': 'application/json',
     },
     body: data ? JSON.stringify(data) : undefined,
+  })
+
+  return handleResponse<T>(response)
+}
+
+export async function put<T>(endpoint: string, data?: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: data ? JSON.stringify(data) : undefined,
+  })
+
+  return handleResponse<T>(response)
+}
+
+export async function del<T>(endpoint: string): Promise<T> {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+    },
   })
 
   return handleResponse<T>(response)

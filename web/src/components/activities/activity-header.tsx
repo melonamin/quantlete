@@ -32,15 +32,9 @@ export function ActivityHeader({ activity }: ActivityHeaderProps) {
               <p className="mt-2 text-muted-foreground">{activity.description}</p>
             )}
             <div className="flex gap-2 mt-3">
-              {activity.commute && (
-                <Badge variant="secondary">Commute</Badge>
-              )}
-              {activity.trainer && (
-                <Badge variant="secondary">Indoor</Badge>
-              )}
-              {activity.private && (
-                <Badge variant="outline">Private</Badge>
-              )}
+              {activity.commute && <Badge variant="secondary">Commute</Badge>}
+              {activity.trainer && <Badge variant="secondary">Indoor</Badge>}
+              {activity.private && <Badge variant="outline">Private</Badge>}
             </div>
           </div>
         </div>

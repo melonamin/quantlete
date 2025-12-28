@@ -1,12 +1,7 @@
 import { useRef, useEffect } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
-import {
-  LineChart,
-  BarChart,
-  PieChart,
-  ScatterChart,
-} from 'echarts/charts'
+import { LineChart, BarChart, PieChart, ScatterChart, EffectScatterChart } from 'echarts/charts'
 import {
   TitleComponent,
   TooltipComponent,
@@ -27,6 +22,7 @@ echarts.use([
   BarChart,
   PieChart,
   ScatterChart,
+  EffectScatterChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,

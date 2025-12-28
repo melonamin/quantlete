@@ -20,8 +20,11 @@ func NewImportHandler(imp *importer.Importer) *ImportHandler {
 
 // StartImportRequest represents a request to start an import.
 type StartImportRequest struct {
-	FullSync       bool `json:"full_sync"`
-	IncludeStreams bool `json:"include_streams"`
+	FullSync           bool `json:"full_sync"`
+	IncludeStreams     bool `json:"include_streams"`
+	IncludeSegments    bool `json:"include_segments"`
+	IncludeBestEfforts bool `json:"include_best_efforts"`
+	IncludePhotos      bool `json:"include_photos"`
 }
 
 // Start handles POST /api/v1/import/start
@@ -35,8 +38,11 @@ func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opts := importer.ImportOptions{
-		FullSync:       req.FullSync,
-		IncludeStreams: req.IncludeStreams,
+		FullSync:           req.FullSync,
+		IncludeStreams:     req.IncludeStreams,
+		IncludeSegments:    req.IncludeSegments,
+		IncludeBestEfforts: req.IncludeBestEfforts,
+		IncludePhotos:      req.IncludePhotos,
 	}
 
 	// Use background context since import runs asynchronously after HTTP request completes

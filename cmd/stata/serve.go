@@ -81,6 +81,10 @@ func runServe(port int, dev bool) error {
 	tokenRepo := storage.NewTokenRepository(db)
 	gearRepo := storage.NewGearRepository(db)
 	streamRepo := storage.NewStreamRepository(db)
+	segmentRepo := storage.NewSegmentRepository(db)
+	bestEffortsRepo := storage.NewBestEffortsRepository(db)
+	maintenanceRepo := storage.NewMaintenanceRepository(db)
+	photoRepo := storage.NewPhotoRepository(db)
 
 	// Restore tokens from database
 	if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
@@ -88,7 +92,7 @@ func runServe(port int, dev bool) error {
 	}
 
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo)
+	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo)
 
 	// Create router
 	router := api.NewRouter(cfg, stravaClient, db, imp)

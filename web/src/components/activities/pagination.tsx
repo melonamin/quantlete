@@ -9,13 +9,7 @@ interface PaginationProps {
   onPageChange: (page: number) => void
 }
 
-export function Pagination({
-  page,
-  totalPages,
-  total,
-  perPage,
-  onPageChange,
-}: PaginationProps) {
+export function Pagination({ page, totalPages, total, perPage, onPageChange }: PaginationProps) {
   const start = (page - 1) * perPage + 1
   const end = Math.min(page * perPage, total)
 
@@ -23,8 +17,8 @@ export function Pagination({
     <div className="flex items-center justify-between px-2 py-4">
       <p className="text-sm text-muted-foreground">
         Showing <span className="font-medium">{start}</span> to{' '}
-        <span className="font-medium">{end}</span> of{' '}
-        <span className="font-medium">{total}</span> activities
+        <span className="font-medium">{end}</span> of <span className="font-medium">{total}</span>{' '}
+        activities
       </p>
       <div className="flex items-center gap-2">
         <Button

@@ -36,9 +36,8 @@ export function SportBreakdown({ stats, isLoading }: SportBreakdownProps) {
       ) : (
         <div className="space-y-3">
           {stats.slice(0, 6).map((stat) => {
-            const percentage = totalActivities > 0
-              ? Math.round((stat.activity_count / totalActivities) * 100)
-              : 0
+            const percentage =
+              totalActivities > 0 ? Math.round((stat.activity_count / totalActivities) * 100) : 0
             const Icon = getSportIcon(stat.sport_type)
 
             return (
@@ -54,9 +53,7 @@ export function SportBreakdown({ stats, isLoading }: SportBreakdownProps) {
                     <p className="font-medium text-sm truncate">
                       {formatSportType(stat.sport_type)}
                     </p>
-                    <span className="text-xs text-muted-foreground ml-2">
-                      {percentage}%
-                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">{percentage}%</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
                     <div

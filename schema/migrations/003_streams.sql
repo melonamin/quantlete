@@ -15,3 +15,4 @@ CREATE TABLE IF NOT EXISTS activity_streams (
 
 -- Index for querying streams by activity
 CREATE INDEX IF NOT EXISTS idx_streams_activity_id ON activity_streams(activity_id);
+

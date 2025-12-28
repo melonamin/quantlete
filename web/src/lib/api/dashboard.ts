@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { get, put } from './client'
 
 // Types
 export interface DashboardStats {
@@ -81,6 +81,19 @@ export interface CalendarActivity {
   start_date: string
   distance: number
   moving_time: number
+  total_elevation_gain: number
+}
+
+export interface CalendarMonthSummary {
+  year: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_elevation_gain: number
+  total_moving_time: number
+  total_calories: number
+  workout_count: number
+  challenges_completed: number
 }
 
 export interface HeatmapActivity {
@@ -94,6 +107,7 @@ export interface HeatmapActivity {
 export interface HeatmapResponse {
   activities: HeatmapActivity[]
   total: number
+  countries?: { country: string; iso2?: string; count: number }[]
 }
 
 export interface HeatmapFilters {
@@ -101,6 +115,7 @@ export interface HeatmapFilters {
   after?: string
   before?: string
   commute?: boolean
+  workout_type?: number
 }
 
 export interface EddingtonDay {
@@ -119,6 +134,25 @@ export interface EddingtonResult {
   next_steps: EddingtonStep[]
 }
 
+export interface EddingtonHistoryPoint {
+  date: string
+  number: number
+}
+
+export type WidgetWidth = 4 | 6 | 8 | 12
+
+export interface DashboardWidgetConfig {
+  id: string
+  width: WidgetWidth
+  hidden: boolean
+  settings?: Record<string, unknown>
+}
+
+export interface DashboardConfig {
+  version: number
+  widgets: DashboardWidgetConfig[]
+}
+
 // Query keys
 export const dashboardKeys = {
   all: ['dashboard'] as const,
@@ -130,9 +164,15 @@ export const dashboardKeys = {
   monthly: (year?: number) => [...dashboardKeys.all, 'monthly', year] as const,
   yearly: () => [...dashboardKeys.all, 'yearly'] as const,
   calendar: (year: number) => [...dashboardKeys.all, 'calendar', year] as const,
-  calendarActivities: (year: number, month: number) => [...dashboardKeys.all, 'calendarActivities', year, month] as const,
+  calendarActivities: (year: number, month: number) =>
+    [...dashboardKeys.all, 'calendarActivities', year, month] as const,
+  calendarSummary: (year: number, month: number) =>
+    [...dashboardKeys.all, 'calendarSummary', year, month] as const,
   heatmap: (filters: HeatmapFilters) => [...dashboardKeys.all, 'heatmap', filters] as const,
   eddington: (sportType?: string) => [...dashboardKeys.all, 'eddington', sportType] as const,
+  eddingtonHistory: (sportType?: string) =>
+    [...dashboardKeys.all, 'eddingtonHistory', sportType] as const,
+  config: () => [...dashboardKeys.all, 'config'] as const,
 }
 
 // Hooks
@@ -174,7 +214,8 @@ export function useSportTypeStats() {
 export function useMonthlyStats(year?: number) {
   return useQuery({
     queryKey: dashboardKeys.monthly(year),
-    queryFn: () => get<MonthlyStat[]>(year ? `/dashboard/monthly?year=${year}` : '/dashboard/monthly'),
+    queryFn: () =>
+      get<MonthlyStat[]>(year ? `/dashboard/monthly?year=${year}` : '/dashboard/monthly'),
   })
 }
 
@@ -195,7 +236,16 @@ export function useCalendarData(year: number) {
 export function useCalendarActivities(year: number, month: number) {
   return useQuery({
     queryKey: dashboardKeys.calendarActivities(year, month),
-    queryFn: () => get<CalendarActivity[]>(`/dashboard/calendar/activities?year=${year}&month=${month}`),
+    queryFn: () =>
+      get<CalendarActivity[]>(`/dashboard/calendar/activities?year=${year}&month=${month}`),
+  })
+}
+
+export function useCalendarSummary(year: number, month: number) {
+  return useQuery({
+    queryKey: dashboardKeys.calendarSummary(year, month),
+    queryFn: () =>
+      get<CalendarMonthSummary>(`/dashboard/calendar/summary?year=${year}&month=${month}`),
   })
 }
 
@@ -208,6 +258,8 @@ export function useHeatmapData(filters: HeatmapFilters = {}) {
       if (filters.after) params.set('after', filters.after)
       if (filters.before) params.set('before', filters.before)
       if (filters.commute !== undefined) params.set('commute', String(filters.commute))
+      if (filters.workout_type !== undefined)
+        params.set('workout_type', String(filters.workout_type))
 
       const queryString = params.toString()
       return get<HeatmapResponse>(`/stats/heatmap${queryString ? `?${queryString}` : ''}`)
@@ -221,6 +273,33 @@ export function useEddingtonData(sportType?: string) {
     queryFn: () => {
       const params = sportType ? `?sport_type=${sportType}` : ''
       return get<EddingtonResult>(`/stats/eddington${params}`)
+    },
+  })
+}
+
+export function useEddingtonHistory(sportType?: string) {
+  return useQuery({
+    queryKey: dashboardKeys.eddingtonHistory(sportType),
+    queryFn: () => {
+      const params = sportType ? `?sport_type=${sportType}` : ''
+      return get<EddingtonHistoryPoint[]>(`/stats/eddington/history${params}`)
+    },
+  })
+}
+
+export function useDashboardConfig() {
+  return useQuery({
+    queryKey: dashboardKeys.config(),
+    queryFn: () => get<DashboardConfig>('/dashboard/config'),
+  })
+}
+
+export function useUpdateDashboardConfig() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (cfg: DashboardConfig) => put<DashboardConfig>('/dashboard/config', cfg),
+    onSuccess: (data) => {
+      queryClient.setQueryData(dashboardKeys.config(), data)
     },
   })
 }

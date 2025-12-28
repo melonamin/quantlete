@@ -1,8 +1,13 @@
-import { useState } from 'react'
-import { useEddingtonData, type EddingtonResult } from '@/lib/api'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  useAppSettings,
+  useAuthStatus,
+  useEddingtonData,
+  useEddingtonHistory,
+  type EddingtonResult,
+} from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -12,59 +17,76 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Bike, Footprints, Activity } from 'lucide-react'
+import { LineChart } from '@/components/charts'
 
-type SportFilter = 'all' | 'ride' | 'run'
-
-const RIDE_TYPES = 'Ride,MountainBikeRide,GravelRide,EBikeRide,VirtualRide'
-const RUN_TYPES = 'Run,TrailRun,VirtualRun'
+const DEFAULT_DEFS = [
+  { id: 'all', name: 'All activities', sport_types: undefined },
+  {
+    id: 'rides',
+    name: 'Rides',
+    sport_types: ['Ride', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'VirtualRide'],
+  },
+  { id: 'runs', name: 'Runs', sport_types: ['Run', 'TrailRun', 'VirtualRun'] },
+]
 
 export function EddingtonPage() {
-  const [sportFilter, setSportFilter] = useState<SportFilter>('all')
+  const { data: auth } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated
+  const { data: settings } = useAppSettings({ enabled: !!isAuthenticated })
+  const defs = (
+    settings?.eddington_definitions && settings.eddington_definitions.length
+      ? settings.eddington_definitions
+      : DEFAULT_DEFS
+  ) as {
+    id: string
+    name: string
+    sport_types?: string[]
+  }[]
 
-  const sportType =
-    sportFilter === 'ride'
-      ? RIDE_TYPES
-      : sportFilter === 'run'
-        ? RUN_TYPES
-        : undefined
+  const [defId, setDefId] = useState(defs[0]?.id ?? 'all')
+  useEffect(() => {
+    if (!defs.length) return
+    if (defs.some((d) => d.id === defId)) return
+    setDefId(defs[0].id)
+  }, [defs, defId])
+
+  const def = defs.find((d) => d.id === defId) ?? defs[0]
+  const sportType = def?.sport_types?.length ? def.sport_types.join(',') : undefined
 
   const { data, isLoading, error } = useEddingtonData(sportType)
+  const { data: history, isLoading: historyLoading } = useEddingtonHistory(sportType)
+
+  const historySeries = useMemo(() => {
+    const pts = (history ?? []).map((p) => ({ x: p.date, y: p.number }))
+    return [
+      {
+        name: 'Eddington',
+        data: pts,
+        smooth: false,
+        step: 'end' as const,
+      },
+    ]
+  }, [history])
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Eddington Number</h1>
-          <p className="text-muted-foreground">
-            Track your Eddington number progress
-          </p>
+          <p className="text-muted-foreground">Track your Eddington number progress</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={sportFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSportFilter('all')}
+        <div className="flex items-center gap-2">
+          <select
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+            value={defId}
+            onChange={(e) => setDefId(e.target.value)}
           >
-            <Activity className="h-4 w-4 mr-1" />
-            All
-          </Button>
-          <Button
-            variant={sportFilter === 'ride' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSportFilter('ride')}
-          >
-            <Bike className="h-4 w-4 mr-1" />
-            Rides
-          </Button>
-          <Button
-            variant={sportFilter === 'run' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSportFilter('run')}
-          >
-            <Footprints className="h-4 w-4 mr-1" />
-            Runs
-          </Button>
+            {defs.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -75,27 +97,56 @@ export function EddingtonPage() {
           <p className="text-destructive">Failed to load Eddington data</p>
         </div>
       ) : data ? (
-        <EddingtonDisplay data={data} />
+        <EddingtonDisplay
+          data={data}
+          title={def?.name ?? 'Eddington'}
+          historySeries={historySeries}
+          historyLoading={historyLoading}
+        />
       ) : null}
     </div>
   )
 }
 
-function EddingtonDisplay({ data }: { data: EddingtonResult }) {
+function EddingtonDisplay({
+  data,
+  title,
+  historySeries,
+  historyLoading,
+}: {
+  data: EddingtonResult
+  title: string
+  historySeries: { name: string; data: { x: string; y: number }[]; smooth: boolean; step: 'end' }[]
+  historyLoading: boolean
+}) {
   return (
     <div className="space-y-6">
       {/* Main number */}
       <Card>
         <CardContent className="pt-6">
           <div className="text-center">
-            <div className="text-7xl font-bold text-strava mb-2">
-              {data.number}
-            </div>
+            <div className="text-7xl font-bold text-strava mb-2">{data.number}</div>
             <p className="text-muted-foreground">
-              You have ridden at least {data.number} km on {data.number}{' '}
-              different days
+              {title}: at least {data.number} km on {data.number} different days
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LineChart
+            series={historySeries}
+            xAxisType="time"
+            yAxisLabel="Eddington"
+            height={260}
+            loading={historyLoading}
+            showLegend={false}
+            showDataZoom
+          />
         </CardContent>
       </Card>
 
@@ -117,18 +168,13 @@ function EddingtonDisplay({ data }: { data: EddingtonResult }) {
               <TableBody>
                 {data.next_steps.map((step) => (
                   <TableRow key={step.target}>
-                    <TableCell className="font-medium">
-                      E{step.target}
-                    </TableCell>
+                    <TableCell className="font-medium">E{step.target}</TableCell>
                     <TableCell>
-                      {step.rides_needed}{' '}
-                      {step.rides_needed === 1 ? 'ride' : 'rides'} of{' '}
+                      {step.rides_needed} {step.rides_needed === 1 ? 'day' : 'days'} of{' '}
                       {step.target}+ km
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={step.rides_needed === 1 ? 'default' : 'outline'}
-                      >
+                      <Badge variant={step.rides_needed === 1 ? 'default' : 'outline'}>
                         {step.rides_needed === 1 ? 'Almost there!' : 'In progress'}
                       </Badge>
                     </TableCell>
@@ -160,9 +206,7 @@ function EddingtonDisplay({ data }: { data: EddingtonResult }) {
                   <TableRow key={day.date}>
                     <TableCell className="font-medium">#{index + 1}</TableCell>
                     <TableCell>{day.date}</TableCell>
-                    <TableCell className="text-right">
-                      {day.distance.toFixed(1)} km
-                    </TableCell>
+                    <TableCell className="text-right">{day.distance.toFixed(1)} km</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

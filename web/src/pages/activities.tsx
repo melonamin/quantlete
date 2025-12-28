@@ -19,16 +19,11 @@ export function ActivitiesPage() {
 
       {error && (
         <div className="rounded-lg border border-destructive bg-destructive/10 p-4 mb-6">
-          <p className="text-destructive">
-            Failed to load activities: {error.message}
-          </p>
+          <p className="text-destructive">Failed to load activities: {error.message}</p>
         </div>
       )}
 
-      <ActivitiesTable
-        activities={data?.data ?? []}
-        isLoading={isLoading}
-      />
+      <ActivitiesTable activities={data?.data ?? []} isLoading={isLoading} />
 
       {data && data.total > 0 && (
         <Pagination

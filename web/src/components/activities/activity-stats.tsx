@@ -9,15 +9,7 @@ import {
 import { getSportCategory } from '@/lib/sport-types'
 import { useSettingsStore } from '@/stores'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Route,
-  Clock,
-  Mountain,
-  Gauge,
-  Heart,
-  Zap,
-  Flame,
-} from 'lucide-react'
+import { Route, Clock, Mountain, Gauge, Heart, Zap, Flame } from 'lucide-react'
 
 interface ActivityStatsProps {
   activity: Activity
@@ -41,9 +33,7 @@ function StatCard({ icon: Icon, label, value, subValue }: StatCardProps) {
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-2xl font-bold tabular-nums">{value}</p>
-            {subValue && (
-              <p className="text-sm text-muted-foreground">{subValue}</p>
-            )}
+            {subValue && <p className="text-sm text-muted-foreground">{subValue}</p>}
           </div>
         </div>
       </CardContent>

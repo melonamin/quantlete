@@ -15,15 +15,17 @@ import (
 
 // ActivitiesHandler handles activity-related endpoints.
 type ActivitiesHandler struct {
-	repo   *storage.ActivityRepository
-	strava *strava.Client
+	repo    *storage.ActivityRepository
+	streams *storage.StreamRepository
+	strava  *strava.Client
 }
 
 // NewActivitiesHandler creates a new activities handler.
-func NewActivitiesHandler(repo *storage.ActivityRepository, stravaClient *strava.Client) *ActivitiesHandler {
+func NewActivitiesHandler(repo *storage.ActivityRepository, streams *storage.StreamRepository, stravaClient *strava.Client) *ActivitiesHandler {
 	return &ActivitiesHandler{
-		repo:   repo,
-		strava: stravaClient,
+		repo:    repo,
+		streams: streams,
+		strava:  stravaClient,
 	}
 }
 
@@ -136,6 +138,47 @@ func (h *ActivitiesHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, activityToResponse(activity))
+}
+
+type ActivityStreamResponse struct {
+	ActivityID   int64           `json:"activity_id"`
+	StreamType   string          `json:"stream_type"`
+	OriginalSize int             `json:"original_size"`
+	Resolution   string          `json:"resolution"`
+	SeriesType   string          `json:"series_type"`
+	Data         json.RawMessage `json:"data"`
+}
+
+// GetStreams handles GET /api/v1/activities/:id/streams
+func (h *ActivitiesHandler) GetStreams(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid activity ID"})
+		return
+	}
+
+	streams, err := h.streams.GetByActivityID(ctx, id)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch streams"})
+		return
+	}
+
+	resp := make([]ActivityStreamResponse, 0, len(streams))
+	for _, s := range streams {
+		resp = append(resp, ActivityStreamResponse{
+			ActivityID:   s.ActivityID,
+			StreamType:   s.StreamType,
+			OriginalSize: s.OriginalSize,
+			Resolution:   s.Resolution,
+			SeriesType:   s.SeriesType,
+			Data:         s.Data,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // parseListParams extracts filter and pagination params from the request.

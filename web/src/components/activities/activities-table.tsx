@@ -1,12 +1,6 @@
 import type { Activity } from '@/lib/api'
 import { ActivityRow } from './activity-row'
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ActivitiesTableProps {
@@ -72,13 +66,27 @@ function ActivitiesTableSkeleton() {
         <TableBody>
           {Array.from({ length: 10 }).map((_, i) => (
             <TableRow key={i}>
-              <TableHead><Skeleton className="h-4 w-48" /></TableHead>
-              <TableHead><Skeleton className="h-4 w-20" /></TableHead>
-              <TableHead><Skeleton className="h-4 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-4 w-16 ml-auto" /></TableHead>
-              <TableHead><Skeleton className="h-4 w-16 ml-auto" /></TableHead>
-              <TableHead><Skeleton className="h-4 w-16 ml-auto" /></TableHead>
-              <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-48" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-20" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-24" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-16 ml-auto" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-16 ml-auto" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-16 ml-auto" />
+              </TableHead>
+              <TableHead>
+                <Skeleton className="h-4 w-16" />
+              </TableHead>
             </TableRow>
           ))}
         </TableBody>

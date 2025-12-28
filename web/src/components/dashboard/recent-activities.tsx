@@ -16,7 +16,11 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
     return (
       <WidgetWrapper
         title="Recent Activities"
-        action={<Button variant="ghost" size="sm" disabled>View all</Button>}
+        action={
+          <Button variant="ghost" size="sm" disabled>
+            View all
+          </Button>
+        }
       >
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
@@ -60,20 +64,23 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
                   className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
                   style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
                 >
-                  <Icon className="h-5 w-5" style={{ color: getSportHexColor(activity.sport_type) }} />
+                  <Icon
+                    className="h-5 w-5"
+                    style={{ color: getSportHexColor(activity.sport_type) }}
+                  />
                 </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{activity.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatRelativeDate(activity.start_date)}
-                </p>
-              </div>
-              <div className="text-right text-sm">
-                <p className="font-medium">{formatDistance(activity.distance)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatDuration(activity.moving_time)}
-                </p>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{activity.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatRelativeDate(activity.start_date)}
+                  </p>
+                </div>
+                <div className="text-right text-sm">
+                  <p className="font-medium">{formatDistance(activity.distance)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDuration(activity.moving_time)}
+                  </p>
+                </div>
               </Link>
             )
           })}

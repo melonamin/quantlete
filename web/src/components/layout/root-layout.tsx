@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
+import { useAppSettings, useAuthStatus } from '@/lib/api'
 import {
   LayoutDashboard,
   Activity,
@@ -10,27 +11,41 @@ import {
   Bike,
   TrendingUp,
   Timer,
+  Camera,
+  Award,
   Settings,
+  History,
 } from 'lucide-react'
 
 interface RootLayoutProps {
   children: ReactNode
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Activities', href: '/activities', icon: Activity },
-  { name: 'Heatmap', href: '/heatmap', icon: Map },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Segments', href: '/segments', icon: Trophy },
-  { name: 'Gear', href: '/gear', icon: Bike },
-  { name: 'Eddington', href: '/eddington', icon: TrendingUp },
-  { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
-]
-
 export function RootLayout({ children }: RootLayoutProps) {
   const routerState = useRouterState()
   const currentPath = routerState.location.pathname
+  const { data: auth } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated
+  const { data: settings } = useAppSettings({ enabled: !!isAuthenticated })
+
+  const showEddington =
+    settings?.eddington_definitions && settings.eddington_definitions.length
+      ? settings.eddington_definitions.some((d) => d.show_in_nav !== false)
+      : true
+
+  const navigation = [
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Activities', href: '/activities', icon: Activity },
+    { name: 'Heatmap', href: '/heatmap', icon: Map },
+    { name: 'Calendar', href: '/calendar', icon: Calendar },
+    { name: 'Segments', href: '/segments', icon: Trophy },
+    { name: 'Gear', href: '/gear', icon: Bike },
+    { name: 'Photos', href: '/photos', icon: Camera },
+    { name: 'Challenges', href: '/challenges', icon: Award },
+    ...(showEddington ? [{ name: 'Eddington', href: '/eddington', icon: TrendingUp }] : []),
+    { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
+    { name: 'Rewind', href: '/rewind', icon: History },
+  ]
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,7 +62,8 @@ export function RootLayout({ children }: RootLayoutProps) {
           {/* Desktop navigation */}
           <nav className="ml-8 hidden md:flex items-center gap-1">
             {navigation.map((item) => {
-              const isActive = currentPath === item.href ||
+              const isActive =
+                currentPath === item.href ||
                 (item.href !== '/' && currentPath.startsWith(item.href))
               return (
                 <Link
@@ -85,9 +101,7 @@ export function RootLayout({ children }: RootLayoutProps) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1">
-        {children}
-      </main>
+      <main className="flex-1">{children}</main>
     </div>
   )
 }

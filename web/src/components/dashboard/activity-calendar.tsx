@@ -12,15 +12,16 @@ export function ActivityCalendar() {
   const { data: yearlyStats } = useYearlyStats()
   const { data: calendarData, isLoading } = useCalendarData(year)
 
-  const availableYears = yearlyStats?.map(s => s.year) ?? [currentYear]
+  const availableYears = yearlyStats?.map((s) => s.year) ?? [currentYear]
   const minYear = Math.min(...availableYears)
   const maxYear = Math.max(...availableYears)
 
-  const chartData = calendarData?.map(d => ({
-    date: d.date,
-    count: d.activity_count,
-    distance: d.total_distance,
-  })) ?? []
+  const chartData =
+    calendarData?.map((d) => ({
+      date: d.date,
+      count: d.activity_count,
+      distance: d.total_distance,
+    })) ?? []
 
   return (
     <WidgetWrapper
@@ -31,7 +32,7 @@ export function ActivityCalendar() {
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0"
-            onClick={() => setYear(y => Math.max(minYear, y - 1))}
+            onClick={() => setYear((y) => Math.max(minYear, y - 1))}
             disabled={year <= minYear}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -41,7 +42,7 @@ export function ActivityCalendar() {
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0"
-            onClick={() => setYear(y => Math.min(maxYear, y + 1))}
+            onClick={() => setYear((y) => Math.min(maxYear, y + 1))}
             disabled={year >= maxYear}
           >
             <ChevronRight className="h-4 w-4" />
@@ -49,12 +50,7 @@ export function ActivityCalendar() {
         </div>
       }
     >
-      <ActivityCalendarChart
-        data={chartData}
-        year={year}
-        height={160}
-        loading={isLoading}
-      />
+      <ActivityCalendarChart data={chartData} year={year} height={160} loading={isLoading} />
     </WidgetWrapper>
   )
 }
