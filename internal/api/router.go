@@ -115,6 +115,11 @@ func (r *Router) mountRoutes() {
 			router.Get("/yearly", r.dashboardHandler.GetYearlyStats)
 			router.Get("/calendar", r.dashboardHandler.GetCalendarData)
 		})
+
+		// Stats routes (heatmap, etc.)
+		router.Route("/stats", func(router chi.Router) {
+			router.Get("/heatmap", r.dashboardHandler.GetHeatmapData)
+		})
 	})
 
 	// Static file serving (placeholder for embedded files)

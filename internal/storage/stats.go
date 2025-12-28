@@ -335,6 +335,23 @@ type YearStat struct {
 	TotalElevation float64 `json:"total_elevation"`
 }
 
+// HeatmapActivity represents an activity for the heatmap visualization.
+type HeatmapActivity struct {
+	ID              int64   `json:"id"`
+	SportType       string  `json:"sport_type"`
+	SummaryPolyline string  `json:"summary_polyline"`
+	StartLat        float64 `json:"start_lat"`
+	StartLng        float64 `json:"start_lng"`
+}
+
+// HeatmapFilters contains filters for heatmap queries.
+type HeatmapFilters struct {
+	SportTypes  []string
+	StartAfter  *time.Time
+	StartBefore *time.Time
+	Commute     *bool
+}
+
 // GetYearlyStats returns statistics grouped by year.
 func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) ([]YearStat, error) {
 	rows, err := r.db.Query(`
@@ -364,4 +381,68 @@ func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) (
 	}
 
 	return yearly, rows.Err()
+}
+
+// GetHeatmapData returns activities with polylines for heatmap visualization.
+func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, filters HeatmapFilters) ([]HeatmapActivity, error) {
+	query := `
+		SELECT id, sport_type, summary_polyline, COALESCE(start_lat, 0), COALESCE(start_lng, 0)
+		FROM activities
+		WHERE athlete_id = ? AND summary_polyline IS NOT NULL AND summary_polyline != ''
+	`
+	args := []interface{}{athleteID}
+
+	if len(filters.SportTypes) > 0 {
+		placeholders := make([]string, len(filters.SportTypes))
+		for i, st := range filters.SportTypes {
+			placeholders[i] = "?"
+			args = append(args, st)
+		}
+		query += " AND sport_type IN (" + joinStrings(placeholders, ",") + ")"
+	}
+
+	if filters.StartAfter != nil {
+		query += " AND start_date >= ?"
+		args = append(args, *filters.StartAfter)
+	}
+
+	if filters.StartBefore != nil {
+		query += " AND start_date <= ?"
+		args = append(args, *filters.StartBefore)
+	}
+
+	if filters.Commute != nil {
+		query += " AND commute = ?"
+		args = append(args, *filters.Commute)
+	}
+
+	query += " ORDER BY start_date DESC"
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var activities []HeatmapActivity
+	for rows.Next() {
+		var a HeatmapActivity
+		if err := rows.Scan(&a.ID, &a.SportType, &a.SummaryPolyline, &a.StartLat, &a.StartLng); err != nil {
+			return nil, err
+		}
+		activities = append(activities, a)
+	}
+
+	return activities, rows.Err()
+}
+
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for _, s := range strs[1:] {
+		result += sep + s
+	}
+	return result
 }

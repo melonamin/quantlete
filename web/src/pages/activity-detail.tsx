@@ -1,6 +1,7 @@
 import { useParams, Link } from '@tanstack/react-router'
 import { useActivity } from '@/lib/api'
 import { ActivityHeader, ActivityStats } from '@/components/activities'
+import { ActivityMap } from '@/components/maps'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft } from 'lucide-react'
 
@@ -48,12 +49,12 @@ export function ActivityDetailPage() {
       <ActivityHeader activity={activity} />
       <ActivityStats activity={activity} />
 
-      {/* Map placeholder - will be implemented in Phase 7 */}
       {activity.summary_polyline && (
-        <div className="mt-6 rounded-lg border border-border bg-muted/50 p-8 text-center">
-          <p className="text-muted-foreground">
-            Map visualization coming in Phase 7
-          </p>
+        <div className="mt-6">
+          <ActivityMap
+            polyline={activity.summary_polyline}
+            className="h-[400px]"
+          />
         </div>
       )}
     </div>

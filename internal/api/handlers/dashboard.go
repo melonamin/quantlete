@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sasha/stata/internal/storage"
@@ -215,4 +216,61 @@ func (h *DashboardHandler) GetCalendarData(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, data)
+}
+
+// HeatmapResponse contains the heatmap data and summary statistics.
+type HeatmapResponse struct {
+	Activities []storage.HeatmapActivity `json:"activities"`
+	Total      int                       `json:"total"`
+}
+
+// GetHeatmapData handles GET /api/v1/stats/heatmap
+func (h *DashboardHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	q := r.URL.Query()
+	filters := storage.HeatmapFilters{}
+
+	// Parse sport types
+	if sportTypes := q.Get("sport_type"); sportTypes != "" {
+		filters.SportTypes = strings.Split(sportTypes, ",")
+	}
+
+	// Parse date range
+	if after := q.Get("after"); after != "" {
+		if t, err := time.Parse("2006-01-02", after); err == nil {
+			filters.StartAfter = &t
+		}
+	}
+
+	if before := q.Get("before"); before != "" {
+		if t, err := time.Parse("2006-01-02", before); err == nil {
+			filters.StartBefore = &t
+		}
+	}
+
+	// Parse commute filter
+	if commute := q.Get("commute"); commute != "" {
+		v := commute == "true" || commute == "1"
+		filters.Commute = &v
+	}
+
+	activities, err := h.stats.GetHeatmapData(r.Context(), athlete.ID, filters)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get heatmap data"})
+		return
+	}
+
+	if activities == nil {
+		activities = []storage.HeatmapActivity{}
+	}
+
+	writeJSON(w, http.StatusOK, HeatmapResponse{
+		Activities: activities,
+		Total:      len(activities),
+	})
 }

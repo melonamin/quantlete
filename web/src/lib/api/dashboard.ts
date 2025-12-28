@@ -74,6 +74,26 @@ export interface CalendarDay {
   total_distance: number
 }
 
+export interface HeatmapActivity {
+  id: number
+  sport_type: string
+  summary_polyline: string
+  start_lat: number
+  start_lng: number
+}
+
+export interface HeatmapResponse {
+  activities: HeatmapActivity[]
+  total: number
+}
+
+export interface HeatmapFilters {
+  sport_type?: string
+  after?: string
+  before?: string
+  commute?: boolean
+}
+
 // Query keys
 export const dashboardKeys = {
   all: ['dashboard'] as const,
@@ -85,6 +105,7 @@ export const dashboardKeys = {
   monthly: (year?: number) => [...dashboardKeys.all, 'monthly', year] as const,
   yearly: () => [...dashboardKeys.all, 'yearly'] as const,
   calendar: (year: number) => [...dashboardKeys.all, 'calendar', year] as const,
+  heatmap: (filters: HeatmapFilters) => [...dashboardKeys.all, 'heatmap', filters] as const,
 }
 
 // Hooks
@@ -141,5 +162,21 @@ export function useCalendarData(year: number) {
   return useQuery({
     queryKey: dashboardKeys.calendar(year),
     queryFn: () => get<CalendarDay[]>(`/dashboard/calendar?year=${year}`),
+  })
+}
+
+export function useHeatmapData(filters: HeatmapFilters = {}) {
+  return useQuery({
+    queryKey: dashboardKeys.heatmap(filters),
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (filters.sport_type) params.set('sport_type', filters.sport_type)
+      if (filters.after) params.set('after', filters.after)
+      if (filters.before) params.set('before', filters.before)
+      if (filters.commute !== undefined) params.set('commute', String(filters.commute))
+
+      const queryString = params.toString()
+      return get<HeatmapResponse>(`/stats/heatmap${queryString ? `?${queryString}` : ''}`)
+    },
   })
 }
