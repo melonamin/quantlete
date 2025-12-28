@@ -274,3 +274,40 @@ func (h *DashboardHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request
 		Total:      len(activities),
 	})
 }
+
+// GetCalendarActivities handles GET /api/v1/dashboard/calendar/activities
+func (h *DashboardHandler) GetCalendarActivities(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	now := time.Now()
+	year := now.Year()
+	month := int(now.Month())
+
+	if y := r.URL.Query().Get("year"); y != "" {
+		if parsed, err := strconv.Atoi(y); err == nil && parsed > 2000 && parsed < 2100 {
+			year = parsed
+		}
+	}
+
+	if m := r.URL.Query().Get("month"); m != "" {
+		if parsed, err := strconv.Atoi(m); err == nil && parsed >= 1 && parsed <= 12 {
+			month = parsed
+		}
+	}
+
+	activities, err := h.stats.GetCalendarActivities(r.Context(), athlete.ID, year, month)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar activities"})
+		return
+	}
+
+	if activities == nil {
+		activities = []storage.CalendarActivity{}
+	}
+
+	writeJSON(w, http.StatusOK, activities)
+}

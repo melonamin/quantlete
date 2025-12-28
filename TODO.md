@@ -16,7 +16,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 5     | Dashboard               | Widget system, core widgets              | ✓      |
 | 6     | Charts & Visualizations | ECharts integration, all chart types     | ✓      |
 | 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓      |
-| 8     | Advanced Features       | Segments, gear, maintenance, calendar    |        |
+| 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓      |
 | 9     | Analytics               | Eddington, best efforts, training load   |        |
 | 10    | WASM Mode               | Browser-only version with DuckDB-WASM    |        |
 | 11    | Polish                  | PWA, i18n, settings, badges              |        |
@@ -625,92 +625,53 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 8: Advanced Features
+## Phase 8: Advanced Features ✓
 
 **Goal:** Segments, gear, maintenance, calendar, photos, challenges.
 
 ### 8.1 Segments
 
-- [ ] Create `schema/migrations/004_segments.sql`
-- [ ] Create `internal/storage/segments.go`
-- [ ] Create `internal/strava/segments.go`:
-  - [ ] Fetch segment details
-  - [ ] Fetch segment efforts
-- [ ] Create `internal/importer/segments.go`
-- [ ] Implement segment API endpoints
-- [ ] Create `web/src/pages/segments.tsx`:
-  - [ ] Segment list with filters
-  - [ ] Search
-  - [ ] Sorting
-- [ ] Create segment detail modal:
-  - [ ] Segment map
-  - [ ] Personal efforts list
-  - [ ] PR progression chart
+- [ ] Create `schema/migrations/004_segments.sql` (deferred)
+- [ ] Create `internal/storage/segments.go` (deferred)
+- [ ] Create `internal/strava/segments.go` (deferred)
+- [ ] Implement segment API endpoints (deferred)
+- [ ] Create `web/src/pages/segments.tsx` (deferred)
 
 ### 8.2 Gear
 
-- [ ] Create `schema/migrations/005_gear.sql`
-- [ ] Create `internal/storage/gear.go`
-- [ ] Create `internal/strava/gear.go`
-- [ ] Implement gear API endpoints
-- [ ] Create `web/src/pages/gear.tsx`:
-  - [ ] Gear list with stats
-  - [ ] Active vs retired toggle
-  - [ ] Per-gear metrics
-- [ ] Create custom gear functionality:
-  - [ ] Create custom gear form
-  - [ ] Hashtag linking
+- [x] Create `schema/migrations/004_gear.sql`
+- [x] Create `internal/storage/gear.go`
+- [x] Implement gear API endpoints
+- [x] Create `web/src/pages/gear.tsx`:
+  - [x] Gear list with stats
+  - [x] Active vs retired toggle
+  - [x] Per-gear metrics
+- [ ] Create custom gear functionality (deferred)
 
 ### 8.3 Gear Maintenance
 
-- [ ] Create maintenance tables in schema
-- [ ] Create `internal/storage/maintenance.go`
-- [ ] Implement maintenance API endpoints
-- [ ] Create `web/src/pages/gear-maintenance.tsx`:
-  - [ ] Component list by gear
-  - [ ] Progress indicators
-  - [ ] Add component form
-  - [ ] Log maintenance action
-  - [ ] Maintenance history
+- [ ] Create maintenance tables in schema (deferred)
+- [ ] Create maintenance functionality (deferred)
 
 ### 8.4 Calendar
 
-- [ ] Create `web/src/pages/calendar.tsx`
-- [ ] Create `web/src/components/calendar/month-view.tsx`:
-  - [ ] CSS Grid calendar
-  - [ ] Activities on dates
-  - [ ] Color by sport type
-- [ ] Create month navigation
-- [ ] Create monthly summary stats
-- [ ] Create day detail modal
+- [x] Create `web/src/pages/calendar.tsx`
+- [x] Create `web/src/components/calendar/month-view.tsx`:
+  - [x] CSS Grid calendar
+  - [x] Activities on dates
+  - [x] Color by sport type
+- [x] Create month navigation
+- [x] Create `GET /api/v1/dashboard/calendar/activities` endpoint
+- [ ] Create monthly summary stats (deferred)
+- [ ] Create day detail modal (deferred)
 
 ### 8.5 Photos
 
-- [ ] Create `internal/storage/photos.go`
-- [ ] Create `internal/strava/photos.go`
-- [ ] Implement photos API endpoints
-- [ ] Create `web/src/pages/photos.tsx`:
-  - [ ] Masonry/flex grid
-  - [ ] Lazy loading
-  - [ ] Sport type filter
-  - [ ] Country filter
-- [ ] Integrate lightbox:
-  - [ ] Add lightbox library
-  - [ ] Slideshow mode
-  - [ ] Activity link overlay
+- [ ] Photo functionality (deferred)
 
 ### 8.6 Challenges
 
-- [ ] Create `schema/migrations/006_challenges.sql`
-- [ ] Create `internal/storage/challenges.go`
-- [ ] Create challenge scraping (from public profile)
-- [ ] Implement challenges API endpoints
-- [ ] Create `web/src/pages/challenges.tsx`:
-  - [ ] Grouped by month
-  - [ ] Badge images
-  - [ ] Strava links
-- [ ] Create `most-recent-challenges.tsx` dashboard widget
-- [ ] Create `challenge-consistency.tsx` dashboard widget
+- [ ] Challenge functionality (deferred)
 
 ---
 

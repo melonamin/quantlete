@@ -24,6 +24,7 @@ type Router struct {
 	activitiesHandler *handlers.ActivitiesHandler
 	importHandler     *handlers.ImportHandler
 	dashboardHandler  *handlers.DashboardHandler
+	gearHandler       *handlers.GearHandler
 }
 
 // NewRouter creates a new HTTP router with all routes configured.
@@ -53,12 +54,14 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	athleteRepo := storage.NewAthleteRepository(db)
 	tokenRepo := storage.NewTokenRepository(db)
 	statsRepo := storage.NewStatsRepository(db)
+	gearRepo := storage.NewGearRepository(db)
 
 	// Create handlers
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
 	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, stravaClient)
 	importHandler := handlers.NewImportHandler(imp)
 	dashboardHandler := handlers.NewDashboardHandler(statsRepo, stravaClient)
+	gearHandler := handlers.NewGearHandler(gearRepo, stravaClient)
 
 	router := &Router{
 		Mux:               r,
@@ -69,6 +72,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 		activitiesHandler: activitiesHandler,
 		importHandler:     importHandler,
 		dashboardHandler:  dashboardHandler,
+		gearHandler:       gearHandler,
 	}
 
 	// Mount routes
@@ -114,11 +118,18 @@ func (r *Router) mountRoutes() {
 			router.Get("/monthly", r.dashboardHandler.GetMonthlyStats)
 			router.Get("/yearly", r.dashboardHandler.GetYearlyStats)
 			router.Get("/calendar", r.dashboardHandler.GetCalendarData)
+			router.Get("/calendar/activities", r.dashboardHandler.GetCalendarActivities)
 		})
 
 		// Stats routes (heatmap, etc.)
 		router.Route("/stats", func(router chi.Router) {
 			router.Get("/heatmap", r.dashboardHandler.GetHeatmapData)
+		})
+
+		// Gear routes
+		router.Route("/gear", func(router chi.Router) {
+			router.Get("/", r.gearHandler.List)
+			router.Get("/{id}", r.gearHandler.GetByID)
 		})
 	})
 

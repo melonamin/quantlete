@@ -74,6 +74,15 @@ export interface CalendarDay {
   total_distance: number
 }
 
+export interface CalendarActivity {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  moving_time: number
+}
+
 export interface HeatmapActivity {
   id: number
   sport_type: string
@@ -105,6 +114,7 @@ export const dashboardKeys = {
   monthly: (year?: number) => [...dashboardKeys.all, 'monthly', year] as const,
   yearly: () => [...dashboardKeys.all, 'yearly'] as const,
   calendar: (year: number) => [...dashboardKeys.all, 'calendar', year] as const,
+  calendarActivities: (year: number, month: number) => [...dashboardKeys.all, 'calendarActivities', year, month] as const,
   heatmap: (filters: HeatmapFilters) => [...dashboardKeys.all, 'heatmap', filters] as const,
 }
 
@@ -162,6 +172,13 @@ export function useCalendarData(year: number) {
   return useQuery({
     queryKey: dashboardKeys.calendar(year),
     queryFn: () => get<CalendarDay[]>(`/dashboard/calendar?year=${year}`),
+  })
+}
+
+export function useCalendarActivities(year: number, month: number) {
+  return useQuery({
+    queryKey: dashboardKeys.calendarActivities(year, month),
+    queryFn: () => get<CalendarActivity[]>(`/dashboard/calendar/activities?year=${year}&month=${month}`),
   })
 }
 

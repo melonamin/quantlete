@@ -297,6 +297,16 @@ type CalendarDay struct {
 	TotalDistance float64 `json:"total_distance"`
 }
 
+// CalendarActivity represents an activity summary for the calendar view.
+type CalendarActivity struct {
+	ID         int64     `json:"id"`
+	Name       string    `json:"name"`
+	SportType  string    `json:"sport_type"`
+	StartDate  time.Time `json:"start_date"`
+	Distance   float64   `json:"distance"`
+	MovingTime int       `json:"moving_time"`
+}
+
 // GetCalendarData returns daily activity counts for a given year.
 func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, year int) ([]CalendarDay, error) {
 	rows, err := r.db.Query(`
@@ -324,6 +334,33 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 	}
 
 	return days, rows.Err()
+}
+
+// GetCalendarActivities returns activities for a specific month.
+func (r *StatsRepository) GetCalendarActivities(ctx context.Context, athleteID int64, year, month int) ([]CalendarActivity, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, sport_type, start_date, distance, moving_time
+		FROM activities
+		WHERE athlete_id = ?
+		  AND CAST(strftime(start_date, '%Y') AS INTEGER) = ?
+		  AND CAST(strftime(start_date, '%m') AS INTEGER) = ?
+		ORDER BY start_date ASC
+	`, athleteID, year, month)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var activities []CalendarActivity
+	for rows.Next() {
+		var a CalendarActivity
+		if err := rows.Scan(&a.ID, &a.Name, &a.SportType, &a.StartDate, &a.Distance, &a.MovingTime); err != nil {
+			return nil, err
+		}
+		activities = append(activities, a)
+	}
+
+	return activities, rows.Err()
 }
 
 // YearStat represents statistics for a single year.
