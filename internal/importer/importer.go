@@ -343,7 +343,7 @@ func (i *Importer) importActivity(ctx context.Context, a *strava.Activity, athle
 
 	// Hashtag-based maintenance logging.
 	if i.maintenance != nil {
-		if _, err := i.maintenance.LogFromActivityHashtags(ctx, athleteID, act.ID, act.StartDateLocal, act.Name); err != nil {
+		if _, err := i.maintenance.LogFromActivityHashtags(ctx, athleteID, act.ID, act.StartDateLocal.Time, act.Name); err != nil {
 			slog.Debug("failed to log maintenance from hashtags", "activity_id", act.ID, "error", err)
 		}
 	}
@@ -414,7 +414,7 @@ func (i *Importer) importBestEfforts(ctx context.Context, a *strava.Activity, at
 			continue
 		}
 		dt, canonM := canonicalBestEffortDistanceType(be.Distance, be.Name)
-		start := be.StartDate
+		start := storage.SQLiteTime{Time: be.StartDate}
 		moving := be.MovingTime
 		out = append(out, storage.BestEffort{
 			AthleteID:    athleteID,
@@ -479,6 +479,13 @@ func ptrInt(v int) *int {
 	return &v
 }
 
+func ptrSQLiteTime(t *time.Time) *storage.SQLiteTime {
+	if t == nil {
+		return nil
+	}
+	return &storage.SQLiteTime{Time: *t}
+}
+
 func floatSliceLatLng(latlng []float64) (lat *float64, lng *float64) {
 	if len(latlng) < 2 {
 		return nil, nil
@@ -538,14 +545,14 @@ func (i *Importer) importSegments(ctx context.Context, a *strava.Activity, athle
 			AthleteKOMRank:       segDetail.AthleteSegmentStats.KOMRank,
 			AthleteEffortCount:   effortCount,
 			AthletePRElapsedTime: prElapsed,
-			AthletePRDate:        segDetail.AthleteSegmentStats.PRDate,
+			AthletePRDate:        ptrSQLiteTime(segDetail.AthleteSegmentStats.PRDate),
 		}
 		if err := i.segments.UpsertSegment(ctx, s); err != nil {
 			return fmt.Errorf("upserting segment %d: %w", segDetail.ID, err)
 		}
 
-		startDate := effort.StartDate
-		startDateLocal := effort.StartDateLocal
+		startDate := storage.SQLiteTime{Time: effort.StartDate}
+		startDateLocal := storage.SQLiteTime{Time: effort.StartDateLocal}
 		e := &storage.SegmentEffort{
 			ID:               effort.ID,
 			SegmentID:        segDetail.ID,

@@ -22,8 +22,8 @@ type Athlete struct {
 	ProfileMedium string
 	Profile       string
 	Weight        float64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	CreatedAt     SQLiteTime
+	UpdatedAt     SQLiteTime
 }
 
 // AuthToken represents stored OAuth tokens.
@@ -32,9 +32,9 @@ type AuthToken struct {
 	AccessToken  string
 	RefreshToken string
 	TokenType    string
-	ExpiresAt    time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ExpiresAt    SQLiteTime
+	CreatedAt    SQLiteTime
+	UpdatedAt    SQLiteTime
 }
 
 // AthleteRepository handles athlete persistence.
@@ -187,15 +187,14 @@ func (r *TokenRepository) GetByAthleteID(ctx context.Context, athleteID int64) (
 	return &t, nil
 }
 
-// GetActive retrieves tokens that haven't expired yet.
+// GetActive retrieves all tokens (refresh tokens don't expire, access tokens will be refreshed).
 func (r *TokenRepository) GetActive(ctx context.Context) ([]AuthToken, error) {
 	rows, err := r.db.Query(`
 		SELECT athlete_id, access_token, refresh_token, token_type,
 			expires_at, created_at, updated_at
 		FROM auth_tokens
-		WHERE expires_at > ?
 		ORDER BY athlete_id
-	`, time.Now())
+	`)
 	if err != nil {
 		return nil, err
 	}

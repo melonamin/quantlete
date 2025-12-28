@@ -15,9 +15,9 @@ type Challenge struct {
 	Name           string     `json:"name"`
 	Slug           string     `json:"slug,omitempty"`
 	BadgeURL       string     `json:"badge_url,omitempty"`
-	CompletionDate *time.Time `json:"completion_date,omitempty"`
+	CompletionDate *SQLiteTime `json:"completion_date,omitempty"`
 	Month          string     `json:"month,omitempty"` // YYYY-MM
-	CreatedAt      time.Time  `json:"created_at"`
+	CreatedAt            SQLiteTime  `json:"created_at"`
 }
 
 type ChallengeRepository struct {

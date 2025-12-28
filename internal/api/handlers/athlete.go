@@ -37,7 +37,7 @@ func parseMetricPoints(points []metricPointDTO) ([]storage.AthleteMetricPoint, e
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, storage.AthleteMetricPoint{RecordedAt: t, Value: p.Value})
+		out = append(out, storage.AthleteMetricPoint{RecordedAt: storage.SQLiteTime{Time: t}, Value: p.Value})
 	}
 	return out, nil
 }

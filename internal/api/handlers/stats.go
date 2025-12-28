@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -159,6 +160,7 @@ func (h *StatsHandler) GetEddingtonData(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.stats.GetEddingtonData(r.Context(), athlete.ID, sportTypes)
 	if err != nil {
+		slog.Error("failed to get eddington data", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get eddington data"})
 		return
 	}
@@ -181,6 +183,7 @@ func (h *StatsHandler) GetEddingtonHistory(w http.ResponseWriter, r *http.Reques
 
 	points, err := h.stats.GetEddingtonHistory(r.Context(), athlete.ID, sportTypes)
 	if err != nil {
+		slog.Error("failed to get eddington history", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get eddington history"})
 		return
 	}
@@ -756,9 +759,9 @@ func (h *StatsHandler) GetDaytimeDistribution(w http.ResponseWriter, r *http.Req
 	query := `
 		SELECT
 			CASE
-				WHEN CAST(strftime(start_date_local, '%H') AS INTEGER) BETWEEN 5 AND 11 THEN 'Morning'
-				WHEN CAST(strftime(start_date_local, '%H') AS INTEGER) BETWEEN 12 AND 16 THEN 'Afternoon'
-				WHEN CAST(strftime(start_date_local, '%H') AS INTEGER) BETWEEN 17 AND 21 THEN 'Evening'
+				WHEN CAST(strftime('%H', start_date_local) AS INTEGER) BETWEEN 5 AND 11 THEN 'Morning'
+				WHEN CAST(strftime('%H', start_date_local) AS INTEGER) BETWEEN 12 AND 16 THEN 'Afternoon'
+				WHEN CAST(strftime('%H', start_date_local) AS INTEGER) BETWEEN 17 AND 21 THEN 'Evening'
 				ELSE 'Night'
 			END AS bucket,
 			COUNT(*) AS count
@@ -817,7 +820,7 @@ func (h *StatsHandler) GetWeekdayDistribution(w http.ResponseWriter, r *http.Req
 	}
 
 	query := `
-		SELECT CAST(strftime(start_date_local, '%w') AS INTEGER) AS weekday, COUNT(*) AS count
+		SELECT CAST(strftime('%w', start_date_local) AS INTEGER) AS weekday, COUNT(*) AS count
 		FROM activities
 		WHERE athlete_id = ?
 	`

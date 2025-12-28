@@ -63,7 +63,7 @@ func (db *DB) createMigrationsTable() error {
 		CREATE TABLE IF NOT EXISTS _migrations (
 			version INTEGER PRIMARY KEY,
 			name TEXT NOT NULL,
-			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			applied_at TEXT DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
 	return err

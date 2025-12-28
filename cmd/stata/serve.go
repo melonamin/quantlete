@@ -176,7 +176,7 @@ func restoreAuth(
 		AccessToken:  storedToken.AccessToken,
 		RefreshToken: storedToken.RefreshToken,
 		TokenType:    storedToken.TokenType,
-		Expiry:       storedToken.ExpiresAt,
+		Expiry:       storedToken.ExpiresAt.Time,
 	}
 
 	// Convert to strava.Athlete

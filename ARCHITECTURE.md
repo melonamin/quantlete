@@ -13,8 +13,8 @@ This document describes the technical architecture for implementing the Statisti
 | **Single binary distribution** | Go with embedded React assets via `go:embed` |
 | **CLI + Web modes** | Cobra CLI with `serve` and utility commands |
 | **Rich UI** | React 18 + shadcn/ui + Tailwind CSS |
-| **Analytics performance** | DuckDB for OLAP-optimized queries |
-| **Browser-only option** | DuckDB-WASM with OPFS persistence |
+| **Analytics performance** | SQLite for reliable local storage |
+| **Browser-only option** | SQLite-WASM with OPFS persistence |
 | **Self-hosted simplicity** | SQLite-like deployment (single file database) |
 
 ### 1.2 High-Level Architecture
@@ -34,7 +34,7 @@ This document describes the technical architecture for implementing the Statisti
 │  │       │           │       │  │  ┌─────────────────────────────────┐  │
 │  │       └─────┬─────┘       │  │  │         React SPA               │  │
 │  │             │             │  │  │  ┌───────────┐ ┌─────────────┐  │  │
-│  │             ▼             │  │  │  │  UI Layer │ │ DuckDB-WASM │  │  │
+│  │             ▼             │  │  │  │  UI Layer │ │ SQLite-WASM │  │  │
 │  │  ┌─────────────────────┐  │  │  │  └─────┬─────┘ └──────┬──────┘  │  │
 │  │  │   Embedded React    │  │  │  │        │              │         │  │
 │  │  │   (go:embed dist/)  │  │  │  │        └──────┬───────┘         │  │
@@ -42,13 +42,13 @@ This document describes the technical architecture for implementing the Statisti
 │  │             │             │  │  │               ▼                 │  │
 │  │             ▼             │  │  │  ┌─────────────────────────┐    │  │
 │  │  ┌─────────────────────┐  │  │  │  │   OPFS (Browser FS)     │    │  │
-│  │  │       DuckDB        │  │  │  │  │   stata.duckdb          │    │  │
-│  │  │    (CGO driver)     │  │  │  │  └─────────────────────────┘    │  │
+│  │  │       SQLite        │  │  │  │  │   stata.db              │    │  │
+│  │  │  (pure Go driver)   │  │  │  │  └─────────────────────────┘    │  │
 │  │  └─────────────────────┘  │  │  └─────────────────────────────────┘  │
 │  │             │             │  │                 │                     │
 │  │             ▼             │  │                 │                     │
 │  │  ┌─────────────────────┐  │  │                 │                     │
-│  │  │   stata.duckdb      │  │  │                 │                     │
+│  │  │     stata.db        │  │  │                 │                     │
 │  │  │   (local file)      │  │  │                 │                     │
 │  │  └─────────────────────┘  │  │                 │                     │
 │  └───────────────────────────┘  │                 │                     │
@@ -74,7 +74,7 @@ This document describes the technical architecture for implementing the Statisti
 | HTTP Router | chi | v5 | Stdlib-compatible, middleware support |
 | CLI Framework | cobra | v1.8+ | Industry standard for Go CLIs |
 | Configuration | viper | v1.18+ | Multi-source config, cobra integration |
-| Database | go-duckdb | latest | CGO driver for DuckDB |
+| Database | modernc.org/sqlite | latest | Pure Go SQLite driver (no CGO) |
 | OAuth | golang.org/x/oauth2 | latest | Standard OAuth2 implementation |
 | Scheduler | robfig/cron | v3 | Cron expression support |
 | Logging | slog | stdlib | Structured logging (Go 1.21+) |
@@ -98,7 +98,7 @@ This document describes the technical architecture for implementing the Statisti
 | Data Fetching | TanStack Query | 5.x | Caching, background refresh |
 | Router | TanStack Router | 1.x | Type-safe routing |
 | Forms | React Hook Form | 7.x | Performance, validation |
-| DuckDB WASM | @duckdb/duckdb-wasm | latest | Browser-only mode |
+| SQLite WASM | @aspect-build/sqlite3-wasm | latest | Browser-only mode |
 
 ### 2.3 Build & Tooling
 
@@ -112,20 +112,18 @@ This document describes the technical architecture for implementing the Statisti
 | Testing (E2E) | Playwright | User preference |
 | CI/CD | GitHub Actions | Standard, GoReleaser integration |
 
-### 2.4 Database: DuckDB
+### 2.4 Database: SQLite
 
-**Why DuckDB over SQLite:**
+**Why SQLite:**
 
-| Aspect | DuckDB | SQLite |
-|--------|--------|--------|
-| Query Type | OLAP (analytics) | OLTP (transactions) |
-| Aggregations | Optimized, columnar | Row-by-row |
-| Window Functions | First-class | Supported but slower |
-| Parquet Support | Native | Requires extension |
-| WASM | Official, maintained | sql.js (community) |
-| Time Series | Excellent | Adequate |
+SQLite was chosen for its simplicity and reliability:
 
-For an analytics dashboard with heavy aggregations, GROUP BY, and time-range queries, DuckDB provides significant performance advantages.
+- **Pure Go driver** - `modernc.org/sqlite` requires no CGO, simplifying cross-compilation
+- **Battle-tested** - Most widely deployed database engine
+- **Single file** - Simple backup and portability
+- **Zero configuration** - No server setup required
+- **WASM support** - Available for browser-only mode via sql.js or @aspect-build/sqlite3-wasm
+- **Adequate performance** - For a single-user analytics dashboard, SQLite provides sufficient performance
 
 ---
 
@@ -171,7 +169,7 @@ stata/
 │   │   └── loader.go           # Viper loading logic
 │   │
 │   ├── storage/
-│   │   ├── db.go               # DuckDB connection management
+│   │   ├── db.go               # SQLite connection management
 │   │   ├── migrations.go       # Schema migrations
 │   │   ├── activities.go       # Activity repository
 │   │   ├── segments.go         # Segment repository
@@ -308,7 +306,7 @@ stata/
 │   │   │   │   ├── index.ts          # DataSource factory
 │   │   │   │   ├── types.ts          # Shared interfaces
 │   │   │   │   ├── api-client.ts     # REST API implementation
-│   │   │   │   └── wasm-client.ts    # DuckDB-WASM implementation
+│   │   │   │   └── wasm-client.ts    # SQLite-WASM implementation
 │   │   │   │
 │   │   │   ├── strava/
 │   │   │   │   ├── client.ts         # Direct Strava API (WASM mode)
@@ -1093,7 +1091,7 @@ In browser-only mode:
 1. React app is served from static hosting (CDN, GitHub Pages)
 2. User authenticates directly with Strava (implicit OAuth flow)
 3. Browser fetches data from Strava API (CORS is supported)
-4. Data is stored in DuckDB-WASM with OPFS persistence
+4. Data is stored in SQLite-WASM with OPFS persistence
 5. All processing happens client-side
 
 ### 8.2 Strava OAuth in Browser
@@ -1128,41 +1126,32 @@ export async function exchangeCode(code: string): Promise<TokenResponse> {
 }
 ```
 
-### 8.3 DuckDB-WASM Setup
+### 8.3 SQLite-WASM Setup
 
 ```typescript
 // web/src/lib/db/wasm-client.ts
 
-import * as duckdb from '@duckdb/duckdb-wasm';
-import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
-import duckdb_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
+import initSqlJs, { Database } from 'sql.js';
 
 export class WasmDataSource implements DataSource {
-  private db: duckdb.AsyncDuckDB | null = null;
-  private conn: duckdb.AsyncDuckDBConnection | null = null;
+  private db: Database | null = null;
 
   async initialize(): Promise<void> {
-    const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
-      mvp: {
-        mainModule: duckdb_wasm,
-        mainWorker: duckdb_worker,
-      },
-    };
-
-    const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-    const worker = new Worker(bundle.mainWorker!);
-    const logger = new duckdb.ConsoleLogger();
-
-    this.db = new duckdb.AsyncDuckDB(logger, worker);
-    await this.db.instantiate(bundle.mainModule);
-
-    // Open database with OPFS persistence
-    await this.db.open({
-      path: 'opfs://stata.duckdb',
-      accessMode: duckdb.AccessMode.ReadWrite,
+    const SQL = await initSqlJs({
+      locateFile: (file) => `https://sql.js.org/dist/${file}`,
     });
 
-    this.conn = await this.db.connect();
+    // Try to load existing database from OPFS
+    const opfsRoot = await navigator.storage.getDirectory();
+    try {
+      const fileHandle = await opfsRoot.getFileHandle('stata.db');
+      const file = await fileHandle.getFile();
+      const buffer = await file.arrayBuffer();
+      this.db = new SQL.Database(new Uint8Array(buffer));
+    } catch {
+      // Create new database if none exists
+      this.db = new SQL.Database();
+    }
 
     // Run migrations if needed
     await this.runMigrations();
@@ -1175,11 +1164,21 @@ export class WasmDataSource implements DataSource {
 
   async getActivities(filters: ActivityFilters): Promise<PaginatedResult<Activity>> {
     const { sql, params } = buildActivityQuery(filters);
-    const result = await this.conn!.query(sql, ...params);
+    const result = this.db!.exec(sql, params);
     return {
-      data: result.toArray().map(rowToActivity),
+      data: result[0]?.values.map(rowToActivity) ?? [],
       meta: { /* pagination */ }
     };
+  }
+
+  async persist(): Promise<void> {
+    // Save database to OPFS
+    const data = this.db!.export();
+    const opfsRoot = await navigator.storage.getDirectory();
+    const fileHandle = await opfsRoot.getFileHandle('stata.db', { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(data);
+    await writable.close();
   }
 
   // ... implement other methods
@@ -1204,7 +1203,7 @@ export class WasmDataSource implements DataSource {
 
 ### 9.1 Self-Hosted Mode
 
-- OAuth tokens stored in DuckDB database file
+- OAuth tokens stored in SQLite database file
 - Database file should have restricted permissions (0600)
 - No built-in authentication (single-user assumption)
 - If exposing to internet, place behind reverse proxy with auth
@@ -1228,7 +1227,7 @@ export class WasmDataSource implements DataSource {
 
 ### 10.1 Database
 
-- DuckDB columnar storage is optimal for dashboard aggregations
+- SQLite is adequate for single-user dashboard aggregations
 - Consider materializing frequently-used aggregates
 - Stream data (activity_streams) is the largest table - query selectively
 - Use OPFS in WASM for better performance than IndexedDB

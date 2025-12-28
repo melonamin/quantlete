@@ -185,7 +185,7 @@ func (h *AuthHandler) persistToken(ctx context.Context, token *oauth2.Token, ath
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		TokenType:    token.TokenType,
-		ExpiresAt:    token.Expiry,
+		ExpiresAt:    storage.SQLiteTime{Time: token.Expiry},
 	}
 	return h.tokens.Upsert(ctx, storageToken)
 }

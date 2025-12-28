@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -174,6 +175,7 @@ func (h *SegmentsHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.segments.List(r.Context(), athlete.ID, f, limit)
 	if err != nil {
+		slog.Error("failed to list segments", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list segments"})
 		return
 	}

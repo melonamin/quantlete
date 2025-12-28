@@ -40,14 +40,14 @@ type WeeklyStat struct {
 
 // RecentActivity represents a simplified activity for the dashboard.
 type RecentActivity struct {
-	ID              int64     `json:"id"`
-	Name            string    `json:"name"`
-	SportType       string    `json:"sport_type"`
-	StartDate       time.Time `json:"start_date"`
-	Distance        float64   `json:"distance"`
-	MovingTime      int       `json:"moving_time"`
-	ElevationGain   float64   `json:"elevation_gain"`
-	SummaryPolyline string    `json:"summary_polyline,omitempty"`
+	ID              int64      `json:"id"`
+	Name            string     `json:"name"`
+	SportType       string     `json:"sport_type"`
+	StartDate       SQLiteTime `json:"start_date"`
+	Distance        float64    `json:"distance"`
+	MovingTime      int        `json:"moving_time"`
+	ElevationGain   float64    `json:"elevation_gain"`
+	SummaryPolyline string     `json:"summary_polyline,omitempty"`
 }
 
 // StatsRepository handles statistics queries.
@@ -255,7 +255,7 @@ type MonthlyStat struct {
 func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, year int) ([]MonthlyStat, error) {
 	query := `
 		SELECT
-			strftime(start_date, '%Y-%m') as month,
+			strftime('%Y-%m', start_date) as month,
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance,
 			COALESCE(SUM(moving_time), 0) as total_time,
@@ -266,7 +266,7 @@ func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, 
 	args := []interface{}{athleteID}
 
 	if year > 0 {
-		query += ` AND strftime(start_date, '%Y') = ?`
+		query += ` AND strftime('%Y', start_date) = ?`
 		args = append(args, year)
 	}
 
@@ -305,7 +305,7 @@ type CalendarActivity struct {
 	ID                 int64     `json:"id"`
 	Name               string    `json:"name"`
 	SportType          string    `json:"sport_type"`
-	StartDate          time.Time `json:"start_date"`
+	StartDate            SQLiteTime `json:"start_date"`
 	Distance           float64   `json:"distance"`
 	MovingTime         int       `json:"moving_time"`
 	TotalElevationGain float64   `json:"total_elevation_gain"`
@@ -315,11 +315,11 @@ type CalendarActivity struct {
 func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, year int) ([]CalendarDay, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			strftime(start_date, '%Y-%m-%d') as date,
+			strftime('%Y-%m-%d', start_date) as date,
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance
 		FROM activities
-		WHERE athlete_id = ? AND strftime(start_date, '%Y') = ?
+		WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
 		GROUP BY date
 		ORDER BY date ASC
 	`, athleteID, year)
@@ -346,8 +346,8 @@ func (r *StatsRepository) GetCalendarActivities(ctx context.Context, athleteID i
 		SELECT id, name, sport_type, start_date, distance, moving_time, COALESCE(total_elevation_gain, 0)
 		FROM activities
 		WHERE athlete_id = ?
-		  AND CAST(strftime(start_date, '%Y') AS INTEGER) = ?
-		  AND CAST(strftime(start_date, '%m') AS INTEGER) = ?
+		  AND CAST(strftime('%Y', start_date) AS INTEGER) = ?
+		  AND CAST(strftime('%m', start_date) AS INTEGER) = ?
 		ORDER BY start_date ASC
 	`, athleteID, year, month)
 	if err != nil {
@@ -394,8 +394,8 @@ func (r *StatsRepository) GetCalendarMonthSummary(ctx context.Context, athleteID
 			COALESCE(SUM(CASE WHEN workout_type IS NOT NULL AND workout_type != 0 THEN 1 ELSE 0 END), 0) AS workout_count
 		FROM activities
 		WHERE athlete_id = ?
-		  AND CAST(strftime(start_date, '%Y') AS INTEGER) = ?
-		  AND CAST(strftime(start_date, '%m') AS INTEGER) = ?
+		  AND CAST(strftime('%Y', start_date) AS INTEGER) = ?
+		  AND CAST(strftime('%m', start_date) AS INTEGER) = ?
 	`, athleteID, year, month).Scan(
 		&s.ActivityCount,
 		&s.TotalDistance,
@@ -451,7 +451,7 @@ type HeatmapFilters struct {
 func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) ([]YearStat, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			CAST(strftime(start_date, '%Y') AS INTEGER) as year,
+			CAST(strftime('%Y', start_date) AS INTEGER) as year,
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance,
 			COALESCE(SUM(moving_time), 0) as total_time,
@@ -683,7 +683,7 @@ type EddingtonStep struct {
 func (r *StatsRepository) GetEddingtonData(ctx context.Context, athleteID int64, sportTypes []string) (*EddingtonResult, error) {
 	query := `
 		SELECT
-			strftime(start_date, '%Y-%m-%d') as date,
+			strftime('%Y-%m-%d', start_date) as date,
 			SUM(distance) / 1000.0 as distance_km
 		FROM activities
 		WHERE athlete_id = ?

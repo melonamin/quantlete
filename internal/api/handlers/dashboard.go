@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -114,24 +115,28 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 	// Fetch all dashboard data
 	stats, err := h.stats.GetDashboardStats(ctx, athlete.ID)
 	if err != nil {
+		slog.Error("failed to get dashboard stats", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get stats"})
 		return
 	}
 
 	weeklyStats, err := h.stats.GetWeeklyStats(ctx, athlete.ID)
 	if err != nil {
+		slog.Error("failed to get weekly stats", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get weekly stats"})
 		return
 	}
 
 	recentActivities, err := h.stats.GetRecentActivities(ctx, athlete.ID, 5)
 	if err != nil {
+		slog.Error("failed to get recent activities", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get recent activities"})
 		return
 	}
 
 	sportTypeStats, err := h.stats.GetStatsBySportType(ctx, athlete.ID)
 	if err != nil {
+		slog.Error("failed to get sport type stats", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get sport type stats"})
 		return
 	}

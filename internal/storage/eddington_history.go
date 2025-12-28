@@ -15,7 +15,7 @@ type EddingtonHistoryPoint struct {
 func (r *StatsRepository) GetEddingtonHistory(ctx context.Context, athleteID int64, sportTypes []string) ([]EddingtonHistoryPoint, error) {
 	query := `
 		SELECT
-			CAST(strftime(start_date_local, '%Y-%m-%d') AS VARCHAR) AS day,
+			strftime('%Y-%m-%d', start_date_local) AS day,
 			SUM(distance) / 1000.0 AS distance_km
 		FROM activities
 		WHERE athlete_id = ?

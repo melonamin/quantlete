@@ -9,38 +9,45 @@ import (
 	"path/filepath"
 	"sync"
 
-	_ "github.com/marcboeker/go-duckdb" // DuckDB driver
+	_ "modernc.org/sqlite" // SQLite driver (pure Go)
 )
 
-// DB wraps a DuckDB database connection.
+// DB wraps a SQLite database connection.
 type DB struct {
 	conn *sql.DB
 	path string
 	mu   sync.RWMutex
 }
 
-// Open opens or creates a DuckDB database at the given path.
+// Open opens or creates a SQLite database at the given path.
 func Open(dataDir string) (*DB, error) {
 	// Ensure data directory exists
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating data directory: %w", err)
 	}
 
-	dbPath := filepath.Join(dataDir, "stata.duckdb")
+	dbPath := filepath.Join(dataDir, "stata.db")
 
-	conn, err := sql.Open("duckdb", dbPath)
+	dsn := dbPath
+	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	// Configure connection pool
-	conn.SetMaxOpenConns(1) // DuckDB works best with a single connection
+	conn.SetMaxOpenConns(1) // SQLite works best with a single connection
 	conn.SetMaxIdleConns(1)
 
 	// Test connection
 	if err := conn.Ping(); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("connecting to database: %w", err)
+	}
+
+	// Enable foreign keys (disabled by default in SQLite)
+	if _, err := conn.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
 	db := &DB{
@@ -51,9 +58,9 @@ func Open(dataDir string) (*DB, error) {
 	return db, nil
 }
 
-// OpenInMemory opens an in-memory DuckDB database (for testing).
+// OpenInMemory opens an in-memory SQLite database (for testing).
 func OpenInMemory() (*DB, error) {
-	conn, err := sql.Open("duckdb", "")
+	conn, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return nil, fmt.Errorf("opening in-memory database: %w", err)
 	}
@@ -64,6 +71,12 @@ func OpenInMemory() (*DB, error) {
 	if err := conn.Ping(); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("connecting to in-memory database: %w", err)
+	}
+
+	// Enable foreign keys
+	if _, err := conn.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
 	return &DB{

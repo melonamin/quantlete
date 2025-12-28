@@ -22,8 +22,8 @@ type Gear struct {
 	Hashtag          string
 	PurchasePrice    *float64
 	PurchaseCurrency string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	CreatedAt        SQLiteTime
+	UpdatedAt        SQLiteTime
 }
 
 // GearRepository handles gear persistence.

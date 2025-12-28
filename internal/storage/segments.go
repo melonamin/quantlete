@@ -26,9 +26,9 @@ type Segment struct {
 	AthleteKOMRank       *int
 	AthleteEffortCount   *int
 	AthletePRElapsedTime *int
-	AthletePRDate        *time.Time
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	AthletePRDate        *SQLiteTime
+	CreatedAt            SQLiteTime
+	UpdatedAt            SQLiteTime
 }
 
 type SegmentEffort struct {
@@ -39,15 +39,15 @@ type SegmentEffort struct {
 	Name             string
 	ElapsedTime      int
 	MovingTime       int
-	StartDate        *time.Time
-	StartDateLocal   *time.Time
+	StartDate        *SQLiteTime
+	StartDateLocal   *SQLiteTime
 	Distance         float64
 	AverageWatts     *float64
 	AverageHeartrate *float64
 	MaxHeartrate     *int
 	PRRank           *int
 	Country          string
-	CreatedAt        time.Time
+	CreatedAt        SQLiteTime
 }
 
 type SegmentRepository struct {
@@ -130,9 +130,9 @@ func (r *SegmentRepository) UpsertEffort(ctx context.Context, e *SegmentEffort) 
 
 type SegmentListItem struct {
 	Segment
-	TimesCompleted  int        `json:"times_completed"`
-	LastEffortDate  *time.Time `json:"last_effort_date,omitempty"`
-	BestElapsedTime *int       `json:"best_elapsed_time,omitempty"`
+	TimesCompleted  int         `json:"times_completed"`
+	LastEffortDate  *SQLiteTime `json:"last_effort_date,omitempty"`
+	BestElapsedTime *int        `json:"best_elapsed_time,omitempty"`
 }
 
 type SegmentFilters struct {
@@ -181,7 +181,7 @@ func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f Segment
 		query += " AND s.athlete_kom_rank = 1"
 	}
 	if f.Search != "" {
-		query += " AND s.name ILIKE ?"
+		query += " AND s.name LIKE ? COLLATE NOCASE"
 		args = append(args, "%"+f.Search+"%")
 	}
 

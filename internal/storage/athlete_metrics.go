@@ -8,7 +8,7 @@ import (
 )
 
 type AthleteMetricPoint struct {
-	RecordedAt time.Time `json:"recorded_at"`
+	RecordedAt           SQLiteTime `json:"recorded_at"`
 	Value      float64   `json:"value"`
 }
 

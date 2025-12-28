@@ -28,11 +28,11 @@ const hrZoneDefinitionsTable = "hr_zone_definitions"
 func (r *ZonesRepository) ensureHRZoneDefinitionsTable(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS hr_zone_definitions (
-			athlete_id BIGINT NOT NULL REFERENCES athletes(id),
+			athlete_id INTEGER NOT NULL REFERENCES athletes(id),
 			sport_type TEXT NOT NULL,
-			effective_from DATE NOT NULL,
+			effective_from TEXT NOT NULL,
 			method TEXT NOT NULL,
-			zones JSON NOT NULL,
+			zones TEXT NOT NULL,
 			PRIMARY KEY (athlete_id, sport_type, effective_from)
 		)
 	`)
@@ -45,7 +45,7 @@ func (r *ZonesRepository) ensureHRZoneDefinitionsTable(ctx context.Context) erro
 
 func (r *ZonesRepository) ListHR(ctx context.Context, athleteID int64) ([]HRZoneDefinition, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT athlete_id, sport_type, CAST(effective_from AS VARCHAR), method, zones
+		SELECT athlete_id, sport_type, effective_from, method, zones
 		FROM hr_zone_definitions
 		WHERE athlete_id = ?
 		ORDER BY sport_type ASC, effective_from DESC
@@ -56,7 +56,7 @@ func (r *ZonesRepository) ListHR(ctx context.Context, athleteID int64) ([]HRZone
 				return nil, err
 			}
 			rows, err = r.db.QueryContext(ctx, `
-				SELECT athlete_id, sport_type, CAST(effective_from AS VARCHAR), method, zones
+				SELECT athlete_id, sport_type, effective_from, method, zones
 				FROM hr_zone_definitions
 				WHERE athlete_id = ?
 				ORDER BY sport_type ASC, effective_from DESC
@@ -157,23 +157,23 @@ func (r *ZonesRepository) GetApplicableHR(ctx context.Context, athleteID int64, 
 		var effective string
 		var zonesStr string
 		err := r.db.QueryRowContext(ctx, `
-			SELECT sport_type, CAST(effective_from AS VARCHAR), method, zones
+			SELECT sport_type, effective_from, method, zones
 			FROM hr_zone_definitions
-			WHERE athlete_id = ? AND sport_type = ? AND effective_from <= CAST(? AS DATE)
+			WHERE athlete_id = ? AND sport_type = ? AND effective_from <= date(?)
 			ORDER BY effective_from DESC
 			LIMIT 1
-		`, athleteID, st, at).Scan(&def.SportType, &effective, &def.Method, &zonesStr)
+		`, athleteID, st, at.Format("2006-01-02")).Scan(&def.SportType, &effective, &def.Method, &zonesStr)
 		if err != nil && isMissingTable(err, hrZoneDefinitionsTable) {
 			if err2 := r.ensureHRZoneDefinitionsTable(ctx); err2 != nil {
 				return nil, nil, err2
 			}
 			err = r.db.QueryRowContext(ctx, `
-				SELECT sport_type, CAST(effective_from AS VARCHAR), method, zones
+				SELECT sport_type, effective_from, method, zones
 				FROM hr_zone_definitions
-				WHERE athlete_id = ? AND sport_type = ? AND effective_from <= CAST(? AS DATE)
+				WHERE athlete_id = ? AND sport_type = ? AND effective_from <= date(?)
 				ORDER BY effective_from DESC
 				LIMIT 1
-			`, athleteID, st, at).Scan(&def.SportType, &effective, &def.Method, &zonesStr)
+			`, athleteID, st, at.Format("2006-01-02")).Scan(&def.SportType, &effective, &def.Method, &zonesStr)
 		}
 		if err != nil {
 			if isNotFound(err) {

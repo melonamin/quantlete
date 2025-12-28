@@ -87,7 +87,7 @@ type RewindReport struct {
 
 func (r *StatsRepository) ListRewindYears(ctx context.Context, athleteID int64) ([]int, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT CAST(strftime(start_date_local, '%Y') AS INTEGER) AS y
+		SELECT DISTINCT CAST(strftime('%Y', start_date_local) AS INTEGER) AS y
 		FROM activities
 		WHERE athlete_id = ?
 		ORDER BY y DESC
@@ -218,7 +218,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 
 		rows, err := r.db.QueryContext(ctx, `
 			SELECT
-				CAST(strftime(start_date_local, '%m') AS INTEGER) AS m,
+				CAST(strftime('%m', start_date_local) AS INTEGER) AS m,
 				COUNT(*) AS activities,
 				SUM(distance) AS distance_m,
 				SUM(total_elevation_gain) AS elevation_m
@@ -275,7 +275,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 				FROM w
 			)
 			SELECT
-				CAST(strftime(dt, '%m') AS INTEGER) AS mon,
+				CAST(strftime('%m', dt) AS INTEGER) AS mon,
 				COUNT(*) AS prs
 			FROM m
 			WHERE dt >= ? AND (prev_best IS NULL OR best_so_far < prev_best)
@@ -329,7 +329,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		hours[h] = RewindHourCount{Hour: h, Count: 0}
 	}
 	hrRows, err := r.db.QueryContext(ctx, `
-		SELECT CAST(strftime(start_date_local, '%H') AS INTEGER) AS h, COUNT(*) AS c
+		SELECT CAST(strftime('%H', start_date_local) AS INTEGER) AS h, COUNT(*) AS c
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		GROUP BY h
@@ -422,7 +422,7 @@ func computeRewindStreaks(ctx context.Context, db *DB, athleteID int64, start, e
 
 	active := map[string]bool{}
 	for rows.Next() {
-		var day time.Time
+		var day SQLiteTime
 		if err := rows.Scan(&day); err != nil {
 			continue
 		}
@@ -469,7 +469,7 @@ func queryBiggest(ctx context.Context, db *DB, athleteID int64, start, end time.
 	`, athleteID, start, end)
 
 	var a RewindBiggestActivity
-	var startLocal time.Time
+	var startLocal SQLiteTime
 	var v sql.NullFloat64
 	if metric == "moving_time" {
 		var vv sql.NullInt64

@@ -17,7 +17,7 @@ type Photo struct {
 	ThumbnailURL string          `json:"thumbnail_url,omitempty"`
 	Caption      string          `json:"caption,omitempty"`
 	Location     json.RawMessage `json:"location,omitempty"`
-	CreatedAt    time.Time       `json:"created_at"`
+	CreatedAt    SQLiteTime      `json:"created_at"`
 }
 
 type PhotoRepository struct {
@@ -83,10 +83,10 @@ type PhotoListFilters struct {
 
 type PhotoListItem struct {
 	Photo
-	ActivityName    string    `json:"activity_name"`
-	SportType       string    `json:"sport_type"`
-	StartDateLocal  time.Time `json:"start_date_local"`
-	LocationCountry string    `json:"location_country,omitempty"`
+	ActivityName    string     `json:"activity_name"`
+	SportType       string     `json:"sport_type"`
+	StartDateLocal  SQLiteTime `json:"start_date_local"`
+	LocationCountry string     `json:"location_country,omitempty"`
 }
 
 type PhotoFacetCount struct {

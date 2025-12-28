@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 )
 
 type BestEffort struct {
@@ -19,7 +18,7 @@ type BestEffort struct {
 	StartIndex   *int
 	EndIndex     *int
 	PRRank       *int
-	StartDate    *time.Time
+	StartDate    *SQLiteTime
 }
 
 type BestEffortPR struct {
@@ -32,7 +31,7 @@ type BestEffortPR struct {
 	ActivityID     int64
 	ActivityName   string
 	SportType      string
-	StartDateLocal time.Time
+	StartDateLocal       SQLiteTime
 }
 
 type BestEffortListItem struct {
@@ -47,7 +46,7 @@ type BestEffortListItem struct {
 	ActivityID     int64
 	ActivityName   string
 	SportType      string
-	StartDateLocal time.Time
+	StartDateLocal       SQLiteTime
 }
 
 type BestEffortsRepository struct {
@@ -288,9 +287,9 @@ func nullIntPtr(v *int) any {
 	return *v
 }
 
-func nullTimePtr(t *time.Time) any {
+func nullTimePtr(t *SQLiteTime) any {
 	if t == nil {
 		return nil
 	}
-	return *t
+	return t.Time
 }

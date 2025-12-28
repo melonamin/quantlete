@@ -37,7 +37,7 @@ func NewTrainingLoadRepository(db *DB, streams *StreamRepository, metrics *Athle
 type ActivityForLoad struct {
 	ID          int64
 	SportType   string
-	StartDate   time.Time
+	StartDate            SQLiteTime
 	MovingTimeS int
 }
 
@@ -107,7 +107,7 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 
 	// 1) Cycling: power-based TSS.
 	if len(wattsRaw) > 0 {
-		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_cycling_watts", a.StartDate)
+		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_cycling_watts", a.StartDate.Time)
 		if err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 
 	// 2) Running: pace/speed-based TSS (threshold speed).
 	if isRun && len(speedRaw) > 0 {
-		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_running_mps", a.StartDate)
+		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_running_mps", a.StartDate.Time)
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 
 	// 3) Running: HR-based TSS (approximate LTHR from HR zone definition).
 	if isRun && len(hrRaw) > 0 && r.zones != nil {
-		def, cfg, err := r.zones.GetApplicableHR(ctx, athleteID, a.SportType, a.StartDate)
+		def, cfg, err := r.zones.GetApplicableHR(ctx, athleteID, a.SportType, a.StartDate.Time)
 		if err != nil {
 			return err
 		}
@@ -220,7 +220,7 @@ func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID i
 	defer func() { _ = rows.Close() }()
 
 	type dayRow struct {
-		Day time.Time
+		Day SQLiteTime
 		TSS float64
 	}
 	var days []dayRow
@@ -292,7 +292,7 @@ func round2(v float64) float64 {
 }
 
 func (r *TrainingLoadRepository) GetSummary(ctx context.Context, athleteID int64) (*DailyTrainingLoadPoint, error) {
-	var day time.Time
+	var day SQLiteTime
 	var tss, ctl, atl, tsb float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT day, tss, ctl, atl, tsb

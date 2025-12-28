@@ -10,7 +10,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | ----- | ----------------------- | ---------------------------------------- | ----------- |
 | 0     | Project Setup           | Repository, tooling, CI/CD               | ✓           |
 | 1     | Core Backend            | Go server, Strava OAuth, basic import    | ✓           |
-| 2     | Database & Storage      | DuckDB schema, activity storage          | ✓           |
+| 2     | Database & Storage      | SQLite schema, activity storage          | ✓           |
 | 3     | Frontend Foundation     | React shell, routing, shadcn setup       | ✓           |
 | 4     | Activities Feature      | Activity list, filters, detail view      | ✓           |
 | 5     | Dashboard               | Widget system, core widgets              | ✓           |
@@ -18,7 +18,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓           |
 | 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓           |
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
-| 10    | WASM Mode               | Browser-only version with DuckDB-WASM    |             |
+| 10    | WASM Mode               | Browser-only version with SQLite-WASM    |             |
 | 11    | Polish                  | PWA, i18n, settings, badges              |             |
 
 ---
@@ -42,7 +42,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] `github.com/go-chi/chi/v5`
   - [x] `github.com/spf13/cobra`
   - [x] `github.com/spf13/viper`
-  - [x] `github.com/marcboeker/go-duckdb`
+  - [x] `modernc.org/sqlite`
   - [x] `golang.org/x/oauth2`
   - [x] `github.com/robfig/cron/v3`
   - [x] `github.com/stretchr/testify`
@@ -187,12 +187,12 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ## Phase 2: Database & Storage ✓
 
-**Goal:** DuckDB schema set up, activities persisted locally.
+**Goal:** SQLite schema set up, activities persisted locally.
 
-### 2.1 DuckDB Connection
+### 2.1 SQLite Connection
 
 - [x] Create `internal/storage/db.go`:
-  - [x] Open/create DuckDB file
+  - [x] Open/create SQLite file
   - [x] Connection pool management
   - [x] Close on shutdown
 - [x] Configure database path from config
@@ -1032,18 +1032,18 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ## Phase 10: WASM Mode
 
-**Goal:** Browser-only version with DuckDB-WASM.
+**Goal:** Browser-only version with SQLite-WASM.
 
-### 10.1 DuckDB-WASM Setup
+### 10.1 SQLite-WASM Setup
 
-- [ ] Install `@duckdb/duckdb-wasm`
+- [ ] Install `sql.js` or `@aspect-build/sqlite3-wasm`
 - [ ] Create `web/src/lib/db/wasm-client.ts`:
-  - [ ] Initialize DuckDB-WASM
+  - [ ] Initialize SQLite-WASM
   - [ ] OPFS persistence setup
   - [ ] Implement DataSource interface
 - [ ] Create schema migration for browser:
   - [ ] Embed SQL as strings
-  - [ ] Version tracking in DuckDB
+  - [ ] Version tracking in SQLite
 
 ### 10.2 Strava Direct Integration
 

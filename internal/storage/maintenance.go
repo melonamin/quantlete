@@ -15,8 +15,8 @@ type Component struct {
 	Name               string    `json:"name"`
 	ImageURL           string    `json:"image_url,omitempty"`
 	MaintenanceHashtag string    `json:"maintenance_hashtag,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	CreatedAt            SQLiteTime `json:"created_at"`
+	UpdatedAt            SQLiteTime `json:"updated_at"`
 }
 
 type MaintenanceRule struct {
@@ -24,20 +24,20 @@ type MaintenanceRule struct {
 	ComponentID    int64     `json:"component_id"`
 	Type           string    `json:"type"` // distance_m | time_s | days
 	ThresholdValue float64   `json:"threshold_value"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	CreatedAt            SQLiteTime `json:"created_at"`
+	UpdatedAt            SQLiteTime `json:"updated_at"`
 }
 
 type MaintenanceLogEntry struct {
 	ComponentID int64     `json:"component_id"`
 	ActivityID  *int64    `json:"activity_id,omitempty"`
-	CompletedAt time.Time `json:"completed_at"`
+	CompletedAt          SQLiteTime `json:"completed_at"`
 }
 
 type ComponentWithRules struct {
 	Component
 	Rules           []MaintenanceRule `json:"rules"`
-	LastCompletedAt *time.Time        `json:"last_completed_at,omitempty"`
+	LastCompletedAt *SQLiteTime       `json:"last_completed_at,omitempty"`
 }
 
 type RuleProgress struct {
@@ -538,9 +538,9 @@ func (r *MaintenanceRepository) Due(ctx context.Context, athleteID int64) ([]Due
 	out := make([]DueComponent, 0, len(components))
 	for _, c := range components {
 		c.Rules = rulesByComponent[c.ID]
-		since := c.CreatedAt
+		since := c.CreatedAt.Time
 		if c.LastCompletedAt != nil && !c.LastCompletedAt.IsZero() {
-			since = *c.LastCompletedAt
+			since = c.LastCompletedAt.Time
 		}
 
 		var dist float64

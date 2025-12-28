@@ -150,9 +150,9 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 			Name:           name,
 			Slug:           strings.TrimSpace(p.Slug),
 			BadgeURL:       strings.TrimSpace(p.BadgeURL),
-			CompletionDate: p.CompletionDate,
+			CompletionDate: ptrSQLiteTime(p.CompletionDate),
 			Month:          strings.TrimSpace(p.Month),
-			CreatedAt:      time.Now(),
+			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
 		}
 		if err := h.repo.Upsert(r.Context(), c); err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to store challenges"})
@@ -162,4 +162,11 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, importResponse{Imported: imported})
+}
+
+func ptrSQLiteTime(t *time.Time) *storage.SQLiteTime {
+	if t == nil {
+		return nil
+	}
+	return &storage.SQLiteTime{Time: *t}
 }

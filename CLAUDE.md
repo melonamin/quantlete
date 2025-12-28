@@ -7,7 +7,7 @@ This is the Stata project - a self-hosted analytics dashboard for Strava activit
 - `cmd/stata/` - Go CLI entry points (main, serve, import commands)
 - `internal/` - Go internal packages (api, storage, strava client, importer)
 - `web/` - React frontend (Vite + TypeScript)
-- `schema/migrations/` - DuckDB database migrations
+- `schema/migrations/` - SQLite database migrations
 - `docs/` - Documentation (SPECIFICATION.md, ARCHITECTURE.md, TODO.md)
 
 ## Build Commands
@@ -46,7 +46,7 @@ cd web && yarn typecheck  # TypeScript check
 ### Go
 - Use `slog` for structured logging
 - Follow standard Go project layout
-- CGO is enabled (required for DuckDB)
+- Pure Go (no CGO required)
 - Run `golangci-lint` before committing
 
 ### TypeScript/React
@@ -58,9 +58,9 @@ cd web && yarn typecheck  # TypeScript check
 
 ## Database
 
-- DuckDB for analytics (OLAP-optimized)
+- SQLite for storage and analytics
 - Migrations in `schema/migrations/`
-- CGO driver: `github.com/marcboeker/go-duckdb`
+- Pure Go driver: `modernc.org/sqlite`
 
 ## Testing
 
@@ -74,7 +74,7 @@ cd web && yarn typecheck  # TypeScript check
 - chi (HTTP router)
 - cobra (CLI)
 - viper (config)
-- go-duckdb (database)
+- modernc.org/sqlite (database)
 
 ### React
 - React 18+ with TypeScript
@@ -93,6 +93,6 @@ These files are manually configured and should not be changed:
 ## Important Notes
 
 - Single binary distribution goal - React is embedded via go:embed
-- Browser-only WASM mode is planned (DuckDB-WASM + OPFS)
+- Browser-only WASM mode is planned (sql.js + OPFS)
 - Strava OAuth required for data import
 - Rate limit awareness for Strava API (15-min and daily limits)

@@ -16,8 +16,8 @@ type Activity struct {
 	Name                 string
 	Description          string
 	SportType            string
-	StartDate            time.Time
-	StartDateLocal       time.Time
+	StartDate            SQLiteTime
+	StartDateLocal       SQLiteTime
 	Timezone             string
 	LocationCity         string
 	LocationState        string
@@ -53,8 +53,8 @@ type Activity struct {
 	EndLng               *float64
 	Polyline             string
 	SummaryPolyline      string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	CreatedAt            SQLiteTime
+	UpdatedAt            SQLiteTime
 }
 
 // ActivityFilters defines query filters for activities.
@@ -89,21 +89,7 @@ func NewActivityRepository(db *DB) *ActivityRepository {
 
 // Upsert inserts or updates an activity.
 func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
-	// Check if activity exists
-	var exists bool
-	err := r.db.QueryRow("SELECT 1 FROM activities WHERE id = ?", a.ID).Scan(&exists)
-	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("checking activity existence: %w", err)
-	}
-
-	if exists {
-		// Activity exists - skip update to avoid DuckDB FK issues
-		// DuckDB internally does DELETE+INSERT for UPDATE, which violates FK constraints
-		return nil
-	}
-
-	// INSERT new activity
-	_, err = r.db.Exec(`
+	_, err := r.db.Exec(`
 		INSERT INTO activities (
 			id, athlete_id, name, description, sport_type,
 			start_date, start_date_local, timezone,
@@ -135,6 +121,48 @@ func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
 			?, ?,
 			?, ?
 		)
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			description = EXCLUDED.description,
+			sport_type = EXCLUDED.sport_type,
+			start_date = EXCLUDED.start_date,
+			start_date_local = EXCLUDED.start_date_local,
+			timezone = EXCLUDED.timezone,
+			location_city = EXCLUDED.location_city,
+			location_state = EXCLUDED.location_state,
+			location_country = EXCLUDED.location_country,
+			distance = EXCLUDED.distance,
+			moving_time = EXCLUDED.moving_time,
+			elapsed_time = EXCLUDED.elapsed_time,
+			total_elevation_gain = EXCLUDED.total_elevation_gain,
+			elev_high = EXCLUDED.elev_high,
+			elev_low = EXCLUDED.elev_low,
+			average_speed = EXCLUDED.average_speed,
+			max_speed = EXCLUDED.max_speed,
+			average_heartrate = EXCLUDED.average_heartrate,
+			max_heartrate = EXCLUDED.max_heartrate,
+			average_watts = EXCLUDED.average_watts,
+			max_watts = EXCLUDED.max_watts,
+			weighted_average_watts = EXCLUDED.weighted_average_watts,
+			kilojoules = EXCLUDED.kilojoules,
+			average_cadence = EXCLUDED.average_cadence,
+			calories = EXCLUDED.calories,
+			kudos_count = EXCLUDED.kudos_count,
+			comment_count = EXCLUDED.comment_count,
+			photo_count = EXCLUDED.photo_count,
+			commute = EXCLUDED.commute,
+			private = EXCLUDED.private,
+			trainer = EXCLUDED.trainer,
+			workout_type = EXCLUDED.workout_type,
+			device_name = EXCLUDED.device_name,
+			gear_id = EXCLUDED.gear_id,
+			start_lat = EXCLUDED.start_lat,
+			start_lng = EXCLUDED.start_lng,
+			end_lat = EXCLUDED.end_lat,
+			end_lng = EXCLUDED.end_lng,
+			polyline = EXCLUDED.polyline,
+			summary_polyline = EXCLUDED.summary_polyline,
+			updated_at = EXCLUDED.updated_at
 	`,
 		a.ID, a.AthleteID, a.Name, a.Description, a.SportType,
 		a.StartDate, a.StartDateLocal, a.Timezone,
@@ -228,7 +256,7 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 	}
 
 	if filters.Search != "" {
-		conditions = append(conditions, "name ILIKE ?")
+		conditions = append(conditions, "name LIKE ? COLLATE NOCASE")
 		args = append(args, "%"+filters.Search+"%")
 	}
 
@@ -482,7 +510,7 @@ type ActivityStream struct {
 	Resolution   string
 	SeriesType   string
 	Data         json.RawMessage
-	CreatedAt    time.Time
+	CreatedAt    SQLiteTime
 }
 
 // Upsert inserts or updates a stream.

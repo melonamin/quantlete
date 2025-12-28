@@ -12,7 +12,7 @@ type PeakPowerBest struct {
 	DurationS  int       `json:"duration_s"`
 	Watts      float64   `json:"watts"`
 	ActivityID int64     `json:"activity_id"`
-	StartDate  time.Time `json:"start_date"`
+	StartDate            SQLiteTime `json:"start_date"`
 }
 
 type PeakPowerHistoryPoint struct {
@@ -249,7 +249,7 @@ func (r *PowerRepository) GetHistory(ctx context.Context, athleteID int64, durat
 	var points []PeakPowerHistoryPoint
 	best := 0.0
 	for rows.Next() {
-		var t time.Time
+		var t SQLiteTime
 		var w float64
 		if err := rows.Scan(&t, &w); err != nil {
 			return nil, err

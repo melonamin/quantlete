@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -86,6 +87,7 @@ func (h *PhotosHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.photos.List(r.Context(), athlete.ID, filters, page, perPage)
 	if err != nil {
+		slog.Error("failed to fetch photos", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch photos"})
 		return
 	}

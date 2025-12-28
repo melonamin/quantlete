@@ -21,7 +21,7 @@ type GearMonthlyUsage struct {
 func (r *GearRepository) GetMonthlyUsage(ctx context.Context, athleteID int64, includeRetired bool) ([]GearMonthlyUsage, error) {
 	query := `
 		SELECT
-			strftime(a.start_date, '%Y-%m') AS month,
+			strftime('%Y-%m', a.start_date) AS month,
 			a.gear_id AS gear_id,
 			COALESCE(g.name, '') AS gear_name,
 			COALESCE(g.source, 'strava') AS source,

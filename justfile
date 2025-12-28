@@ -16,9 +16,10 @@ default:
 dev:
     #!/usr/bin/env bash
     set -a && source .env 2>/dev/null && set +a
+    lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
     trap 'kill 0' EXIT
-    air &
-    cd web && yarn dev &
+    stdbuf -oL air 2>&1 | stdbuf -oL sed 's/^/[api] /' &
+    (cd web && yarn dev 2>&1) | sed 's/^/[web] /' &
     wait
 
 # Run Go API server in dev mode with hot reload
@@ -43,11 +44,11 @@ build-web:
 
 # Build Go binary (requires web to be built first)
 build-go:
-    CGO_ENABLED=1 go build -o bin/stata ./cmd/stata
+    go build -o bin/stata ./cmd/stata
 
 # Build with version info
 build-release version="dev":
-    CGO_ENABLED=1 go build -ldflags "-X main.version={{version}} -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/stata ./cmd/stata
+    go build -ldflags "-X main.version={{version}} -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/stata ./cmd/stata
 
 # Clean build artifacts
 clean:
