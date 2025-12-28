@@ -238,7 +238,7 @@ func (r *MaintenanceRepository) CreateComponent(ctx context.Context, athleteID i
 	}
 	tag := normalizeTag(in.MaintenanceHashtag)
 
-	now := time.Now()
+	now := SQLiteTime{Time: time.Now()}
 	var id int64
 	err = r.db.QueryRowContext(ctx, `
 		INSERT INTO components (gear_id, name, image_url, maintenance_hashtag, created_at, updated_at)
@@ -299,7 +299,7 @@ func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID i
 		return nil, err
 	}
 
-	now := time.Now()
+	now := SQLiteTime{Time: time.Now()}
 
 	if in.Name != nil || in.ImageURL != nil || in.MaintenanceHashtag != nil {
 		name := ""
@@ -414,7 +414,7 @@ func (r *MaintenanceRepository) LogMaintenance(ctx context.Context, athleteID in
 		INSERT INTO maintenance_log (component_id, activity_id, completed_at, created_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (component_id, completed_at) DO NOTHING
-	`, componentID, activityID, completedAt, time.Now())
+	`, componentID, activityID, completedAt, SQLiteTime{Time: time.Now()})
 	return err
 }
 
@@ -430,7 +430,7 @@ func (r *MaintenanceRepository) LogFromActivityHashtags(ctx context.Context, ath
 		placeholders = append(placeholders, "?")
 		tagArgs = append(tagArgs, t)
 	}
-	createdAt := time.Now()
+	createdAt := SQLiteTime{Time: time.Now()}
 
 	query := fmt.Sprintf(`
 		INSERT INTO maintenance_log (component_id, activity_id, completed_at, created_at)

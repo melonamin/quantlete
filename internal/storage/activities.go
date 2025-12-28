@@ -177,7 +177,7 @@ func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
 		a.DeviceName, a.GearID,
 		a.StartLat, a.StartLng, a.EndLat, a.EndLng,
 		a.Polyline, a.SummaryPolyline,
-		time.Now(), time.Now(),
+		SQLiteTime{Time: time.Now()}, SQLiteTime{Time: time.Now()},
 	)
 	return err
 }
@@ -525,7 +525,7 @@ func (r *StreamRepository) Upsert(ctx context.Context, s *ActivityStream) error 
 			series_type = EXCLUDED.series_type,
 			data = EXCLUDED.data
 	`,
-		s.ActivityID, s.StreamType, s.OriginalSize, s.Resolution, s.SeriesType, s.Data, time.Now(),
+		s.ActivityID, s.StreamType, s.OriginalSize, s.Resolution, s.SeriesType, s.Data, SQLiteTime{Time: time.Now()},
 	)
 	return err
 }

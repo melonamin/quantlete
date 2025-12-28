@@ -72,7 +72,7 @@ func (r *AthleteRepository) Upsert(ctx context.Context, a *Athlete) error {
 	`,
 		a.ID, a.Username, a.FirstName, a.LastName, a.City, a.State, a.Country,
 		a.Sex, a.Premium, a.Summit, a.ProfileMedium, a.Profile, a.Weight,
-		time.Now(), time.Now(),
+		SQLiteTime{Time: time.Now()}, SQLiteTime{Time: time.Now()},
 	)
 	return err
 }
@@ -159,7 +159,7 @@ func (r *TokenRepository) Upsert(ctx context.Context, t *AuthToken) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?)
 	`,
 		t.AthleteID, t.AccessToken, t.RefreshToken, t.TokenType,
-		t.ExpiresAt, time.Now(), time.Now(),
+		t.ExpiresAt, SQLiteTime{Time: time.Now()}, SQLiteTime{Time: time.Now()},
 	)
 	return err
 }

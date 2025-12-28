@@ -9,6 +9,7 @@ interface DashboardLayoutState {
   reset: (config: DashboardConfig) => void
   ensureWidget: (widget: DashboardWidgetConfig) => void
   moveWidget: (activeId: string, overId: string) => void
+  reorderWidgets: (orderedIds: string[]) => void
   setWidgetHidden: (id: string, hidden: boolean) => void
   setWidgetWidth: (id: string, width: WidgetWidth) => void
 }
@@ -43,6 +44,19 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>((set, get) =
     const [moved] = widgets.splice(from, 1)
     widgets.splice(to, 0, moved)
     set({ config: { ...config, widgets } })
+  },
+  reorderWidgets: (orderedIds) => {
+    const config = get().config
+    if (!config) return
+    const widgetMap = new Map(config.widgets.map((w) => [w.id, w]))
+    // Start with visible widgets in new order
+    const reordered = orderedIds
+      .map((id) => widgetMap.get(id))
+      .filter((w): w is DashboardWidgetConfig => !!w)
+    // Add any widgets not in orderedIds (hidden ones) at the end
+    const orderedSet = new Set(orderedIds)
+    const remaining = config.widgets.filter((w) => !orderedSet.has(w.id))
+    set({ config: { ...config, widgets: [...reordered, ...remaining] } })
   },
   setWidgetHidden: (id, hidden) => {
     const config = get().config

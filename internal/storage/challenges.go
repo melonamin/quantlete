@@ -45,7 +45,7 @@ func (r *ChallengeRepository) Upsert(ctx context.Context, c *Challenge) error {
 			badge_url = EXCLUDED.badge_url,
 			completion_date = EXCLUDED.completion_date,
 			month = EXCLUDED.month
-	`, c.ID, c.AthleteID, c.Name, c.Slug, c.BadgeURL, c.CompletionDate, c.Month, time.Now())
+	`, c.ID, c.AthleteID, c.Name, c.Slug, c.BadgeURL, c.CompletionDate, c.Month, SQLiteTime{Time: time.Now()})
 	return err
 }
 

@@ -1,13 +1,32 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
   useDashboardConfig,
   useUpdateDashboardConfig,
   type DashboardWidgetConfig,
   type WidgetWidth,
 } from '@/lib/api/dashboard'
-import { Button } from '@/components/ui/button'
 import { useDashboardLayoutStore } from '@/stores/dashboard'
+import { SortableWidget } from './sortable-widget'
+import { WidgetPanel } from './widget-panel'
 import { cn } from '@/lib/utils/cn'
+import { Settings2, X, GripVertical } from 'lucide-react'
 
 export interface WidgetDefinition {
   id: string
@@ -17,19 +36,11 @@ export interface WidgetDefinition {
   render: () => ReactNode
 }
 
-const WIDTH_OPTIONS: { label: string; value: WidgetWidth }[] = [
-  { label: '33%', value: 4 },
-  { label: '50%', value: 6 },
-  { label: '66%', value: 8 },
-  { label: '100%', value: 12 },
-]
-
 function normalizeConfig(
   cfg: { version: number; widgets: DashboardWidgetConfig[] },
   defs: WidgetDefinition[]
 ) {
   const byId = new Map(defs.map((d) => [d.id, d] as const))
-
   const existing = cfg.widgets.filter((w) => byId.has(w.id))
   const existingIds = new Set(existing.map((w) => w.id))
   const missing = defs
@@ -48,13 +59,32 @@ function normalizeConfig(
 export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
   const { data: serverConfig, isLoading, error } = useDashboardConfig()
   const save = useUpdateDashboardConfig()
-  const { config, setConfig, editMode, setEditMode, moveWidget, setWidgetHidden, setWidgetWidth } =
-    useDashboardLayoutStore()
+  const {
+    config,
+    setConfig,
+    editMode,
+    setEditMode,
+    setWidgetHidden,
+    setWidgetWidth,
+    reorderWidgets,
+  } = useDashboardLayoutStore()
 
-  const [showManage, setShowManage] = useState(false)
+  const [showPanel, setShowPanel] = useState(false)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const lastSavedRef = useRef<string>('')
   const hasLoadedRef = useRef(false)
   const saveTimer = useRef<number | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   const normalizedServerConfig = useMemo(() => {
     if (!serverConfig) return null
@@ -90,6 +120,17 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
     }
   }, [config, save, setConfig])
 
+  // Keyboard shortcut to exit edit mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editMode) {
+        setEditMode(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [editMode, setEditMode])
+
   const ordered = useMemo(() => {
     if (!config) return []
     const defsById = new Map(widgets.map((w) => [w.id, w] as const))
@@ -106,145 +147,147 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
   }, [config, widgets])
 
   const visible = ordered.filter((w) => !w.hidden)
+  const visibleIds = visible.map((w) => w.id)
 
-  const onDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!editMode) return
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', id)
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
   }
 
-  const onDrop = (e: React.DragEvent<HTMLDivElement>, overId: string) => {
-    if (!editMode) return
-    e.preventDefault()
-    const activeId = e.dataTransfer.getData('text/plain')
-    if (activeId) moveWidget(activeId, overId)
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (over && active.id !== over.id) {
+      const oldIndex = visibleIds.indexOf(active.id as string)
+      const newIndex = visibleIds.indexOf(over.id as string)
+      const newOrder = arrayMove(visibleIds, oldIndex, newIndex)
+      reorderWidgets(newOrder)
+    }
   }
+
+  const activeWidget = activeId ? visible.find((w) => w.id === activeId) : null
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
+      <div className="rounded-sm border border-destructive bg-destructive/10 p-4">
         <p className="text-sm text-destructive">Failed to load dashboard layout.</p>
       </div>
     )
   }
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEditMode(!editMode)}
-            disabled={isLoading}
-          >
-            {editMode ? 'Done' : 'Edit layout'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowManage(true)}
-            disabled={isLoading || !config}
-          >
-            Manage widgets
-          </Button>
-        </div>
-        {save.isPending && <p className="text-xs text-muted-foreground">Saving…</p>}
-      </div>
-
-      <div className={cn('grid gap-6 md:grid-cols-12', editMode && 'select-none')}>
-        {visible.map((w) => (
-          <div
-            key={w.id}
-            className={cn(
-              'relative md:col-span-12',
-              w.width === 4 && 'md:col-span-4',
-              w.width === 6 && 'md:col-span-6',
-              w.width === 8 && 'md:col-span-8',
-              w.width === 12 && 'md:col-span-12',
-              editMode && 'cursor-move'
-            )}
-            draggable={editMode}
-            onDragStart={(e) => onDragStart(e, w.id)}
-            onDragOver={(e) => editMode && e.preventDefault()}
-            onDrop={(e) => onDrop(e, w.id)}
-          >
-            {editMode && (
-              <div className="absolute right-2 top-2 z-10 flex items-center gap-2 rounded-md bg-background/80 p-1 backdrop-blur">
-                <select
-                  className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                  value={w.width}
-                  onChange={(e) => setWidgetWidth(w.id, Number(e.target.value) as WidgetWidth)}
-                >
-                  {WIDTH_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <Button variant="outline" size="sm" onClick={() => setWidgetHidden(w.id, true)}>
-                  Hide
-                </Button>
-              </div>
-            )}
-            {w.render()}
+    <div className="relative">
+      {/* Edit Mode Status Bar */}
+      {editMode && (
+        <div className="mb-4 flex items-center justify-between rounded-sm border border-terminal-green/30 bg-terminal-green/5 px-4 py-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-terminal-green" />
+              <span className="text-sm font-medium text-terminal-green">EDIT MODE</span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Drag widgets to reorder • Click width buttons to resize • Press ESC to exit
+            </span>
           </div>
-        ))}
-      </div>
-
-      {showManage && config && (
-        <ManageWidgetsDialog
-          onClose={() => setShowManage(false)}
-          widgets={ordered}
-          setWidgetHidden={setWidgetHidden}
-        />
-      )}
-    </div>
-  )
-}
-
-function ManageWidgetsDialog({
-  onClose,
-  widgets,
-  setWidgetHidden,
-}: {
-  onClose: () => void
-  widgets: { id: string; title: string; hidden: boolean }[]
-  setWidgetHidden: (id: string, hidden: boolean) => void
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
-      <div className="mx-auto mt-20 w-full max-w-lg rounded-lg border border-border bg-card p-4 shadow-lg">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">Manage widgets</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {widgets.map((w) => (
-            <label
-              key={w.id}
-              className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+          <div className="flex items-center gap-2">
+            {save.isPending && (
+              <span className="text-xs text-terminal-amber animate-pulse">SAVING...</span>
+            )}
+            <button
+              onClick={() => setShowPanel(true)}
+              className="flex items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1 text-xs transition-colors hover:border-terminal-green hover:text-terminal-green"
             >
-              <span className="text-sm">{w.title}</span>
-              <input
-                type="checkbox"
-                checked={!w.hidden}
-                onChange={(e) => setWidgetHidden(w.id, !e.target.checked)}
-              />
-            </label>
-          ))}
+              <Settings2 className="h-3 w-3" />
+              WIDGETS
+            </button>
+            <button
+              onClick={() => setEditMode(false)}
+              className="flex items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1 text-xs transition-colors hover:border-destructive hover:text-destructive"
+            >
+              <X className="h-3 w-3" />
+              EXIT
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Normal Mode Controls */}
+      {!editMode && (
+        <div className="mb-4 flex items-center justify-end">
+          <button
+            onClick={() => setEditMode(true)}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-xs transition-all hover:border-terminal-green hover:text-terminal-green disabled:opacity-50"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            Customize Dashboard
+          </button>
+        </div>
+      )}
+
+      {/* Widget Grid */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={visibleIds} strategy={rectSortingStrategy}>
+          <div
+            className={cn(
+              'grid gap-4 md:grid-cols-12',
+              editMode && 'rounded-sm border border-dashed border-border/50 p-4'
+            )}
+          >
+            {visible.map((w) => (
+              <SortableWidget
+                key={w.id}
+                id={w.id}
+                title={w.title}
+                width={w.width}
+                editMode={editMode}
+                onWidthChange={(width) => setWidgetWidth(w.id, width)}
+                onHide={() => setWidgetHidden(w.id, true)}
+              >
+                {w.render()}
+              </SortableWidget>
+            ))}
+          </div>
+        </SortableContext>
+
+        {/* Drag Overlay - shows dragged widget preview */}
+        <DragOverlay>
+          {activeWidget ? (
+            <div
+              className={cn(
+                'rounded-sm border-2 border-terminal-green bg-card/95 shadow-2xl shadow-terminal-green/20',
+                'opacity-90 backdrop-blur',
+                activeWidget.width === 4 && 'w-[300px]',
+                activeWidget.width === 6 && 'w-[400px]',
+                activeWidget.width === 8 && 'w-[500px]',
+                activeWidget.width === 12 && 'w-[600px]'
+              )}
+            >
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                <GripVertical className="h-4 w-4 text-terminal-green" />
+                <span className="text-sm font-medium">{activeWidget.title}</span>
+              </div>
+              <div className="p-4 opacity-50">
+                <div className="h-24 rounded-sm bg-muted/50" />
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      {/* Widget Management Panel */}
+      <WidgetPanel
+        open={showPanel}
+        onClose={() => setShowPanel(false)}
+        widgets={ordered}
+        onToggleWidget={(id, hidden) => setWidgetHidden(id, hidden)}
+        onReorder={(newOrder) => reorderWidgets(newOrder)}
+      />
     </div>
   )
 }

@@ -186,7 +186,7 @@ func (r *TrainingLoadRepository) upsertActivity(ctx context.Context, athleteID i
 			intensity_factor = EXCLUDED.intensity_factor,
 			tss = EXCLUDED.tss,
 			computed_at = EXCLUDED.computed_at
-	`, a.ID, athleteID, a.SportType, method, ftpUsed, normalized, ifactor, tss, time.Now())
+	`, a.ID, athleteID, a.SportType, method, ftpUsed, normalized, ifactor, tss, SQLiteTime{Time: time.Now()})
 	return err
 }
 

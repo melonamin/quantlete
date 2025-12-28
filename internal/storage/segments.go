@@ -93,7 +93,7 @@ func (r *SegmentRepository) UpsertSegment(ctx context.Context, s *Segment) error
 		s.StartLat, s.StartLng, s.EndLat, s.EndLng,
 		s.Starred, s.Polyline,
 		s.AthleteKOMRank, s.AthleteEffortCount, s.AthletePRElapsedTime, s.AthletePRDate,
-		time.Now(),
+		SQLiteTime{Time: time.Now()},
 	)
 	return err
 }

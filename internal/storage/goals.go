@@ -112,7 +112,7 @@ func (r *GoalsRepository) UpsertConfig(ctx context.Context, athleteID int64, cfg
 		ON CONFLICT (athlete_id) DO UPDATE SET
 			config = EXCLUDED.config,
 			updated_at = EXCLUDED.updated_at
-	`, athleteID, b, time.Now())
+	`, athleteID, b, SQLiteTime{Time: time.Now()})
 	return err
 }
 

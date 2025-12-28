@@ -45,7 +45,7 @@ func (r *PhotoRepository) Upsert(ctx context.Context, p *Photo) error {
 			thumbnail_url = EXCLUDED.thumbnail_url,
 			caption = EXCLUDED.caption,
 			location = EXCLUDED.location
-	`, p.ID, p.AthleteID, p.ActivityID, p.URL, p.ThumbnailURL, p.Caption, location, time.Now())
+	`, p.ID, p.AthleteID, p.ActivityID, p.URL, p.ThumbnailURL, p.Caption, location, SQLiteTime{Time: time.Now()})
 	return err
 }
 

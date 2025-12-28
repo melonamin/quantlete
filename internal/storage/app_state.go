@@ -37,7 +37,7 @@ func (r *AppStateRepository) Set(ctx context.Context, key, value string) error {
 		ON CONFLICT (key) DO UPDATE SET
 			value = EXCLUDED.value,
 			updated_at = EXCLUDED.updated_at
-	`, key, value, time.Now())
+	`, key, value, SQLiteTime{Time: time.Now()})
 	return err
 }
 

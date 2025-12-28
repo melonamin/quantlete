@@ -87,7 +87,7 @@ func (r *PowerRepository) EnsureActivityComputed(ctx context.Context, athleteID 
 		return err
 	}
 
-	now := time.Now()
+	now := SQLiteTime{Time: time.Now()}
 	for _, d := range missing {
 		best := analysis.RollingMaxAverage(watts, d)
 		if best <= 0 {
@@ -164,15 +164,18 @@ func (r *PowerRepository) GetBest(ctx context.Context, athleteID int64, duration
 		args = append(args, d)
 	}
 
+	// Use window function to get activity_id and start_date for the max watts per duration
 	query := `
-		SELECT
-			p.duration_s,
-			MAX(p.best_avg_watts) AS watts,
-			arg_max(p.activity_id, p.best_avg_watts) AS activity_id,
-			arg_max(a.start_date, p.best_avg_watts) AS start_date
-		FROM power_best_efforts p
-		JOIN activities a ON a.id = p.activity_id
-		WHERE p.athlete_id = ? AND p.duration_s IN (` + joinStrings(placeholders, ",") + `)
+		WITH ranked AS (
+			SELECT
+				p.duration_s,
+				p.best_avg_watts,
+				p.activity_id,
+				a.start_date,
+				ROW_NUMBER() OVER (PARTITION BY p.duration_s ORDER BY p.best_avg_watts DESC) AS rn
+			FROM power_best_efforts p
+			JOIN activities a ON a.id = p.activity_id
+			WHERE p.athlete_id = ? AND p.duration_s IN (` + joinStrings(placeholders, ",") + `)
 	`
 
 	if after != nil {
@@ -193,8 +196,11 @@ func (r *PowerRepository) GetBest(ctx context.Context, athleteID int64, duration
 	}
 
 	query += `
-		GROUP BY p.duration_s
-		ORDER BY p.duration_s ASC
+		)
+		SELECT duration_s, best_avg_watts AS watts, activity_id, start_date
+		FROM ranked
+		WHERE rn = 1
+		ORDER BY duration_s ASC
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
