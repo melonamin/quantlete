@@ -2,7 +2,7 @@
 -- Streams contain time-series data for activities (heart rate, power, GPS, etc.)
 
 CREATE TABLE IF NOT EXISTS activity_streams (
-    activity_id BIGINT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    activity_id BIGINT NOT NULL REFERENCES activities(id),
     stream_type TEXT NOT NULL,  -- 'time', 'distance', 'latlng', 'altitude', etc.
     original_size INTEGER,
     resolution TEXT,

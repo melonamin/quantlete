@@ -36,7 +36,7 @@ func NewClient(cfg *config.StravaConfig) *Client {
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		RedirectURL:  cfg.RedirectURI,
-		Scopes:       []string{"read", "activity:read_all", "profile:read_all"},
+		Scopes:       []string{"activity:read_all"},
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  authURL,
 			TokenURL: tokenURL,

@@ -30,6 +30,16 @@ func Load() (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
+	// Explicitly bind nested env vars (AutomaticEnv doesn't work well with nested structs)
+	_ = v.BindEnv("server.port", "STATA_SERVER_PORT")
+	_ = v.BindEnv("server.host", "STATA_SERVER_HOST")
+	_ = v.BindEnv("server.dev_mode", "STATA_SERVER_DEV_MODE")
+	_ = v.BindEnv("strava.client_id", "STATA_STRAVA_CLIENT_ID")
+	_ = v.BindEnv("strava.client_secret", "STATA_STRAVA_CLIENT_SECRET")
+	_ = v.BindEnv("strava.redirect_uri", "STATA_STRAVA_REDIRECT_URI")
+	_ = v.BindEnv("storage.data_dir", "STATA_STORAGE_DATA_DIR")
+	_ = v.BindEnv("log.level", "STATA_LOG_LEVEL")
+
 	// Config file (optional)
 	v.SetConfigName("stata")
 	v.SetConfigType("yaml")

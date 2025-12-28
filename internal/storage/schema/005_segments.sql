@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS segments (
 CREATE TABLE IF NOT EXISTS segment_efforts (
     id BIGINT PRIMARY KEY,
     segment_id BIGINT NOT NULL REFERENCES segments(id),
-    activity_id BIGINT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    activity_id BIGINT NOT NULL REFERENCES activities(id),
     athlete_id BIGINT NOT NULL REFERENCES athletes(id),
     name TEXT,
     elapsed_time INTEGER,     -- seconds
@@ -42,4 +42,4 @@ CREATE TABLE IF NOT EXISTS segment_efforts (
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_segment_id ON segment_efforts(segment_id);
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_activity_id ON segment_efforts(activity_id);
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_athlete_id ON segment_efforts(athlete_id);
-CREATE INDEX IF NOT EXISTS idx_segment_efforts_pr_rank ON segment_efforts(pr_rank) WHERE pr_rank IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_segment_efforts_pr_rank ON segment_efforts(pr_rank);

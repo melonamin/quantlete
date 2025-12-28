@@ -1,6 +1,9 @@
 # Stata - Statistics for Strava
 # Task runner using just (https://github.com/casey/just)
 
+# Load .env file if it exists
+set dotenv-load
+
 # Default recipe - show available commands
 default:
     @just --list
@@ -14,7 +17,8 @@ dev: dev-api dev-web
 
 # Run Go API server in dev mode with hot reload
 dev-api:
-    air
+    #!/usr/bin/env bash
+    set -a && source .env && set +a && exec air
 
 # Run React dev server
 dev-web:
