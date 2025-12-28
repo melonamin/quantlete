@@ -1,7 +1,14 @@
 import { useRef, useEffect } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
-import { LineChart, BarChart, PieChart, ScatterChart, EffectScatterChart } from 'echarts/charts'
+import {
+  LineChart,
+  BarChart,
+  PieChart,
+  ScatterChart,
+  EffectScatterChart,
+  HeatmapChart,
+} from 'echarts/charts'
 import {
   TitleComponent,
   TooltipComponent,
@@ -11,6 +18,8 @@ import {
   ToolboxComponent,
   MarkLineComponent,
   MarkPointComponent,
+  VisualMapComponent,
+  CalendarComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsOption } from 'echarts'
@@ -23,6 +32,7 @@ echarts.use([
   PieChart,
   ScatterChart,
   EffectScatterChart,
+  HeatmapChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
@@ -31,6 +41,8 @@ echarts.use([
   ToolboxComponent,
   MarkLineComponent,
   MarkPointComponent,
+  VisualMapComponent,
+  CalendarComponent,
   CanvasRenderer,
 ])
 

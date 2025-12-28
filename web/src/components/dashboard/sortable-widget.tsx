@@ -1,9 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils/cn'
 import type { WidgetWidth } from '@/lib/api/dashboard'
 import { GripVertical, EyeOff, Columns2, Columns3, Columns4, Square } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 
 interface SortableWidgetProps {
   id: string
@@ -35,15 +34,15 @@ export function SortableWidget({
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
     isDragging,
     isOver,
   } = useSortable({ id, disabled: !editMode })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  // For variable-width grid items, we don't apply transform animations
+  // The grid handles positioning - we only use DragOverlay for drag visual
+  const style: CSSProperties = {
+    opacity: isDragging ? 0.3 : 1,
+    // Prevent the item from "jumping" by not applying transforms
   }
 
   return (
@@ -51,13 +50,12 @@ export function SortableWidget({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'relative md:col-span-12 transition-all duration-200',
+        'relative md:col-span-12',
         width === 4 && 'md:col-span-4',
         width === 6 && 'md:col-span-6',
         width === 8 && 'md:col-span-8',
         width === 12 && 'md:col-span-12',
-        // Dragging states
-        isDragging && 'opacity-40 scale-[0.98]',
+        // Drop target indicator
         isOver && !isDragging && 'ring-2 ring-terminal-green ring-offset-2 ring-offset-background',
         // Edit mode visual
         editMode && 'group'
@@ -67,22 +65,21 @@ export function SortableWidget({
       {editMode && (
         <div
           className={cn(
-            'absolute inset-0 z-10 rounded-sm transition-all duration-200',
+            'absolute inset-0 z-10 rounded-sm',
             'border-2 border-transparent',
-            'group-hover:border-terminal-green/50 group-hover:bg-terminal-green/5',
-            isDragging && 'border-terminal-green bg-terminal-green/10'
+            !isDragging && 'group-hover:border-terminal-green/50 group-hover:bg-terminal-green/5',
+            isDragging && 'border-dashed border-terminal-green/50 bg-terminal-green/5'
           )}
         >
-          {/* Top Control Bar */}
-          <div
-            className={cn(
-              'absolute -top-px left-0 right-0 flex items-center justify-between',
-              'rounded-t-sm bg-card/95 backdrop-blur border border-border',
-              'transform transition-all duration-200',
-              'opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0',
-              isDragging && 'opacity-100 translate-y-0'
-            )}
-          >
+          {/* Top Control Bar - hidden during drag */}
+          {!isDragging && (
+            <div
+              className={cn(
+                'absolute -top-px left-0 right-0 flex items-center justify-between',
+                'rounded-t-sm bg-card/95 backdrop-blur border border-border',
+                'opacity-0 group-hover:opacity-100'
+              )}
+            >
             {/* Drag Handle */}
             <button
               {...attributes}

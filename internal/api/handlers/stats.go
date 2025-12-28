@@ -711,12 +711,14 @@ func (h *StatsHandler) GetTrainingLoad(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.trainingLoad.EnsureComputedForRange(r.Context(), athlete.ID, after, before); err != nil {
+		slog.Error("failed to compute training load", "error", err)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute training load"})
 		return
 	}
 
 	series, err := h.trainingLoad.GetDailySeries(r.Context(), athlete.ID, after, before)
 	if err != nil {
+		slog.Error("failed to load training load", "error", err)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load training load"})
 		return
 	}

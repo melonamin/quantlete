@@ -9,12 +9,12 @@ import {
   DragOverlay,
   type DragStartEvent,
   type DragEndEvent,
+  MeasuringStrategy,
 } from '@dnd-kit/core'
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import {
   useDashboardConfig,
@@ -78,13 +78,20 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 10,
       },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  // Measuring configuration to prevent layout thrashing during drag
+  const measuringConfig = {
+    droppable: {
+      strategy: MeasuringStrategy.Always,
+    },
+  }
 
   const normalizedServerConfig = useMemo(() => {
     if (!serverConfig) return null
@@ -231,8 +238,9 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        measuring={measuringConfig}
       >
-        <SortableContext items={visibleIds} strategy={rectSortingStrategy}>
+        <SortableContext items={visibleIds}>
           <div
             className={cn(
               'grid gap-4 md:grid-cols-12',

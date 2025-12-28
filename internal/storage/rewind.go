@@ -116,21 +116,23 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		end = time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
 	} else {
 		// All-time: from first to last activity.
-		var minT, maxT sql.NullTime
+		var minS, maxS sql.NullString
 		if err := r.db.QueryRowContext(ctx, `
-			SELECT MIN(CAST(start_date_local AS DATE)), MAX(CAST(start_date_local AS DATE))
+			SELECT MIN(date(start_date_local)), MAX(date(start_date_local))
 			FROM activities
 			WHERE athlete_id = ?
-		`, athleteID).Scan(&minT, &maxT); err != nil {
+		`, athleteID).Scan(&minS, &maxS); err != nil {
 			return nil, err
 		}
-		if !minT.Valid || !maxT.Valid {
+		if !minS.Valid || !maxS.Valid {
 			now := time.Now().UTC()
 			start, end = now, now
 		} else {
-			start = time.Date(minT.Time.Year(), minT.Time.Month(), minT.Time.Day(), 0, 0, 0, 0, time.UTC)
+			minT, _ := time.Parse("2006-01-02", minS.String)
+			maxT, _ := time.Parse("2006-01-02", maxS.String)
+			start = time.Date(minT.Year(), minT.Month(), minT.Day(), 0, 0, 0, 0, time.UTC)
 			// end is exclusive
-			end = time.Date(maxT.Time.Year(), maxT.Time.Month(), maxT.Time.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
+			end = time.Date(maxT.Year(), maxT.Month(), maxT.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
 		}
 	}
 
@@ -175,7 +177,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	// Active days within range.
 	var activeDays int
 	if err := r.db.QueryRowContext(ctx, `
-		SELECT COUNT(DISTINCT CAST(start_date_local AS DATE))
+		SELECT COUNT(DISTINCT date(start_date_local))
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 	`, athleteID, start, end).Scan(&activeDays); err != nil {
@@ -410,7 +412,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 
 func computeRewindStreaks(ctx context.Context, db *DB, athleteID int64, start, end time.Time) RewindStreaks {
 	rows, err := db.QueryContext(ctx, `
-		SELECT DISTINCT CAST(start_date_local AS DATE) AS day
+		SELECT DISTINCT date(start_date_local) AS day
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		ORDER BY day ASC

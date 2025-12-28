@@ -193,7 +193,7 @@ func (r *TrainingLoadRepository) upsertActivity(ctx context.Context, athleteID i
 func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID int64, after, before *time.Time) ([]DailyTrainingLoadPoint, error) {
 	query := `
 		SELECT
-			CAST(a.start_date_local AS DATE) AS day,
+			date(a.start_date_local) AS day,
 			COALESCE(SUM(tl.tss), 0) AS tss
 		FROM activities a
 		LEFT JOIN activity_training_load tl ON tl.activity_id = a.id
