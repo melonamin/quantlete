@@ -1,0 +1,126 @@
+version: "2"
+
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - dupl
+    - errcheck
+    - gochecknoinits
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+
+  settings:
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    staticcheck:
+      checks:
+        - all
+        - -QF1001 # De Morgan's law - style preference
+        - -QF1003 # tagged switch - style preference
+        - -QF1007 # merge conditional assignment - style preference
+        - -ST1003 # variable naming (hubId vs hubID) - style preference
+        - -ST1016 # receiver name consistency - style preference
+        - -ST1020 # comment format on exported functions - style preference
+        - -ST1021 # comment format on exported types - style preference
+        - -ST1022 # comment format on exported consts - style preference
+        - -SA1019 # deprecated identifier usage - can be fixed incrementally
+        - -SA1029 # context.WithValue with string key - would require refactoring
+        - -SA9003 # empty branch - sometimes intentional for clarity
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: exported
+          disabled: true # Too noisy for existing code
+        - name: var-naming
+          disabled: true # Too noisy for existing code
+        - name: context-keys-type
+          disabled: true # Style preference
+    gocritic:
+      disabled-checks:
+        - wrapperFunc
+        - hugeParam
+        - rangeValCopy
+        - singleCaseSwitch
+        - ifElseChain
+        - unnamedResult
+        - exitAfterDefer
+        - commentedOutCode
+        - typeAssertChain
+        - appendCombine
+        - preferFprint
+        - sprintfQuotedString
+        - unslice
+        - builtinShadow
+        - builtinShadowDecl
+        - elseif
+      enabled-tags:
+        - performance
+        - style
+        - experimental
+    govet:
+      enable:
+        - shadow
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (net/http.ResponseWriter).Write
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - revive
+        text: "package-comments: should have a package comment"
+      - linters:
+          - staticcheck
+        text: at least one file in a package should have a package comment
+      - linters:
+          - dupl
+          - gosec
+        path: _test\.go
+      - linters:
+          - revive
+          - unused
+        path: _test\.go$
+        text: unused-parameter
+    paths:
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+
+formatters:
+  enable:
+    - gofmt
+  settings:
+    gofmt:
+      simplify: true
+  exclusions:
+    generated: lax
+    paths:
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
