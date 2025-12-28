@@ -36,9 +36,11 @@ export function HeartRateZones() {
       }
       isLoading={isLoading}
     >
-      <div className="space-y-3">
-        <StackedBarChart categories={['']} series={series} horizontal height={110} />
-        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+      <div className="h-full flex flex-col gap-3">
+        <div className="flex-1 min-h-0">
+          <StackedBarChart categories={['']} series={series} horizontal height="100%" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground flex-shrink-0">
           {seconds.map((s, idx) => {
             const pct = total > 0 ? Math.round((s / total) * 100) : 0
             return (
@@ -61,7 +63,7 @@ export function HeartRateZones() {
           })}
         </div>
         {defs && defs.length === 0 && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground flex-shrink-0">
             Set zone definitions in Settings (Zones section).
           </p>
         )}

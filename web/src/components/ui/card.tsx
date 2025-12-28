@@ -32,7 +32,10 @@ function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-title"
-      className={cn('text-[11px] font-medium uppercase tracking-wider text-muted-foreground', className)}
+      className={cn(
+        'text-[11px] font-medium uppercase tracking-wider text-muted-foreground',
+        className
+      )}
       {...props}
     />
   )
@@ -82,4 +85,13 @@ function CardValue({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
-export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent, CardValue }
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
+  CardValue,
+}

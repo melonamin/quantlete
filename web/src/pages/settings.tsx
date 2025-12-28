@@ -699,8 +699,11 @@ function VirtualWorldTilesEditor({
   saving: boolean
 }) {
   const current = useMemo(() => {
-    const merged =
-      settings ?? { version: 2, virtual_world_tile_layers: {}, eddington_definitions: DEFAULT_EDDINGTON_DEFS }
+    const merged = settings ?? {
+      version: 2,
+      virtual_world_tile_layers: {},
+      eddington_definitions: DEFAULT_EDDINGTON_DEFS,
+    }
     return {
       ...merged,
       version: merged.version ?? 2,

@@ -11,11 +11,7 @@ export function RootLayout({ children }: RootLayoutProps) {
   const { collapsed } = useSidebarStore()
   const isDesktop = useMediaQuery('(min-width: 768px)')
 
-  const marginLeft = isDesktop
-    ? collapsed
-      ? SIDEBAR_COLLAPSED_WIDTH
-      : SIDEBAR_EXPANDED_WIDTH
-    : 0
+  const marginLeft = isDesktop ? (collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH) : 0
 
   return (
     <div className="min-h-screen bg-background">

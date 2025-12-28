@@ -13,7 +13,7 @@ export function WeekdayStats() {
 
   return (
     <WidgetWrapper title="Weekday" isLoading={isLoading}>
-      <DonutChart data={slices} height={220} loading={isLoading} />
+      <DonutChart data={slices} height="100%" loading={isLoading} />
     </WidgetWrapper>
   )
 }

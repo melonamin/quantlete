@@ -13,7 +13,7 @@ export function DaytimeStats() {
 
   return (
     <WidgetWrapper title="Time of Day" isLoading={isLoading}>
-      <DonutChart data={slices} height={220} loading={isLoading} />
+      <DonutChart data={slices} height="100%" loading={isLoading} />
     </WidgetWrapper>
   )
 }

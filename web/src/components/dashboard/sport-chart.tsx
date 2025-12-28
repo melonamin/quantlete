@@ -41,7 +41,7 @@ export function SportChart() {
         </div>
       }
     >
-      <SportDistributionChart data={chartData} metric={metric} height={220} loading={isLoading} />
+      <SportDistributionChart data={chartData} metric={metric} height="100%" loading={isLoading} />
     </WidgetWrapper>
   )
 }

@@ -140,10 +140,12 @@ export interface EddingtonHistoryPoint {
 }
 
 export type WidgetWidth = 4 | 6 | 8 | 12
+export type WidgetHeight = 1 | 2 | 3 // Row units: 1=compact, 2=standard, 3=tall
 
 export interface DashboardWidgetConfig {
   id: string
   width: WidgetWidth
+  height?: WidgetHeight
   hidden: boolean
   settings?: Record<string, unknown>
 }

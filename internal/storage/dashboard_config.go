@@ -16,9 +16,18 @@ const (
 	WidgetWidthFull     WidgetWidth = 12
 )
 
+type WidgetHeight int
+
+const (
+	WidgetHeightCompact  WidgetHeight = 1
+	WidgetHeightStandard WidgetHeight = 2
+	WidgetHeightTall     WidgetHeight = 3
+)
+
 type DashboardWidgetConfig struct {
 	ID       string         `json:"id"`
 	Width    WidgetWidth    `json:"width"`
+	Height   WidgetHeight   `json:"height,omitempty"`
 	Hidden   bool           `json:"hidden"`
 	Settings map[string]any `json:"settings,omitempty"`
 }

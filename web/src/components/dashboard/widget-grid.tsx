@@ -1,26 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react'
 import {
   DndContext,
-  closestCenter,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
+  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
+  type DragMoveEvent,
   MeasuringStrategy,
 } from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import {
   useDashboardConfig,
   useUpdateDashboardConfig,
   type DashboardWidgetConfig,
   type WidgetWidth,
+  type WidgetHeight,
 } from '@/lib/api/dashboard'
 import { useDashboardLayoutStore } from '@/stores/dashboard'
 import { SortableWidget } from './sortable-widget'
@@ -28,10 +27,34 @@ import { WidgetPanel } from './widget-panel'
 import { cn } from '@/lib/utils/cn'
 import { Settings2, X, GripVertical } from 'lucide-react'
 
+// Droppable container for the entire grid
+function DroppableGrid({ editMode, children }: { editMode: boolean; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'widget-grid-container',
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        // 12-column grid with row-based heights and dense packing
+        'grid gap-4 md:grid-cols-12 grid-flow-row-dense',
+        // Base row height for spanning (180px per row unit)
+        'auto-rows-[180px]',
+        editMode && 'rounded-sm border border-dashed border-border/50 p-4 min-h-[200px]',
+        editMode && isOver && 'border-terminal-green/50 bg-terminal-green/5'
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 export interface WidgetDefinition {
   id: string
   title: string
   defaultWidth: WidgetWidth
+  defaultHeight?: WidgetHeight
   defaultHidden?: boolean
   render: () => ReactNode
 }
@@ -50,6 +73,7 @@ function normalizeConfig(
         ({
           id: d.id,
           width: d.defaultWidth,
+          height: d.defaultHeight,
           hidden: !!d.defaultHidden,
         }) satisfies DashboardWidgetConfig
     )
@@ -66,14 +90,18 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
     setEditMode,
     setWidgetHidden,
     setWidgetWidth,
+    setWidgetHeight,
     reorderWidgets,
   } = useDashboardLayoutStore()
 
   const [showPanel, setShowPanel] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
   const lastSavedRef = useRef<string>('')
   const hasLoadedRef = useRef(false)
   const saveTimer = useRef<number | null>(null)
+  const widgetRefs = useRef<Map<string, HTMLElement>>(new Map())
+  const pointerPositionRef = useRef<{ x: number; y: number } | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -115,9 +143,10 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
     if (saveTimer.current) window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
       save.mutate(config, {
-        onSuccess: (saved) => {
-          lastSavedRef.current = JSON.stringify(saved)
-          setConfig(saved)
+        onSuccess: () => {
+          // Just update the saved ref - don't overwrite local state
+          // The local store is the source of truth
+          lastSavedRef.current = next
         },
       })
     }, 650)
@@ -147,6 +176,7 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
       .map((w) => ({
         id: w.id,
         width: w.width,
+        height: w.height ?? (w.def as WidgetDefinition).defaultHeight ?? 2,
         hidden: w.hidden,
         title: (w.def as WidgetDefinition).title,
         render: (w.def as WidgetDefinition).render,
@@ -156,20 +186,121 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
   const visible = ordered.filter((w) => !w.hidden)
   const visibleIds = visible.map((w) => w.id)
 
+  // Calculate drop position based on pointer coordinates
+  const calculateDropIndex = useCallback(
+    (pointerX: number, pointerY: number, activeId: string): number | null => {
+      const refs = widgetRefs.current
+      const positions: { id: string; rect: DOMRect; originalIndex: number }[] = []
+
+      visibleIds.forEach((id, index) => {
+        const el = refs.get(id)
+        if (el) {
+          positions.push({ id, rect: el.getBoundingClientRect(), originalIndex: index })
+        }
+      })
+
+      if (positions.length === 0) return null
+
+      const activeIndex = visibleIds.indexOf(activeId)
+
+      // Sort positions by their vertical then horizontal position (reading order)
+      positions.sort((a, b) => {
+        const rowA = Math.floor(a.rect.top / 50) // Group by approximate rows
+        const rowB = Math.floor(b.rect.top / 50)
+        if (rowA !== rowB) return rowA - rowB
+        return a.rect.left - b.rect.left
+      })
+
+      // Find where the pointer falls in the sorted order
+      let insertBeforeIndex = positions.length // Default: insert at end
+
+      for (let i = 0; i < positions.length; i++) {
+        const pos = positions[i]
+        const rect = pos.rect
+
+        // Check if pointer is above this widget's vertical center
+        // or in the same row but before its horizontal center
+        const verticalCenter = rect.top + rect.height / 2
+        const horizontalCenter = rect.left + rect.width / 2
+
+        if (pointerY < verticalCenter - rect.height * 0.3) {
+          // Pointer is clearly above this row
+          insertBeforeIndex = pos.originalIndex
+          break
+        } else if (
+          pointerY >= rect.top - 20 &&
+          pointerY <= rect.bottom + 20 &&
+          pointerX < horizontalCenter
+        ) {
+          // Same row, pointer is to the left
+          insertBeforeIndex = pos.originalIndex
+          break
+        }
+      }
+
+      // Convert "insert before" index to final target index
+      let targetIndex = insertBeforeIndex
+
+      // If we're inserting after the active item's original position,
+      // we need to account for it being removed
+      if (targetIndex > activeIndex) {
+        targetIndex--
+      }
+
+      // Clamp to valid range
+      return Math.max(0, Math.min(targetIndex, visibleIds.length - 1))
+    },
+    [visibleIds]
+  )
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
+    setDropIndex(null)
+    pointerPositionRef.current = null
+  }
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    if (!event.active) return
+
+    // Track pointer position from the delta
+    const initialRect = event.active.rect.current.initial
+    const delta = event.delta
+
+    if (initialRect) {
+      const pointerX = initialRect.left + initialRect.width / 2 + delta.x
+      const pointerY = initialRect.top + initialRect.height / 2 + delta.y
+      pointerPositionRef.current = { x: pointerX, y: pointerY }
+
+      const newDropIndex = calculateDropIndex(pointerX, pointerY, event.active.id as string)
+      setDropIndex(newDropIndex)
+    }
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
+    const { active } = event
+    let finalDropIndex = dropIndex
 
-    if (over && active.id !== over.id) {
-      const oldIndex = visibleIds.indexOf(active.id as string)
-      const newIndex = visibleIds.indexOf(over.id as string)
-      const newOrder = arrayMove(visibleIds, oldIndex, newIndex)
-      reorderWidgets(newOrder)
+    // If dropIndex wasn't set via onDragMove, calculate from final position
+    if (finalDropIndex === null && pointerPositionRef.current) {
+      finalDropIndex = calculateDropIndex(
+        pointerPositionRef.current.x,
+        pointerPositionRef.current.y,
+        active.id as string
+      )
     }
+
+    setActiveId(null)
+    setDropIndex(null)
+    pointerPositionRef.current = null
+
+    if (finalDropIndex === null) return
+
+    const oldIndex = visibleIds.indexOf(active.id as string)
+    if (oldIndex === -1) return
+    if (oldIndex === finalDropIndex) return
+
+    const newOrder = arrayMove(visibleIds, oldIndex, finalDropIndex)
+    reorderWidgets(newOrder)
   }
 
   const activeWidget = activeId ? visible.find((w) => w.id === activeId) : null
@@ -235,32 +366,50 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
       {/* Widget Grid */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={rectIntersection}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         measuring={measuringConfig}
       >
         <SortableContext items={visibleIds}>
-          <div
-            className={cn(
-              'grid gap-4 md:grid-cols-12',
-              editMode && 'rounded-sm border border-dashed border-border/50 p-4'
+          <DroppableGrid editMode={editMode}>
+            {visible.map((w, index) => {
+              // Show drop indicator before this widget
+              const showIndicatorBefore =
+                activeId !== null && dropIndex === index && visibleIds.indexOf(activeId) !== index
+
+              return (
+                <SortableWidget
+                  key={w.id}
+                  id={w.id}
+                  title={w.title}
+                  width={w.width}
+                  height={w.height}
+                  editMode={editMode}
+                  onWidthChange={(width) => setWidgetWidth(w.id, width)}
+                  onHeightChange={(height) => setWidgetHeight(w.id, height)}
+                  onHide={() => setWidgetHidden(w.id, true)}
+                  showDropIndicator={showIndicatorBefore}
+                  onRefChange={(el) => {
+                    if (el) {
+                      widgetRefs.current.set(w.id, el)
+                    } else {
+                      widgetRefs.current.delete(w.id)
+                    }
+                  }}
+                >
+                  {w.render()}
+                </SortableWidget>
+              )
+            })}
+            {/* Drop indicator at the end */}
+            {activeId !== null && dropIndex === visible.length - 1 && (
+              <div className="col-span-12 flex items-center justify-center py-2">
+                <div className="h-1 w-full max-w-md rounded-full bg-terminal-green animate-pulse" />
+              </div>
             )}
-          >
-            {visible.map((w) => (
-              <SortableWidget
-                key={w.id}
-                id={w.id}
-                title={w.title}
-                width={w.width}
-                editMode={editMode}
-                onWidthChange={(width) => setWidgetWidth(w.id, width)}
-                onHide={() => setWidgetHidden(w.id, true)}
-              >
-                {w.render()}
-              </SortableWidget>
-            ))}
-          </div>
+          </DroppableGrid>
         </SortableContext>
 
         {/* Drag Overlay - shows dragged widget preview */}

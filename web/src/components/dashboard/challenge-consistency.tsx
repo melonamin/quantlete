@@ -48,12 +48,14 @@ export function ChallengeConsistency() {
       {chartData.length === 0 ? (
         <div className="text-sm text-muted-foreground">No challenges imported yet.</div>
       ) : (
-        <>
-          <div className="mb-2 text-sm text-muted-foreground">
+        <div className="h-full flex flex-col">
+          <div className="mb-2 text-sm text-muted-foreground flex-shrink-0">
             {streak} month{streak === 1 ? '' : 's'} in a row with at least 1 challenge.
           </div>
-          <BarChart data={chartData} height={220} showValues />
-        </>
+          <div className="flex-1 min-h-0">
+            <BarChart data={chartData} height="100%" showValues />
+          </div>
+        </div>
       )}
     </WidgetWrapper>
   )

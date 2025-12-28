@@ -56,6 +56,7 @@ func (t *SQLiteTime) parseString(s string) error {
 		"2006-01-02T15:04:05Z",                    // RFC3339 UTC
 		"2006-01-02T15:04:05-07:00",               // RFC3339 with timezone
 		"2006-01-02 15:04:05",                     // SQLite without timezone
+		"2006-01-02",                              // SQLite date() function output
 		"2006-01-02T15:04:05.000Z",                // RFC3339 with milliseconds
 		"2006-01-02 15:04:05.999999999 -0700 MST", // Go default format (after stripping m=)
 		time.RFC3339,

@@ -174,14 +174,9 @@ interface SortableWidgetItemProps {
 }
 
 function SortableWidgetItem({ widget, index, onToggle }: SortableWidgetItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: widget.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: widget.id,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -234,11 +229,7 @@ function SortableWidgetItem({ widget, index, onToggle }: SortableWidgetItemProps
         )}
         title={widget.hidden ? 'Show widget' : 'Hide widget'}
       >
-        {widget.hidden ? (
-          <EyeOff className="h-4 w-4" />
-        ) : (
-          <Eye className="h-4 w-4" />
-        )}
+        {widget.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
     </div>
   )

@@ -33,9 +33,9 @@ export function TrainingLoad() {
       }
       isLoading={isLoading}
     >
-      <div className="space-y-3">
+      <div className="h-full flex flex-col gap-3">
         {data?.summary && (
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 gap-2 text-center flex-shrink-0">
             <div className="rounded-md border border-border p-2">
               <div className="text-xs text-muted-foreground">CTL</div>
               <div className="font-semibold">{data.summary.ctl.toFixed(1)}</div>
@@ -50,7 +50,9 @@ export function TrainingLoad() {
             </div>
           </div>
         )}
-        <LineChart series={series} height={220} showLegend={false} showDataZoom={false} />
+        <div className="flex-1 min-h-0">
+          <LineChart series={series} height="100%" showLegend={false} showDataZoom={false} />
+        </div>
       </div>
     </WidgetWrapper>
   )

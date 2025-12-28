@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import type { DashboardConfig, DashboardWidgetConfig, WidgetWidth } from '@/lib/api/dashboard'
+import type {
+  DashboardConfig,
+  DashboardWidgetConfig,
+  WidgetWidth,
+  WidgetHeight,
+} from '@/lib/api/dashboard'
 
 interface DashboardLayoutState {
   config: DashboardConfig | null
@@ -12,6 +17,7 @@ interface DashboardLayoutState {
   reorderWidgets: (orderedIds: string[]) => void
   setWidgetHidden: (id: string, hidden: boolean) => void
   setWidgetWidth: (id: string, width: WidgetWidth) => void
+  setWidgetHeight: (id: string, height: WidgetHeight) => void
 }
 
 function upsertWidget(widgets: DashboardWidgetConfig[], widget: DashboardWidgetConfig) {
@@ -68,6 +74,12 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>((set, get) =
     const config = get().config
     if (!config) return
     const widgets = config.widgets.map((w) => (w.id === id ? { ...w, width } : w))
+    set({ config: { ...config, widgets } })
+  },
+  setWidgetHeight: (id, height) => {
+    const config = get().config
+    if (!config) return
+    const widgets = config.widgets.map((w) => (w.id === id ? { ...w, height } : w))
     set({ config: { ...config, widgets } })
   },
 }))

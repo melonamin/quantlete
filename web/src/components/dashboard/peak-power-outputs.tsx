@@ -33,7 +33,7 @@ export function PeakPowerOutputs() {
       }
       isLoading={isLoading}
     >
-      <BarChart data={chartData} height={220} showValues />
+      <BarChart data={chartData} height="100%" showValues />
     </WidgetWrapper>
   )
 }

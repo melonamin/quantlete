@@ -50,7 +50,7 @@ export function ActivityCalendar() {
         </div>
       }
     >
-      <ActivityCalendarChart data={chartData} year={year} height={160} loading={isLoading} />
+      <ActivityCalendarChart data={chartData} year={year} height="100%" loading={isLoading} />
     </WidgetWrapper>
   )
 }

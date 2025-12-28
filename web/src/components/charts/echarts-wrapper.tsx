@@ -1,5 +1,30 @@
 import { useRef, useEffect } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
+
+// Suppress harmless echarts-for-react warnings in development mode:
+// 1. Disposal errors during React 18 Strict Mode's double-invocation
+// 2. Deprecated containLabel warning (types don't support the replacement yet)
+if (import.meta.env.DEV) {
+  const origError = console.error
+  console.error = (...args: unknown[]) => {
+    const msg = args[0]
+    if (typeof msg === 'object' && msg instanceof TypeError) {
+      if (msg.message?.includes('disconnect')) {
+        return
+      }
+    }
+    origError.apply(console, args)
+  }
+
+  const origWarn = console.warn
+  console.warn = (...args: unknown[]) => {
+    const msg = args[0]
+    if (typeof msg === 'string' && msg.includes('containLabel')) {
+      return
+    }
+    origWarn.apply(console, args)
+  }
+}
 import * as echarts from 'echarts/core'
 import {
   LineChart,

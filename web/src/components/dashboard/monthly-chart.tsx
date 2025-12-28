@@ -43,33 +43,37 @@ export function MonthlyChart() {
         </div>
       }
     >
-      <div className="mb-3 flex gap-1">
-        <Button
-          variant={metric === 'distance' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={() => setMetric('distance')}
-        >
-          Distance
-        </Button>
-        <Button
-          variant={metric === 'count' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={() => setMetric('count')}
-        >
-          Activities
-        </Button>
-        <Button
-          variant={metric === 'time' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={() => setMetric('time')}
-        >
-          Time
-        </Button>
+      <div className="h-full flex flex-col">
+        <div className="mb-3 flex gap-1 flex-shrink-0">
+          <Button
+            variant={metric === 'distance' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setMetric('distance')}
+          >
+            Distance
+          </Button>
+          <Button
+            variant={metric === 'count' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setMetric('count')}
+          >
+            Activities
+          </Button>
+          <Button
+            variant={metric === 'time' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setMetric('time')}
+          >
+            Time
+          </Button>
+        </div>
+        <div className="flex-1 min-h-0">
+          <MonthlyStatsChart data={chartData} metric={metric} height="100%" loading={isLoading} />
+        </div>
       </div>
-      <MonthlyStatsChart data={chartData} metric={metric} height={200} loading={isLoading} />
     </WidgetWrapper>
   )
 }
