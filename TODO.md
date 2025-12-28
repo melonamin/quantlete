@@ -104,68 +104,68 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 1: Core Backend
+## Phase 1: Core Backend ✓
 
 **Goal:** Go server running with Strava OAuth working.
 
 ### 1.1 Configuration System
-- [ ] Create `internal/config/config.go` with config struct
-- [ ] Create `internal/config/loader.go` with Viper integration
-- [ ] Support configuration via:
-  - [ ] Environment variables
-  - [ ] Config file (YAML)
-  - [ ] Command-line flags
-- [ ] Configuration fields:
-  - [ ] Server port
-  - [ ] Data directory path
-  - [ ] Strava client ID/secret
-  - [ ] Strava redirect URI
-  - [ ] Log level
+- [x] Create `internal/config/config.go` with config struct
+- [x] Create `internal/config/loader.go` with Viper integration
+- [x] Support configuration via:
+  - [x] Environment variables
+  - [x] Config file (YAML)
+  - [x] Command-line flags
+- [x] Configuration fields:
+  - [x] Server port
+  - [x] Data directory path
+  - [x] Strava client ID/secret
+  - [x] Strava redirect URI
+  - [x] Log level
 
 ### 1.2 HTTP Server
-- [ ] Create `internal/api/router.go` with chi router
-- [ ] Create `internal/api/middleware.go`:
-  - [ ] Request logging middleware
-  - [ ] CORS middleware (for dev mode)
-  - [ ] Recovery middleware
-- [ ] Create `cmd/stata/serve.go` command
-- [ ] Implement graceful shutdown
+- [x] Create `internal/api/router.go` with chi router
+- [x] Create `internal/api/middleware.go`:
+  - [x] Request logging middleware
+  - [x] CORS middleware (for dev mode)
+  - [x] Recovery middleware
+- [x] Create `cmd/stata/serve.go` command
+- [x] Implement graceful shutdown
 - [ ] Serve static files from embedded React build
-- [ ] Verify server starts and serves placeholder page
+- [x] Verify server starts and serves placeholder page
 
 ### 1.3 Strava OAuth Flow
-- [ ] Create `internal/strava/oauth.go`:
-  - [ ] OAuth2 config setup
-  - [ ] Generate auth URL
-  - [ ] Exchange code for tokens
-  - [ ] Refresh expired tokens
-- [ ] Create `internal/api/handlers/auth.go`:
-  - [ ] `GET /api/v1/auth/strava` - redirect to Strava
-  - [ ] `GET /api/v1/auth/strava/callback` - handle callback
-  - [ ] `GET /api/v1/auth/status` - check auth status
-  - [ ] `POST /api/v1/auth/refresh` - force token refresh
-- [ ] Store tokens (initially in memory, later in DB)
+- [x] Create `internal/strava/oauth.go`:
+  - [x] OAuth2 config setup
+  - [x] Generate auth URL
+  - [x] Exchange code for tokens
+  - [x] Refresh expired tokens
+- [x] Create `internal/api/handlers/auth.go`:
+  - [x] `GET /api/v1/auth/strava` - redirect to Strava
+  - [x] `GET /api/v1/auth/strava/callback` - handle callback
+  - [x] `GET /api/v1/auth/status` - check auth status
+  - [x] `POST /api/v1/auth/refresh` - force token refresh
+- [x] Store tokens (initially in memory, later in DB)
 - [ ] Test OAuth flow end-to-end
 
 ### 1.4 Strava API Client
-- [ ] Create `internal/strava/client.go`:
-  - [ ] HTTP client with auth header injection
-  - [ ] Rate limit tracking from response headers
+- [x] Create `internal/strava/client.go`:
+  - [x] HTTP client with auth header injection
+  - [x] Rate limit tracking from response headers
   - [ ] Automatic token refresh on 401
-- [ ] Create `internal/strava/types.go`:
-  - [ ] Activity struct matching Strava API
-  - [ ] Athlete struct
-  - [ ] Gear struct
-  - [ ] Stream types
-- [ ] Create `internal/strava/ratelimit.go`:
-  - [ ] Track 15-min and daily limits
-  - [ ] Expose rate limit status
+- [x] Create `internal/strava/types.go`:
+  - [x] Activity struct matching Strava API
+  - [x] Athlete struct
+  - [x] Gear struct
+  - [x] Stream types
+- [x] Create `internal/strava/ratelimit.go`:
+  - [x] Track 15-min and daily limits
+  - [x] Expose rate limit status
 
 ### 1.5 Basic Activity Fetching
-- [ ] Create `internal/strava/activities.go`:
-  - [ ] `GetActivities(page, perPage)` - list activities
-  - [ ] `GetActivity(id)` - single activity detail
-  - [ ] `GetActivityStreams(id, types)` - stream data
+- [x] Create `internal/strava/activities.go`:
+  - [x] `GetActivities(page, perPage)` - list activities
+  - [x] `GetActivity(id)` - single activity detail
+  - [x] `GetActivityStreams(id, types)` - stream data
 - [ ] Create `internal/api/handlers/activities.go`:
   - [ ] `GET /api/v1/activities` - proxy to Strava (temporary)
 - [ ] Test fetching activities from Strava API
