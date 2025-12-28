@@ -38,7 +38,7 @@ func NewGearRepository(db *DB) *GearRepository {
 
 // Upsert inserts or updates gear.
 func (r *GearRepository) Upsert(ctx context.Context, g *Gear) error {
-	now := time.Now()
+	now := SQLiteTime{Time: time.Now()}
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE gear
 		SET

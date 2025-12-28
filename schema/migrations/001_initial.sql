@@ -397,3 +397,10 @@ CREATE TABLE IF NOT EXISTS power_best_efforts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_power_best_efforts_athlete_duration ON power_best_efforts(athlete_id, duration_s);
+
+-- App-level state for things like rate limiter state that need to survive restarts
+CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

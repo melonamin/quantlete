@@ -1,6 +1,6 @@
 import type { DashboardStats } from '@/lib/api/dashboard'
 import { formatDistance, formatDuration, formatElevation } from '@/lib/format'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardValue } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface StatsSummaryProps {
@@ -53,17 +53,15 @@ export function StatsSummary({ stats, isLoading }: StatsSummaryProps) {
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
         <Card key={card.title}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {card.title}
-            </CardTitle>
+          <CardHeader className="pb-1">
+            <CardTitle>{card.title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{card.value}</div>
-            <p className="text-xs text-muted-foreground">{card.description}</p>
+            <CardValue>{card.value}</CardValue>
+            <p className="text-xs text-muted-foreground tabular-nums">{card.description}</p>
           </CardContent>
         </Card>
       ))}

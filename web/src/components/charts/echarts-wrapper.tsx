@@ -80,28 +80,28 @@ export function EChartsWrapper({
   )
 }
 
-// Theme colors that work in both light and dark modes
+// Terminal-themed chart colors
 export const chartColors = {
-  primary: '#3b82f6',
-  secondary: '#8b5cf6',
-  success: '#22c55e',
-  warning: '#f59e0b',
-  danger: '#ef4444',
-  info: '#06b6d4',
+  primary: '#4ade80', // terminal green
+  secondary: '#fb923c', // strava orange
+  success: '#4ade80',
+  warning: '#fbbf24', // terminal amber
+  danger: '#f87171',
+  info: '#22d3ee', // terminal cyan
   // Sport colors
-  ride: '#f97316',
-  run: '#22c55e',
-  swim: '#3b82f6',
-  walk: '#a855f7',
-  winter: '#06b6d4',
+  ride: '#4ade80',
+  run: '#fb923c',
+  swim: '#22d3ee',
+  walk: '#a78bfa',
+  winter: '#38bdf8',
   other: '#6b7280',
   // Data series
-  heartRate: '#ef4444',
-  power: '#f59e0b',
-  cadence: '#8b5cf6',
-  elevation: '#22c55e',
-  speed: '#3b82f6',
-  temperature: '#06b6d4',
+  heartRate: '#f87171',
+  power: '#fbbf24',
+  cadence: '#a78bfa',
+  elevation: '#4ade80',
+  speed: '#22d3ee',
+  temperature: '#fb923c',
 }
 
 // Common chart configurations
@@ -114,9 +114,25 @@ export const defaultGridConfig = {
 
 export const defaultTooltipConfig = {
   trigger: 'axis' as const,
-  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  borderColor: 'transparent',
+  backgroundColor: 'rgba(20, 20, 30, 0.95)',
+  borderColor: 'rgba(60, 60, 80, 0.5)',
   textStyle: {
-    color: '#fff',
+    color: '#e5e5e5',
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 11,
+  },
+}
+
+export const defaultAxisStyle = {
+  axisLine: {
+    lineStyle: { color: 'rgba(100, 100, 120, 0.3)' },
+  },
+  splitLine: {
+    lineStyle: { color: 'rgba(100, 100, 120, 0.15)' },
+  },
+  axisLabel: {
+    color: 'rgba(160, 160, 180, 0.8)',
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10,
   },
 }

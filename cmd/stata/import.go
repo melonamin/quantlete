@@ -90,9 +90,30 @@ func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, in
 	bestEffortsRepo := storage.NewBestEffortsRepository(db)
 	maintenanceRepo := storage.NewMaintenanceRepository(db)
 	photoRepo := storage.NewPhotoRepository(db)
+	appStateRepo := storage.NewAppStateRepository(db)
 
 	// Create Strava client
 	stravaClient := strava.NewClient(&cfg.Strava)
+
+	// Restore rate limit state from database
+	if stateJSON, err := appStateRepo.Get(context.Background(), "strava_rate_limit"); err == nil && stateJSON != "" {
+		if err := stravaClient.RateLimiter().LoadFromJSON(stateJSON); err != nil {
+			slog.Warn("failed to restore rate limit state", "error", err)
+		} else {
+			status := stravaClient.RateLimiter().Status()
+			slog.Info("restored rate limit state",
+				"usage_15min", status.Usage15Min,
+				"limit_15min", status.Limit15Min,
+				"usage_daily", status.UsageDaily,
+				"limit_daily", status.LimitDaily,
+			)
+		}
+	}
+
+	// Set up rate limit persistence
+	stravaClient.SetRateLimitPersister(func(json string) error {
+		return appStateRepo.Set(context.Background(), "strava_rate_limit", json)
+	})
 
 	// Check if we have a stored token
 	// For now, we need to authenticate via the web interface first

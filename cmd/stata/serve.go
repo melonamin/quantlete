@@ -85,6 +85,17 @@ func runServe(port int, dev bool) error {
 	bestEffortsRepo := storage.NewBestEffortsRepository(db)
 	maintenanceRepo := storage.NewMaintenanceRepository(db)
 	photoRepo := storage.NewPhotoRepository(db)
+	appStateRepo := storage.NewAppStateRepository(db)
+
+	// Restore rate limit state from database
+	if err := restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
+		slog.Warn("failed to restore rate limit state", "error", err)
+	}
+
+	// Set up rate limit persistence
+	stravaClient.SetRateLimitPersister(func(json string) error {
+		return appStateRepo.Set(context.Background(), "strava_rate_limit", json)
+	})
 
 	// Restore tokens from database
 	if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
@@ -198,6 +209,37 @@ func restoreAuth(
 
 	stravaClient.SetToken(token, athlete)
 	slog.Info("restored auth from database", "athlete_id", athlete.ID, "expires_at", token.Expiry)
+
+	return nil
+}
+
+// restoreRateLimitState restores rate limit state from the database on startup.
+func restoreRateLimitState(
+	ctx context.Context,
+	stravaClient *strava.Client,
+	appStateRepo *storage.AppStateRepository,
+) error {
+	stateJSON, err := appStateRepo.Get(ctx, "strava_rate_limit")
+	if err != nil {
+		return fmt.Errorf("getting rate limit state: %w", err)
+	}
+
+	if stateJSON == "" {
+		slog.Debug("no stored rate limit state found")
+		return nil
+	}
+
+	if err := stravaClient.RateLimiter().LoadFromJSON(stateJSON); err != nil {
+		return fmt.Errorf("loading rate limit state: %w", err)
+	}
+
+	status := stravaClient.RateLimiter().Status()
+	slog.Info("restored rate limit state",
+		"usage_15min", status.Usage15Min,
+		"limit_15min", status.Limit15Min,
+		"usage_daily", status.UsageDaily,
+		"limit_daily", status.LimitDaily,
+	)
 
 	return nil
 }

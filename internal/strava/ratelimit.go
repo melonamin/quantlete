@@ -2,6 +2,7 @@ package strava
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -159,4 +160,83 @@ func (r *RateLimiter) RemainingDaily() int {
 		return 0
 	}
 	return remaining
+}
+
+// persistedState is the JSON structure for persisted rate limit state.
+type persistedState struct {
+	Limit15Min int       `json:"limit_15min"`
+	Usage15Min int       `json:"usage_15min"`
+	LimitDaily int       `json:"limit_daily"`
+	UsageDaily int       `json:"usage_daily"`
+	LastUpdate time.Time `json:"last_update"`
+}
+
+// ToJSON serializes the rate limit state to JSON for persistence.
+func (r *RateLimiter) ToJSON() (string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	state := persistedState{
+		Limit15Min: r.limit15Min,
+		Usage15Min: r.usage15Min,
+		LimitDaily: r.limitDaily,
+		UsageDaily: r.usageDaily,
+		LastUpdate: r.lastUpdate,
+	}
+
+	data, err := json.Marshal(state)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// LoadFromJSON restores rate limit state from JSON.
+// It applies decay based on time elapsed since last update.
+func (r *RateLimiter) LoadFromJSON(data string) error {
+	if data == "" {
+		return nil
+	}
+
+	var state persistedState
+	if err := json.Unmarshal([]byte(data), &state); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Apply time-based decay to usage counters
+	now := time.Now()
+	elapsed := now.Sub(state.LastUpdate)
+
+	// 15-minute limit resets every 15 minutes
+	// If more than 15 minutes have passed, reset 15-min usage
+	if elapsed >= 15*time.Minute {
+		state.Usage15Min = 0
+	}
+
+	// Daily limit resets at midnight UTC
+	// Check if we've crossed a day boundary
+	lastDay := state.LastUpdate.UTC().Truncate(24 * time.Hour)
+	today := now.UTC().Truncate(24 * time.Hour)
+	if today.After(lastDay) {
+		state.UsageDaily = 0
+	}
+
+	r.limit15Min = state.Limit15Min
+	r.usage15Min = state.Usage15Min
+	r.limitDaily = state.LimitDaily
+	r.usageDaily = state.UsageDaily
+	r.lastUpdate = state.LastUpdate
+
+	// Apply defaults if limits are 0 (corrupted state)
+	if r.limit15Min == 0 {
+		r.limit15Min = 100
+	}
+	if r.limitDaily == 0 {
+		r.limitDaily = 1000
+	}
+
+	return nil
 }

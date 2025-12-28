@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql/driver"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -42,14 +43,21 @@ func (t *SQLiteTime) parseString(s string) error {
 		return nil
 	}
 
+	// Strip monotonic clock reading if present (Go's default time.String() format)
+	// Format: "2006-01-02 15:04:05.999999999 -0700 MST m=+0.000000001"
+	if idx := strings.Index(s, " m="); idx != -1 {
+		s = s[:idx]
+	}
+
 	// Try common formats
 	formats := []string{
-		"2006-01-02 15:04:05-07:00",     // SQLite with timezone
-		"2006-01-02 15:04:05+00:00",     // SQLite with UTC
-		"2006-01-02T15:04:05Z",          // RFC3339 UTC
-		"2006-01-02T15:04:05-07:00",     // RFC3339 with timezone
-		"2006-01-02 15:04:05",           // SQLite without timezone
-		"2006-01-02T15:04:05.000Z",      // RFC3339 with milliseconds
+		"2006-01-02 15:04:05-07:00",               // SQLite with timezone
+		"2006-01-02 15:04:05+00:00",               // SQLite with UTC
+		"2006-01-02T15:04:05Z",                    // RFC3339 UTC
+		"2006-01-02T15:04:05-07:00",               // RFC3339 with timezone
+		"2006-01-02 15:04:05",                     // SQLite without timezone
+		"2006-01-02T15:04:05.000Z",                // RFC3339 with milliseconds
+		"2006-01-02 15:04:05.999999999 -0700 MST", // Go default format (after stripping m=)
 		time.RFC3339,
 		time.RFC3339Nano,
 	}

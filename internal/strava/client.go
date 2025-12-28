@@ -19,15 +19,19 @@ const (
 	apiBase  = "https://www.strava.com/api/v3"
 )
 
+// RateLimitPersister is called after each API request to persist rate limit state.
+type RateLimitPersister func(json string) error
+
 // Client is a Strava API client.
 type Client struct {
-	cfg        *config.StravaConfig
-	oauth      *oauth2.Config
-	httpClient *http.Client
-	rateLimit  *RateLimiter
-	token      *oauth2.Token
-	athlete    *Athlete
-	tokenMu    sync.RWMutex
+	cfg              *config.StravaConfig
+	oauth            *oauth2.Config
+	httpClient       *http.Client
+	rateLimit        *RateLimiter
+	rateLimitPersist RateLimitPersister
+	token            *oauth2.Token
+	athlete          *Athlete
+	tokenMu          sync.RWMutex
 }
 
 // NewClient creates a new Strava API client.
@@ -105,6 +109,16 @@ func (c *Client) GetAthlete() *Athlete {
 	return c.athlete
 }
 
+// RateLimiter returns the rate limiter for state persistence.
+func (c *Client) RateLimiter() *RateLimiter {
+	return c.rateLimit
+}
+
+// SetRateLimitPersister sets the callback for persisting rate limit state.
+func (c *Client) SetRateLimitPersister(p RateLimitPersister) {
+	c.rateLimitPersist = p
+}
+
 // IsAuthenticated returns true if the client has a valid token.
 func (c *Client) IsAuthenticated() bool {
 	c.tokenMu.RLock()
@@ -142,6 +156,13 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 
 	// Update rate limits from response headers
 	c.rateLimit.UpdateFromHeaders(resp.Header)
+
+	// Persist rate limit state if persister is configured
+	if c.rateLimitPersist != nil {
+		if json, err := c.rateLimit.ToJSON(); err == nil {
+			_ = c.rateLimitPersist(json) // Best effort, don't fail request on persistence error
+		}
+	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("unauthorized: token may be expired")
