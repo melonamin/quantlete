@@ -10,6 +10,11 @@ type HealthResponse struct {
 	Status string `json:"status"`
 }
 
+// ErrorResponse represents an error response.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 // HealthCheck handles GET /api/v1/health.
 func HealthCheck(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

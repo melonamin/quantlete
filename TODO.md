@@ -172,61 +172,61 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 2: Database & Storage
+## Phase 2: Database & Storage ✓
 
 **Goal:** DuckDB schema set up, activities persisted locally.
 
 ### 2.1 DuckDB Connection
-- [ ] Create `internal/storage/db.go`:
-  - [ ] Open/create DuckDB file
-  - [ ] Connection pool management
-  - [ ] Close on shutdown
-- [ ] Configure database path from config
+- [x] Create `internal/storage/db.go`:
+  - [x] Open/create DuckDB file
+  - [x] Connection pool management
+  - [x] Close on shutdown
+- [x] Configure database path from config
 - [ ] Test database creation
 
 ### 2.2 Schema Migrations
-- [ ] Create `internal/storage/migrations.go`:
-  - [ ] Migration tracking table
-  - [ ] Run pending migrations
+- [x] Create `internal/storage/migrations.go`:
+  - [x] Migration tracking table
+  - [x] Run pending migrations
   - [ ] Rollback support (optional)
-- [ ] Create `schema/migrations/001_initial.sql`:
-  - [ ] Athletes table
-  - [ ] Auth tokens table
-- [ ] Create `schema/migrations/002_activities.sql`:
-  - [ ] Activities table with all fields
-  - [ ] Indexes
-- [ ] Create `schema/migrations/003_streams.sql`:
-  - [ ] Activity streams table
-- [ ] Embed migrations using `go:embed`
+- [x] Create `schema/migrations/001_initial.sql`:
+  - [x] Athletes table
+  - [x] Auth tokens table
+- [x] Create `schema/migrations/002_activities.sql`:
+  - [x] Activities table with all fields
+  - [x] Indexes
+- [x] Create `schema/migrations/003_streams.sql`:
+  - [x] Activity streams table
+- [x] Embed migrations using `go:embed`
 
 ### 2.3 Activity Repository
-- [ ] Create `internal/storage/activities.go`:
-  - [ ] `Insert(activity)` - upsert activity
-  - [ ] `GetByID(id)` - fetch single activity
-  - [ ] `List(filters, pagination)` - filtered list
-  - [ ] `GetTotals(filters)` - sum aggregates
+- [x] Create `internal/storage/activities.go`:
+  - [x] `Insert(activity)` - upsert activity
+  - [x] `GetByID(id)` - fetch single activity
+  - [x] `List(filters, pagination)` - filtered list
+  - [x] `GetTotals(filters)` - sum aggregates
 - [ ] Create `internal/storage/queries/activities.sql`:
   - [ ] Parameterized queries
 - [ ] Unit tests for repository
 
 ### 2.4 Importer Service
-- [ ] Create `internal/importer/importer.go`:
-  - [ ] Orchestrate full import
-  - [ ] Track import progress
-  - [ ] Handle rate limits gracefully
-- [ ] Create `internal/importer/activities.go`:
-  - [ ] Fetch activities in batches
-  - [ ] Transform Strava → domain model
-  - [ ] Persist to database
-- [ ] Create `cmd/stata/import.go` command:
-  - [ ] Trigger manual import
-  - [ ] Show progress
+- [x] Create `internal/importer/importer.go`:
+  - [x] Orchestrate full import
+  - [x] Track import progress
+  - [x] Handle rate limits gracefully
+- [x] Create `internal/importer/activities.go`:
+  - [x] Fetch activities in batches
+  - [x] Transform Strava → domain model
+  - [x] Persist to database
+- [x] Create `cmd/stata/import.go` command:
+  - [x] Trigger manual import
+  - [x] Show progress
 - [ ] Test importing real activities
 
 ### 2.5 Athlete & Token Storage
-- [ ] Create `internal/storage/athletes.go`:
-  - [ ] Store athlete profile
-  - [ ] Store/retrieve OAuth tokens
+- [x] Create `internal/storage/athletes.go`:
+  - [x] Store athlete profile
+  - [x] Store/retrieve OAuth tokens
 - [ ] Update OAuth flow to persist tokens
 - [ ] Retrieve tokens on server start
 

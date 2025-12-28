@@ -13,6 +13,7 @@ import (
 
 	"github.com/sasha/stata/internal/api"
 	"github.com/sasha/stata/internal/config"
+	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
 
@@ -55,11 +56,25 @@ func runServe(port int, dev bool) error {
 	}))
 	slog.SetDefault(logger)
 
+	// Open database
+	db, err := storage.Open(cfg.Storage.DataDir)
+	if err != nil {
+		return fmt.Errorf("opening database: %w", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	slog.Info("database opened", "path", db.Path())
+
+	// Run migrations
+	if err := db.Migrate(); err != nil {
+		return fmt.Errorf("running migrations: %w", err)
+	}
+
 	// Create Strava client
 	stravaClient := strava.NewClient(&cfg.Strava)
 
 	// Create router
-	router := api.NewRouter(cfg, stravaClient)
+	router := api.NewRouter(cfg, stravaClient, db)
 
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
