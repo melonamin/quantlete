@@ -1,25 +1,38 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 
+	"golang.org/x/oauth2"
+
 	"github.com/sasha/stata/internal/config"
+	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	cfg    *config.Config
-	strava *strava.Client
+	cfg      *config.Config
+	strava   *strava.Client
+	tokens   *storage.TokenRepository
+	athletes *storage.AthleteRepository
 }
 
 // NewAuthHandler creates a new auth handler.
-func NewAuthHandler(cfg *config.Config, stravaClient *strava.Client) *AuthHandler {
+func NewAuthHandler(
+	cfg *config.Config,
+	stravaClient *strava.Client,
+	tokens *storage.TokenRepository,
+	athletes *storage.AthleteRepository,
+) *AuthHandler {
 	return &AuthHandler{
-		cfg:    cfg,
-		strava: stravaClient,
+		cfg:      cfg,
+		strava:   stravaClient,
+		tokens:   tokens,
+		athletes: athletes,
 	}
 }
 
@@ -65,11 +78,23 @@ func (h *AuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("OAuth successful", "athlete_id", athlete.ID, "athlete_name", athlete.FirstName+" "+athlete.LastName)
 
-	// Store the token (in-memory for now, will be persisted to DB later)
+	// Persist token and athlete to database
+	if err := h.persistAuth(r.Context(), token, athlete); err != nil {
+		slog.Error("failed to persist auth", "error", err)
+		// Continue anyway - in-memory storage will still work for this session
+	} else {
+		slog.Info("auth persisted to database", "athlete_id", athlete.ID, "expires_at", token.Expiry)
+	}
+
+	// Store in memory for immediate use
 	h.strava.SetToken(token, athlete)
 
-	// Redirect to dashboard
-	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	// Redirect to frontend - in dev mode redirect to Vite dev server
+	redirectURL := "/settings"
+	if h.cfg.Server.DevMode {
+		redirectURL = "http://localhost:5173/settings"
+	}
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 // Status handles GET /api/v1/auth/status.
@@ -108,13 +133,59 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.strava.SetToken(newToken, h.strava.GetAthlete())
+	athlete := h.strava.GetAthlete()
+	h.strava.SetToken(newToken, athlete)
+
+	// Persist refreshed token
+	if athlete != nil {
+		if err := h.persistToken(r.Context(), newToken, athlete.ID); err != nil {
+			slog.Error("failed to persist refreshed token", "error", err)
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	resp := AuthStatusResponse{
 		Authenticated: true,
-		Athlete:       h.strava.GetAthlete(),
+		Athlete:       athlete,
 		ExpiresAt:     newToken.Expiry.Unix(),
 	}
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// persistAuth saves the athlete and token to the database.
+func (h *AuthHandler) persistAuth(ctx context.Context, token *oauth2.Token, athlete *strava.Athlete) error {
+	// Save athlete profile
+	storageAthlete := &storage.Athlete{
+		ID:            athlete.ID,
+		Username:      athlete.Username,
+		FirstName:     athlete.FirstName,
+		LastName:      athlete.LastName,
+		City:          athlete.City,
+		State:         athlete.State,
+		Country:       athlete.Country,
+		Sex:           athlete.Sex,
+		Premium:       athlete.Premium,
+		Summit:        athlete.Summit,
+		ProfileMedium: athlete.ProfileMedium,
+		Profile:       athlete.Profile,
+		Weight:        athlete.Weight,
+	}
+	if err := h.athletes.Upsert(ctx, storageAthlete); err != nil {
+		return err
+	}
+
+	// Save token
+	return h.persistToken(ctx, token, athlete.ID)
+}
+
+// persistToken saves the OAuth token to the database.
+func (h *AuthHandler) persistToken(ctx context.Context, token *oauth2.Token, athleteID int64) error {
+	storageToken := &storage.AuthToken{
+		AthleteID:    athleteID,
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		TokenType:    token.TokenType,
+		ExpiresAt:    token.Expiry,
+	}
+	return h.tokens.Upsert(ctx, storageToken)
 }

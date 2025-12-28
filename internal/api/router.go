@@ -9,6 +9,7 @@ import (
 
 	"github.com/sasha/stata/internal/api/handlers"
 	"github.com/sasha/stata/internal/config"
+	"github.com/sasha/stata/internal/importer"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
@@ -21,10 +22,11 @@ type Router struct {
 	stravaClient      *strava.Client
 	authHandler       *handlers.AuthHandler
 	activitiesHandler *handlers.ActivitiesHandler
+	importHandler     *handlers.ImportHandler
 }
 
 // NewRouter creates a new HTTP router with all routes configured.
-func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB) *Router {
+func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, imp *importer.Importer) *Router {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -47,10 +49,13 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB) 
 
 	// Create repositories
 	activityRepo := storage.NewActivityRepository(db)
+	athleteRepo := storage.NewAthleteRepository(db)
+	tokenRepo := storage.NewTokenRepository(db)
 
 	// Create handlers
-	authHandler := handlers.NewAuthHandler(cfg, stravaClient)
+	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
 	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, stravaClient)
+	importHandler := handlers.NewImportHandler(imp)
 
 	router := &Router{
 		Mux:               r,
@@ -59,6 +64,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB) 
 		stravaClient:      stravaClient,
 		authHandler:       authHandler,
 		activitiesHandler: activitiesHandler,
+		importHandler:     importHandler,
 	}
 
 	// Mount routes
@@ -85,6 +91,13 @@ func (r *Router) mountRoutes() {
 		router.Route("/activities", func(router chi.Router) {
 			router.Get("/", r.activitiesHandler.List)
 			router.Get("/{id}", r.activitiesHandler.GetByID)
+		})
+
+		// Import routes
+		router.Route("/import", func(router chi.Router) {
+			router.Post("/start", r.importHandler.Start)
+			router.Get("/progress", r.importHandler.Progress)
+			router.Post("/cancel", r.importHandler.Cancel)
 		})
 	})
 

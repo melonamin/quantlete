@@ -12,13 +12,19 @@ default:
 # Development
 # ============================================================================
 
-# Run both Go API and React dev server
-dev: dev-api dev-web
+# Run both Go API and React dev server concurrently
+dev:
+    #!/usr/bin/env bash
+    set -a && source .env 2>/dev/null && set +a
+    trap 'kill 0' EXIT
+    air &
+    cd web && yarn dev &
+    wait
 
 # Run Go API server in dev mode with hot reload
 dev-api:
     #!/usr/bin/env bash
-    set -a && source .env && set +a && exec air
+    set -a && source .env 2>/dev/null && set +a && exec air
 
 # Run React dev server
 dev-web:

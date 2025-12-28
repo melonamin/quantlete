@@ -8,9 +8,10 @@ import (
 )
 
 // convertActivity converts a Strava activity to a storage activity.
-func convertActivity(a *strava.Activity) *storage.Activity {
+func convertActivity(a *strava.Activity, athleteID int64) *storage.Activity {
 	act := &storage.Activity{
 		ID:                 a.ID,
+		AthleteID:          athleteID,
 		Name:               a.Name,
 		Description:        a.Description,
 		SportType:          a.SportType,

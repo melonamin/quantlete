@@ -95,12 +95,24 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 
 	// Run import in background
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("import panicked", "panic", r)
+				i.mu.Lock()
+				i.progress.Status = StatusFailed
+				i.progress.Error = fmt.Sprintf("panic: %v", r)
+				i.progress.CompletedAt = time.Now()
+				i.mu.Unlock()
+			}
+		}()
+
 		err := i.runImport(ctx, opts)
 		i.mu.Lock()
 		defer i.mu.Unlock()
 
 		i.progress.CompletedAt = time.Now()
 		if err != nil {
+			slog.Error("import failed", "error", err)
 			if ctx.Err() == context.Canceled {
 				i.progress.Status = StatusCanceled
 			} else {
@@ -139,17 +151,22 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 
 	stravaAthlete := i.stravaClient.GetAthlete()
 	if stravaAthlete == nil {
+		slog.Error("import failed: not authenticated")
 		return fmt.Errorf("not authenticated")
 	}
+	slog.Info("import authenticated", "athlete_id", stravaAthlete.ID)
 
 	// Save athlete profile
+	slog.Info("saving athlete profile")
 	athlete := convertAthlete(stravaAthlete)
 	athlete.ID = stravaAthlete.ID
 	if err := i.athletes.Upsert(ctx, athlete); err != nil {
 		slog.Warn("failed to save athlete profile", "error", err)
 	}
+	slog.Info("athlete profile saved")
 
 	// Import activities page by page
+	slog.Info("starting activity fetch loop")
 	page := 1
 	perPage := 100
 	seenIDs := make(map[int64]bool)
@@ -165,14 +182,18 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		i.progress.CurrentPage = page
 		i.mu.Unlock()
 
-		slog.Debug("fetching activities page", "page", page)
+		slog.Info("fetching activities page", "page", page)
 
 		activities, err := i.stravaClient.GetActivities(ctx, page, perPage)
 		if err != nil {
+			slog.Error("failed to fetch activities", "page", page, "error", err)
 			return fmt.Errorf("fetching activities page %d: %w", page, err)
 		}
 
+		slog.Info("fetched activities", "page", page, "count", len(activities))
+
 		if len(activities) == 0 {
+			slog.Info("no more activities, import done")
 			break
 		}
 
@@ -193,7 +214,7 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 			i.mu.Unlock()
 
 			// Convert and store activity
-			if err := i.importActivity(ctx, &a, opts.IncludeStreams); err != nil {
+			if err := i.importActivity(ctx, &a, stravaAthlete.ID, opts.IncludeStreams); err != nil {
 				slog.Warn("failed to import activity", "id", a.ID, "error", err)
 				i.mu.Lock()
 				i.progress.FailedCount++
@@ -229,9 +250,9 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 }
 
 // importActivity imports a single activity.
-func (i *Importer) importActivity(ctx context.Context, a *strava.Activity, includeStreams bool) error {
+func (i *Importer) importActivity(ctx context.Context, a *strava.Activity, athleteID int64, includeStreams bool) error {
 	// Convert Strava activity to storage activity
-	act := convertActivity(a)
+	act := convertActivity(a, athleteID)
 
 	if err := i.activities.Upsert(ctx, act); err != nil {
 		return fmt.Errorf("storing activity: %w", err)

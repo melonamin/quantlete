@@ -37,10 +37,10 @@ type Activity struct {
 	AverageSpeed         float64         `json:"average_speed"` // m/s
 	MaxSpeed             float64         `json:"max_speed"`     // m/s
 	AverageHeartrate     float64         `json:"average_heartrate"`
-	MaxHeartrate         int             `json:"max_heartrate"`
+	MaxHeartrate         float64         `json:"max_heartrate"`
 	AverageWatts         float64         `json:"average_watts"`
-	MaxWatts             int             `json:"max_watts"`
-	WeightedAverageWatts int             `json:"weighted_average_watts"`
+	MaxWatts             float64         `json:"max_watts"`
+	WeightedAverageWatts float64         `json:"weighted_average_watts"`
 	Kilojoules           float64         `json:"kilojoules"`
 	AverageCadence       float64         `json:"average_cadence"`
 	Calories             float64         `json:"calories"`
@@ -79,7 +79,7 @@ type SegmentEffort struct {
 	Distance         float64   `json:"distance"`
 	AverageWatts     float64   `json:"average_watts"`
 	AverageHeartrate float64   `json:"average_heartrate"`
-	MaxHeartrate     int       `json:"max_heartrate"`
+	MaxHeartrate     float64   `json:"max_heartrate"`
 	PRRank           *int      `json:"pr_rank"`
 	Segment          Segment   `json:"segment"`
 }
@@ -122,7 +122,7 @@ type Lap struct {
 	MaxSpeed         float64 `json:"max_speed"`
 	AverageWatts     float64 `json:"average_watts"`
 	AverageHeartrate float64 `json:"average_heartrate"`
-	MaxHeartrate     int     `json:"max_heartrate"`
+	MaxHeartrate     float64 `json:"max_heartrate"`
 	AverageCadence   float64 `json:"average_cadence"`
 	LapIndex         int     `json:"lap_index"`
 }

@@ -28,10 +28,10 @@ type Activity struct {
 	AverageSpeed         float64
 	MaxSpeed             float64
 	AverageHeartrate     *float64
-	MaxHeartrate         *int
+	MaxHeartrate         *float64
 	AverageWatts         *float64
-	MaxWatts             *int
-	WeightedAverageWatts *int
+	MaxWatts             *float64
+	WeightedAverageWatts *float64
 	Kilojoules           *float64
 	AverageCadence       *float64
 	Calories             *float64
@@ -85,8 +85,16 @@ func NewActivityRepository(db *DB) *ActivityRepository {
 }
 
 // Upsert inserts or updates an activity.
+// Uses DELETE + INSERT because DuckDB doesn't allow updating indexed columns in UPSERT.
 func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
-	_, err := r.db.Exec(`
+	// Delete existing activity
+	_, err := r.db.Exec("DELETE FROM activities WHERE id = ?", a.ID)
+	if err != nil {
+		return fmt.Errorf("deleting existing activity: %w", err)
+	}
+
+	// Insert activity
+	_, err = r.db.Exec(`
 		INSERT INTO activities (
 			id, athlete_id, name, description, sport_type,
 			start_date, start_date_local, timezone,
@@ -116,38 +124,6 @@ func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
 			?, ?,
 			?, ?
 		)
-		ON CONFLICT (id) DO UPDATE SET
-			name = EXCLUDED.name,
-			description = EXCLUDED.description,
-			sport_type = EXCLUDED.sport_type,
-			distance = EXCLUDED.distance,
-			moving_time = EXCLUDED.moving_time,
-			elapsed_time = EXCLUDED.elapsed_time,
-			total_elevation_gain = EXCLUDED.total_elevation_gain,
-			elev_high = EXCLUDED.elev_high,
-			elev_low = EXCLUDED.elev_low,
-			average_speed = EXCLUDED.average_speed,
-			max_speed = EXCLUDED.max_speed,
-			average_heartrate = EXCLUDED.average_heartrate,
-			max_heartrate = EXCLUDED.max_heartrate,
-			average_watts = EXCLUDED.average_watts,
-			max_watts = EXCLUDED.max_watts,
-			weighted_average_watts = EXCLUDED.weighted_average_watts,
-			kilojoules = EXCLUDED.kilojoules,
-			average_cadence = EXCLUDED.average_cadence,
-			calories = EXCLUDED.calories,
-			kudos_count = EXCLUDED.kudos_count,
-			comment_count = EXCLUDED.comment_count,
-			photo_count = EXCLUDED.photo_count,
-			commute = EXCLUDED.commute,
-			private = EXCLUDED.private,
-			trainer = EXCLUDED.trainer,
-			workout_type = EXCLUDED.workout_type,
-			device_name = EXCLUDED.device_name,
-			gear_id = EXCLUDED.gear_id,
-			polyline = EXCLUDED.polyline,
-			summary_polyline = EXCLUDED.summary_polyline,
-			updated_at = EXCLUDED.updated_at
 	`,
 		a.ID, a.AthleteID, a.Name, a.Description, a.SportType,
 		a.StartDate, a.StartDateLocal, a.Timezone,

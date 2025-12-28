@@ -33,21 +33,20 @@ func NewGearRepository(db *DB) *GearRepository {
 }
 
 // Upsert inserts or updates gear.
+// Uses DELETE + INSERT because DuckDB doesn't allow updating indexed columns in UPSERT.
 func (r *GearRepository) Upsert(ctx context.Context, g *Gear) error {
-	_, err := r.db.Exec(`
+	// Delete existing gear
+	_, err := r.db.Exec("DELETE FROM gear WHERE id = ?", g.ID)
+	if err != nil {
+		return fmt.Errorf("deleting existing gear: %w", err)
+	}
+
+	// Insert gear
+	_, err = r.db.Exec(`
 		INSERT INTO gear (
 			id, athlete_id, name, is_primary, retired, distance,
 			brand_name, model_name, description, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (id) DO UPDATE SET
-			name = EXCLUDED.name,
-			is_primary = EXCLUDED.is_primary,
-			retired = EXCLUDED.retired,
-			distance = EXCLUDED.distance,
-			brand_name = EXCLUDED.brand_name,
-			model_name = EXCLUDED.model_name,
-			description = EXCLUDED.description,
-			updated_at = EXCLUDED.updated_at
 	`,
 		g.ID, g.AthleteID, g.Name, g.Primary, g.Retired, g.Distance,
 		g.BrandName, g.ModelName, g.Description, time.Now(), time.Now(),

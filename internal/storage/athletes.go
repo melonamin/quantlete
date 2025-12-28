@@ -143,18 +143,20 @@ func NewTokenRepository(db *DB) *TokenRepository {
 }
 
 // Upsert inserts or updates an auth token.
+// Uses DELETE + INSERT because DuckDB doesn't allow updating indexed columns in UPSERT.
 func (r *TokenRepository) Upsert(ctx context.Context, t *AuthToken) error {
-	_, err := r.db.Exec(`
+	// Delete existing token for this athlete
+	_, err := r.db.Exec("DELETE FROM auth_tokens WHERE athlete_id = ?", t.AthleteID)
+	if err != nil {
+		return fmt.Errorf("deleting existing token: %w", err)
+	}
+
+	// Insert new token
+	_, err = r.db.Exec(`
 		INSERT INTO auth_tokens (
 			athlete_id, access_token, refresh_token, token_type,
 			expires_at, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (athlete_id) DO UPDATE SET
-			access_token = EXCLUDED.access_token,
-			refresh_token = EXCLUDED.refresh_token,
-			token_type = EXCLUDED.token_type,
-			expires_at = EXCLUDED.expires_at,
-			updated_at = EXCLUDED.updated_at
 	`,
 		t.AthleteID, t.AccessToken, t.RefreshToken, t.TokenType,
 		t.ExpiresAt, time.Now(), time.Now(),

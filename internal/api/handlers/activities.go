@@ -54,10 +54,10 @@ type ActivityResponse struct {
 	AverageSpeed         float64  `json:"average_speed"`
 	MaxSpeed             float64  `json:"max_speed"`
 	AverageHeartrate     *float64 `json:"average_heartrate,omitempty"`
-	MaxHeartrate         *int     `json:"max_heartrate,omitempty"`
+	MaxHeartrate         *float64 `json:"max_heartrate,omitempty"`
 	AverageWatts         *float64 `json:"average_watts,omitempty"`
-	MaxWatts             *int     `json:"max_watts,omitempty"`
-	WeightedAverageWatts *int     `json:"weighted_average_watts,omitempty"`
+	MaxWatts             *float64 `json:"max_watts,omitempty"`
+	WeightedAverageWatts *float64 `json:"weighted_average_watts,omitempty"`
 	Kilojoules           *float64 `json:"kilojoules,omitempty"`
 	AverageCadence       *float64 `json:"average_cadence,omitempty"`
 	Calories             *float64 `json:"calories,omitempty"`

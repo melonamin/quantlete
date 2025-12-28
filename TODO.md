@@ -6,20 +6,20 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ## Overview
 
-| Phase | Focus | Deliverable |
-|-------|-------|-------------|
-| 0 | Project Setup | Repository, tooling, CI/CD |
-| 1 | Core Backend | Go server, Strava OAuth, basic import |
-| 2 | Database & Storage | DuckDB schema, activity storage |
-| 3 | Frontend Foundation | React shell, routing, shadcn setup |
-| 4 | Activities Feature | Activity list, filters, detail view |
-| 5 | Dashboard | Widget system, core widgets |
-| 6 | Charts & Visualizations | ECharts integration, all chart types |
-| 7 | Maps & Heatmap | Leaflet integration, route visualization |
-| 8 | Advanced Features | Segments, gear, maintenance, calendar |
-| 9 | Analytics | Eddington, best efforts, training load |
-| 10 | WASM Mode | Browser-only version with DuckDB-WASM |
-| 11 | Polish | PWA, i18n, settings, badges |
+| Phase | Focus | Deliverable | Status |
+|-------|-------|-------------|--------|
+| 0 | Project Setup | Repository, tooling, CI/CD | ✓ |
+| 1 | Core Backend | Go server, Strava OAuth, basic import | ✓ |
+| 2 | Database & Storage | DuckDB schema, activity storage | ✓ |
+| 3 | Frontend Foundation | React shell, routing, shadcn setup | ✓ |
+| 4 | Activities Feature | Activity list, filters, detail view | ✓ |
+| 5 | Dashboard | Widget system, core widgets | |
+| 6 | Charts & Visualizations | ECharts integration, all chart types | |
+| 7 | Maps & Heatmap | Leaflet integration, route visualization | |
+| 8 | Advanced Features | Segments, gear, maintenance, calendar | |
+| 9 | Analytics | Eddington, best efforts, training load | |
+| 10 | WASM Mode | Browser-only version with DuckDB-WASM | |
+| 11 | Polish | PWA, i18n, settings, badges | |
 
 ---
 
@@ -145,7 +145,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] `GET /api/v1/auth/status` - check auth status
   - [x] `POST /api/v1/auth/refresh` - force token refresh
 - [x] Store tokens (initially in memory, later in DB)
-- [ ] Test OAuth flow end-to-end
+- [x] Test OAuth flow end-to-end
 
 ### 1.4 Strava API Client
 - [x] Create `internal/strava/client.go`:
@@ -166,8 +166,9 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] `GetActivities(page, perPage)` - list activities
   - [x] `GetActivity(id)` - single activity detail
   - [x] `GetActivityStreams(id, types)` - stream data
-- [ ] Create `internal/api/handlers/activities.go`:
-  - [ ] `GET /api/v1/activities` - proxy to Strava (temporary)
+- [x] Create `internal/api/handlers/activities.go`:
+  - [x] `GET /api/v1/activities` - from local DB
+  - [x] `GET /api/v1/activities/:id` - single activity
 - [ ] Test fetching activities from Strava API
 
 ---
@@ -221,128 +222,111 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [x] Create `cmd/stata/import.go` command:
   - [x] Trigger manual import
   - [x] Show progress
-- [ ] Test importing real activities
+- [x] Test importing real activities
 
 ### 2.5 Athlete & Token Storage
 - [x] Create `internal/storage/athletes.go`:
   - [x] Store athlete profile
   - [x] Store/retrieve OAuth tokens
-- [ ] Update OAuth flow to persist tokens
-- [ ] Retrieve tokens on server start
+- [x] Update OAuth flow to persist tokens
+- [x] Retrieve tokens on server start
 
 ---
 
-## Phase 3: Frontend Foundation
+## Phase 3: Frontend Foundation ✓
 
 **Goal:** React app shell with routing and basic layout.
 
 ### 3.1 App Shell
-- [ ] Create `web/src/app.tsx` with router setup
-- [ ] Create route definitions for all pages
-- [ ] Create `web/src/pages/` placeholder pages:
-  - [ ] Dashboard
-  - [ ] Activities
-  - [ ] Segments
-  - [ ] Heatmap
-  - [ ] Calendar
-  - [ ] Best Efforts
-  - [ ] Eddington
-  - [ ] Gear
-  - [ ] Photos
-  - [ ] Challenges
-  - [ ] Rewind
-  - [ ] Settings
+- [x] Create `web/src/main.tsx` with router setup
+- [x] Create route definitions for all pages
+- [x] Create `web/src/pages/` placeholder pages:
+  - [x] Dashboard
+  - [x] Activities
+  - [x] Activity Detail
+  - [x] Heatmap
+  - [x] Calendar
+  - [x] Segments
+  - [x] Gear
+  - [x] Eddington
+  - [x] Best Efforts
+  - [x] Settings
 
 ### 3.2 Layout Components
-- [ ] Create `web/src/components/layout/header.tsx`:
-  - [ ] App title
-  - [ ] Navigation menu
-  - [ ] Settings link
-- [ ] Create `web/src/components/layout/sidebar.tsx`:
-  - [ ] Navigation links
-  - [ ] Active state
-  - [ ] Collapsible on mobile
-- [ ] Create `web/src/components/layout/breadcrumb.tsx`
-- [ ] Create `web/src/components/layout/page-layout.tsx`:
-  - [ ] Combines header + sidebar + content area
+- [x] Create `web/src/components/layout/root-layout.tsx`:
+  - [x] App title
+  - [x] Navigation sidebar
+  - [x] Content area
+- [ ] Create breadcrumb component (deferred)
+- [ ] Collapsible sidebar on mobile (deferred)
 
 ### 3.3 shadcn/ui Base Components
-- [ ] Add essential components via shadcn CLI:
-  - [ ] Button
-  - [ ] Card
-  - [ ] Dialog
-  - [ ] Dropdown Menu
-  - [ ] Input
-  - [ ] Label
-  - [ ] Select
-  - [ ] Table
-  - [ ] Tabs
-  - [ ] Toast
-  - [ ] Tooltip
-  - [ ] Badge
-  - [ ] Skeleton
-  - [ ] Switch
-  - [ ] Calendar
-  - [ ] Popover
+- [x] Initialize shadcn/ui with Tailwind v4
+- [x] Add essential components via shadcn CLI:
+  - [x] Button
+  - [x] Card
+  - [x] Table
+  - [x] Badge
+  - [x] Skeleton
+  - [x] Separator
+  - [ ] Dialog (add when needed)
+  - [ ] Dropdown Menu (add when needed)
+  - [ ] Input (add when needed)
+  - [ ] Select (add when needed)
 
 ### 3.4 Data Layer Setup
-- [ ] Create `web/src/lib/db/types.ts` - DataSource interface
-- [ ] Create `web/src/lib/db/api-client.ts` - REST implementation
-- [ ] Create `web/src/lib/db/index.ts` - factory function
-- [ ] Create `web/src/types/` - shared TypeScript types:
-  - [ ] Activity
-  - [ ] Segment
-  - [ ] Gear
-  - [ ] Athlete
-  - [ ] Common types (pagination, filters)
+- [x] Create `web/src/lib/api/types.ts` - TypeScript types
+- [x] Create `web/src/lib/api/client.ts` - REST client
+- [x] Create `web/src/lib/api/activities.ts` - Activity hooks
+- [x] Create `web/src/lib/api/auth.ts` - Auth hooks
 
 ### 3.5 State Management
-- [ ] Create `web/src/stores/settings.ts`:
-  - [ ] Unit system (metric/imperial)
-  - [ ] Theme preference
-  - [ ] Locale
-- [ ] Create `web/src/stores/filters.ts`:
-  - [ ] Global filter state
-  - [ ] URL sync
+- [x] Create `web/src/stores/settings.ts`:
+  - [x] Unit system (metric/imperial)
+  - [x] Theme preference
+- [x] Create `web/src/stores/activity-filters.ts`:
+  - [x] Filter state
+  - [ ] URL sync (deferred)
 
 ### 3.6 TanStack Query Setup
-- [ ] Configure QueryClient with defaults
-- [ ] Create query key factory
-- [ ] Create base hooks structure
+- [x] Configure QueryClient with defaults
+- [x] Create query key factory (activityKeys, authKeys)
+- [x] Create base hooks structure
 
 ### 3.7 Utility Functions
-- [ ] Create `web/src/lib/utils/units.ts`:
-  - [ ] Distance conversion (m ↔ km ↔ mi)
-  - [ ] Speed conversion (m/s ↔ km/h ↔ mph)
-  - [ ] Elevation conversion (m ↔ ft)
-  - [ ] Pace formatting
-- [ ] Create `web/src/lib/utils/dates.ts`:
-  - [ ] Date formatting
-  - [ ] Duration formatting
-- [ ] Create `web/src/lib/utils/cn.ts` - className helper
-- [ ] Create `web/src/lib/constants/sport-types.ts`
-- [ ] Create `web/src/lib/constants/colors.ts`
+- [x] Create `web/src/lib/format.ts`:
+  - [x] Distance conversion
+  - [x] Speed conversion
+  - [x] Elevation conversion
+  - [x] Pace formatting
+  - [x] Date/time formatting
+  - [x] Duration formatting
+- [x] Create `web/src/lib/utils.ts` - className helper (cn)
+- [x] Create `web/src/lib/sport-types.ts`:
+  - [x] Sport category mapping
+  - [x] Sport colors
+  - [x] Sport icons
 
 ### 3.8 Integration
 - [ ] Embed React build in Go binary using `go:embed`
 - [ ] Serve React from Go server
-- [ ] Configure Vite proxy for API in dev mode
-- [ ] Test full stack integration
+- [x] Configure Vite proxy for API in dev mode
+- [x] Test full stack integration
 
 ---
 
-## Phase 4: Activities Feature
+## Phase 4: Activities Feature ✓
 
 **Goal:** Complete activities list with filtering, sorting, and detail view.
 
 ### 4.1 Activities API Endpoints
-- [ ] Implement `GET /api/v1/activities`:
-  - [ ] Pagination
-  - [ ] All filter parameters
-  - [ ] Sorting
-  - [ ] Search
-- [ ] Implement `GET /api/v1/activities/:id`:
-  - [ ] Full activity detail
+- [x] Implement `GET /api/v1/activities`:
+  - [x] Pagination
+  - [x] All filter parameters
+  - [x] Sorting
+  - [x] Search
+- [x] Implement `GET /api/v1/activities/:id`:
+  - [x] Full activity detail
   - [ ] Include gear info
 - [ ] Implement `GET /api/v1/activities/:id/streams`:
   - [ ] Return stream data
@@ -350,44 +334,54 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] Return photo URLs
 
 ### 4.2 Activities List Page
-- [ ] Create `web/src/hooks/use-activities.ts`:
-  - [ ] TanStack Query hook
-  - [ ] Filter state management
-  - [ ] Pagination state
+- [x] Create `web/src/lib/api/activities.ts`:
+  - [x] TanStack Query hook
+  - [x] Filter state management
+  - [x] Pagination state
 - [ ] Create `web/src/components/activities/activity-filters.tsx`:
   - [ ] Sport type multi-select
   - [ ] Date range picker
-  - [ ] Country dropdown
   - [ ] Gear dropdown
-  - [ ] Device dropdown
   - [ ] Commute toggle
-  - [ ] Workout type
   - [ ] Search input
   - [ ] Clear filters button
-- [ ] Create `web/src/components/activities/activity-table.tsx`:
-  - [ ] TanStack Table integration
-  - [ ] Virtual scrolling for large lists
-  - [ ] Sortable columns
-  - [ ] Sticky header
-  - [ ] Totals row
-- [ ] Create `web/src/pages/activities.tsx`:
-  - [ ] Combine filters + table
-  - [ ] URL state sync
+- [x] Create `web/src/components/activities/activities-table.tsx`:
+  - [x] Activity table with columns
+  - [x] Loading skeleton
+  - [x] Empty state
+- [x] Create `web/src/components/activities/pagination.tsx`:
+  - [x] Page navigation
+  - [x] Results count
+- [x] Create `web/src/pages/activities.tsx`:
+  - [x] Table with real data
+  - [x] Pagination
+  - [ ] URL state sync (deferred)
 
 ### 4.3 Activity Detail Page
-- [ ] Create `web/src/pages/activity-detail.tsx`
-- [ ] Create `web/src/components/activities/activity-header.tsx`:
-  - [ ] Name, date, sport icon
-  - [ ] Link to Strava
-- [ ] Create `web/src/components/activities/activity-stats.tsx`:
-  - [ ] Grid of key metrics
-  - [ ] Conditional display based on sport type
+- [x] Create `web/src/pages/activity-detail.tsx`
+- [x] Create `web/src/components/activities/activity-header.tsx`:
+  - [x] Name, date, sport icon
+  - [x] Link to Strava
+  - [x] Tags (commute, indoor, private)
+- [x] Create `web/src/components/activities/activity-stats.tsx`:
+  - [x] Grid of key metrics
+  - [x] Conditional display based on sport type
 - [ ] Create `web/src/components/activities/activity-map.tsx`:
-  - [ ] Route visualization (placeholder, full in Phase 7)
-- [ ] Create `web/src/components/activities/activity-weather.tsx`:
-  - [ ] Weather conditions display
+  - [ ] Route visualization (Phase 7)
 
-### 4.4 Activity Streams (Preparation)
+### 4.4 Import Functionality
+- [x] Create `internal/api/handlers/import.go`:
+  - [x] Start import endpoint
+  - [x] Progress endpoint
+  - [x] Cancel endpoint
+- [x] Create `web/src/lib/api/import.ts`:
+  - [x] Import hooks with polling
+- [x] Update Settings page:
+  - [x] Strava connection status
+  - [x] Import progress display
+  - [x] Start/cancel import buttons
+
+### 4.5 Activity Streams (Preparation)
 - [ ] Create stream data hooks
 - [ ] Create stream data types
 - [ ] Prepare for chart integration (Phase 6)
