@@ -19,6 +19,9 @@ import {
   RecentChallenges,
   ChallengeConsistency,
   EddingtonWidget,
+  YearlyStats,
+  DistanceBreakdown,
+  ChallengeConsistencyGrid,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -245,6 +248,30 @@ export function DashboardPage() {
             defaultHeight: 2,
             defaultHidden: true,
             render: () => <EddingtonWidget />,
+          },
+          {
+            id: 'yearly_stats',
+            title: 'Yearly Comparison',
+            defaultWidth: 8,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <YearlyStats />,
+          },
+          {
+            id: 'distance_breakdown',
+            title: 'Distance Breakdown',
+            defaultWidth: 6,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <DistanceBreakdown />,
+          },
+          {
+            id: 'challenge_consistency_grid',
+            title: 'Goal Consistency Grid',
+            defaultWidth: 12,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <ChallengeConsistencyGrid />,
           },
         ]}
       />

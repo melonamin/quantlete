@@ -19,7 +19,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓           |
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
 | 10    | Feature Parity & Beyond | Gap features + unique enhancements       | **NEXT**    |
-| 11    | WASM Mode               | Browser-only version with SQLite-WASM    |             |
+| 11    | WASM Mode               | Browser-only version with SQLite-WASM    | ✓           |
 | 12    | Polish                  | PWA, i18n, settings, badges              |             |
 
 ---

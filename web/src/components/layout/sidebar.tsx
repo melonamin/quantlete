@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  BarChart3,
 } from 'lucide-react'
 import { useEffect, useCallback } from 'react'
 
@@ -47,6 +48,7 @@ export function Sidebar() {
     { name: 'Activities', href: '/activities', icon: Activity, shortcut: 'g a' },
     { name: 'Heatmap', href: '/heatmap', icon: Map, shortcut: 'g h' },
     { name: 'Calendar', href: '/calendar', icon: Calendar, shortcut: 'g c' },
+    { name: 'Monthly Stats', href: '/monthly-stats', icon: BarChart3 },
     { name: 'Segments', href: '/segments', icon: Trophy, shortcut: 'g s' },
     { name: 'Gear', href: '/gear', icon: Bike, shortcut: 'g g' },
     { name: 'Photos', href: '/photos', icon: Camera },

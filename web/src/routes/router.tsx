@@ -16,6 +16,7 @@ import { PowerPage } from '@/pages/power'
 import { PhotosPage } from '@/pages/photos'
 import { ChallengesPage } from '@/pages/challenges'
 import { OAuthCallbackPage } from '@/pages/oauth-callback'
+import { MonthlyStatsPage } from '@/pages/monthly-stats'
 
 // Root route with layout
 const rootRoute = createRootRoute({
@@ -138,6 +139,13 @@ const oauthCallbackRoute = createRoute({
   component: OAuthCallbackPage,
 })
 
+// Monthly Stats
+const monthlyStatsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/monthly-stats',
+  component: MonthlyStatsPage,
+})
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
@@ -156,6 +164,7 @@ const routeTree = rootRoute.addChildren([
   challengesRoute,
   settingsRoute,
   oauthCallbackRoute,
+  monthlyStatsRoute,
 ])
 
 // Create router

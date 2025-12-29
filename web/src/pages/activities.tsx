@@ -1,9 +1,9 @@
 import { useActivities } from '@/lib/api'
 import { useActivityFiltersStore } from '@/stores'
-import { ActivitiesTable, Pagination } from '@/components/activities'
+import { ActivitiesTable, Pagination, ActivityFiltersPanel } from '@/components/activities'
 
 export function ActivitiesPage() {
-  const { filters, setFilters } = useActivityFiltersStore()
+  const { filters, setFilters, resetFilters } = useActivityFiltersStore()
   const { data, isLoading, error } = useActivities(filters)
 
   const handlePageChange = (page: number) => {
@@ -16,6 +16,12 @@ export function ActivitiesPage() {
         <h1 className="text-2xl font-bold">Activities</h1>
         <p className="text-muted-foreground">Browse and filter your activities</p>
       </div>
+
+      <ActivityFiltersPanel
+        filters={filters}
+        onFiltersChange={setFilters}
+        onReset={resetFilters}
+      />
 
       {error && (
         <div className="rounded-lg border border-destructive bg-destructive/10 p-4 mb-6">
