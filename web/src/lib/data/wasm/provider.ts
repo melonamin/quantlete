@@ -1160,6 +1160,11 @@ export class WasmProvider implements DataProvider {
       rate_limit_limit_15min: 0,
       rate_limit_used_daily: 0,
       rate_limit_limit_daily: 0,
+
+      // Rate limit waiting state (not applicable in WASM mode)
+      waiting_for_rate_limit: false,
+      waiting_until: undefined,
+      waiting_reason: undefined,
     }
   }
 

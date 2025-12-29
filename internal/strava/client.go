@@ -169,7 +169,7 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return fmt.Errorf("rate limited by Strava")
+		return c.rateLimit.CreateRateLimitError()
 	}
 
 	if resp.StatusCode >= 400 {

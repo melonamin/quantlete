@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useAuthStatus, useDashboard } from '@/lib/data'
 import { isWasmMode } from '@/lib/mode'
+import { shouldShowOnboarding } from '@/components/onboarding/welcome-modal'
 import {
   StatsSummary,
   RecentActivities,
@@ -44,10 +45,14 @@ export function DashboardPage() {
   const { data: authStatus, isLoading: authLoading } = useAuthStatus()
   const { data: dashboard, isLoading, error } = useDashboard()
 
-  const isAuthenticated = authStatus?.authenticated
+  const isAuthenticated = authStatus?.authenticated ?? false
 
-  // Show getting started if not authenticated
-  if (!authLoading && !isAuthenticated) {
+  // In WASM mode, if onboarding modal is showing, don't show the Get Started card
+  // (the modal handles the login flow)
+  const onboardingShowing = shouldShowOnboarding(isAuthenticated, authLoading)
+
+  // Show getting started if not authenticated and onboarding isn't showing
+  if (!authLoading && !isAuthenticated && !onboardingShowing) {
     const stravaAuthUrl = getStravaAuthUrl()
 
     return (

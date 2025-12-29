@@ -72,6 +72,12 @@ type ImportState struct {
 
 	// Error tracking
 	FailedCount int `json:"failed_count"`
+
+	// Watermark: only fetch activities after this date (for incremental sync)
+	AfterDate *time.Time `json:"after_date,omitempty"`
+
+	// Track the newest activity date seen during this sync (for updating watermark)
+	NewestActivityDate *time.Time `json:"newest_activity_date,omitempty"`
 }
 
 // EstimatedAPICalls returns the estimated total API calls for the import.

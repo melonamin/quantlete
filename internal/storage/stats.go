@@ -267,7 +267,7 @@ func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, 
 
 	if year > 0 {
 		query += ` AND strftime('%Y', start_date) = ?`
-		args = append(args, year)
+		args = append(args, fmt.Sprintf("%d", year))
 	}
 
 	query += `
@@ -322,7 +322,7 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 		WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
 		GROUP BY date
 		ORDER BY date ASC
-	`, athleteID, year)
+	`, athleteID, fmt.Sprintf("%d", year))
 	if err != nil {
 		return nil, err
 	}

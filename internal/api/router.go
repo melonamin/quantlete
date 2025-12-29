@@ -78,11 +78,13 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	maintenanceRepo := storage.NewMaintenanceRepository(db)
 	photoRepo := storage.NewPhotoRepository(db)
 	challengeRepo := storage.NewChallengeRepository(db)
+	appStateRepo := storage.NewAppStateRepository(db)
+	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
 
 	// Create handlers
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
 	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, streamRepo, stravaClient)
-	importHandler := handlers.NewImportHandler(imp)
+	importHandler := handlers.NewImportHandler(imp, syncHistoryRepo, stravaClient)
 	dashboardHandler := handlers.NewDashboardHandler(statsRepo, dashboardConfigRepo, stravaClient)
 	goalsHandler := handlers.NewGoalsHandler(goalsRepo, stravaClient)
 	athleteHandler := handlers.NewAthleteHandler(metricsRepo, stravaClient)
@@ -151,6 +153,8 @@ func (r *Router) mountRoutes() {
 			router.Post("/start", r.importHandler.Start)
 			router.Get("/progress", r.importHandler.Progress)
 			router.Post("/cancel", r.importHandler.Cancel)
+			router.Get("/history", r.importHandler.History)
+			router.Get("/watermark", r.importHandler.Watermark)
 		})
 
 		// Dashboard routes

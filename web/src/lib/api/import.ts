@@ -1,6 +1,46 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { get, post } from './client'
 
+// Sync run represents a single import/sync history entry.
+export interface SyncRun {
+  id: number
+  athlete_id: number
+  started_at: string
+  completed_at?: string
+  duration_seconds?: number
+
+  status: 'running' | 'completed' | 'failed' | 'canceled'
+  error?: string
+
+  // Counts
+  activities_total: number
+  activities_imported: number
+  activities_skipped: number
+  gear_imported: number
+  streams_imported: number
+  segments_imported: number
+  photos_imported: number
+  failed_count: number
+
+  // Options
+  full_sync: boolean
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+
+  // Watermark
+  newest_activity_date?: string
+
+  created_at: string
+}
+
+// Sync watermark for incremental sync.
+export interface SyncWatermark {
+  last_synced_at: string
+  newest_activity_date?: string
+}
+
 // Import phases in order of execution
 export type ImportPhase =
   | 'idle'
@@ -51,6 +91,11 @@ export interface ImportProgress {
   rate_limit_limit_15min: number
   rate_limit_used_daily: number
   rate_limit_limit_daily: number
+
+  // Rate limit waiting state
+  waiting_for_rate_limit: boolean
+  waiting_until?: string
+  waiting_reason?: string
 }
 
 // By default, all data types are imported. Use skip_* to exclude specific types.
@@ -65,6 +110,8 @@ export interface StartImportRequest {
 
 export const importKeys = {
   progress: ['import', 'progress'] as const,
+  history: ['import', 'history'] as const,
+  watermark: ['import', 'watermark'] as const,
 }
 
 export function useImportProgress(enabled = true) {
@@ -101,5 +148,21 @@ export function useCancelImport() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: importKeys.progress })
     },
+  })
+}
+
+export function useSyncHistory(enabled = true) {
+  return useQuery({
+    queryKey: importKeys.history,
+    queryFn: () => get<SyncRun[]>('/import/history'),
+    enabled,
+  })
+}
+
+export function useSyncWatermark(enabled = true) {
+  return useQuery({
+    queryKey: importKeys.watermark,
+    queryFn: () => get<SyncWatermark | null>('/import/watermark'),
+    enabled,
   })
 }

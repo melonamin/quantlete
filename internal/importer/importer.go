@@ -67,6 +67,11 @@ type Progress struct {
 	RateLimitLimit15Min int `json:"rate_limit_limit_15min"`
 	RateLimitUsedDaily  int `json:"rate_limit_used_daily"`
 	RateLimitLimitDaily int `json:"rate_limit_limit_daily"`
+
+	// Rate limit waiting state
+	WaitingForRateLimit bool      `json:"waiting_for_rate_limit"`
+	WaitingUntil        time.Time `json:"waiting_until,omitempty"`
+	WaitingReason       string    `json:"waiting_reason,omitempty"`
 }
 
 // Importer orchestrates data import from Strava.
@@ -81,11 +86,15 @@ type Importer struct {
 	bestEfforts  *storage.BestEffortsRepository
 	maintenance  *storage.MaintenanceRepository
 	photos       *storage.PhotoRepository
+	syncHistory  *storage.SyncHistoryRepository
 
 	// State management for resume capability
 	stateManager *StateManager
 	state        *ImportState
 	eta          *ETAEstimator
+
+	// Current sync run (for history tracking)
+	currentRunID int64
 
 	segmentCacheMu sync.Mutex
 	segmentCache   map[int64]*strava.Segment
@@ -108,6 +117,7 @@ func New(
 	maintenance *storage.MaintenanceRepository,
 	photos *storage.PhotoRepository,
 	appState *storage.AppStateRepository,
+	syncHistory *storage.SyncHistoryRepository,
 ) *Importer {
 	return &Importer{
 		stravaClient: stravaClient,
@@ -120,6 +130,7 @@ func New(
 		bestEfforts:  bestEfforts,
 		maintenance:  maintenance,
 		photos:       photos,
+		syncHistory:  syncHistory,
 		stateManager: NewStateManager(appState),
 		eta:          NewETAEstimator(),
 		segmentCache: make(map[int64]*strava.Segment),
@@ -144,6 +155,14 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 		i.mu.Unlock()
 		return fmt.Errorf("import already in progress")
 	}
+
+	// Get athlete ID for sync history
+	athlete := i.stravaClient.GetAthlete()
+	if athlete == nil {
+		i.mu.Unlock()
+		return fmt.Errorf("not authenticated")
+	}
+	athleteID := athlete.ID
 
 	// Load or create state
 	var state *ImportState
@@ -170,9 +189,37 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 			SkipBestEfforts: opts.SkipBestEfforts,
 			SkipPhotos:      opts.SkipPhotos,
 		}
+
+		// Load watermark for incremental sync (unless full sync requested)
+		if !opts.FullSync && i.syncHistory != nil {
+			wm, err := i.syncHistory.GetWatermark(ctx, athleteID)
+			if err != nil {
+				slog.Warn("failed to load sync watermark", "error", err)
+			} else if wm != nil && wm.NewestActivityDate != nil {
+				state.AfterDate = wm.NewestActivityDate
+				slog.Info("using incremental sync from watermark",
+					"after_date", wm.NewestActivityDate.Format(time.RFC3339))
+			}
+		}
 	}
 
 	i.state = state
+
+	// Start sync run record
+	if i.syncHistory != nil {
+		run, err := i.syncHistory.StartRun(ctx, athleteID, storage.SyncRunOptions{
+			FullSync:        opts.FullSync,
+			SkipStreams:     opts.SkipStreams,
+			SkipSegments:    opts.SkipSegments,
+			SkipBestEfforts: opts.SkipBestEfforts,
+			SkipPhotos:      opts.SkipPhotos,
+		})
+		if err != nil {
+			slog.Warn("failed to start sync run record", "error", err)
+		} else {
+			i.currentRunID = run.ID
+		}
+	}
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(ctx)
@@ -202,19 +249,67 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 		defer i.mu.Unlock()
 
 		i.progress.CompletedAt = time.Now()
+
+		// Build sync run counts
+		counts := storage.SyncRunCounts{
+			ActivitiesTotal:    i.state.ActivitiesTotal,
+			ActivitiesImported: i.state.ActivitiesDone,
+			ActivitiesSkipped:  i.state.ActivitiesTotal - i.state.ActivitiesDone,
+			GearImported:       i.state.GearDone,
+			StreamsImported:    i.state.StreamsDone,
+			SegmentsImported:   i.state.SegmentsDone,
+			PhotosImported:     i.state.PhotosDone,
+			FailedCount:        i.state.FailedCount,
+			NewestActivityDate: i.state.NewestActivityDate,
+		}
+
 		if err != nil {
 			slog.Error("import failed", "error", err)
 			if ctx.Err() == context.Canceled {
 				i.progress.Status = StatusCanceled
+				// Log canceled run
+				if i.syncHistory != nil && i.currentRunID > 0 {
+					if logErr := i.syncHistory.CancelRun(context.Background(), i.currentRunID, counts); logErr != nil {
+						slog.Warn("failed to log canceled sync run", "error", logErr)
+					}
+				}
 			} else {
 				i.progress.Status = StatusFailed
 				i.progress.Error = err.Error()
+				// Log failed run
+				if i.syncHistory != nil && i.currentRunID > 0 {
+					if logErr := i.syncHistory.FailRun(context.Background(), i.currentRunID, err.Error(), counts); logErr != nil {
+						slog.Warn("failed to log failed sync run", "error", logErr)
+					}
+				}
 			}
 		} else {
 			i.progress.Status = StatusCompleted
 			i.progress.Phase = PhaseCompleted
+
+			// Log completed run
+			if i.syncHistory != nil && i.currentRunID > 0 {
+				if logErr := i.syncHistory.CompleteRun(context.Background(), i.currentRunID, counts); logErr != nil {
+					slog.Warn("failed to log completed sync run", "error", logErr)
+				}
+
+				// Update watermark with newest activity date
+				if i.state.NewestActivityDate != nil {
+					wm := &storage.SyncWatermark{
+						LastSyncedAt:       time.Now(),
+						NewestActivityDate: i.state.NewestActivityDate,
+					}
+					if wmErr := i.syncHistory.SetWatermark(context.Background(), athleteID, wm); wmErr != nil {
+						slog.Warn("failed to update sync watermark", "error", wmErr)
+					} else {
+						slog.Info("updated sync watermark",
+							"newest_activity_date", i.state.NewestActivityDate.Format(time.RFC3339))
+					}
+				}
+			}
+
 			// Clear state on successful completion
-			if clearErr := i.stateManager.Clear(ctx); clearErr != nil {
+			if clearErr := i.stateManager.Clear(context.Background()); clearErr != nil {
 				slog.Warn("failed to clear import state", "error", clearErr)
 			}
 		}
@@ -393,18 +488,87 @@ func (i *Importer) updateProgress() {
 	i.progress.EstimatedETA = FormatETA(i.eta.EstimateCompletion(remaining))
 }
 
+// waitForRateLimit handles rate limit errors by waiting and retrying.
+// It updates progress to show the waiting state so the UI can display a countdown.
+func (i *Importer) waitForRateLimit(ctx context.Context, err error) error {
+	rle, ok := strava.IsRateLimitError(err)
+	if !ok {
+		return err
+	}
+
+	slog.Info("rate limited by Strava, waiting for reset",
+		"wait_duration", rle.RetryAfter.Round(time.Second),
+		"reset_at", rle.ResetAt)
+
+	// Update progress to show waiting state
+	i.mu.Lock()
+	i.progress.WaitingForRateLimit = true
+	i.progress.WaitingUntil = rle.ResetAt
+	i.progress.WaitingReason = fmt.Sprintf("Rate limit exceeded. Waiting %v for reset.", rle.RetryAfter.Round(time.Second))
+	i.mu.Unlock()
+
+	// Wait for the rate limit to reset
+	select {
+	case <-ctx.Done():
+		i.clearWaitingState()
+		return ctx.Err()
+	case <-time.After(rle.RetryAfter):
+		i.clearWaitingState()
+		return nil
+	}
+}
+
+// clearWaitingState clears the rate limit waiting state from progress.
+func (i *Importer) clearWaitingState() {
+	i.mu.Lock()
+	i.progress.WaitingForRateLimit = false
+	i.progress.WaitingUntil = time.Time{}
+	i.progress.WaitingReason = ""
+	i.mu.Unlock()
+}
+
+// withRetry wraps an API operation with rate limit retry logic.
+func (i *Importer) withRetry(ctx context.Context, op func() error) error {
+	for {
+		err := op()
+		if err == nil {
+			return nil
+		}
+
+		// Check if it's a rate limit error
+		if _, ok := strava.IsRateLimitError(err); ok {
+			if waitErr := i.waitForRateLimit(ctx, err); waitErr != nil {
+				return waitErr
+			}
+			// Retry the operation after waiting
+			continue
+		}
+
+		// Non-rate-limit error, return it
+		return err
+	}
+}
+
 // runActivitiesPhase imports all activity metadata.
+// Activities are fetched from Strava newest-first (descending by start_date),
+// so users see their fresh data first during sync.
 func (i *Importer) runActivitiesPhase(ctx context.Context, athleteID int64) error {
 	page := i.state.ActivitiesLastPage
 	if page == 0 {
 		page = 1
 	}
-	perPage := 100
+	perPage := strava.MaxActivitiesPerPage
 	seenIDs := make(map[int64]bool)
 
 	// Mark seen IDs from existing state
 	for _, id := range i.state.ActivityIDs {
 		seenIDs[id] = true
+	}
+
+	// Log watermark usage
+	if i.state.AfterDate != nil {
+		slog.Info("incremental sync: fetching activities after watermark",
+			"after_date", i.state.AfterDate.Format(time.RFC3339))
 	}
 
 	for {
@@ -419,9 +583,18 @@ func (i *Importer) runActivitiesPhase(ctx context.Context, athleteID int64) erro
 		i.progress.CurrentPage = page
 		i.mu.Unlock()
 
-		slog.Debug("fetching activities page", "page", page)
+		slog.Debug("fetching activities page", "page", page, "after_date", i.state.AfterDate)
 
-		activities, err := i.stravaClient.GetActivities(ctx, page, perPage)
+		var activities []strava.Activity
+		err := i.withRetry(ctx, func() error {
+			var fetchErr error
+			activities, fetchErr = i.stravaClient.GetActivitiesWithOptions(ctx, strava.GetActivitiesOptions{
+				Page:    page,
+				PerPage: perPage,
+				After:   i.state.AfterDate,
+			})
+			return fetchErr
+		})
 		if err != nil {
 			return fmt.Errorf("fetching activities page %d: %w", page, err)
 		}
@@ -455,6 +628,12 @@ func (i *Importer) runActivitiesPhase(ctx context.Context, athleteID int64) erro
 			}
 
 			i.state.ActivitiesDone++
+
+			// Track newest activity date for watermark
+			if i.state.NewestActivityDate == nil || a.StartDate.After(*i.state.NewestActivityDate) {
+				t := a.StartDate
+				i.state.NewestActivityDate = &t
+			}
 
 			// Collect gear IDs
 			if a.GearID != "" && !contains(i.state.GearIDs, a.GearID) {
@@ -558,8 +737,13 @@ func (i *Importer) runActivityDetailsPhase(ctx context.Context, athleteID int64)
 
 		activityID := i.state.ActivityIDs[idx]
 
-		// Fetch activity detail
-		detail, err := i.stravaClient.GetActivity(ctx, activityID)
+		// Fetch activity detail with retry for rate limits
+		var detail *strava.Activity
+		err := i.withRetry(ctx, func() error {
+			var fetchErr error
+			detail, fetchErr = i.stravaClient.GetActivity(ctx, activityID)
+			return fetchErr
+		})
 		if err != nil {
 			slog.Debug("failed to fetch activity detail", "activity_id", activityID, "error", err)
 			i.state.DetailsLastIndex = idx + 1
@@ -628,9 +812,14 @@ func (i *Importer) runSegmentDetailsPhase(ctx context.Context) error {
 
 		segmentID := i.state.SegmentIDsToFetch[idx]
 
-		seg, err := i.stravaClient.GetSegment(ctx, segmentID)
-		if err != nil {
-			slog.Debug("failed to fetch segment detail", "segment_id", segmentID, "error", err)
+		var seg *strava.Segment
+		fetchErr := i.withRetry(ctx, func() error {
+			var err error
+			seg, err = i.stravaClient.GetSegment(ctx, segmentID)
+			return err
+		})
+		if fetchErr != nil {
+			slog.Debug("failed to fetch segment detail", "segment_id", segmentID, "error", fetchErr)
 		} else if err := i.storeSegment(ctx, seg); err != nil {
 			slog.Debug("failed to store segment", "segment_id", segmentID, "error", err)
 		} else {
@@ -1015,7 +1204,12 @@ func (i *Importer) importSegments(ctx context.Context, a *strava.Activity, athle
 }
 
 func (i *Importer) importPhotos(ctx context.Context, activityID int64, athleteID int64) error {
-	photos, err := i.stravaClient.GetActivityPhotos(ctx, activityID)
+	var photos []strava.ActivityPhoto
+	err := i.withRetry(ctx, func() error {
+		var fetchErr error
+		photos, fetchErr = i.stravaClient.GetActivityPhotos(ctx, activityID)
+		return fetchErr
+	})
 	if err != nil {
 		return err
 	}
@@ -1089,7 +1283,12 @@ func bestPhotoURLs(urls map[string]string) (best string, thumb string) {
 
 // importStreams imports stream data for an activity.
 func (i *Importer) importStreams(ctx context.Context, activityID int64) error {
-	streams, err := i.stravaClient.GetActivityStreams(ctx, activityID, nil)
+	var streams *strava.StreamSet
+	err := i.withRetry(ctx, func() error {
+		var fetchErr error
+		streams, fetchErr = i.stravaClient.GetActivityStreams(ctx, activityID, nil)
+		return fetchErr
+	})
 	if err != nil {
 		return err
 	}
@@ -1257,7 +1456,12 @@ func (i *Importer) storeSegment(ctx context.Context, seg *strava.Segment) error 
 
 // importGear imports gear details.
 func (i *Importer) importGear(ctx context.Context, gearID string) error {
-	gear, err := i.stravaClient.GetGear(ctx, gearID)
+	var gear *strava.Gear
+	err := i.withRetry(ctx, func() error {
+		var fetchErr error
+		gear, fetchErr = i.stravaClient.GetGear(ctx, gearID)
+		return fetchErr
+	})
 	if err != nil {
 		return err
 	}

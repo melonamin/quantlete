@@ -6,16 +6,24 @@ import (
 	"net/http"
 
 	"github.com/sasha/stata/internal/importer"
+	"github.com/sasha/stata/internal/storage"
+	"github.com/sasha/stata/internal/strava"
 )
 
 // ImportHandler handles import-related endpoints.
 type ImportHandler struct {
-	importer *importer.Importer
+	importer     *importer.Importer
+	syncHistory  *storage.SyncHistoryRepository
+	stravaClient *strava.Client
 }
 
 // NewImportHandler creates a new import handler.
-func NewImportHandler(imp *importer.Importer) *ImportHandler {
-	return &ImportHandler{importer: imp}
+func NewImportHandler(imp *importer.Importer, syncHistory *storage.SyncHistoryRepository, stravaClient *strava.Client) *ImportHandler {
+	return &ImportHandler{
+		importer:     imp,
+		syncHistory:  syncHistory,
+		stravaClient: stravaClient,
+	}
 }
 
 // StartImportRequest represents a request to start an import.
@@ -71,4 +79,52 @@ func (h *ImportHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "import cancellation requested",
 	})
+}
+
+// History handles GET /api/v1/import/history
+func (h *ImportHandler) History(w http.ResponseWriter, r *http.Request) {
+	if h.syncHistory == nil {
+		writeJSON(w, http.StatusOK, []storage.SyncRun{})
+		return
+	}
+
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	runs, err := h.syncHistory.GetLatest(r.Context(), athlete.ID, 20)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	if runs == nil {
+		runs = []storage.SyncRun{}
+	}
+
+	writeJSON(w, http.StatusOK, runs)
+}
+
+// Watermark handles GET /api/v1/import/watermark
+func (h *ImportHandler) Watermark(w http.ResponseWriter, r *http.Request) {
+	if h.syncHistory == nil {
+		writeJSON(w, http.StatusOK, nil)
+		return
+	}
+
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	wm, err := h.syncHistory.GetWatermark(r.Context(), athlete.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, wm)
 }

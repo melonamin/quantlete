@@ -102,8 +102,11 @@ func runServe(port int, dev bool) error {
 		slog.Warn("failed to restore auth from database", "error", err)
 	}
 
+	// Create sync history repository
+	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
+
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo)
+	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo, syncHistoryRepo)
 
 	// Create router
 	router := api.NewRouter(cfg, stravaClient, db, imp)

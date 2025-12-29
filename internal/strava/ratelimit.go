@@ -3,12 +3,36 @@ package strava
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+// RateLimitError is returned when Strava returns a 429 status code.
+// It includes information about when the request can be retried.
+type RateLimitError struct {
+	RetryAfter time.Duration
+	ResetAt    time.Time
+	Message    string
+}
+
+func (e *RateLimitError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("rate limited by Strava, retry after %v", e.RetryAfter)
+}
+
+// IsRateLimitError checks if an error is a rate limit error and returns it.
+func IsRateLimitError(err error) (*RateLimitError, bool) {
+	if rle, ok := err.(*RateLimitError); ok {
+		return rle, true
+	}
+	return nil, false
+}
 
 // RateLimiter tracks Strava API rate limits.
 type RateLimiter struct {
@@ -189,6 +213,42 @@ func (r *RateLimiter) ToJSON() (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// TimeUntil15MinReset calculates the duration until the next 15-minute window reset.
+// Strava's 15-minute windows align to clock time (e.g., :00, :15, :30, :45).
+func (r *RateLimiter) TimeUntil15MinReset() time.Duration {
+	now := time.Now()
+	// Find the next 15-minute boundary
+	minute := now.Minute()
+	nextReset := minute + (15 - (minute % 15))
+	if nextReset == minute {
+		nextReset += 15
+	}
+
+	resetTime := time.Date(
+		now.Year(), now.Month(), now.Day(),
+		now.Hour(), nextReset%60, 0, 0,
+		now.Location(),
+	)
+	if nextReset >= 60 {
+		resetTime = resetTime.Add(time.Hour)
+	}
+
+	return resetTime.Sub(now)
+}
+
+// CreateRateLimitError creates a RateLimitError with appropriate timing.
+func (r *RateLimiter) CreateRateLimitError() *RateLimitError {
+	retryAfter := r.TimeUntil15MinReset()
+	// Add a small buffer to ensure we're past the reset
+	retryAfter += 5 * time.Second
+
+	return &RateLimitError{
+		RetryAfter: retryAfter,
+		ResetAt:    time.Now().Add(retryAfter),
+		Message:    fmt.Sprintf("rate limited by Strava, waiting %v for reset", retryAfter.Round(time.Second)),
+	}
 }
 
 // LoadFromJSON restores rate limit state from JSON.

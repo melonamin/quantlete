@@ -5,11 +5,13 @@
  * for access tokens via the worker proxy.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useDataProviderStatus } from '@/lib/data'
+import { useDataProviderStatus, useStartImport } from '@/lib/data'
 import { isWasmMode } from '@/lib/mode'
 import { exchangeCode } from '@/lib/wasm/strava/client'
+import { markOnboardingComplete } from '@/components/onboarding/welcome-modal'
+import { useSyncModalStore } from '@/stores'
 import { Loader2 } from 'lucide-react'
 
 interface OAuthSearchParams {
@@ -22,17 +24,26 @@ export function OAuthCallbackPage() {
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as OAuthSearchParams
   const { provider, initialized, error: providerError } = useDataProviderStatus()
+  const startImport = useStartImport()
+  const openSyncModal = useSyncModalStore((s) => s.openModal)
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string>('Initializing...')
 
+  // Track if we've already processed this callback to prevent double execution
+  const processedRef = useRef(false)
+
   useEffect(() => {
     async function handleCallback() {
+      // Prevent double execution
+      if (processedRef.current) return
+
       console.log('[OAuth] handleCallback called', { initialized, hasProvider: !!provider, providerError })
       setDebugInfo(`initialized=${initialized}, provider=${!!provider}, error=${providerError || 'none'}`)
 
       // Check for provider initialization error
       if (providerError) {
+        processedRef.current = true
         setStatus('error')
         setErrorMessage(`Provider error: ${providerError}`)
         return
@@ -44,8 +55,9 @@ export function OAuthCallbackPage() {
         return
       }
 
-      // Check for OAuth errors
+      // Check for OAuth errors from Strava
       if (search.error) {
+        processedRef.current = true
         setStatus('error')
         setErrorMessage(search.error)
         return
@@ -53,6 +65,7 @@ export function OAuthCallbackPage() {
 
       // Check for authorization code
       if (!search.code) {
+        processedRef.current = true
         setStatus('error')
         setErrorMessage('No authorization code received')
         return
@@ -60,10 +73,14 @@ export function OAuthCallbackPage() {
 
       // Only handle OAuth in WASM mode
       if (!isWasmMode()) {
+        processedRef.current = true
         setStatus('error')
         setErrorMessage('OAuth callback only works in WASM mode')
         return
       }
+
+      // Mark as processed before async work
+      processedRef.current = true
 
       try {
         setDebugInfo('Exchanging code for tokens...')
@@ -76,8 +93,23 @@ export function OAuthCallbackPage() {
         console.log('[OAuth] Token exchange successful')
         setStatus('success')
 
-        // Redirect to dashboard after short delay
+        // Mark onboarding as complete after successful auth
+        markOnboardingComplete()
+
+        // Start the initial sync
+        setDebugInfo('Starting initial sync...')
+        try {
+          await startImport.mutateAsync({})
+          console.log('[OAuth] Import started')
+        } catch (importErr) {
+          console.error('[OAuth] Failed to start import:', importErr)
+          // Don't fail the auth flow if import fails to start
+        }
+
+        // Redirect to dashboard and open sync modal after a short delay
         setTimeout(() => {
+          // Open sync modal after navigation
+          openSyncModal()
           navigate({ to: '/' })
         }, 1500)
       } catch (err) {
@@ -88,7 +120,7 @@ export function OAuthCallbackPage() {
     }
 
     handleCallback()
-  }, [initialized, provider, providerError, search, navigate])
+  }, [initialized, provider, providerError, search.code, search.error, navigate, startImport, openSyncModal])
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -114,7 +146,7 @@ export function OAuthCallbackPage() {
               </svg>
             </div>
             <p className="mt-4 text-lg font-medium">Authentication successful!</p>
-            <p className="text-muted-foreground">Redirecting to dashboard...</p>
+            <p className="text-muted-foreground">Starting sync and redirecting...</p>
           </>
         )}
 

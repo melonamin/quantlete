@@ -4,11 +4,49 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 )
+
+// API pagination limits (per Strava documentation)
+const (
+	// MaxActivitiesPerPage is the maximum number of activities returned per API call.
+	// Strava API limit: 200. Using this value minimizes API calls during sync.
+	MaxActivitiesPerPage = 200
+)
+
+// GetActivitiesOptions configures activity list fetching.
+type GetActivitiesOptions struct {
+	Page    int
+	PerPage int
+	After   *time.Time // Only return activities after this time (for incremental sync)
+	Before  *time.Time // Only return activities before this time
+}
 
 // GetActivities fetches a page of activities for the authenticated athlete.
 func (c *Client) GetActivities(ctx context.Context, page, perPage int) ([]Activity, error) {
-	path := fmt.Sprintf("/athlete/activities?page=%d&per_page=%d", page, perPage)
+	return c.GetActivitiesWithOptions(ctx, GetActivitiesOptions{
+		Page:    page,
+		PerPage: perPage,
+	})
+}
+
+// GetActivitiesWithOptions fetches activities with additional filter options.
+func (c *Client) GetActivitiesWithOptions(ctx context.Context, opts GetActivitiesOptions) ([]Activity, error) {
+	if opts.Page <= 0 {
+		opts.Page = 1
+	}
+	if opts.PerPage <= 0 {
+		opts.PerPage = MaxActivitiesPerPage
+	}
+
+	path := fmt.Sprintf("/athlete/activities?page=%d&per_page=%d", opts.Page, opts.PerPage)
+
+	if opts.After != nil {
+		path += fmt.Sprintf("&after=%d", opts.After.Unix())
+	}
+	if opts.Before != nil {
+		path += fmt.Sprintf("&before=%d", opts.Before.Unix())
+	}
 
 	var activities []Activity
 	if err := c.do(ctx, http.MethodGet, path, &activities); err != nil {

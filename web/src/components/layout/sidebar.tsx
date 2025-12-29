@@ -1,7 +1,8 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
-import { useSidebarStore } from '@/stores/sidebar'
-import { useAppSettings, useAuthStatus } from '@/lib/data'
+import { useSidebarStore, useSyncModalStore } from '@/stores'
+import { useAppSettings, useAuthStatus, useImportProgress } from '@/lib/data'
+import { isWasmMode } from '@/lib/mode'
 import {
   LayoutDashboard,
   Activity,
@@ -21,6 +22,8 @@ import {
   X,
   BarChart3,
   Download,
+  Loader2,
+  Clock,
 } from 'lucide-react'
 import { useEffect, useCallback } from 'react'
 
@@ -39,7 +42,12 @@ export function Sidebar() {
   const currentPath = routerState.location.pathname
   const { data: auth } = useAuthStatus()
   const { data: settings } = useAppSettings({ enabled: !!auth?.authenticated })
+  const { data: importProgress } = useImportProgress()
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useSidebarStore()
+  const openSyncModal = useSyncModalStore((s) => s.openModal)
+
+  const isSyncing = importProgress?.status === 'running'
+  const isWaitingForRateLimit = importProgress?.waiting_for_rate_limit
 
   const showEddington =
     settings?.eddington_definitions?.some((d) => d.show_in_nav !== false) ?? true
@@ -170,6 +178,41 @@ export function Sidebar() {
 
         {/* Bottom section */}
         <div className="border-t border-sidebar-border px-2 py-2">
+          {/* Sync indicator */}
+          {isSyncing && (
+            <Link
+              to="/settings"
+              onClick={(e) => {
+                // In WASM mode, open the sync modal instead of navigating
+                if (isWasmMode()) {
+                  e.preventDefault()
+                  openSyncModal()
+                }
+              }}
+              className={cn(
+                'flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition-colors',
+                isWaitingForRateLimit
+                  ? 'text-amber-600 dark:text-amber-500 hover:bg-amber-100/50 dark:hover:bg-amber-950/30'
+                  : 'text-primary hover:bg-sidebar-accent/50'
+              )}
+              title={collapsed ? (isWaitingForRateLimit ? 'Waiting for rate limit' : 'Sync in progress') : undefined}
+            >
+              {isWaitingForRateLimit ? (
+                <Clock className="h-4 w-4 shrink-0" />
+              ) : (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              )}
+              <span
+                className={cn(
+                  'truncate transition-opacity duration-200',
+                  collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+                )}
+              >
+                {isWaitingForRateLimit ? 'Waiting...' : 'Syncing...'}
+              </span>
+            </Link>
+          )}
+
           <Link
             to="/settings"
             className={cn(

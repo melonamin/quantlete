@@ -130,8 +130,11 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 		return fmt.Errorf("not authenticated with Strava")
 	}
 
+	// Create sync history repository
+	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
+
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo)
+	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo, syncHistoryRepo)
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
