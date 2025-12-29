@@ -20,7 +20,7 @@ import {
   type DashboardWidgetConfig,
   type WidgetWidth,
   type WidgetHeight,
-} from '@/lib/api/dashboard'
+} from '@/lib/data'
 import { useDashboardLayoutStore } from '@/stores/dashboard'
 import { SortableWidget } from './sortable-widget'
 import { WidgetPanel } from './widget-panel'

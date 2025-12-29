@@ -12,9 +12,10 @@ import {
   useUpdateWeightHistory,
   useUpsertHrZoneDefinition,
   useWeightHistory,
-} from '@/lib/api'
+} from '@/lib/data'
 import { useQueryClient } from '@tanstack/react-query'
-import { activityKeys } from '@/lib/api/activities'
+import { isWasmMode } from '@/lib/mode'
+import { getAuthUrl } from '@/lib/wasm/strava/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Check, X, AlertCircle } from 'lucide-react'
@@ -59,7 +60,9 @@ export function SettingsPage() {
   }
 
   const handleImportComplete = () => {
-    queryClient.invalidateQueries({ queryKey: activityKeys.all })
+    // Invalidate activities data to refresh after import
+    queryClient.invalidateQueries({ queryKey: ['data', 'activities'] })
+    queryClient.invalidateQueries({ queryKey: ['data', 'dashboard'] })
   }
 
   // Invalidate activities when import completes
@@ -114,7 +117,15 @@ export function SettingsPage() {
               </div>
               {!isAuthenticated && (
                 <Button asChild className="bg-strava hover:bg-strava/90">
-                  <a href="/api/v1/auth/strava">Connect Strava</a>
+                  <a
+                    href={
+                      isWasmMode()
+                        ? getAuthUrl(`${window.location.origin}/oauth/callback`)
+                        : '/api/v1/auth/strava'
+                    }
+                  >
+                    Connect Strava
+                  </a>
                 </Button>
               )}
             </div>

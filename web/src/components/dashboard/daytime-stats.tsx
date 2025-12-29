@@ -1,5 +1,5 @@
 import { DonutChart } from '@/components/charts'
-import { useDaytimeDistribution } from '@/lib/api'
+import { useDaytimeDistribution } from '@/lib/data'
 import { WidgetWrapper } from './widget-wrapper'
 
 export function DaytimeStats() {

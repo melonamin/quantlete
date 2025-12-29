@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useHrZones, useHrZoneDefinitions } from '@/lib/api'
+import { useHrZones, useHrZoneDefinitions } from '@/lib/data'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import { StackedBarChart } from '@/components/charts'

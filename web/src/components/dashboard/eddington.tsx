@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useQueries } from '@tanstack/react-query'
-import { get, useAppSettings, type EddingtonResult } from '@/lib/api'
+import { useAppSettings, useDataProviderStatus, type EddingtonResult } from '@/lib/data'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 
@@ -22,6 +22,7 @@ const DEFAULT_DEFS = [
 
 export function EddingtonWidget() {
   const { data: settings } = useAppSettings()
+  const { provider, initialized } = useDataProviderStatus()
   const defs = (
     settings?.eddington_definitions && settings.eddington_definitions.length
       ? settings.eddington_definitions
@@ -31,10 +32,13 @@ export function EddingtonWidget() {
   const queries = useQueries({
     queries: defs.map((d) => {
       const sportType = d.sport_types?.length ? d.sport_types.join(',') : undefined
-      const qs = sportType ? `?sport_type=${encodeURIComponent(sportType)}` : ''
       return {
-        queryKey: ['eddington', 'def', d.id, sportType] as const,
-        queryFn: () => get<EddingtonResult>(`/stats/eddington${qs}`),
+        queryKey: ['data', 'eddington', 'def', d.id, sportType] as const,
+        queryFn: async (): Promise<EddingtonResult> => {
+          if (!provider) throw new Error('Provider not ready')
+          return provider.getEddingtonData(sportType)
+        },
+        enabled: initialized && !!provider,
         staleTime: 60_000,
       }
     }),

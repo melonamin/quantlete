@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { cn } from '@/lib/utils/cn'
-import type { WidgetWidth, WidgetHeight } from '@/lib/api/dashboard'
+import type { WidgetWidth, WidgetHeight } from '@/lib/data'
 import {
   GripVertical,
   EyeOff,

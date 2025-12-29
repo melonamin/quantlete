@@ -15,6 +15,7 @@ import { TrainingLoadPage } from '@/pages/training-load'
 import { PowerPage } from '@/pages/power'
 import { PhotosPage } from '@/pages/photos'
 import { ChallengesPage } from '@/pages/challenges'
+import { OAuthCallbackPage } from '@/pages/oauth-callback'
 
 // Root route with layout
 const rootRoute = createRootRoute({
@@ -130,6 +131,13 @@ const challengesRoute = createRoute({
   component: ChallengesPage,
 })
 
+// OAuth callback (WASM mode)
+const oauthCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/oauth/callback',
+  component: OAuthCallbackPage,
+})
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
@@ -147,6 +155,7 @@ const routeTree = rootRoute.addChildren([
   photosRoute,
   challengesRoute,
   settingsRoute,
+  oauthCallbackRoute,
 ])
 
 // Create router

@@ -18,8 +18,9 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓           |
 | 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓           |
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
-| 10    | WASM Mode               | Browser-only version with SQLite-WASM    |             |
-| 11    | Polish                  | PWA, i18n, settings, badges              |             |
+| 10    | Feature Parity & Beyond | Gap features + unique enhancements       | **NEXT**    |
+| 11    | WASM Mode               | Browser-only version with SQLite-WASM    |             |
+| 12    | Polish                  | PWA, i18n, settings, badges              |             |
 
 ---
 
@@ -1030,11 +1031,400 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 10: WASM Mode
+## Phase 10: Feature Parity & Beyond
+
+**Goal:** Match and exceed the reference Statistics for Strava implementation with missing features and unique enhancements.
+
+### Gap Analysis Summary
+
+Compared against reference project (statistics-for-strava PHP implementation):
+
+| Category | Missing Features | Priority |
+|----------|-----------------|----------|
+| Dashboard Widgets | 6 widgets | High |
+| Pages | 2 pages | Medium |
+| Heatmap Features | 4 features | Medium |
+| UX Enhancements | 5 features | Medium |
+| Beyond Reference | 8 features | High |
+
+---
+
+### 10.1 Missing Dashboard Widgets
+
+#### 10.1.1 Yearly Stats Widget
+Year-over-year comparison with delta indicators showing improvement/regression.
+
+- [ ] Create `web/src/components/dashboard/widgets/yearly-stats.tsx`:
+  - [ ] Multi-year comparison table
+  - [ ] Columns: year, distance, elevation, time, activities, calories
+  - [ ] Delta arrows (↑/↓) with color coding (green/red)
+  - [ ] Percentage change display
+  - [ ] Per-sport type tabs
+- [ ] Create `GET /api/v1/dashboard/yearly-comparison` endpoint:
+  - [ ] Return yearly aggregates with deltas
+  - [ ] Support sport type filter
+- [ ] Add widget to dashboard registry
+
+#### 10.1.2 Distance Breakdown Widget
+Activity statistics grouped by distance categories/zones.
+
+- [ ] Create `web/src/components/dashboard/widgets/distance-breakdown.tsx`:
+  - [ ] Distance zone categories (e.g., 0-5km, 5-10km, 10-20km, 20-50km, 50-100km, 100km+)
+  - [ ] Per-zone stats: count, total distance, avg distance, elevation, time, avg speed
+  - [ ] Per-sport type tabs
+  - [ ] Bar chart visualization of zone distribution
+- [ ] Create `GET /api/v1/stats/distance-breakdown` endpoint:
+  - [ ] Configurable zone boundaries
+  - [ ] Sport type filter
+- [ ] Add widget to dashboard registry
+
+#### 10.1.3 Zwift Stats Widget
+Virtual cycling platform statistics per world.
+
+- [ ] Create `web/src/components/dashboard/widgets/zwift-stats.tsx`:
+  - [ ] Table with Zwift world rows (Watopia, London, New York, France, Paris, etc.)
+  - [ ] Columns: workouts, distance, elevation, time, calories
+  - [ ] World detection from activity metadata
+  - [ ] Link to filter heatmap by world
+- [ ] Create `GET /api/v1/stats/virtual-worlds` endpoint:
+  - [ ] Aggregate by virtual world
+  - [ ] Support for Zwift, Rouvy, MyWhoosh
+- [ ] Add widget to dashboard registry
+
+#### 10.1.4 Recent Challenges Widget
+Horizontal scrolling display of recently completed challenges.
+
+- [ ] Create `web/src/components/dashboard/widgets/recent-challenges.tsx`:
+  - [ ] Horizontal scroll container with overflow
+  - [ ] Challenge badge images (130px height)
+  - [ ] Lazy-loaded images
+  - [ ] Challenge name on hover
+  - [ ] Link to Strava challenge page
+  - [ ] "View all" link to challenges page
+- [ ] Add widget to dashboard registry
+
+#### 10.1.5 Intro Text Widget
+Custom introductory content widget for dashboard personalization.
+
+- [ ] Create `web/src/components/dashboard/widgets/intro-text.tsx`:
+  - [ ] Markdown content support
+  - [ ] Editable via settings
+  - [ ] Default welcome message
+- [ ] Store intro text in settings
+- [ ] Add widget to dashboard registry
+
+#### 10.1.6 Challenge Consistency Grid Widget
+Visual grid showing monthly goal achievement with checkmarks.
+
+- [ ] Create `web/src/components/dashboard/widgets/challenge-consistency-grid.tsx`:
+  - [ ] Challenge names as rows
+  - [ ] Months as columns (vertical text orientation)
+  - [ ] Green checkmark (✓) for goal reached
+  - [ ] Red X (✗) for goal missed
+  - [ ] Color-coded cells (green/red background)
+  - [ ] Configurable challenge definitions
+- [ ] Extend existing challenge consistency data
+- [ ] Add widget to dashboard registry
+
+---
+
+### 10.2 Missing Pages
+
+#### 10.2.1 Monthly Stats Page
+Dedicated page with accordion-style monthly breakdown tables.
+
+- [ ] Create `web/src/pages/monthly-stats.tsx`:
+  - [ ] Accordion rows by month (expandable/collapsible)
+  - [ ] Per-month columns: workouts, distance, elevation, moving time, calories, challenges
+  - [ ] Per-activity-type breakdown when expanded
+  - [ ] Year selector
+  - [ ] Sport type filter
+  - [ ] Export to CSV option
+- [ ] Create `GET /api/v1/stats/monthly-breakdown` endpoint:
+  - [ ] Return monthly aggregates with sport breakdown
+  - [ ] Year filter
+- [ ] Add route and navigation link
+
+#### 10.2.2 Badge Display Page
+SVG badge generation for profile embedding.
+
+- [ ] Create `web/src/pages/badges.tsx`:
+  - [ ] Three tabs: User Badge, PB Badges, Virtual Badges
+  - [ ] User Badge:
+    - [ ] Total stats summary badge
+    - [ ] Customizable colors
+    - [ ] SVG preview
+    - [ ] Embed code generator (Markdown, HTML)
+  - [ ] PB Badges:
+    - [ ] Personal best badges per sport type
+    - [ ] Distance/time achievements
+  - [ ] Virtual Badges:
+    - [ ] Zwift level/achievements
+    - [ ] Virtual world stats
+- [ ] Create `GET /api/v1/badges/user` endpoint
+- [ ] Create `GET /api/v1/badges/pb` endpoint
+- [ ] Create `GET /api/v1/badges/virtual` endpoint
+- [ ] SVG generation in Go (`internal/badges/`)
+- [ ] Add route and navigation link
+
+---
+
+### 10.3 Heatmap Enhancements
+
+#### 10.3.1 Click-to-Explore Nearby Routes
+Discover activities near a clicked point on the map.
+
+- [ ] Add click handler to heatmap:
+  - [ ] On map click, find activities within 100m radius
+  - [ ] Show popup with matching activities
+  - [ ] Activity name, date, distance, sport type
+  - [ ] Link to activity detail
+- [ ] Create `GET /api/v1/activities/nearby` endpoint:
+  - [ ] lat/lng parameters
+  - [ ] radius parameter (default 100m)
+  - [ ] Return matching activities
+
+#### 10.3.2 Country View Switching with FlyTo
+Quick navigation to activities by country.
+
+- [ ] Add country selector dropdown to heatmap filters:
+  - [ ] List countries with activity counts
+  - [ ] Country flags
+  - [ ] "All countries" option
+- [ ] Implement flyTo animation:
+  - [ ] Calculate bounds for selected country's activities
+  - [ ] Animate map to fit bounds
+  - [ ] Smooth transition
+- [ ] Persist country selection in URL
+
+#### 10.3.3 Workout Type Filter
+Filter heatmap activities by workout type.
+
+- [ ] Add workout type filter to heatmap sidebar:
+  - [ ] Race, Workout, Long Run, etc.
+  - [ ] Checkbox multi-select
+- [ ] Update `GET /api/v1/stats/heatmap` to support workout_type filter
+- [ ] Update heatmap UI to show filter
+
+#### 10.3.4 Activity Route Preview on Hover
+Show activity details when hovering over a route.
+
+- [ ] Add hover handlers to polylines:
+  - [ ] Highlight hovered route (increase opacity/width)
+  - [ ] Show tooltip with activity name, date, stats
+- [ ] Implement efficient hover detection for overlapping routes
+
+---
+
+### 10.4 UX Enhancements
+
+#### 10.4.1 Connected Charts (Cross-Filtering)
+Synchronized selection across multiple dashboard charts.
+
+- [ ] Create ECharts connection manager:
+  - [ ] Register chart instances by ID
+  - [ ] Broadcast selection events
+  - [ ] Highlight corresponding data across charts
+- [ ] Implement in monthly/weekly/yearly charts:
+  - [ ] Click on month → highlight in all charts
+  - [ ] Show activities for selected period
+- [ ] Create connected chart wrapper component
+
+#### 10.4.2 Chart Detail Modals
+Deep-dive popups when clicking chart elements.
+
+- [ ] Create `web/src/components/charts/chart-detail-modal.tsx`:
+  - [ ] Triggered on chart bar/point click
+  - [ ] Show detailed breakdown of clicked data
+  - [ ] List of activities for that period
+  - [ ] Sub-charts for deeper analysis
+- [ ] Integrate with monthly stats chart:
+  - [ ] Click month → show month detail modal
+  - [ ] Activities list, sport breakdown, comparison
+- [ ] Integrate with yearly stats chart
+
+#### 10.4.3 Multi-Field Search in Activities
+Advanced search across multiple activity fields.
+
+- [ ] Enhance activities search:
+  - [ ] Search in name, description, location
+  - [ ] Gear name search
+  - [ ] Hashtag search
+  - [ ] Segment name search
+- [ ] Update `GET /api/v1/activities` search parameter
+- [ ] Add search syntax help tooltip
+
+#### 10.4.4 Accordion Tables
+Collapsible row groups for dense data display.
+
+- [ ] Create `web/src/components/ui/accordion-table.tsx`:
+  - [ ] Expandable row groups
+  - [ ] Summary row with totals
+  - [ ] Expand/collapse all button
+  - [ ] Animated transitions
+- [ ] Apply to:
+  - [ ] Monthly stats page
+  - [ ] Gear page (group by gear type)
+  - [ ] Segments page (group by country)
+
+#### 10.4.5 Clustered Table Rendering
+Performance optimization for large tables.
+
+- [ ] Implement virtual scrolling with @tanstack/react-virtual:
+  - [ ] Render only visible rows
+  - [ ] Smooth scroll handling
+  - [ ] Maintain selection state
+- [ ] Apply to:
+  - [ ] Activities table (1000+ rows)
+  - [ ] Segments table
+  - [ ] Best efforts table
+
+---
+
+### 10.5 Beyond Reference - Unique Features
+
+These features go beyond the reference implementation to make Stata superior.
+
+#### 10.5.1 AI-Powered Activity Insights
+Automatic insights generated from activity data.
+
+- [ ] Create `internal/insights/analyzer.go`:
+  - [ ] Detect unusual patterns (new PR, longest streak, etc.)
+  - [ ] Compare to historical averages
+  - [ ] Generate natural language insights
+- [ ] Create `GET /api/v1/insights` endpoint
+- [ ] Create `web/src/components/dashboard/widgets/insights.tsx`:
+  - [ ] Display generated insights
+  - [ ] "Your longest ride this month"
+  - [ ] "You're 15% faster than last year"
+  - [ ] "New personal best on Segment X"
+- [ ] Add widget to dashboard registry
+
+#### 10.5.2 Weather Overlay for Activities
+Show weather conditions during activities.
+
+- [ ] Integrate weather API (Open-Meteo):
+  - [ ] Historical weather lookup by date/location
+  - [ ] Temperature, wind, precipitation
+- [ ] Create `web/src/components/activities/weather-badge.tsx`:
+  - [ ] Weather icon
+  - [ ] Temperature range
+  - [ ] Wind speed/direction
+  - [ ] Conditions (sunny, cloudy, rainy)
+- [ ] Add weather to activity detail page
+- [ ] Store weather data in database (cache)
+
+#### 10.5.3 Route Similarity Finder
+Find similar routes to a given activity.
+
+- [ ] Create route similarity algorithm:
+  - [ ] Compare polyline shapes
+  - [ ] Distance matching
+  - [ ] Start/end location proximity
+- [ ] Create `GET /api/v1/activities/:id/similar` endpoint
+- [ ] Add "Similar Routes" section to activity detail
+- [ ] Show comparison stats (faster/slower times)
+
+#### 10.5.4 Training Plan Suggestions
+Basic training recommendations based on history.
+
+- [ ] Create `internal/training/planner.go`:
+  - [ ] Analyze training load trends
+  - [ ] Suggest recovery days
+  - [ ] Recommend target distances
+- [ ] Create `GET /api/v1/training/suggestions` endpoint
+- [ ] Create training suggestions widget:
+  - [ ] "Consider a rest day tomorrow"
+  - [ ] "Good time for a long ride"
+  - [ ] "Your fitness is peaking"
+
+#### 10.5.5 Social Comparison (Anonymous)
+Compare your stats to aggregated anonymous data.
+
+- [ ] Create opt-in data sharing:
+  - [ ] Anonymous aggregate submission
+  - [ ] No PII included
+- [ ] Create comparison display:
+  - [ ] "Your average distance is higher than 75% of cyclists"
+  - [ ] Age group comparisons
+  - [ ] Regional comparisons
+
+#### 10.5.6 Goal Recommendations
+Smart goal suggestions based on historical data.
+
+- [ ] Analyze past performance:
+  - [ ] Calculate achievable stretch goals
+  - [ ] Weekly/monthly/yearly targets
+- [ ] Create goal suggestion UI:
+  - [ ] "Based on your history, try 200km this month"
+  - [ ] One-click goal creation
+  - [ ] Difficulty indicator (easy/moderate/stretch)
+
+#### 10.5.7 Strava Comments & Kudos Integration
+Display social interactions from Strava.
+
+- [ ] Import kudos count per activity
+- [ ] Import comments (text only)
+- [ ] Create `web/src/components/activities/social-stats.tsx`:
+  - [ ] Kudos count with heart icon
+  - [ ] Comments list
+  - [ ] "Most kudos'd activities" widget
+- [ ] Add to activity detail page
+
+#### 10.5.8 Export & Backup Features
+Comprehensive data export capabilities.
+
+- [ ] Create `GET /api/v1/export/activities` (CSV/JSON)
+- [ ] Create `GET /api/v1/export/full` (complete backup)
+- [ ] Create import from backup
+- [ ] Create `web/src/pages/export.tsx`:
+  - [ ] Export format selection
+  - [ ] Date range filter
+  - [ ] Include streams option
+  - [ ] Download progress
+- [ ] Add to settings page
+
+---
+
+### 10.6 Implementation Priority
+
+**Sprint 1 - Dashboard Gaps (High Priority):**
+1. Yearly Stats Widget
+2. Distance Breakdown Widget
+3. Recent Challenges Widget
+4. Challenge Consistency Grid Widget
+
+**Sprint 2 - Pages & Heatmap:**
+1. Monthly Stats Page
+2. Click-to-Explore on Heatmap
+3. Country View Switching
+4. Workout Type Filter
+
+**Sprint 3 - UX Polish:**
+1. Chart Detail Modals
+2. Multi-Field Search
+3. Accordion Tables
+4. Clustered Table Rendering
+
+**Sprint 4 - Beyond Reference:**
+1. AI-Powered Insights
+2. Weather Overlay
+3. Goal Recommendations
+4. Export Features
+
+**Sprint 5 - Advanced Features:**
+1. Badge Display Page
+2. Route Similarity Finder
+3. Zwift Stats Widget
+4. Connected Charts
+
+---
+
+## Phase 11: WASM Mode
 
 **Goal:** Browser-only version with SQLite-WASM.
 
-### 10.1 SQLite-WASM Setup
+### 11.1 SQLite-WASM Setup
 
 - [ ] Install `sql.js` or `@aspect-build/sqlite3-wasm`
 - [ ] Create `web/src/lib/db/wasm-client.ts`:
@@ -1045,7 +1435,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] Embed SQL as strings
   - [ ] Version tracking in SQLite
 
-### 10.2 Strava Direct Integration
+### 11.2 Strava Direct Integration
 
 - [ ] Create `web/src/lib/strava/client.ts`:
   - [ ] Direct Strava API calls from browser
@@ -1054,7 +1444,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [ ] Handle token storage (localStorage)
 - [ ] Rate limit tracking in browser
 
-### 10.3 Browser Importer
+### 11.3 Browser Importer
 
 - [ ] Create `web/src/lib/importer/`:
   - [ ] Activity importer (browser version)
@@ -1066,7 +1456,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] Estimated time remaining
   - [ ] Pause/resume
 
-### 10.4 Mode Detection & Switching
+### 11.4 Mode Detection & Switching
 
 - [ ] Create build configuration for WASM mode
 - [ ] Create `web/src/lib/mode.ts`:
@@ -1078,13 +1468,13 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] Scheduled imports
   - [ ] Challenge scraping
 
-### 10.5 Static Hosting Build
+### 11.5 Static Hosting Build
 
 - [ ] Create separate Vite config for WASM build
 - [ ] Configure for static hosting (GitHub Pages, etc.)
 - [ ] Create deployment documentation
 
-### 10.6 Token Exchange Service (Optional)
+### 11.6 Token Exchange Service (Optional)
 
 - [ ] Create Cloudflare Worker for token exchange
 - [ ] Or document user-provided serverless option
@@ -1092,11 +1482,11 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 11: Polish
+## Phase 12: Polish
 
 **Goal:** PWA, internationalization, settings, badges, final polish.
 
-### 11.1 PWA Support
+### 12.1 PWA Support
 
 - [ ] Create `web/public/manifest.json`
 - [ ] Create service worker for offline support
@@ -1104,14 +1494,14 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [ ] Configure installable prompt
 - [ ] Test PWA installation
 
-### 11.3 Unit System
+### 12.2 Unit System
 
 - [ ] Create unit conversion utilities
 - [ ] Add unit system selector
 - [ ] Apply unit formatting throughout app
 - [ ] Persist preference
 
-### 11.4 Settings Page
+### 12.3 Settings Page
 
 - [ ] Create `web/src/pages/settings.tsx`:
   - [ ] Profile section (photo, name)
@@ -1124,7 +1514,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] Notification settings
   - [ ] Data export
 
-### 11.5 SVG Badges
+### 12.4 SVG Badges
 
 - [ ] Create badge generation in Go:
   - [ ] Strava stats badge
@@ -1134,7 +1524,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [ ] Create badge preview in settings
 - [ ] Create embed code generator
 
-### 11.6 Webhooks
+### 12.5 Webhooks
 
 - [ ] Implement Strava webhook subscription:
   - [ ] `GET /api/v1/webhooks/strava` - validation
@@ -1142,7 +1532,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [ ] Handle activity create/update/delete events
 - [ ] Trigger incremental import on webhook
 
-### 11.7 Scheduler
+### 12.6 Scheduler
 
 - [ ] Create `internal/scheduler/scheduler.go`
 - [ ] Configurable scheduled jobs:
@@ -1151,7 +1541,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] App update check
 - [ ] Create scheduler configuration in settings
 
-### 11.8 Notifications
+### 12.7 Notifications
 
 - [ ] Integrate Shoutrrr for notifications
 - [ ] Create notification settings UI
@@ -1160,7 +1550,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [ ] Maintenance due
   - [ ] New features (optional)
 
-### 11.9 Final Polish
+### 12.8 Final Polish
 
 - [ ] Accessibility audit:
   - [ ] ARIA labels

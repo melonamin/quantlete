@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { usePowerStats } from '@/lib/api'
+import { usePowerStats } from '@/lib/data'
 import { WidgetWrapper } from './widget-wrapper'
 import { BarChart } from '@/components/charts'
 import { Button } from '@/components/ui/button'

@@ -32,15 +32,66 @@ dev-web:
     cd web && yarn dev
 
 # ============================================================================
+# Code Generation
+# ============================================================================
+
+# Generate all code (SQL queries, schema)
+generate: generate-sql generate-schema
+
+# Generate SQL query code (Go + TypeScript)
+generate-sql:
+    go run ./scripts/generate-sql
+
+# Generate schema for browser WASM mode
+generate-schema:
+    go run ./scripts/generate-schema
+
+# ============================================================================
+# WASM Algorithms (TinyGo)
+# ============================================================================
+
+# Build shared WASM algorithms with TinyGo
+build-algorithms:
+    #!/usr/bin/env bash
+    set -e
+    which tinygo > /dev/null || (echo "Error: TinyGo not installed. Run: yay -S tinygo-bin" && exit 1)
+    mkdir -p algorithms/build web/public/wasm
+    tinygo build -o algorithms/build/algorithms.wasm -target wasm -opt 2 -no-debug ./algorithms/go/wasm
+    cp algorithms/build/algorithms.wasm web/public/wasm/
+    cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/public/wasm/
+
+# Build algorithms for development (with debug info, larger binary)
+build-algorithms-debug:
+    #!/usr/bin/env bash
+    set -e
+    which tinygo > /dev/null || (echo "Error: TinyGo not installed. Run: yay -S tinygo-bin" && exit 1)
+    mkdir -p algorithms/build web/public/wasm
+    tinygo build -o algorithms/build/algorithms.wasm -target wasm ./algorithms/go/wasm
+    cp algorithms/build/algorithms.wasm web/public/wasm/
+    cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/public/wasm/
+
+# Test algorithms (native Go)
+test-algorithms:
+    go test -v ./algorithms/go/...
+
+# Check TinyGo installation
+check-tinygo:
+    @which tinygo > /dev/null && tinygo version || echo "TinyGo not installed. Run: yay -S tinygo-bin"
+
+# ============================================================================
 # Building
 # ============================================================================
 
 # Build everything
-build: build-web build-go
+build: generate build-web build-go
 
-# Build React frontend
+# Build React frontend (server mode, for Go embedding)
 build-web:
-    cd web && yarn build
+    cd web && yarn build:server
+
+# Build React frontend (WASM mode, for static hosting)
+build-web-wasm:
+    cd web && yarn build:wasm
 
 # Build Go binary (requires web to be built first)
 build-go:
@@ -54,6 +105,7 @@ build-release version="dev":
 clean:
     rm -rf bin/
     rm -rf web/dist/
+    rm -rf web/dist-wasm/
 
 # ============================================================================
 # Testing
@@ -161,11 +213,30 @@ release-snapshot:
     goreleaser release --snapshot --clean
 
 # ============================================================================
+# Cloudflare Deployment (WASM mode)
+# ============================================================================
+
+# Deploy WASM mode to Cloudflare Pages
+deploy-wasm: build-web-wasm
+    cd web && npx wrangler pages deploy dist-wasm --project-name=stata
+
+# Deploy worker to Cloudflare Workers
+deploy-worker:
+    cd worker && npm run deploy
+
+# Deploy both worker and pages
+deploy-cf: deploy-worker deploy-wasm
+
+# Preview WASM mode locally
+preview-wasm:
+    cd web && yarn preview:wasm
+
+# ============================================================================
 # Setup
 # ============================================================================
 
 # Install all dependencies
-setup: setup-go setup-web
+setup: setup-go setup-web setup-worker check-tinygo
 
 # Install Go dependencies
 setup-go:
@@ -174,6 +245,10 @@ setup-go:
 # Install React dependencies
 setup-web:
     cd web && yarn install
+
+# Install Worker dependencies (for WASM mode OAuth proxy)
+setup-worker:
+    cd worker && npm install
 
 # Install development tools
 setup-tools:

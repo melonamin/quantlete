@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMonthlyStats, useYearlyStats } from '@/lib/api/dashboard'
+import { useMonthlyStats, useYearlyStats } from '@/lib/data'
 import { MonthlyStatsChart } from '@/components/charts/activity-charts'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'

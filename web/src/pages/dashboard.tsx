@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { useDashboard, useAuthStatus } from '@/lib/api'
+import { useAuthStatus, useDashboard } from '@/lib/data'
+import { isWasmMode } from '@/lib/mode'
 import {
   StatsSummary,
   RecentActivities,
@@ -21,15 +22,27 @@ import {
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getAuthUrl as getStravaOAuthUrl } from '@/lib/wasm/strava/client'
+
+function getStravaAuthUrl(): string {
+  if (isWasmMode()) {
+    const redirectUri = `${window.location.origin}/oauth/callback`
+    return getStravaOAuthUrl(redirectUri)
+  }
+  // Server mode - use server-side OAuth
+  return '/api/v1/auth/strava'
+}
 
 export function DashboardPage() {
-  const { data: authStatus } = useAuthStatus()
+  const { data: authStatus, isLoading: authLoading } = useAuthStatus()
   const { data: dashboard, isLoading, error } = useDashboard()
 
   const isAuthenticated = authStatus?.authenticated
 
   // Show getting started if not authenticated
-  if (!isAuthenticated) {
+  if (!authLoading && !isAuthenticated) {
+    const stravaAuthUrl = getStravaAuthUrl()
+
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -46,8 +59,13 @@ export function DashboardPage() {
               Connect your Strava account to import your activities and view your statistics.
             </p>
             <Button asChild className="bg-strava hover:bg-strava/90">
-              <a href="/api/v1/auth/strava">Connect Strava</a>
+              <a href={stravaAuthUrl}>Connect Strava</a>
             </Button>
+            {isWasmMode() && (
+              <p className="text-xs text-muted-foreground">
+                Running in browser-only mode. Your data will be stored locally.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

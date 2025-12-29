@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import type { RecentActivity } from '@/lib/api/dashboard'
+import type { RecentActivity } from '@/lib/data'
 import { formatDistance, formatDuration, formatRelativeDate } from '@/lib/format'
 import { getSportIcon, getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'

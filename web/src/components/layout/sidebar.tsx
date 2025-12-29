@@ -1,7 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/stores/sidebar'
-import { useAppSettings, useAuthStatus } from '@/lib/api'
+import { useAppSettings, useAuthStatus } from '@/lib/data'
 import {
   LayoutDashboard,
   Activity,

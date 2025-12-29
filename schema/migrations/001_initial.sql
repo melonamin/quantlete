@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS activities (
 
     -- Other
     calories REAL,
+    suffer_score INTEGER,
     kudos_count INTEGER DEFAULT 0,
     comment_count INTEGER DEFAULT 0,
     photo_count INTEGER DEFAULT 0,
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS activities (
     workout_type INTEGER,
     device_name TEXT,
     gear_id TEXT,
+    embed_token TEXT,
 
     -- Coordinates
     start_lat REAL,

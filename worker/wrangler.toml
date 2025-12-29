@@ -1,0 +1,14 @@
+# Stata Strava Proxy Worker
+name = "stata-strava-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# Environment variables (set these via Cloudflare dashboard or wrangler secret)
+# STRAVA_CLIENT_ID - Your Strava app client ID
+# STRAVA_CLIENT_SECRET - Your Strava app client secret
+# ALLOWED_ORIGIN - The frontend URL (e.g., https://stata.pages.dev)
+
+[vars]
+STRAVA_API_BASE = "https://www.strava.com/api/v3"
+STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
+STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"

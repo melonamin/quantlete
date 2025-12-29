@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSportTypeStats } from '@/lib/api/dashboard'
+import { useSportTypeStats } from '@/lib/data'
 import { SportDistributionChart } from '@/components/charts/activity-charts'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'

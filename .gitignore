@@ -15,6 +15,10 @@ coverage.html
 # Go workspace
 go.work
 
+# Generated code
+*.gen.go
+*.gen.ts
+
 # IDE
 .idea/
 .vscode/
@@ -29,26 +33,19 @@ Thumbs.db
 # Environment
 .env
 .env.local
-.env.*.local
+.env.*
+!.env.*.example
 
 # Data
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *.duckdb
 *.duckdb.wal
-data/
-
-# Node
-web/node_modules/
-web/.pnp.*
-web/.yarn/*
-!web/.yarn/patches
-!web/.yarn/plugins
-!web/.yarn/releases
-!web/.yarn/sdks
-!web/.yarn/versions
-web/dist/
-
-# Build
-dist/
 
 # Logs
 *.log
@@ -58,3 +55,31 @@ yarn-error.log*
 
 # GoReleaser
 dist/
+
+# ===== Web =====
+web/node_modules/
+web/dist/
+web/dist-wasm/
+web/.pnp.*
+web/.yarn/*
+!web/.yarn/patches
+!web/.yarn/plugins
+!web/.yarn/releases
+!web/.yarn/sdks
+!web/.yarn/versions
+
+# ===== Worker (Cloudflare) =====
+worker/node_modules/
+worker/.wrangler/
+worker/dist/
+
+# ===== Algorithms (AssemblyScript) =====
+algorithms/build/
+algorithms/node_modules/
+algorithms/.pnp.*
+algorithms/.yarn/*
+!algorithms/.yarn/patches
+!algorithms/.yarn/plugins
+!algorithms/.yarn/releases
+!algorithms/.yarn/sdks
+!algorithms/.yarn/versions

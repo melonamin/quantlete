@@ -1,26 +1,80 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import fs from 'fs'
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+/**
+ * Plugin to copy sql.js WASM file to public/wasm directory.
+ * This ensures the WASM file is available at /wasm/sql-wasm.wasm in both dev and build.
+ */
+function copySqlJsWasm(): Plugin {
+  return {
+    name: 'copy-sqljs-wasm',
+    buildStart() {
+      const wasmDir = path.resolve(__dirname, 'public/wasm')
+      const source = path.resolve(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm')
+      const dest = path.resolve(wasmDir, 'sql-wasm.wasm')
+
+      // Ensure directory exists
+      if (!fs.existsSync(wasmDir)) {
+        fs.mkdirSync(wasmDir, { recursive: true })
+      }
+
+      // Copy WASM file if it doesn't exist or is outdated
+      if (!fs.existsSync(dest) || fs.statSync(source).mtime > fs.statSync(dest).mtime) {
+        fs.copyFileSync(source, dest)
+        console.log('[copySqlJsWasm] Copied sql-wasm.wasm to public/wasm/')
+      }
     },
-  },
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8081',
-        changeOrigin: true,
+  }
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const buildMode = env.VITE_BUILD_MODE || 'server'
+  const isWasmMode = buildMode === 'wasm'
+
+  return {
+    plugins: [
+      react(),
+      tailwindcss(),
+      // Only include sql.js WASM copy plugin in wasm mode
+      ...(isWasmMode ? [copySqlJsWasm()] : []),
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
     },
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-  },
+    define: {
+      __BUILD_MODE__: JSON.stringify(buildMode),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    },
+    server: {
+      port: 5173,
+      // Disable proxy in WASM mode (no backend)
+      proxy: isWasmMode
+        ? undefined
+        : {
+            '/api': {
+              target: 'http://localhost:8081',
+              changeOrigin: true,
+            },
+          },
+    },
+    build: {
+      // Different output directories for each mode
+      outDir: isWasmMode ? 'dist-wasm' : 'dist',
+      sourcemap: true,
+    },
+    // WASM mode: handle sql.js WASM files
+    ...(isWasmMode && {
+      optimizeDeps: {
+        // Include sql.js for proper CommonJS->ESM conversion
+        include: ['sql.js'],
+      },
+      assetsInclude: ['**/*.wasm'],
+    }),
+  }
 })
