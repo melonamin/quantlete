@@ -17,6 +17,7 @@ import { PhotosPage } from '@/pages/photos'
 import { ChallengesPage } from '@/pages/challenges'
 import { OAuthCallbackPage } from '@/pages/oauth-callback'
 import { MonthlyStatsPage } from '@/pages/monthly-stats'
+import { ExportPage } from '@/pages/export'
 
 // Root route with layout
 const rootRoute = createRootRoute({
@@ -146,6 +147,13 @@ const monthlyStatsRoute = createRoute({
   component: MonthlyStatsPage,
 })
 
+// Export
+const exportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/export',
+  component: ExportPage,
+})
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
@@ -165,6 +173,7 @@ const routeTree = rootRoute.addChildren([
   settingsRoute,
   oauthCallbackRoute,
   monthlyStatsRoute,
+  exportRoute,
 ])
 
 // Create router

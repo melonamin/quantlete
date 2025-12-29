@@ -20,6 +20,7 @@ import {
   Menu,
   X,
   BarChart3,
+  Download,
 } from 'lucide-react'
 import { useEffect, useCallback } from 'react'
 
@@ -56,6 +57,7 @@ export function Sidebar() {
     ...(showEddington ? [{ name: 'Eddington', href: '/eddington', icon: TrendingUp }] : []),
     { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
     { name: 'Rewind', href: '/rewind', icon: History },
+    { name: 'Export', href: '/export', icon: Download },
   ]
 
   const handleKeyDown = useCallback(

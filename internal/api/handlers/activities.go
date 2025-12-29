@@ -77,6 +77,8 @@ type ActivityResponse struct {
 	EndLat               *float64 `json:"end_lat,omitempty"`
 	EndLng               *float64 `json:"end_lng,omitempty"`
 	SummaryPolyline      string   `json:"summary_polyline,omitempty"`
+	LocationCity         string   `json:"location_city,omitempty"`
+	LocationCountry      string   `json:"location_country,omitempty"`
 }
 
 // List returns a paginated list of activities.
@@ -291,6 +293,8 @@ func activityToResponse(a *storage.Activity) ActivityResponse {
 		EndLat:               a.EndLat,
 		EndLng:               a.EndLng,
 		SummaryPolyline:      a.SummaryPolyline,
+		LocationCity:         a.LocationCity,
+		LocationCountry:      a.LocationCountry,
 	}
 }
 

@@ -22,6 +22,10 @@ import {
   YearlyStats,
   DistanceBreakdown,
   ChallengeConsistencyGrid,
+  ZwiftStats,
+  IntroText,
+  GoalRecommendations,
+  ActivityInsights,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -272,6 +276,38 @@ export function DashboardPage() {
             defaultHeight: 2,
             defaultHidden: true,
             render: () => <ChallengeConsistencyGrid />,
+          },
+          {
+            id: 'zwift_stats',
+            title: 'Virtual Riding',
+            defaultWidth: 6,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <ZwiftStats />,
+          },
+          {
+            id: 'intro_text',
+            title: 'Welcome',
+            defaultWidth: 4,
+            defaultHeight: 1,
+            defaultHidden: true,
+            render: () => <IntroText />,
+          },
+          {
+            id: 'goal_recommendations',
+            title: 'Goal Suggestions',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <GoalRecommendations />,
+          },
+          {
+            id: 'activity_insights',
+            title: 'Insights',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <ActivityInsights />,
           },
         ]}
       />

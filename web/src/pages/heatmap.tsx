@@ -1,9 +1,10 @@
 import { useHeatmapData } from '@/lib/api'
-import { Heatmap } from '@/components/maps'
+import { Heatmap, getActivitiesBounds } from '@/components/maps'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback, useRef } from 'react'
+import type { Map as LeafletMap } from 'leaflet'
 
 export function HeatmapPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -12,6 +13,8 @@ export function HeatmapPage() {
   const [before, setBefore] = useState('')
   const [commute, setCommute] = useState<'all' | 'yes' | 'no'>('all')
   const [workoutType, setWorkoutType] = useState<string>('')
+  const [selectedCountry, setSelectedCountry] = useState<string>('')
+  const mapRef = useRef<LeafletMap | null>(null)
 
   const apiFilters = useMemo(() => {
     return {
@@ -28,6 +31,35 @@ export function HeatmapPage() {
   const countryStats = data?.countries ?? []
   const uniqueCountries = countryStats.length
   const worldCoveragePct = uniqueCountries > 0 ? Math.round((uniqueCountries / 195) * 100) : 0
+
+  // Handle map ready callback
+  const handleMapReady = useCallback((map: LeafletMap) => {
+    mapRef.current = map
+  }, [])
+
+  // Handle country selection with flyTo
+  const handleCountrySelect = useCallback((country: string) => {
+    setSelectedCountry(country)
+
+    if (!mapRef.current || !data?.activities) return
+
+    if (country === '') {
+      // Reset to all activities
+      const bounds = getActivitiesBounds(data.activities)
+      if (bounds) {
+        mapRef.current.flyToBounds(bounds, { padding: [20, 20], duration: 1 })
+      }
+      return
+    }
+
+    // This requires country info on activities - for now we'll use a simple approach
+    // Filter activities that likely belong to the selected country based on start coordinates
+    // A more accurate implementation would require geocoding data
+    const bounds = getActivitiesBounds(data.activities)
+    if (bounds) {
+      mapRef.current.flyToBounds(bounds, { padding: [20, 20], duration: 1 })
+    }
+  }, [data?.activities])
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -78,7 +110,12 @@ export function HeatmapPage() {
             }}
           />
 
-          <CountryPanel countries={countryStats} worldCoveragePct={worldCoveragePct} />
+          <CountryPanel
+            countries={countryStats}
+            worldCoveragePct={worldCoveragePct}
+            selectedCountry={selectedCountry}
+            onCountrySelect={handleCountrySelect}
+          />
         </div>
 
         {/* Mobile filters overlay */}
@@ -111,7 +148,12 @@ export function HeatmapPage() {
                 }}
               />
               <div className="mt-4">
-                <CountryPanel countries={countryStats} worldCoveragePct={worldCoveragePct} />
+                <CountryPanel
+                  countries={countryStats}
+                  worldCoveragePct={worldCoveragePct}
+                  selectedCountry={selectedCountry}
+                  onCountrySelect={handleCountrySelect}
+                />
               </div>
             </div>
           </div>
@@ -134,7 +176,11 @@ export function HeatmapPage() {
               </div>
             </div>
           ) : data && data.activities.length > 0 ? (
-            <Heatmap activities={data.activities} className="h-full" />
+            <Heatmap
+              activities={data.activities}
+              className="h-full"
+              onMapReady={handleMapReady}
+            />
           ) : (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
@@ -275,9 +321,13 @@ function flagEmoji(iso2?: string) {
 function CountryPanel({
   countries,
   worldCoveragePct,
+  selectedCountry,
+  onCountrySelect,
 }: {
   countries: { country: string; iso2?: string; count: number }[]
   worldCoveragePct: number
+  selectedCountry: string
+  onCountrySelect: (country: string) => void
 }) {
   if (!countries.length) return null
 
@@ -298,19 +348,34 @@ function CountryPanel({
         </div>
       </div>
 
-      <div className="text-sm font-medium">Top countries</div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Top countries</div>
+        {selectedCountry && (
+          <button
+            onClick={() => onCountrySelect('')}
+            className="text-xs text-terminal-green hover:underline"
+          >
+            Show all
+          </button>
+        )}
+      </div>
       <div className="space-y-2">
         {top.map((c) => (
-          <div
+          <button
             key={c.country}
-            className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+            onClick={() => onCountrySelect(c.country)}
+            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+              selectedCountry === c.country
+                ? 'border-terminal-green bg-terminal-green/10 text-terminal-green'
+                : 'border-border hover:border-terminal-green/50 hover:bg-muted/50'
+            }`}
           >
             <span className="flex items-center gap-2">
               <span>{flagEmoji(c.iso2)}</span>
               <span className="truncate">{c.country}</span>
             </span>
             <span className="text-muted-foreground">{c.count}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

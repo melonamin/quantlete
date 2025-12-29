@@ -38,6 +38,8 @@ export interface Activity {
   end_lat?: number
   end_lng?: number
   summary_polyline?: string
+  location_city?: string
+  location_country?: string
 }
 
 export interface PaginatedResponse<T> {

@@ -1,4 +1,5 @@
 export { ActivitiesTable } from './activities-table'
+export { VirtualizedActivitiesTable } from './virtualized-activities-table'
 export { ActivityRow } from './activity-row'
 export { ActivityHeader } from './activity-header'
 export { ActivityStats } from './activity-stats'

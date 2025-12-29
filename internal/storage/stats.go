@@ -430,6 +430,7 @@ type YearStat struct {
 // HeatmapActivity represents an activity for the heatmap visualization.
 type HeatmapActivity struct {
 	ID              int64   `json:"id"`
+	Name            string  `json:"name"`
 	SportType       string  `json:"sport_type"`
 	SummaryPolyline string  `json:"summary_polyline"`
 	StartLat        float64 `json:"start_lat"`
@@ -481,7 +482,7 @@ func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) (
 // GetHeatmapData returns activities with polylines for heatmap visualization.
 func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, filters HeatmapFilters) ([]HeatmapActivity, error) {
 	query := `
-		SELECT id, sport_type, summary_polyline, COALESCE(start_lat, 0), COALESCE(start_lng, 0)
+		SELECT id, name, sport_type, summary_polyline, COALESCE(start_lat, 0), COALESCE(start_lng, 0)
 		FROM activities
 		WHERE athlete_id = ? AND summary_polyline IS NOT NULL AND summary_polyline != ''
 	`
@@ -534,7 +535,7 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 	var activities []HeatmapActivity
 	for rows.Next() {
 		var a HeatmapActivity
-		if err := rows.Scan(&a.ID, &a.SportType, &a.SummaryPolyline, &a.StartLat, &a.StartLng); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.SportType, &a.SummaryPolyline, &a.StartLat, &a.StartLng); err != nil {
 			return nil, err
 		}
 		activities = append(activities, a)

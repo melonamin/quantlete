@@ -98,6 +98,7 @@ export interface CalendarMonthSummary {
 
 export interface HeatmapActivity {
   id: number
+  name: string
   sport_type: string
   summary_polyline: string
   start_lat: number

@@ -34,6 +34,7 @@ type Router struct {
 	maintenanceHandler *handlers.MaintenanceHandler
 	photosHandler      *handlers.PhotosHandler
 	challengesHandler  *handlers.ChallengesHandler
+	exportHandler      *handlers.ExportHandler
 }
 
 // NewRouter creates a new HTTP router with all routes configured.
@@ -93,6 +94,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	maintenanceHandler := handlers.NewMaintenanceHandler(maintenanceRepo, stravaClient)
 	photosHandler := handlers.NewPhotosHandler(photoRepo, stravaClient)
 	challengesHandler := handlers.NewChallengesHandler(challengeRepo, stravaClient)
+	exportHandler := handlers.NewExportHandler(activityRepo, stravaClient)
 
 	router := &Router{
 		Mux:                r,
@@ -113,6 +115,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 		maintenanceHandler: maintenanceHandler,
 		photosHandler:      photosHandler,
 		challengesHandler:  challengesHandler,
+		exportHandler:      exportHandler,
 	}
 
 	// Mount routes
@@ -252,6 +255,13 @@ func (r *Router) mountRoutes() {
 		router.Route("/settings", func(router chi.Router) {
 			router.Get("/", r.settingsHandler.Get)
 			router.Put("/", r.settingsHandler.Update)
+		})
+
+		// Export routes
+		router.Route("/export", func(router chi.Router) {
+			router.Get("/stats", r.exportHandler.ExportStats)
+			router.Get("/activities/csv", r.exportHandler.ExportActivitiesCSV)
+			router.Get("/activities/json", r.exportHandler.ExportActivitiesJSON)
 		})
 	})
 
