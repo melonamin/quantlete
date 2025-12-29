@@ -94,3 +94,16 @@ export function getSportHexColor(sportType: string): string {
   }
   return colors[category]
 }
+
+export function getSportEmoji(sportType: string): string {
+  const category = getSportCategory(sportType)
+  const emojis: Record<SportCategory, string> = {
+    ride: '🚴',
+    run: '🏃',
+    walk: '🚶',
+    swim: '🏊',
+    winter: '⛷️',
+    other: '🏋️',
+  }
+  return emojis[category]
+}

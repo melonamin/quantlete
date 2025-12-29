@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useDashboardMonthly } from '@/lib/data'
+import { useMonthlyStats } from '@/lib/data'
 import { useTrainingGoals, useUpdateTrainingGoals } from '@/lib/api/goals'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,7 @@ const DIFFICULTY_CONFIG: Record<Difficulty, { label: string; color: string; icon
   }
 
 export function GoalRecommendations() {
-  const { data: monthlyData, isLoading: monthlyLoading } = useDashboardMonthly()
+  const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyStats()
   const { data: goalsData, isLoading: goalsLoading } = useTrainingGoals()
   const updateGoals = useUpdateTrainingGoals()
 
@@ -44,15 +44,14 @@ export function GoalRecommendations() {
     if (recentMonths.length < 2) return []
 
     // Calculate averages
-    const avgDistance = recentMonths.reduce((sum, m) => sum + m.distance, 0) / recentMonths.length
+    const avgDistance = recentMonths.reduce((sum, m) => sum + m.total_distance, 0) / recentMonths.length
     const avgElevation =
-      recentMonths.reduce((sum, m) => sum + m.elevation, 0) / recentMonths.length
-    const avgTime = recentMonths.reduce((sum, m) => sum + m.moving_time, 0) / recentMonths.length
+      recentMonths.reduce((sum, m) => sum + m.total_elevation, 0) / recentMonths.length
+    const avgTime = recentMonths.reduce((sum, m) => sum + m.total_time, 0) / recentMonths.length
 
     // Calculate best month
-    const bestDistance = Math.max(...recentMonths.map((m) => m.distance))
-    const bestElevation = Math.max(...recentMonths.map((m) => m.elevation))
-    const bestTime = Math.max(...recentMonths.map((m) => m.moving_time))
+    const bestDistance = Math.max(...recentMonths.map((m) => m.total_distance))
+    const bestElevation = Math.max(...recentMonths.map((m) => m.total_elevation))
 
     // Check if we already have goals set
     const hasDistanceGoal =

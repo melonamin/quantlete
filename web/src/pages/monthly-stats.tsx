@@ -37,7 +37,7 @@ export function MonthlyStatsPage() {
   const [year, setYear] = useState(currentYear)
 
   const { data: monthlyData, isLoading } = useMonthlyStats(year)
-  const { data: sportTypeData } = useSportTypeStats()
+  const { data: _sportTypeData } = useSportTypeStats()
 
   // Build groups with mock sport breakdown (in production this would come from the API)
   const groups: AccordionTableGroup<MonthlySummary, SportBreakdown>[] = useMemo(() => {

@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { Polyline, Popup, useMapEvents, CircleMarker } from 'react-leaflet'
-import type { LeafletMouseEvent, Map as LeafletMap, LatLngBounds } from 'leaflet'
+import type { LeafletMouseEvent, Map as LeafletMap } from 'leaflet'
 import { BaseMap } from './base-map'
 import { decodePolyline, getBounds } from '@/lib/maps'
 import { tileLayers } from '@/lib/maps'
@@ -165,8 +165,8 @@ export function Heatmap({
                   {clickedPoint.nearby.map(({ activity, distance }) => (
                     <Link
                       key={activity.id}
-                      to="/activities/$id"
-                      params={{ id: String(activity.id) }}
+                      to="/activities/$activityId"
+                      params={{ activityId: String(activity.id) }}
                       className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors text-sm"
                     >
                       <span className="text-base">{getSportEmoji(activity.sport_type)}</span>
@@ -191,7 +191,7 @@ export function Heatmap({
 }
 
 // Helper to calculate bounds for a set of activities
-export function getActivitiesBounds(activities: HeatmapActivity[]): LatLngBounds | undefined {
+export function getActivitiesBounds(activities: HeatmapActivity[]): [[number, number], [number, number]] | undefined {
   const points = activities
     .filter((a) => a.start_lat && a.start_lng)
     .map((a) => [a.start_lat, a.start_lng] as [number, number])

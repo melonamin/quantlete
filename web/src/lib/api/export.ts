@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiClient } from './client'
+import { get } from './client'
 
 export interface ExportStats {
   total_activities: number
@@ -8,8 +8,7 @@ export interface ExportStats {
 }
 
 export async function getExportStats(): Promise<ExportStats> {
-  const response = await apiClient.get('/export/stats')
-  return response.data
+  return get<ExportStats>('/export/stats')
 }
 
 export function useExportStats() {

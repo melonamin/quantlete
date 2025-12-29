@@ -33,23 +33,45 @@ export function ChallengeConsistencyGrid() {
     if (!goalsData?.progress) return []
 
     const statuses: GoalStatus[] = []
+    const currentMonth = new Date().toISOString().slice(0, 7)
 
-    // Group by goal name and track monthly completion
-    for (const period of ['monthly'] as const) {
-      const periodGoals = goalsData.progress[period]
-      if (!periodGoals) continue
+    // Progress is keyed by sport name, then by period
+    for (const [sportName, periods] of Object.entries(goalsData.progress)) {
+      const monthlyProgress = periods.month
+      if (!monthlyProgress) continue
 
-      for (const goal of periodGoals) {
-        const isComplete = goal.current >= goal.target
-        const currentMonth = new Date().toISOString().slice(0, 7)
+      // Check if any metric has a target set in config
+      const sportConfig = goalsData.config?.sports.find((s) => s.name === sportName)
+      if (!sportConfig?.targets?.month) continue
 
-        // Create a simple status entry
-        const monthsMap = new Map<string, boolean>()
+      const targets = sportConfig.targets.month
+      const monthsMap = new Map<string, boolean>()
+
+      // Check distance goal
+      if (targets.distance_m && targets.distance_m > 0) {
+        const isComplete = monthlyProgress.distance_m >= targets.distance_m
         monthsMap.set(currentMonth, isComplete)
-
         statuses.push({
-          name: `${goal.sport_type || 'All'} ${goal.metric}`,
-          months: monthsMap,
+          name: `${sportName} distance`,
+          months: new Map(monthsMap),
+        })
+      }
+
+      // Check elevation goal
+      if (targets.elevation_m && targets.elevation_m > 0) {
+        const isComplete = monthlyProgress.elevation_m >= targets.elevation_m
+        statuses.push({
+          name: `${sportName} elevation`,
+          months: new Map([[currentMonth, isComplete]]),
+        })
+      }
+
+      // Check time goal
+      if (targets.moving_time_s && targets.moving_time_s > 0) {
+        const isComplete = monthlyProgress.moving_time_s >= targets.moving_time_s
+        statuses.push({
+          name: `${sportName} time`,
+          months: new Map([[currentMonth, isComplete]]),
         })
       }
     }

@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useSegmentCountries, useSegmentDetail, useSegments, type SegmentListItem } from '@/lib/api'
 import { formatDate, formatDistance, formatDuration } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table'
 import { SegmentMap } from '@/components/maps'
 import { SegmentPRChart } from '@/components/charts/segment-pr-chart'
+import { Search, X, Filter, Star, Crown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 type SortKey =
   | 'name'
@@ -44,17 +46,26 @@ function sortValueForSegment(seg: SegmentListItem, key: SortKey) {
 }
 
 export function SegmentsPage() {
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [activityType, setActivityType] = useState('')
   const [country, setCountry] = useState('')
   const [starredOnly, setStarredOnly] = useState(false)
   const [komOnly, setKomOnly] = useState(false)
+  const [localSearch, setLocalSearch] = useState('')
   const [search, setSearch] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const [sortKey, setSortKey] = useState<SortKey>('times_completed')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const [selectedSegmentId, setSelectedSegmentId] = useState<number | null>(null)
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(localSearch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [localSearch])
 
   const apiFilters = useMemo(() => {
     return {
@@ -75,11 +86,7 @@ export function SegmentsPage() {
     for (const s of segments ?? []) {
       if (s.activity_type) types.add(s.activity_type)
     }
-    const base = ['', 'Ride', 'Run']
-    for (const t of types) {
-      if (!base.includes(t)) base.push(t)
-    }
-    return base
+    return Array.from(types).sort()
   }, [segments])
 
   const sorted = useMemo(() => {
@@ -105,189 +112,307 @@ export function SegmentsPage() {
     setSortDir(key === 'name' ? 'asc' : 'desc')
   }
 
+  const hasActiveFilters = activityType || country || starredOnly || komOnly || search
+
+  const clearFilters = () => {
+    setActivityType('')
+    setCountry('')
+    setStarredOnly(false)
+    setKomOnly(false)
+    setLocalSearch('')
+    setSearch('')
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Segments</h1>
-          <p className="text-muted-foreground">Your segment efforts and PRs</p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="md:hidden"
-          onClick={() => setFiltersOpen(!filtersOpen)}
-        >
-          Filters
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Segments</h1>
+        <p className="text-muted-foreground">Your segment efforts and PRs</p>
       </div>
 
-      <div className="flex gap-6">
-        <div className="hidden w-80 shrink-0 md:block">
-          <FiltersPanel
-            sportOptions={sportOptions}
-            activityType={activityType}
-            setActivityType={setActivityType}
-            countries={countries ?? []}
-            country={country}
-            setCountry={setCountry}
-            starredOnly={starredOnly}
-            setStarredOnly={setStarredOnly}
-            komOnly={komOnly}
-            setKomOnly={setKomOnly}
-            search={search}
-            setSearch={setSearch}
-            onClear={() => {
-              setActivityType('')
-              setCountry('')
-              setStarredOnly(false)
-              setKomOnly(false)
-              setSearch('')
-            }}
+      {/* Filters Panel - Stacked Layout */}
+      <div className="space-y-4 rounded-lg border border-border bg-card p-4 mb-6">
+        {/* Search input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search segments by name..."
+            className="h-10 w-full rounded-md border border-border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
           />
+          {localSearch && (
+            <button
+              onClick={() => setLocalSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
-        {filtersOpen && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm md:hidden">
-            <div className="mx-auto mt-10 w-[calc(100%-2rem)] max-w-md rounded-lg border border-border bg-card p-4 shadow-lg">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="font-semibold">Filters</div>
-                <Button variant="ghost" size="sm" onClick={() => setFiltersOpen(false)}>
-                  Close
-                </Button>
+        {/* Quick filters */}
+        <div className="flex flex-wrap gap-2">
+          {/* Sport type buttons */}
+          <button
+            onClick={() => setActivityType('')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors',
+              !activityType
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setActivityType(activityType === 'Ride' ? '' : 'Ride')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors',
+              activityType === 'Ride'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            Ride
+          </button>
+          <button
+            onClick={() => setActivityType(activityType === 'Run' ? '' : 'Run')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors',
+              activityType === 'Run'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            Run
+          </button>
+
+          {/* Divider */}
+          <div className="w-px bg-border mx-1" />
+
+          {/* Toggle buttons */}
+          <button
+            onClick={() => setStarredOnly(!starredOnly)}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
+              starredOnly
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            <Star className="h-3 w-3" />
+            Starred
+          </button>
+          <button
+            onClick={() => setKomOnly(!komOnly)}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
+              komOnly
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            <Crown className="h-3 w-3" />
+            KOM
+          </button>
+
+          {/* More filters button */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
+              showAdvanced
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            <Filter className="h-3 w-3" />
+            More
+          </button>
+        </div>
+
+        {/* Advanced filters */}
+        {showAdvanced && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border">
+            {/* Sport type dropdown */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Sport Type</label>
+              <select
+                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={activityType}
+                onChange={(e) => setActivityType(e.target.value)}
+              >
+                <option value="">All types</option>
+                {sportOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Country dropdown */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Country</label>
+              <select
+                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+              >
+                <option value="">All countries</option>
+                {(countries ?? []).map((c) => (
+                  <option key={c.country} value={c.country}>
+                    {flagEmoji(c.iso2)} {c.country} ({c.count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Toggles */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Options</label>
+              <div className="flex flex-wrap gap-3 h-9 items-center">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={starredOnly}
+                    onChange={(e) => setStarredOnly(e.target.checked)}
+                  />
+                  Starred only
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={komOnly}
+                    onChange={(e) => setKomOnly(e.target.checked)}
+                  />
+                  KOM only
+                </label>
               </div>
-              <FiltersPanel
-                sportOptions={sportOptions}
-                activityType={activityType}
-                setActivityType={setActivityType}
-                countries={countries ?? []}
-                country={country}
-                setCountry={setCountry}
-                starredOnly={starredOnly}
-                setStarredOnly={setStarredOnly}
-                komOnly={komOnly}
-                setKomOnly={setKomOnly}
-                search={search}
-                setSearch={setSearch}
-                onClear={() => {
-                  setActivityType('')
-                  setCountry('')
-                  setStarredOnly(false)
-                  setKomOnly(false)
-                  setSearch('')
-                }}
-              />
             </div>
           </div>
         )}
 
-        <div className="min-w-0 flex-1">
-          {error && (
-            <div className="mb-4 rounded-lg border border-destructive bg-destructive/10 p-4">
-              <p className="text-destructive">Failed to load segments: {error.message}</p>
-            </div>
-          )}
-
-          {isLoading ? (
-            <SegmentsSkeleton />
-          ) : sorted.length === 0 ? (
-            <div className="rounded-lg border border-border bg-card p-8 text-center">
-              <p className="text-muted-foreground">No segments found.</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Import with “Include segments” enabled to populate this page.
-              </p>
-              <p className="mt-3 text-sm">
-                <Link to="/settings" className="text-primary hover:underline">
-                  Go to Settings
-                </Link>
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <SortableHead
-                      label="Segment"
-                      active={sortKey === 'name'}
-                      dir={sortDir}
-                      onClick={() => toggleSort('name')}
-                    />
-                    <SortableHead
-                      label="Distance"
-                      align="right"
-                      active={sortKey === 'distance'}
-                      dir={sortDir}
-                      onClick={() => toggleSort('distance')}
-                    />
-                    <SortableHead
-                      label="Max grade"
-                      align="right"
-                      active={sortKey === 'maximum_grade'}
-                      dir={sortDir}
-                      onClick={() => toggleSort('maximum_grade')}
-                    />
-                    <SortableHead
-                      label="Times"
-                      align="right"
-                      active={sortKey === 'times_completed'}
-                      dir={sortDir}
-                      onClick={() => toggleSort('times_completed')}
-                    />
-                    <SortableHead
-                      label="Last effort"
-                      active={sortKey === 'last_effort_date'}
-                      dir={sortDir}
-                      onClick={() => toggleSort('last_effort_date')}
-                    />
-                    <SortableHead
-                      label="Best"
-                      align="right"
-                      active={sortKey === 'best_elapsed_time'}
-                      dir={sortDir}
-                      onClick={() => toggleSort('best_elapsed_time')}
-                    />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sorted.map((seg) => (
-                    <TableRow
-                      key={seg.id}
-                      className="cursor-pointer hover:bg-accent/30"
-                      onClick={() => setSelectedSegmentId(seg.id)}
-                    >
-                      <TableHead>
-                        <div className="flex items-center gap-2">
-                          <div className="min-w-0">
-                            <div className="truncate font-medium">{seg.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {seg.activity_type}
-                              {seg.starred ? ' • ★' : ''}
-                              {seg.athlete_kom_rank === 1 ? ' • KOM' : ''}
-                            </div>
-                          </div>
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-right">{formatDistance(seg.distance)}</TableHead>
-                      <TableHead className="text-right">
-                        {(seg.maximum_grade ?? 0).toFixed(1)}%
-                      </TableHead>
-                      <TableHead className="text-right">{seg.times_completed}</TableHead>
-                      <TableHead>
-                        {seg.last_effort_date ? formatDate(seg.last_effort_date) : '–'}
-                      </TableHead>
-                      <TableHead className="text-right">
-                        {seg.best_elapsed_time ? formatDuration(seg.best_elapsed_time) : '–'}
-                      </TableHead>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
+        {/* Clear filters */}
+        {hasActiveFilters && (
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="h-4 w-4 mr-1" />
+              Clear filters
+            </Button>
+          </div>
+        )}
       </div>
 
+      {/* Error state */}
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive bg-destructive/10 p-4">
+          <p className="text-destructive">Failed to load segments: {error.message}</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {isLoading ? (
+        <SegmentsSkeleton />
+      ) : sorted.length === 0 ? (
+        <div className="rounded-lg border border-border bg-card p-8 text-center">
+          <p className="text-muted-foreground">No segments found.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Import with "Include segments" enabled to populate this page.
+          </p>
+          <p className="mt-3 text-sm">
+            <Link to="/settings" className="text-primary hover:underline">
+              Go to Settings
+            </Link>
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead
+                  label="Segment"
+                  active={sortKey === 'name'}
+                  dir={sortDir}
+                  onClick={() => toggleSort('name')}
+                />
+                <SortableHead
+                  label="Distance"
+                  align="right"
+                  active={sortKey === 'distance'}
+                  dir={sortDir}
+                  onClick={() => toggleSort('distance')}
+                />
+                <SortableHead
+                  label="Max grade"
+                  align="right"
+                  active={sortKey === 'maximum_grade'}
+                  dir={sortDir}
+                  onClick={() => toggleSort('maximum_grade')}
+                />
+                <SortableHead
+                  label="Times"
+                  align="right"
+                  active={sortKey === 'times_completed'}
+                  dir={sortDir}
+                  onClick={() => toggleSort('times_completed')}
+                />
+                <SortableHead
+                  label="Last effort"
+                  active={sortKey === 'last_effort_date'}
+                  dir={sortDir}
+                  onClick={() => toggleSort('last_effort_date')}
+                />
+                <SortableHead
+                  label="Best"
+                  align="right"
+                  active={sortKey === 'best_elapsed_time'}
+                  dir={sortDir}
+                  onClick={() => toggleSort('best_elapsed_time')}
+                />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sorted.map((seg) => (
+                <TableRow
+                  key={seg.id}
+                  className="cursor-pointer hover:bg-accent/30"
+                  onClick={() => setSelectedSegmentId(seg.id)}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{seg.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {seg.activity_type}
+                          {seg.starred ? ' • ★' : ''}
+                          {seg.athlete_kom_rank === 1 ? ' • KOM' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">{formatDistance(seg.distance)}</TableCell>
+                  <TableCell className="text-right">
+                    {(seg.maximum_grade ?? 0).toFixed(1)}%
+                  </TableCell>
+                  <TableCell className="text-right">{seg.times_completed}</TableCell>
+                  <TableCell>
+                    {seg.last_effort_date ? formatDate(seg.last_effort_date) : '–'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {seg.best_elapsed_time ? formatDuration(seg.best_elapsed_time) : '–'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Segment Detail Modal */}
       {selectedSegmentId != null && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
           <div className="mx-auto mt-8 h-[calc(100vh-4rem)] w-[calc(100%-2rem)] max-w-5xl overflow-auto rounded-lg border border-border bg-background shadow-lg">
@@ -382,23 +507,23 @@ export function SegmentsPage() {
                         <TableBody>
                           {detailQuery.data.efforts.map((e) => (
                             <TableRow key={e.id}>
-                              <TableHead>
+                              <TableCell>
                                 {e.start_date_local ? formatDate(e.start_date_local) : '–'}
-                              </TableHead>
-                              <TableHead className="text-right">
+                              </TableCell>
+                              <TableCell className="text-right">
                                 {formatDuration(e.elapsed_time)}
-                              </TableHead>
-                              <TableHead className="text-right">
+                              </TableCell>
+                              <TableCell className="text-right">
                                 {formatDuration(e.moving_time)}
-                              </TableHead>
-                              <TableHead className="text-right">
+                              </TableCell>
+                              <TableCell className="text-right">
                                 {e.average_watts ? Math.round(e.average_watts) : '–'}
-                              </TableHead>
-                              <TableHead className="text-right">
+                              </TableCell>
+                              <TableCell className="text-right">
                                 {e.average_heartrate ? Math.round(e.average_heartrate) : '–'}
-                              </TableHead>
-                              <TableHead>{e.pr_rank ? `#${e.pr_rank}` : '–'}</TableHead>
-                              <TableHead>
+                              </TableCell>
+                              <TableCell>{e.pr_rank ? `#${e.pr_rank}` : '–'}</TableCell>
+                              <TableCell>
                                 <Link
                                   to="/activities/$activityId"
                                   params={{ activityId: String(e.activity_id) }}
@@ -406,7 +531,7 @@ export function SegmentsPage() {
                                 >
                                   View
                                 </Link>
-                              </TableHead>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -452,118 +577,6 @@ function SortableHead({
   )
 }
 
-function FiltersPanel({
-  sportOptions,
-  activityType,
-  setActivityType,
-  countries,
-  country,
-  setCountry,
-  starredOnly,
-  setStarredOnly,
-  komOnly,
-  setKomOnly,
-  search,
-  setSearch,
-  onClear,
-}: {
-  sportOptions: string[]
-  activityType: string
-  setActivityType: (v: string) => void
-  countries: { country: string; iso2?: string; count: number }[]
-  country: string
-  setCountry: (v: string) => void
-  starredOnly: boolean
-  setStarredOnly: (v: boolean) => void
-  komOnly: boolean
-  setKomOnly: (v: boolean) => void
-  search: string
-  setSearch: (v: string) => void
-  onClear: () => void
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="mb-1 text-sm text-muted-foreground">Search</div>
-        <input
-          className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Segment name"
-        />
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="mb-2 text-sm text-muted-foreground">Sport type</div>
-        <div className="flex flex-col gap-2">
-          {sportOptions.map((t) => (
-            <label key={t || 'all'} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="segments-sport"
-                checked={activityType === t}
-                onChange={() => setActivityType(t)}
-              />
-              {t || 'All'}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="mb-2 text-sm text-muted-foreground">Country</div>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center justify-between gap-2 text-sm">
-            <span className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="segments-country"
-                checked={country === ''}
-                onChange={() => setCountry('')}
-              />
-              All
-            </span>
-          </label>
-          {countries.map((c) => (
-            <label key={c.country} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="segments-country"
-                  checked={country === c.country}
-                  onChange={() => setCountry(c.country)}
-                />
-                <span className="w-5 text-center">{flagEmoji(c.iso2)}</span>
-                <span className="truncate">{c.country}</span>
-              </span>
-              <span className="text-xs text-muted-foreground">{c.count}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={starredOnly}
-            onChange={(e) => setStarredOnly(e.target.checked)}
-          />
-          Starred only
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={komOnly} onChange={(e) => setKomOnly(e.target.checked)} />
-          KOM only
-        </label>
-      </div>
-
-      <Button variant="outline" onClick={onClear}>
-        Clear filters
-      </Button>
-    </div>
-  )
-}
-
 function SegmentsSkeleton() {
   return (
     <div className="rounded-lg border border-border">
@@ -581,24 +594,24 @@ function SegmentsSkeleton() {
         <TableBody>
           {Array.from({ length: 10 }).map((_, i) => (
             <TableRow key={i}>
-              <TableHead>
+              <TableCell>
                 <Skeleton className="h-4 w-64" />
-              </TableHead>
-              <TableHead className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <Skeleton className="ml-auto h-4 w-16" />
-              </TableHead>
-              <TableHead className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <Skeleton className="ml-auto h-4 w-12" />
-              </TableHead>
-              <TableHead className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <Skeleton className="ml-auto h-4 w-10" />
-              </TableHead>
-              <TableHead>
+              </TableCell>
+              <TableCell>
                 <Skeleton className="h-4 w-20" />
-              </TableHead>
-              <TableHead className="text-right">
+              </TableCell>
+              <TableCell className="text-right">
                 <Skeleton className="ml-auto h-4 w-14" />
-              </TableHead>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -511,6 +511,7 @@ export class WasmProvider implements DataProvider {
 
     type HeatmapRow = {
       id: number
+      name: string
       sport_type: string
       summary_polyline: string
       start_lat: number
@@ -539,6 +540,7 @@ export class WasmProvider implements DataProvider {
     return {
       activities: activities.map((a) => ({
         id: a.id,
+        name: a.name ?? '',
         sport_type: a.sport_type,
         summary_polyline: a.summary_polyline,
         start_lat: a.start_lat,

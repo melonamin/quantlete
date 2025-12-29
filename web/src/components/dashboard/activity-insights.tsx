@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { useDashboard, useDashboardMonthly, useActivities } from '@/lib/data'
+import { useDashboard, useMonthlyStats, useActivities } from '@/lib/data'
 import { WidgetWrapper } from './widget-wrapper'
-import { formatDistance, formatDuration, formatDate } from '@/lib/format'
+import { formatDistance } from '@/lib/format'
 import {
   Lightbulb,
   TrendingUp,
@@ -26,7 +26,7 @@ interface Insight {
 
 export function ActivityInsights() {
   const { data: dashboard, isLoading: dashboardLoading } = useDashboard()
-  const { data: monthlyData, isLoading: monthlyLoading } = useDashboardMonthly()
+  const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyStats()
   const { data: recentActivities, isLoading: activitiesLoading } = useActivities({
     per_page: 50,
     order_by: 'start_date',
@@ -77,9 +77,9 @@ export function ActivityInsights() {
       const thisMonth = monthlyData[0]
       const lastMonth = monthlyData[1]
 
-      if (thisMonth && lastMonth && lastMonth.distance > 0) {
+      if (thisMonth && lastMonth && lastMonth.total_distance > 0) {
         const distanceChange =
-          ((thisMonth.distance - lastMonth.distance) / lastMonth.distance) * 100
+          ((thisMonth.total_distance - lastMonth.total_distance) / lastMonth.total_distance) * 100
         if (distanceChange > 20) {
           result.push({
             id: 'distance-up',
@@ -87,7 +87,7 @@ export function ActivityInsights() {
             icon: TrendingUp,
             iconColor: 'text-green-500',
             title: `${Math.round(distanceChange)}% more distance`,
-            description: `You've covered ${formatDistance(thisMonth.distance)} this month, up from ${formatDistance(lastMonth.distance)} last month.`,
+            description: `You've covered ${formatDistance(thisMonth.total_distance)} this month, up from ${formatDistance(lastMonth.total_distance)} last month.`,
           })
         } else if (distanceChange < -20) {
           result.push({
@@ -96,7 +96,7 @@ export function ActivityInsights() {
             icon: TrendingDown,
             iconColor: 'text-yellow-500',
             title: 'Quieter month',
-            description: `You're at ${formatDistance(thisMonth.distance)} so far. Last month you did ${formatDistance(lastMonth.distance)}.`,
+            description: `You're at ${formatDistance(thisMonth.total_distance)} so far. Last month you did ${formatDistance(lastMonth.total_distance)}.`,
           })
         }
       }

@@ -35,19 +35,19 @@ export function IntroText() {
       })
     }
 
-    if (stats.total_elevation > 0) {
+    if (stats.total_elevation_gain > 0) {
       items.push({
         icon: Mountain,
         label: 'Elevation',
-        value: `${Math.round(stats.total_elevation).toLocaleString()}m`,
+        value: `${Math.round(stats.total_elevation_gain).toLocaleString()}m`,
       })
     }
 
-    if (stats.total_time > 0) {
+    if (stats.total_moving_time > 0) {
       items.push({
         icon: Clock,
         label: 'Time',
-        value: formatDuration(stats.total_time),
+        value: formatDuration(stats.total_moving_time),
       })
     }
 

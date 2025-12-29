@@ -5,7 +5,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { X } from 'lucide-react'
 
 export interface ChartDetailData {
   title: string
