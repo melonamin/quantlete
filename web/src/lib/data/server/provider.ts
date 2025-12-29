@@ -65,6 +65,8 @@ import type {
   // Goals
   TrainingGoalsConfig,
   TrainingGoalsResponse,
+  // Export
+  ExportStats,
   // Maintenance
   ComponentWithRules,
   DueComponent,
@@ -77,6 +79,7 @@ import type {
   ImportProgress,
   StartImportRequest,
 } from '../types'
+import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
 export class ServerProvider implements DataProvider {
   // ============================================================================
@@ -456,5 +459,22 @@ export class ServerProvider implements DataProvider {
 
   async cancelImport(): Promise<{ message: string }> {
     return post<{ message: string }>('/import/cancel')
+  }
+
+  async getSyncHistory(limit = 10): Promise<SyncRun[]> {
+    return get<SyncRun[]>('/import/history', { limit })
+  }
+
+  async getLatestSync(): Promise<SyncRun | null> {
+    const history = await this.getSyncHistory(1)
+    return history.length > 0 ? history[0] : null
+  }
+
+  async getSyncWatermark(): Promise<SyncWatermark | null> {
+    return get<SyncWatermark | null>('/import/watermark')
+  }
+
+  async getExportStats(): Promise<ExportStats> {
+    return get<ExportStats>('/export/stats')
   }
 }

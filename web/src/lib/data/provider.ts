@@ -61,6 +61,7 @@ import type {
   PhotosListResponse,
   PhotosFilters,
   ActivityPhoto,
+  ExportStats,
   // Challenges
   Challenge,
   // Goals
@@ -78,6 +79,9 @@ import type {
   ImportProgress,
   StartImportRequest,
 } from './types'
+
+// Import SyncRun from API types
+import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
 export interface DataProvider {
   // ============================================================================
@@ -211,9 +215,17 @@ export interface DataProvider {
   updateAppSettings(settings: AppSettings): Promise<AppSettings>
 
   // ============================================================================
-  // Import (server mode only)
+  // Import
   // ============================================================================
   getImportProgress(): Promise<ImportProgress>
   startImport(req?: StartImportRequest): Promise<{ message: string }>
   cancelImport(): Promise<{ message: string }>
+  getSyncHistory(limit?: number): Promise<SyncRun[]>
+  getLatestSync(): Promise<SyncRun | null>
+  getSyncWatermark(): Promise<SyncWatermark | null>
+
+  // ============================================================================
+  // Export
+  // ============================================================================
+  getExportStats(): Promise<ExportStats>
 }

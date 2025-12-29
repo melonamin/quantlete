@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { get, post } from './client'
+import { useDataProviderStatus } from '@/lib/data/context'
 
 // Sync run represents a single import/sync history entry.
 export interface SyncRun {
@@ -115,9 +115,14 @@ export const importKeys = {
 }
 
 export function useImportProgress(enabled = true) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
   return useQuery({
     queryKey: importKeys.progress,
-    queryFn: () => get<ImportProgress>('/import/progress'),
+    queryFn: async (): Promise<ImportProgress> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getImportProgress()
+    },
     refetchInterval: (query) => {
       const data = query.state.data
       if (data?.status === 'running') {
@@ -125,15 +130,19 @@ export function useImportProgress(enabled = true) {
       }
       return false
     },
-    enabled,
+    enabled: enabled && initialized && !error && !!provider,
   })
 }
 
 export function useStartImport() {
   const queryClient = useQueryClient()
+  const { provider, initialized } = useDataProviderStatus()
 
   return useMutation({
-    mutationFn: (req: StartImportRequest = {}) => post<{ message: string }>('/import/start', req),
+    mutationFn: async (req: StartImportRequest = {}) => {
+      if (!provider || !initialized) throw new Error('Data provider not ready')
+      return provider.startImport(req)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: importKeys.progress })
     },
@@ -142,9 +151,13 @@ export function useStartImport() {
 
 export function useCancelImport() {
   const queryClient = useQueryClient()
+  const { provider, initialized } = useDataProviderStatus()
 
   return useMutation({
-    mutationFn: () => post<{ message: string }>('/import/cancel'),
+    mutationFn: async () => {
+      if (!provider || !initialized) throw new Error('Data provider not ready')
+      return provider.cancelImport()
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: importKeys.progress })
     },
@@ -152,17 +165,27 @@ export function useCancelImport() {
 }
 
 export function useSyncHistory(enabled = true) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
   return useQuery({
     queryKey: importKeys.history,
-    queryFn: () => get<SyncRun[]>('/import/history'),
-    enabled,
+    queryFn: async (): Promise<SyncRun[]> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getSyncHistory()
+    },
+    enabled: enabled && initialized && !error && !!provider,
   })
 }
 
 export function useSyncWatermark(enabled = true) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
   return useQuery({
     queryKey: importKeys.watermark,
-    queryFn: () => get<SyncWatermark | null>('/import/watermark'),
-    enabled,
+    queryFn: async (): Promise<SyncWatermark | null> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getSyncWatermark()
+    },
+    enabled: enabled && initialized && !error && !!provider,
   })
 }

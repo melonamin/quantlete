@@ -61,6 +61,7 @@ import type {
   AppSettings,
   ImportProgress,
   StartImportRequest,
+  ExportStats,
 } from '../types'
 import { WasmDatabase, initializeDatabase } from '@/lib/wasm/db'
 import { queries } from '@/lib/wasm/queries.gen'
@@ -81,7 +82,10 @@ import {
   startImport as stravaStartImport,
   cancelImport as stravaCancelImport,
   getImportProgress as stravaGetImportProgress,
+  getSyncHistory as stravaGetSyncHistory,
+  getLatestSync as stravaGetLatestSync,
 } from '@/lib/wasm/strava'
+import type { SyncRun as ApiSyncRun, SyncWatermark } from '@/lib/api/import'
 export class WasmProvider implements DataProvider {
   private db: WasmDatabase | null = null
   private athleteId: number | null = null
@@ -1184,5 +1188,86 @@ export class WasmProvider implements DataProvider {
   async cancelImport(): Promise<{ message: string }> {
     stravaCancelImport()
     return { message: 'Import cancelled' }
+  }
+
+  async getSyncHistory(limit = 10): Promise<ApiSyncRun[]> {
+    const runs = stravaGetSyncHistory(limit)
+
+    // Map WASM SyncRun to API SyncRun format
+    return runs.map((r): ApiSyncRun => ({
+      id: r.id,
+      athlete_id: r.athlete_id,
+      started_at: r.started_at,
+      completed_at: r.completed_at,
+      duration_seconds: r.duration_seconds,
+      status: r.status as ApiSyncRun['status'],
+      error: r.error,
+      activities_total: r.activities_total,
+      activities_imported: r.activities_imported,
+      activities_skipped: r.activities_skipped,
+      gear_imported: 0, // WASM mode doesn't import gear yet
+      streams_imported: r.streams_imported,
+      segments_imported: 0, // WASM mode doesn't import segments yet
+      photos_imported: 0, // WASM mode doesn't import photos yet
+      failed_count: r.failed_count,
+      full_sync: r.full_sync,
+      skip_streams: r.skip_streams,
+      skip_segments: true, // WASM mode always skips segments
+      skip_best_efforts: true, // WASM mode always skips best efforts
+      skip_photos: true, // WASM mode always skips photos
+      newest_activity_date: r.newest_activity_date,
+      created_at: r.started_at, // Use started_at as created_at
+    }))
+  }
+
+  async getLatestSync(): Promise<ApiSyncRun | null> {
+    const run = stravaGetLatestSync()
+    if (!run) return null
+
+    return {
+      id: run.id,
+      athlete_id: run.athlete_id,
+      started_at: run.started_at,
+      completed_at: run.completed_at,
+      duration_seconds: run.duration_seconds,
+      status: run.status as ApiSyncRun['status'],
+      error: run.error,
+      activities_total: run.activities_total,
+      activities_imported: run.activities_imported,
+      activities_skipped: run.activities_skipped,
+      gear_imported: 0,
+      streams_imported: run.streams_imported,
+      segments_imported: 0,
+      photos_imported: 0,
+      failed_count: run.failed_count,
+      full_sync: run.full_sync,
+      skip_streams: run.skip_streams,
+      skip_segments: true,
+      skip_best_efforts: true,
+      skip_photos: true,
+      newest_activity_date: run.newest_activity_date,
+      created_at: run.started_at,
+    }
+  }
+
+  async getSyncWatermark(): Promise<SyncWatermark | null> {
+    return null
+  }
+
+  async getExportStats(): Promise<ExportStats> {
+    const db = this.assertInitialized()
+    const row = db.queryOne<{ total: number; first_activity: string | null; last_activity: string | null }>(
+      `SELECT
+         COUNT(*) as total,
+         MIN(start_date) as first_activity,
+         MAX(start_date) as last_activity
+       FROM activities`
+    )
+
+    return {
+      total_activities: row?.total ?? 0,
+      first_activity: row?.first_activity ?? null,
+      last_activity: row?.last_activity ?? null,
+    }
   }
 }

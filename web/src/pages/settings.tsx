@@ -6,6 +6,7 @@ import {
   useFtpHistory,
   useHrZoneDefinitions,
   useImportProgress,
+  useLatestSync,
   useStartImport,
   useUpdateAppSettings,
   useUpdateFtpHistory,
@@ -19,14 +20,17 @@ import { getAuthUrl } from '@/lib/wasm/strava/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ImportStatus } from '@/components/sync/import-status'
-import { Loader2, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { SyncHistoryModal } from '@/components/sync/sync-history-modal'
+import { Loader2, Check, X, ChevronDown, ChevronRight, History, Clock, AlertCircle } from 'lucide-react'
 import { LineChart } from '@/components/charts'
 import { useMemo, useState } from 'react'
+import { formatDistance } from 'date-fns'
 
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const { data: authStatus } = useAuthStatus()
   const { data: progress } = useImportProgress()
+  const { data: latestSync } = useLatestSync()
   const startImport = useStartImport()
   const cancelImport = useCancelImport()
 
@@ -38,6 +42,7 @@ export function SettingsPage() {
   const [includeBestEfforts, setIncludeBestEfforts] = useState(true)
   const [includePhotos, setIncludePhotos] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
 
   const { data: ftpHistory } = useFtpHistory()
   const updateFtp = useUpdateFtpHistory()
@@ -234,6 +239,88 @@ export function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Last Sync Status */}
+        {isAuthenticated && latestSync && (
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Last Sync</CardTitle>
+                <CardDescription>Your most recent data synchronization</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setShowHistoryModal(true)}>
+                <History className="h-4 w-4 mr-2" />
+                History
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-4">
+                <div className="flex items-center justify-center h-10 w-10 rounded-full shrink-0"
+                  style={{
+                    backgroundColor: latestSync.status === 'completed' ? 'var(--green-100, #dcfce7)'
+                      : latestSync.status === 'failed' ? 'var(--red-100, #fee2e2)'
+                      : latestSync.status === 'running' ? 'var(--blue-100, #dbeafe)'
+                      : 'var(--yellow-100, #fef3c7)'
+                  }}
+                >
+                  {latestSync.status === 'completed' ? (
+                    <Check className="h-5 w-5 text-green-600" />
+                  ) : latestSync.status === 'failed' ? (
+                    <X className="h-5 w-5 text-red-600" />
+                  ) : latestSync.status === 'running' ? (
+                    <Clock className="h-5 w-5 text-blue-600 animate-pulse" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium capitalize">{latestSync.status}</span>
+                    {latestSync.full_sync && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        Full
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatDistance(new Date(latestSync.started_at), new Date(), { addSuffix: true })}
+                    {latestSync.duration_seconds && latestSync.status !== 'running' && (
+                      <> • {latestSync.duration_seconds < 60
+                        ? `${latestSync.duration_seconds}s`
+                        : `${Math.floor(latestSync.duration_seconds / 60)}m ${latestSync.duration_seconds % 60}s`}
+                      </>
+                    )}
+                  </div>
+                  <div className="text-sm mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                    <div>
+                      <span className="text-muted-foreground">Activities:</span>{' '}
+                      {latestSync.activities_imported}
+                      {latestSync.activities_skipped > 0 && (
+                        <span className="text-muted-foreground"> (+{latestSync.activities_skipped} skipped)</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Streams:</span>{' '}
+                      {latestSync.streams_imported}
+                    </div>
+                    {latestSync.failed_count > 0 && (
+                      <div className="text-red-600">
+                        <span className="text-muted-foreground">Failed:</span> {latestSync.failed_count}
+                      </div>
+                    )}
+                  </div>
+                  {latestSync.error && (
+                    <div className="text-sm text-red-600 mt-2 p-2 rounded bg-red-50 dark:bg-red-950">
+                      {latestSync.error}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <SyncHistoryModal open={showHistoryModal} onOpenChange={setShowHistoryModal} />
 
         {/* Display Settings */}
         <Card>

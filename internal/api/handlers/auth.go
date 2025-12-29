@@ -2,15 +2,23 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"golang.org/x/oauth2"
 
 	"github.com/sasha/stata/internal/config"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
+)
+
+const (
+	oauthStateCookieName = "stata_oauth_state"
+	oauthStateTTL        = 5 * time.Minute
 )
 
 // AuthHandler handles authentication endpoints.
@@ -51,13 +59,36 @@ func (h *AuthHandler) InitiateOAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authURL := h.strava.GetAuthURL()
+	state, err := generateStateToken()
+	if err != nil {
+		slog.Error("failed to generate oauth state", "error", err)
+		http.Error(w, "Failed to initiate OAuth", http.StatusInternalServerError)
+		return
+	}
+
+	h.setStateCookie(w, r, state)
+	authURL := h.strava.GetAuthURL(state)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
 // HandleCallback handles GET /api/v1/auth/strava/callback.
 // Exchanges the authorization code for access tokens.
 func (h *AuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		slog.Error("OAuth callback missing state parameter")
+		http.Error(w, "missing state", http.StatusBadRequest)
+		return
+	}
+
+	cookie, err := r.Cookie(oauthStateCookieName)
+	if err != nil || cookie.Value == "" || cookie.Value != state {
+		slog.Error("OAuth state mismatch", "expected", cookieValueOrEmpty(cookie), "received", state, "error", err)
+		http.Error(w, "invalid state", http.StatusBadRequest)
+		return
+	}
+	h.clearStateCookie(w, r)
+
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		errMsg := r.URL.Query().Get("error")
@@ -188,4 +219,46 @@ func (h *AuthHandler) persistToken(ctx context.Context, token *oauth2.Token, ath
 		ExpiresAt:    storage.SQLiteTime{Time: token.Expiry},
 	}
 	return h.tokens.Upsert(ctx, storageToken)
+}
+
+func generateStateToken() (string, error) {
+	var buf [32]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf[:]), nil
+}
+
+func (h *AuthHandler) setStateCookie(w http.ResponseWriter, r *http.Request, state string) {
+	secure := !h.cfg.Server.DevMode && r.TLS != nil
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    state,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(oauthStateTTL.Seconds()),
+	})
+}
+
+func (h *AuthHandler) clearStateCookie(w http.ResponseWriter, r *http.Request) {
+	secure := !h.cfg.Server.DevMode && r.TLS != nil
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+	})
+}
+
+func cookieValueOrEmpty(c *http.Cookie) string {
+	if c == nil {
+		return ""
+	}
+	return c.Value
 }

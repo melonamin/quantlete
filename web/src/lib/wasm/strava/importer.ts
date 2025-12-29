@@ -183,6 +183,8 @@ export function getLatestSync(): SyncRun | null {
  * Start importing activities from Strava.
  */
 export async function startImport(options: ImportOptions = {}): Promise<void> {
+  console.log('[Import] startImport called with options:', JSON.stringify(options))
+
   if (importProgress.status === 'running') {
     throw new Error('Import already running')
   }
@@ -263,26 +265,38 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
           newestActivityDate = activity.start_date
         }
 
-        // Skip if already imported
-        if (existingIds.has(activity.id)) {
-          importProgress.skipped++
-          continue
-        }
+        const activityExists = existingIds.has(activity.id)
 
         try {
-          // Store activity
-          await storeActivity(db, athleteId, activity)
-
-          // Fetch streams (enabled by default)
-          if (options.includeStreams !== false) {
-            const streamsFetched = await fetchAndStoreStreams(db, activity.id)
-            if (streamsFetched) {
-              streamsImported++
-              importProgress.streams_imported = streamsImported
-            }
+          // Store or update activity
+          if (!activityExists) {
+            await storeActivity(db, athleteId, activity)
+            importProgress.imported++
+          } else {
+            importProgress.skipped++
           }
 
-          importProgress.imported++
+          // Fetch streams (enabled by default) - even for existing activities if we don't have streams yet
+          if (options.includeStreams !== false) {
+            // Check if we already have streams for this activity
+            const hasStreams = db.queryOne<{ count: number }>(
+              'SELECT COUNT(*) as count FROM activity_streams WHERE activity_id = ?',
+              [activity.id]
+            )
+
+            if (!hasStreams || hasStreams.count === 0) {
+              console.log(`[Import] Fetching streams for activity ${activity.id} (exists=${activityExists})`)
+              const streamsFetched = await fetchAndStoreStreams(db, activity.id)
+              if (streamsFetched) {
+                streamsImported++
+                importProgress.streams_imported = streamsImported
+              }
+              // Add small delay between stream fetches to avoid rate limiting
+              await sleep(200)
+            } else {
+              console.log(`[Import] Activity ${activity.id} already has ${hasStreams.count} streams, skipping`)
+            }
+          }
         } catch (error) {
           console.error(`Failed to import activity ${activity.id}:`, error)
           importProgress.failed++
@@ -471,14 +485,17 @@ async function fetchAndStoreStreams(
 ): Promise<boolean> {
   try {
     const streamTypes = 'time,distance,latlng,altitude,heartrate,cadence,watts,temp'
+    console.log(`[Import] Fetching streams for activity ${activityId}`)
     const streams = await stravaFetch<StravaStream[]>(
       `/activities/${activityId}/streams?keys=${streamTypes}&key_by_type=false`
     )
 
     if (!streams || streams.length === 0) {
+      console.log(`[Import] No streams returned for activity ${activityId}`)
       return false
     }
 
+    console.log(`[Import] Got ${streams.length} stream types for activity ${activityId}`)
     for (const stream of streams) {
       db.exec(
         `INSERT INTO activity_streams (activity_id, stream_type, data, series_type, original_size, resolution)
@@ -496,8 +513,9 @@ async function fetchAndStoreStreams(
       )
     }
     return true
-  } catch {
-    // Streams may not be available for all activities
+  } catch (err) {
+    // Streams may not be available for all activities (rate limits, manual activities, etc)
+    console.error(`[Import] Failed to fetch streams for activity ${activityId}:`, err)
     return false
   }
 }

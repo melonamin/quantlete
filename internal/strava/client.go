@@ -56,8 +56,11 @@ func NewClient(cfg *config.StravaConfig) *Client {
 }
 
 // GetAuthURL returns the URL to redirect users to for OAuth authorization.
-func (c *Client) GetAuthURL() string {
-	return c.oauth.AuthCodeURL("state", oauth2.AccessTypeOffline)
+func (c *Client) GetAuthURL(state string) string {
+	if state == "" {
+		state = "state"
+	}
+	return c.oauth.AuthCodeURL(state, oauth2.AccessTypeOffline)
 }
 
 // ExchangeCode exchanges an authorization code for access tokens.

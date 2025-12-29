@@ -55,7 +55,7 @@ func Default() *Config {
 		},
 		Storage: StorageConfig{
 			DataDir: "./data",
-			DBFile:  "stata.duckdb",
+			DBFile:  "stata.db",
 		},
 		Log: LogConfig{
 			Level:  "info",

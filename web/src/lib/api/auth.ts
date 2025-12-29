@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { get, post } from './client'
+import { useDataProviderStatus } from '@/lib/data/context'
 import type { AuthStatus } from './types'
 
 export const authKeys = {
@@ -7,19 +7,29 @@ export const authKeys = {
 }
 
 export function useAuthStatus() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
   return useQuery({
     queryKey: authKeys.status,
-    queryFn: () => get<AuthStatus>('/auth/status'),
+    queryFn: async (): Promise<AuthStatus> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getAuthStatus()
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: false,
+    enabled: initialized && !error && !!provider,
   })
 }
 
 export function useRefreshToken() {
   const queryClient = useQueryClient()
+  const { provider, initialized } = useDataProviderStatus()
 
   return useMutation({
-    mutationFn: () => post<{ success: boolean }>('/auth/refresh'),
+    mutationFn: async () => {
+      if (!provider || !initialized) throw new Error('Data provider not ready')
+      return provider.refreshToken()
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: authKeys.status })
     },

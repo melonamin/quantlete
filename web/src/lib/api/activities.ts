@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
+import { useDataProviderStatus } from '@/lib/data/context'
 import type { ActivitiesResponse, Activity, ActivityFilters } from './types'
 
 export const activityKeys = {
@@ -11,34 +11,6 @@ export const activityKeys = {
   streams: (id: number) => [...activityKeys.all, 'streams', id] as const,
 }
 
-export function useActivities(filters: ActivityFilters = {}) {
-  return useQuery({
-    queryKey: activityKeys.list(filters),
-    queryFn: () =>
-      get<ActivitiesResponse>('/activities', {
-        sport_type: filters.sport_type,
-        after: filters.after,
-        before: filters.before,
-        gear_id: filters.gear_id,
-        search: filters.search,
-        commute: filters.commute,
-        trainer: filters.trainer,
-        page: filters.page,
-        per_page: filters.per_page,
-        order_by: filters.order_by,
-        order_dir: filters.order_dir,
-      }),
-  })
-}
-
-export function useActivity(id: number) {
-  return useQuery({
-    queryKey: activityKeys.detail(id),
-    queryFn: () => get<Activity>(`/activities/${id}`),
-    enabled: id > 0,
-  })
-}
-
 export interface ActivityStream {
   activity_id: number
   stream_type: string
@@ -48,10 +20,41 @@ export interface ActivityStream {
   data: unknown
 }
 
+export function useActivities(filters: ActivityFilters = {}) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: activityKeys.list(filters),
+    queryFn: async (): Promise<ActivitiesResponse> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getActivities(filters)
+    },
+    enabled: initialized && !error && !!provider,
+  })
+}
+
+export function useActivity(id: number) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: activityKeys.detail(id),
+    queryFn: async (): Promise<Activity> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getActivity(id)
+    },
+    enabled: id > 0 && initialized && !error && !!provider,
+  })
+}
+
 export function useActivityStreams(id: number) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
   return useQuery({
     queryKey: activityKeys.streams(id),
-    queryFn: () => get<ActivityStream[]>(`/activities/${id}/streams`),
-    enabled: id > 0,
+    queryFn: async (): Promise<ActivityStream[]> => {
+      if (!provider) throw new Error('Data provider not ready')
+      return provider.getActivityStreams(id)
+    },
+    enabled: id > 0 && initialized && !error && !!provider,
   })
 }

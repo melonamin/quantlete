@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	_ "modernc.org/sqlite" // SQLite driver (pure Go)
@@ -20,13 +21,17 @@ type DB struct {
 }
 
 // Open opens or creates a SQLite database at the given path.
-func Open(dataDir string) (*DB, error) {
+func Open(dataDir, dbFile string) (*DB, error) {
 	// Ensure data directory exists
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating data directory: %w", err)
 	}
 
-	dbPath := filepath.Join(dataDir, "stata.db")
+	filename := dbFile
+	if strings.TrimSpace(filename) == "" {
+		filename = "stata.db"
+	}
+	dbPath := filepath.Join(dataDir, filename)
 
 	dsn := dbPath
 	conn, err := sql.Open("sqlite", dsn)

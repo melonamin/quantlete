@@ -74,7 +74,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	}
 
 	// Open database
-	db, err := storage.Open(cfg.Storage.DataDir)
+	db, err := storage.Open(cfg.Storage.DataDir, cfg.Storage.DBFile)
 	if err != nil {
 		return fmt.Errorf("opening database: %w", err)
 	}
@@ -101,18 +101,8 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	stravaClient := strava.NewClient(&cfg.Strava)
 
 	// Restore rate limit state from database
-	if stateJSON, err := appStateRepo.Get(context.Background(), "strava_rate_limit"); err == nil && stateJSON != "" {
-		if err := stravaClient.RateLimiter().LoadFromJSON(stateJSON); err != nil {
-			slog.Warn("failed to restore rate limit state", "error", err)
-		} else {
-			status := stravaClient.RateLimiter().Status()
-			slog.Info("restored rate limit state",
-				"usage_15min", status.Usage15Min,
-				"limit_15min", status.Limit15Min,
-				"usage_daily", status.UsageDaily,
-				"limit_daily", status.LimitDaily,
-			)
-		}
+	if err := restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
+		slog.Warn("failed to restore rate limit state", "error", err)
 	}
 
 	// Set up rate limit persistence
@@ -120,8 +110,12 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 		return appStateRepo.Set(context.Background(), "strava_rate_limit", json)
 	})
 
-	// Check if we have a stored token
-	// For now, we need to authenticate via the web interface first
+	// Restore authentication from stored tokens if available
+	if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
+		slog.Warn("failed to restore auth from database", "error", err)
+	}
+
+	// Check if we have a stored token. If not, prompt the user to authenticate.
 	if !stravaClient.IsAuthenticated() {
 		slog.Info("Not authenticated with Strava")
 		slog.Info("Please start the server and authenticate via the web interface first:")

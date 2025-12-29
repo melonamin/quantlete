@@ -274,12 +274,14 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 
 	// Build ORDER BY
 	orderBy := "start_date"
-	if page.OrderBy != "" {
-		orderBy = page.OrderBy
+	if val := sanitizeActivityOrderBy(page.OrderBy); val != "" {
+		orderBy = val
 	}
 	orderDir := "DESC"
-	if page.OrderDir != "" {
-		orderDir = strings.ToUpper(page.OrderDir)
+	if strings.EqualFold(page.OrderDir, "asc") {
+		orderDir = "ASC"
+	} else if strings.EqualFold(page.OrderDir, "desc") {
+		orderDir = "DESC"
 	}
 
 	// Calculate offset
@@ -445,7 +447,7 @@ func (r *ActivityRepository) GetMostRecent(ctx context.Context, athleteID int64,
 
 // GetLatestActivityDate returns the start date of the most recent activity.
 func (r *ActivityRepository) GetLatestActivityDate(ctx context.Context, athleteID int64) (*time.Time, error) {
-	var startDate *time.Time
+	var startDate SQLiteTime
 	err := r.db.QueryRow(`
 		SELECT start_date FROM activities
 		WHERE athlete_id = ?
@@ -456,7 +458,14 @@ func (r *ActivityRepository) GetLatestActivityDate(ctx context.Context, athleteI
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return startDate, err
+	if err != nil {
+		return nil, err
+	}
+	if startDate.Time.IsZero() {
+		return nil, nil
+	}
+	t := startDate.Time
+	return &t, nil
 }
 
 // scanner interface for sql.Row and sql.Rows
@@ -490,6 +499,34 @@ func scanActivity(s scanner) (*Activity, error) {
 
 func scanActivityRow(rows *sql.Rows) (*Activity, error) {
 	return scanActivity(rows)
+}
+
+var allowedActivityOrderColumns = map[string]string{
+	"start_date":            "start_date",
+	"distance":              "distance",
+	"moving_time":           "moving_time",
+	"elapsed_time":          "elapsed_time",
+	"total_elevation_gain":  "total_elevation_gain",
+	"sport_type":            "sport_type",
+	"name":                  "name",
+	"average_speed":         "average_speed",
+	"average_heartrate":     "average_heartrate",
+	"average_watts":         "average_watts",
+	"average_cadence":       "average_cadence",
+	"calories":              "calories",
+	"created_at":            "created_at",
+	"updated_at":            "updated_at",
+}
+
+func sanitizeActivityOrderBy(column string) string {
+	col := strings.TrimSpace(strings.ToLower(column))
+	if col == "" {
+		return ""
+	}
+	if allowed, ok := allowedActivityOrderColumns[col]; ok {
+		return allowed
+	}
+	return ""
 }
 
 // StreamRepository handles activity stream persistence.

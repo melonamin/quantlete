@@ -114,4 +114,13 @@ export type {
 export type { AppSettings } from '@/lib/api/settings'
 
 // Import types
-export type { ImportProgress, StartImportRequest, ImportPhase } from '@/lib/api/import'
+export type {
+  ImportProgress,
+  StartImportRequest,
+  ImportPhase,
+  SyncRun,
+  SyncWatermark,
+} from '@/lib/api/import'
+
+// Export helpers
+export type { ExportStats } from '@/lib/api/export'

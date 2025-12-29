@@ -1,6 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
-
 export interface Segment {
   id: number
   name: string
@@ -67,49 +64,9 @@ export interface SegmentDetailResponse {
   efforts: SegmentEffort[]
 }
 
-export const segmentKeys = {
-  all: ['segments'] as const,
-  list: (filters: SegmentsFilters) => [...segmentKeys.all, 'list', filters] as const,
-  countries: () => [...segmentKeys.all, 'countries'] as const,
-  detail: (id: number) => [...segmentKeys.all, 'detail', id] as const,
-  efforts: (id: number) => [...segmentKeys.all, 'efforts', id] as const,
-}
-
-export function useSegments(filters: SegmentsFilters = {}) {
-  return useQuery({
-    queryKey: segmentKeys.list(filters),
-    queryFn: () =>
-      get<SegmentListItem[]>('/segments', {
-        activity_type: filters.activity_type,
-        country: filters.country,
-        starred: filters.starred,
-        kom_only: filters.kom_only,
-        search: filters.search,
-        limit: filters.limit,
-      }),
-  })
-}
-
-export function useSegmentCountries(enabled = true) {
-  return useQuery({
-    queryKey: segmentKeys.countries(),
-    queryFn: () => get<SegmentCountryStat[]>('/segments/countries'),
-    enabled,
-  })
-}
-
-export function useSegmentDetail(id: number, enabled = true) {
-  return useQuery({
-    queryKey: segmentKeys.detail(id),
-    queryFn: () => get<SegmentDetailResponse>(`/segments/${id}`),
-    enabled: enabled && id > 0,
-  })
-}
-
-export function useSegmentEfforts(id: number, enabled = true) {
-  return useQuery({
-    queryKey: segmentKeys.efforts(id),
-    queryFn: () => get<SegmentEffort[]>(`/segments/${id}/efforts`),
-    enabled: enabled && id > 0,
-  })
-}
+export {
+  useSegments,
+  useSegmentCountries,
+  useSegmentDetail,
+  useSegmentEfforts,
+} from '@/lib/data'

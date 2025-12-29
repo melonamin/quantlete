@@ -1,4 +1,4 @@
-import { useHeatmapData } from '@/lib/api'
+import { useHeatmap } from '@/lib/api'
 import { Heatmap, getActivitiesBounds } from '@/components/maps'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Link } from '@tanstack/react-router'
@@ -28,7 +28,7 @@ export function HeatmapPage() {
     }
   }, [sportType, after, before, commute, workoutType])
 
-  const { data, isLoading, error } = useHeatmapData(apiFilters)
+  const { data, isLoading, error } = useHeatmap(apiFilters)
 
   const countryStats = data?.countries ?? []
   const uniqueCountries = countryStats.length

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   useAppSettings,
   useAuthStatus,
-  useEddingtonData,
+  useEddington,
   useEddingtonHistory,
   type EddingtonResult,
 } from '@/lib/api'
@@ -53,7 +53,7 @@ export function EddingtonPage() {
   const def = defs.find((d) => d.id === defId) ?? defs[0]
   const sportType = def?.sport_types?.length ? def.sport_types.join(',') : undefined
 
-  const { data, isLoading, error } = useEddingtonData(sportType)
+  const { data, isLoading, error } = useEddington(sportType)
   const { data: history, isLoading: historyLoading } = useEddingtonHistory(sportType)
 
   const historySeries = useMemo(() => {
