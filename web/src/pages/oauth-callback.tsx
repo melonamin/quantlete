@@ -10,8 +10,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useDataProviderStatus, useStartImport } from '@/lib/data'
 import { isWasmMode } from '@/lib/mode'
 import { exchangeCode } from '@/lib/wasm/strava/client'
-import { markOnboardingComplete } from '@/components/onboarding/welcome-modal'
-import { useSyncModalStore } from '@/stores'
+import { useSyncModalStore, markOnboardingComplete } from '@/stores'
 import { Loader2 } from 'lucide-react'
 
 interface OAuthSearchParams {

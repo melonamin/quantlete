@@ -124,14 +124,16 @@ export function RewindPage() {
         </div>
       </div>
 
-      {error ? (
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-8 text-center">
-          <p className="text-destructive">Failed to load rewind.</p>
-        </div>
-      ) : isLoading || !report ? (
+      {isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-80 w-full" />
+        </div>
+      ) : error || !report ? (
+        <div className="rounded-lg border border-destructive bg-destructive/10 p-8 text-center">
+          <p className="text-destructive">
+            {error ? 'Failed to load rewind data.' : 'No activity data available for this period.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-6">

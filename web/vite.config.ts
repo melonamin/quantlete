@@ -67,6 +67,18 @@ export default defineConfig(({ mode }) => {
       // Different output directories for each mode
       outDir: isWasmMode ? 'dist-wasm' : 'dist',
       sourcemap: true,
+      // Use terser in production for better console removal control
+      minify: mode === 'production' ? 'terser' : 'esbuild',
+      terserOptions:
+        mode === 'production'
+          ? {
+              compress: {
+                // Remove console.log/debug/info but keep console.error/warn for error tracking
+                drop_console: false,
+                pure_funcs: ['console.log', 'console.debug', 'console.info'],
+              },
+            }
+          : undefined,
     },
     // WASM mode: handle sql.js WASM files
     ...(isWasmMode && {

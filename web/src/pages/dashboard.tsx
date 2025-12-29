@@ -1,7 +1,10 @@
+import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useAuthStatus, useDashboard } from '@/lib/data'
+import { useAuthStatus, useDashboard, useImportProgress } from '@/lib/data'
+import { useQueryClient } from '@tanstack/react-query'
 import { isWasmMode } from '@/lib/mode'
 import { shouldShowOnboarding } from '@/components/onboarding/welcome-modal'
+import { useOnboardingStore, useSyncModalStore } from '@/stores'
 import {
   StatsSummary,
   RecentActivities,
@@ -42,17 +45,41 @@ function getStravaAuthUrl(): string {
 }
 
 export function DashboardPage() {
+  const queryClient = useQueryClient()
   const { data: authStatus, isLoading: authLoading } = useAuthStatus()
   const { data: dashboard, isLoading, error } = useDashboard()
+  const { data: importProgress } = useImportProgress()
 
   const isAuthenticated = authStatus?.authenticated ?? false
+  const onboardingDismissed = useOnboardingStore((s) => s.dismissed)
+  const syncModalOpen = useSyncModalStore((s) => s.open)
+
+  // Track previous import status to detect completion
+  const prevStatusRef = useRef(importProgress?.status)
+
+  // Refresh dashboard data when sync completes
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current
+    const currentStatus = importProgress?.status
+
+    // If status changed from 'running' to 'completed', refresh dashboard
+    if (prevStatus === 'running' && currentStatus === 'completed') {
+      queryClient.invalidateQueries({ queryKey: ['data', 'dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['data', 'activities'] })
+    }
+
+    prevStatusRef.current = currentStatus
+  }, [importProgress?.status, queryClient])
 
   // In WASM mode, if onboarding modal is showing, don't show the Get Started card
   // (the modal handles the login flow)
-  const onboardingShowing = shouldShowOnboarding(isAuthenticated, authLoading)
+  const onboardingShowing = shouldShowOnboarding(isAuthenticated, authLoading, onboardingDismissed)
 
-  // Show getting started if not authenticated and onboarding isn't showing
-  if (!authLoading && !isAuthenticated && !onboardingShowing) {
+  // Don't show Get Started if sync modal is open (user is already syncing)
+  const syncInProgress = syncModalOpen || importProgress?.status === 'running'
+
+  // Show getting started if not authenticated and onboarding isn't showing and sync isn't in progress
+  if (!authLoading && !isAuthenticated && !onboardingShowing && !syncInProgress) {
     const stravaAuthUrl = getStravaAuthUrl()
 
     return (

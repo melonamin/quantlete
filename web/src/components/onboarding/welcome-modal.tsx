@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
 import { useAuthStatus } from '@/lib/data'
 import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
+import { useOnboardingStore } from '@/stores'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,48 +13,27 @@ import {
 } from '@/components/ui/dialog'
 import { Lock, HardDrive, BarChart3, Clock } from 'lucide-react'
 
-const ONBOARDING_STORAGE_KEY = 'stata_onboarding_seen'
-
-/**
- * Check if onboarding has been completed or dismissed.
- */
-export function isOnboardingComplete(): boolean {
-  return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true'
-}
-
-/**
- * Mark onboarding as complete (called after successful OAuth).
- */
-export function markOnboardingComplete(): void {
-  localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')
-}
-
 /**
  * Check if we should show the onboarding modal.
  * Returns true if: WASM mode + not authenticated + not dismissed + not on OAuth callback page.
  */
-export function shouldShowOnboarding(isAuthenticated: boolean, isLoading: boolean): boolean {
+export function shouldShowOnboarding(isAuthenticated: boolean, isLoading: boolean, dismissed: boolean): boolean {
   if (!isWasmMode()) return false
   if (isLoading) return false
   if (isAuthenticated) return false
-  if (isOnboardingComplete()) return false
+  if (dismissed) return false
   // Don't show on OAuth callback page
-  if (window.location.pathname === '/oauth/callback') return false
+  if (typeof window !== 'undefined' && window.location.pathname === '/oauth/callback') return false
   return true
 }
 
 export function WelcomeModal() {
   const { data: auth, isLoading } = useAuthStatus()
-  const [dismissed, setDismissed] = useState(() => isOnboardingComplete())
+  const { dismissed, dismiss } = useOnboardingStore()
 
   // Determine if we should show the modal
   const isAuthenticated = auth?.authenticated ?? false
-  const show = shouldShowOnboarding(isAuthenticated, isLoading) && !dismissed
-
-  const handleDismiss = useCallback(() => {
-    markOnboardingComplete()
-    setDismissed(true)
-  }, [])
+  const show = shouldShowOnboarding(isAuthenticated, isLoading, dismissed)
 
   const authUrl = getAuthUrl(`${window.location.origin}/oauth/callback`)
 
@@ -122,7 +101,7 @@ export function WelcomeModal() {
           <Button asChild className="w-full bg-[#FC4C02] hover:bg-[#FC4C02]/90">
             <a href={authUrl}>Connect with Strava</a>
           </Button>
-          <Button variant="ghost" className="w-full" onClick={handleDismiss}>
+          <Button variant="ghost" className="w-full" onClick={dismiss}>
             Maybe later
           </Button>
         </DialogFooter>
