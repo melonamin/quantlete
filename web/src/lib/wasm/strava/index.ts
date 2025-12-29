@@ -23,6 +23,9 @@ export {
   startImport,
   cancelImport,
   getImportProgress,
+  getSyncHistory,
+  getLatestSync,
   type ImportOptions,
   type ImportProgress,
+  type SyncRun,
 } from './importer'

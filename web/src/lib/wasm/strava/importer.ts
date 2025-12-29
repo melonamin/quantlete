@@ -18,6 +18,26 @@ export interface ImportProgress {
   failed: number
   current_activity?: string
   error?: string
+  streams_imported?: number
+  sync_run_id?: number
+}
+
+export interface SyncRun {
+  id: number
+  athlete_id: number
+  started_at: string
+  completed_at?: string
+  duration_seconds?: number
+  status: string
+  error?: string
+  activities_total: number
+  activities_imported: number
+  activities_skipped: number
+  streams_imported: number
+  failed_count: number
+  full_sync: boolean
+  skip_streams: boolean
+  newest_activity_date?: string
 }
 
 // Strava API types (simplified)
@@ -75,6 +95,7 @@ let importProgress: ImportProgress = {
   imported: 0,
   skipped: 0,
   failed: 0,
+  streams_imported: 0,
 }
 
 let cancelRequested = false
@@ -96,6 +117,69 @@ export function cancelImport(): void {
 }
 
 /**
+ * Get sync history for the current athlete.
+ */
+export function getSyncHistory(limit = 10): SyncRun[] {
+  const db = getDatabase()
+  const athlete = getAthlete()
+  if (!athlete) return []
+
+  const rows = db.query<{
+    id: number
+    athlete_id: number
+    started_at: string
+    completed_at: string | null
+    duration_seconds: number | null
+    status: string
+    error: string | null
+    activities_total: number
+    activities_imported: number
+    activities_skipped: number
+    streams_imported: number
+    failed_count: number
+    full_sync: number
+    skip_streams: number
+    newest_activity_date: string | null
+  }>(
+    `SELECT id, athlete_id, started_at, completed_at, duration_seconds,
+            status, error, activities_total, activities_imported,
+            activities_skipped, streams_imported, failed_count,
+            full_sync, skip_streams, newest_activity_date
+     FROM sync_history
+     WHERE athlete_id = ?
+     ORDER BY started_at DESC
+     LIMIT ?`,
+    [athlete.id, limit]
+  )
+
+  return rows.map((r) => ({
+    id: r.id,
+    athlete_id: r.athlete_id,
+    started_at: r.started_at,
+    completed_at: r.completed_at ?? undefined,
+    duration_seconds: r.duration_seconds ?? undefined,
+    status: r.status,
+    error: r.error ?? undefined,
+    activities_total: r.activities_total,
+    activities_imported: r.activities_imported,
+    activities_skipped: r.activities_skipped,
+    streams_imported: r.streams_imported,
+    failed_count: r.failed_count,
+    full_sync: r.full_sync === 1,
+    skip_streams: r.skip_streams === 1,
+    newest_activity_date: r.newest_activity_date ?? undefined,
+  }))
+}
+
+/**
+ * Get the latest sync run for the current athlete.
+ */
+export function getLatestSync(): SyncRun | null {
+  const history = getSyncHistory(1)
+  return history.length > 0 ? history[0] : null
+}
+
+/**
  * Start importing activities from Strava.
  */
 export async function startImport(options: ImportOptions = {}): Promise<void> {
@@ -109,16 +193,36 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   }
 
   cancelRequested = false
+  const db = getDatabase()
+  const athleteId = athlete.id
+  const startedAt = new Date().toISOString()
+  let syncRunId: number | null = null
+  let newestActivityDate: string | null = null
+  let streamsImported = 0
+
+  // Create sync history record
+  try {
+    db.exec(
+      `INSERT INTO sync_history (
+        athlete_id, started_at, status, full_sync, skip_streams
+      ) VALUES (?, ?, 'running', ?, ?)`,
+      [athleteId, startedAt, options.fullSync ? 1 : 0, options.includeStreams ? 0 : 1]
+    )
+    const result = db.queryOne<{ id: number }>('SELECT last_insert_rowid() as id')
+    syncRunId = result?.id ?? null
+  } catch (err) {
+    console.error('[Import] Failed to create sync history record:', err)
+  }
+
   importProgress = {
     status: 'running',
     total: 0,
     imported: 0,
     skipped: 0,
     failed: 0,
+    streams_imported: 0,
+    sync_run_id: syncRunId ?? undefined,
   }
-
-  const db = getDatabase()
-  const athleteId = athlete.id
 
   try {
     // Get existing activity IDs if not full sync
@@ -154,6 +258,11 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
 
         importProgress.current_activity = activity.name
 
+        // Track newest activity date
+        if (!newestActivityDate || activity.start_date > newestActivityDate) {
+          newestActivityDate = activity.start_date
+        }
+
         // Skip if already imported
         if (existingIds.has(activity.id)) {
           importProgress.skipped++
@@ -164,9 +273,13 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
           // Store activity
           await storeActivity(db, athleteId, activity)
 
-          // Optionally fetch streams
-          if (options.includeStreams) {
-            await fetchAndStoreStreams(db, activity.id)
+          // Fetch streams (enabled by default)
+          if (options.includeStreams !== false) {
+            const streamsFetched = await fetchAndStoreStreams(db, activity.id)
+            if (streamsFetched) {
+              streamsImported++
+              importProgress.streams_imported = streamsImported
+            }
           }
 
           importProgress.imported++
@@ -189,9 +302,81 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
     }
 
     await db.persist()
+
+    // Update sync history record
+    if (syncRunId) {
+      const completedAt = new Date().toISOString()
+      const durationSeconds = Math.floor(
+        (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
+      )
+      db.exec(
+        `UPDATE sync_history SET
+          completed_at = ?,
+          duration_seconds = ?,
+          status = ?,
+          activities_total = ?,
+          activities_imported = ?,
+          activities_skipped = ?,
+          streams_imported = ?,
+          failed_count = ?,
+          newest_activity_date = ?
+        WHERE id = ?`,
+        [
+          completedAt,
+          durationSeconds,
+          importProgress.status === 'complete' ? 'completed' : 'canceled',
+          importProgress.total,
+          importProgress.imported,
+          importProgress.skipped,
+          streamsImported,
+          importProgress.failed,
+          newestActivityDate,
+          syncRunId,
+        ]
+      )
+      await db.persist()
+    }
   } catch (error) {
     importProgress.status = 'error'
     importProgress.error = error instanceof Error ? error.message : 'Unknown error'
+
+    // Update sync history with failure
+    if (syncRunId) {
+      const completedAt = new Date().toISOString()
+      const durationSeconds = Math.floor(
+        (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
+      )
+      db.exec(
+        `UPDATE sync_history SET
+          completed_at = ?,
+          duration_seconds = ?,
+          status = 'failed',
+          error = ?,
+          activities_total = ?,
+          activities_imported = ?,
+          activities_skipped = ?,
+          streams_imported = ?,
+          failed_count = ?
+        WHERE id = ?`,
+        [
+          completedAt,
+          durationSeconds,
+          importProgress.error,
+          importProgress.total,
+          importProgress.imported,
+          importProgress.skipped,
+          streamsImported,
+          importProgress.failed,
+          syncRunId,
+        ]
+      )
+      try {
+        await db.persist()
+      } catch {
+        // Ignore persist error during failure handling
+      }
+    }
+
     throw error
   }
 }
@@ -278,16 +463,21 @@ async function storeActivity(
 
 /**
  * Fetch and store activity streams.
+ * Returns true if streams were successfully fetched and stored.
  */
 async function fetchAndStoreStreams(
   db: ReturnType<typeof getDatabase>,
   activityId: number
-): Promise<void> {
+): Promise<boolean> {
   try {
     const streamTypes = 'time,distance,latlng,altitude,heartrate,cadence,watts,temp'
     const streams = await stravaFetch<StravaStream[]>(
       `/activities/${activityId}/streams?keys=${streamTypes}&key_by_type=false`
     )
+
+    if (!streams || streams.length === 0) {
+      return false
+    }
 
     for (const stream of streams) {
       db.exec(
@@ -305,8 +495,10 @@ async function fetchAndStoreStreams(
         ]
       )
     }
+    return true
   } catch {
     // Streams may not be available for all activities
+    return false
   }
 }
 

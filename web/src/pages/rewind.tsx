@@ -30,7 +30,7 @@ export function RewindPage() {
     setYear(availableYears[0])
   }, [availableYears, year])
 
-  const { data: report, isLoading, error } = useRewind(year)
+  const { data: report, isLoading, isFetching, error } = useRewind(year)
   const { data: compare, isLoading: compareLoading } = useRewind(
     compareYear ?? 0,
     compareYear !== null
@@ -124,15 +124,18 @@ export function RewindPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {yearsLoading || isLoading || isFetching ? (
         <div className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-80 w-full" />
         </div>
       ) : error || !report ? (
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-8 text-center">
-          <p className="text-destructive">
-            {error ? 'Failed to load rewind data.' : 'No activity data available for this period.'}
+        <div className="rounded-lg border border-border bg-card p-8 text-center">
+          <p className="text-muted-foreground">
+            No activity data available for {year === 0 ? 'this period' : year}.
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Import activities to see your year in review.
           </p>
         </div>
       ) : (
