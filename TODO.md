@@ -18,8 +18,8 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓           |
 | 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓           |
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
-| 10    | Feature Parity & Beyond | Gap features + unique enhancements       | **NEXT**    |
-| 11    | WASM Mode               | Browser-only version with SQLite-WASM    | ✓           |
+| 10    | Feature Parity & Beyond | Gap features + unique enhancements       | ~90%        |
+| 11    | WASM Mode               | Browser-only version with SQLite-WASM    | ~70%        |
 | 12    | Polish                  | PWA, i18n, settings, badges              |             |
 
 ---
@@ -1031,7 +1031,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 10: Feature Parity & Beyond
+## Phase 10: Feature Parity & Beyond (~90%)
 
 **Goal:** Match and exceed the reference Statistics for Strava implementation with missing features and unique enhancements.
 
@@ -1413,57 +1413,59 @@ Comprehensive data export capabilities.
 
 ---
 
-## Phase 11: WASM Mode
+## Phase 11: WASM Mode (~70%)
 
 **Goal:** Browser-only version with SQLite-WASM.
 
-### 11.1 SQLite-WASM Setup
+### 11.1 SQLite-WASM Setup ✓
 
-- [ ] Install `sql.js` or `@aspect-build/sqlite3-wasm`
-- [ ] Create `web/src/lib/db/wasm-client.ts`:
-  - [ ] Initialize SQLite-WASM
-  - [ ] OPFS persistence setup
-  - [ ] Implement DataSource interface
-- [ ] Create schema migration for browser:
-  - [ ] Embed SQL as strings
-  - [ ] Version tracking in SQLite
+- [x] Install `sql.js`
+- [x] Create `web/src/lib/wasm/db/` module:
+  - [x] Initialize SQLite-WASM (`sql-js.ts`)
+  - [x] OPFS persistence setup (`opfs-storage.ts`)
+  - [x] IndexedDB fallback storage
+  - [x] Implement DataProvider interface
+- [x] Create schema migration for browser:
+  - [x] Embed SQL as strings (`schema.gen.ts`)
+  - [x] Version tracking in SQLite
+  - [x] Generated query builders (`queries.gen.ts`)
 
-### 11.2 Strava Direct Integration
+### 11.2 Strava Direct Integration ✓
 
-- [ ] Create `web/src/lib/strava/client.ts`:
-  - [ ] Direct Strava API calls from browser
-  - [ ] OAuth implicit flow handling
-- [ ] Create OAuth callback page for browser mode
-- [ ] Handle token storage (localStorage)
-- [ ] Rate limit tracking in browser
+- [x] Create `web/src/lib/wasm/strava/client.ts`:
+  - [x] Direct Strava API calls from browser
+  - [x] OAuth implicit flow handling
+- [x] Create `web/src/lib/wasm/strava/index.ts` for auth management
+- [x] Handle token storage (localStorage)
+- [x] Rate limit tracking in browser
 
-### 11.3 Browser Importer
+### 11.3 Browser Importer ✓
 
-- [ ] Create `web/src/lib/importer/`:
-  - [ ] Activity importer (browser version)
-  - [ ] Progress tracking
-  - [ ] Rate limit awareness
-- [ ] Create import UI:
-  - [ ] Start import button
-  - [ ] Progress display
+- [x] Create `web/src/lib/wasm/strava/importer.ts`:
+  - [x] Activity importer (browser version)
+  - [x] Progress tracking
+  - [x] Rate limit awareness
+- [x] Create import UI:
+  - [x] Start import button
+  - [x] Progress display
   - [ ] Estimated time remaining
   - [ ] Pause/resume
 
-### 11.4 Mode Detection & Switching
+### 11.4 Mode Detection & Switching ✓
 
-- [ ] Create build configuration for WASM mode
-- [ ] Create `web/src/lib/mode.ts`:
-  - [ ] Detect current mode
-  - [ ] Feature flags per mode
-- [ ] Update DataSource factory
-- [ ] Hide server-only features in WASM mode:
-  - [ ] Webhooks
-  - [ ] Scheduled imports
-  - [ ] Challenge scraping
+- [x] Create unified `DataProvider` interface (`web/src/lib/data/provider.ts`)
+- [x] Create `web/src/lib/data/context.tsx`:
+  - [x] Detect current mode (server vs WASM)
+  - [x] Feature flags per mode
+- [x] Update DataProvider factory with `ServerProvider` and `WasmProvider`
+- [x] Hide server-only features in WASM mode:
+  - [x] Webhooks (not available)
+  - [x] Scheduled imports (not available)
+  - [x] Challenge scraping (stubbed)
 
 ### 11.5 Static Hosting Build
 
-- [ ] Create separate Vite config for WASM build
+- [x] Create separate Vite config for WASM build
 - [ ] Configure for static hosting (GitHub Pages, etc.)
 - [ ] Create deployment documentation
 
@@ -1472,6 +1474,27 @@ Comprehensive data export capabilities.
 - [ ] Create Cloudflare Worker for token exchange
 - [ ] Or document user-provided serverless option
 - [ ] Handle client_secret securely
+
+### 11.7 WASM Provider Completeness
+
+**Note:** The `WasmProvider` implements all `DataProvider` methods, but some return stub/empty data:
+
+**Fully Implemented:**
+- [x] Activities (list, detail, streams)
+- [x] Dashboard stats (summary, weekly, monthly, yearly, calendar)
+- [x] Eddington calculations (via WASM algorithms)
+- [x] Training load (via WASM algorithms)
+- [x] Best efforts
+- [x] Import functionality
+
+**Stubbed (return empty data):**
+- [ ] Segments and segment efforts
+- [ ] Gear (Strava and custom)
+- [ ] Maintenance components
+- [ ] Photos
+- [ ] Challenges
+- [ ] Rewind/year-in-review
+- [ ] Power stats and HR zones
 
 ---
 

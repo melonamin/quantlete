@@ -103,7 +103,7 @@ func runServe(port int, dev bool) error {
 	}
 
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo)
+	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo)
 
 	// Create router
 	router := api.NewRouter(cfg, stravaClient, db, imp)

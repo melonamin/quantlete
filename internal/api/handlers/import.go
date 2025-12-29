@@ -19,12 +19,14 @@ func NewImportHandler(imp *importer.Importer) *ImportHandler {
 }
 
 // StartImportRequest represents a request to start an import.
+// By default, all data types are imported. Use skip_* fields to exclude specific types.
 type StartImportRequest struct {
-	FullSync           bool `json:"full_sync"`
-	IncludeStreams     bool `json:"include_streams"`
-	IncludeSegments    bool `json:"include_segments"`
-	IncludeBestEfforts bool `json:"include_best_efforts"`
-	IncludePhotos      bool `json:"include_photos"`
+	FullSync        bool `json:"full_sync"`
+	Resume          bool `json:"resume"`
+	SkipStreams     bool `json:"skip_streams"`
+	SkipSegments    bool `json:"skip_segments"`
+	SkipBestEfforts bool `json:"skip_best_efforts"`
+	SkipPhotos      bool `json:"skip_photos"`
 }
 
 // Start handles POST /api/v1/import/start
@@ -38,11 +40,12 @@ func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opts := importer.ImportOptions{
-		FullSync:           req.FullSync,
-		IncludeStreams:     req.IncludeStreams,
-		IncludeSegments:    req.IncludeSegments,
-		IncludeBestEfforts: req.IncludeBestEfforts,
-		IncludePhotos:      req.IncludePhotos,
+		FullSync:        req.FullSync,
+		Resume:          req.Resume,
+		SkipStreams:     req.SkipStreams,
+		SkipSegments:    req.SkipSegments,
+		SkipBestEfforts: req.SkipBestEfforts,
+		SkipPhotos:      req.SkipPhotos,
 	}
 
 	// Use background context since import runs asynchronously after HTTP request completes

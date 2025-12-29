@@ -19,10 +19,11 @@ import (
 
 func newImportCmd() *cobra.Command {
 	var fullSync bool
-	var includeStreams bool
-	var includeSegments bool
-	var includeBestEfforts bool
-	var includePhotos bool
+	var resume bool
+	var skipStreams bool
+	var skipSegments bool
+	var skipBestEfforts bool
+	var skipPhotos bool
 
 	cmd := &cobra.Command{
 		Use:   "import",
@@ -31,22 +32,26 @@ func newImportCmd() *cobra.Command {
 
 This command fetches all activities from your Strava account and stores
 them locally for analysis. It respects Strava's rate limits and can be
-interrupted and resumed.`,
+interrupted and resumed.
+
+By default, all data types are imported. Use --skip-* flags to exclude
+specific data types if needed.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, includePhotos)
+			return runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, skipPhotos)
 		},
 	}
 
 	cmd.Flags().BoolVar(&fullSync, "full", false, "Perform a full sync (re-import all activities)")
-	cmd.Flags().BoolVar(&includeStreams, "streams", false, "Include activity stream data (GPS, heartrate, etc.)")
-	cmd.Flags().BoolVar(&includeSegments, "segments", false, "Include segment efforts and segment details (extra API calls)")
-	cmd.Flags().BoolVar(&includeBestEfforts, "best-efforts", false, "Include Strava best efforts (extra API calls)")
-	cmd.Flags().BoolVar(&includePhotos, "photos", false, "Include activity photos (extra API calls)")
+	cmd.Flags().BoolVar(&resume, "resume", false, "Resume from previous interrupted import")
+	cmd.Flags().BoolVar(&skipStreams, "skip-streams", false, "Skip importing activity stream data (GPS, heartrate, etc.)")
+	cmd.Flags().BoolVar(&skipSegments, "skip-segments", false, "Skip importing segment efforts and segment details")
+	cmd.Flags().BoolVar(&skipBestEfforts, "skip-best-efforts", false, "Skip importing Strava best efforts/PRs")
+	cmd.Flags().BoolVar(&skipPhotos, "skip-photos", false, "Skip importing activity photos")
 
 	return cmd
 }
 
-func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, includePhotos bool) error {
+func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, skipPhotos bool) error {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -126,7 +131,7 @@ func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, in
 	}
 
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo)
+	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo)
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -144,19 +149,21 @@ func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, in
 
 	// Start import
 	opts := importer.ImportOptions{
-		FullSync:           fullSync,
-		IncludeStreams:     includeStreams,
-		IncludeSegments:    includeSegments,
-		IncludeBestEfforts: includeBestEfforts,
-		IncludePhotos:      includePhotos,
+		FullSync:        fullSync,
+		Resume:          resume,
+		SkipStreams:     skipStreams,
+		SkipSegments:    skipSegments,
+		SkipBestEfforts: skipBestEfforts,
+		SkipPhotos:      skipPhotos,
 	}
 
 	slog.Info("Starting import",
 		"full_sync", fullSync,
-		"include_streams", includeStreams,
-		"include_segments", includeSegments,
-		"include_best_efforts", includeBestEfforts,
-		"include_photos", includePhotos,
+		"resume", resume,
+		"skip_streams", skipStreams,
+		"skip_segments", skipSegments,
+		"skip_best_efforts", skipBestEfforts,
+		"skip_photos", skipPhotos,
 	)
 
 	if err := imp.Start(ctx, opts); err != nil {
@@ -176,16 +183,38 @@ func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, in
 
 			switch progress.Status {
 			case importer.StatusRunning:
+				// Show phase-specific progress
+				var phaseProgress string
+				switch progress.Phase {
+				case importer.PhaseActivities:
+					phaseProgress = fmt.Sprintf("activities %d/%d", progress.ActivitiesDone, progress.ActivitiesTotal)
+				case importer.PhaseGear:
+					phaseProgress = fmt.Sprintf("gear %d/%d", progress.GearDone, progress.GearTotal)
+				case importer.PhaseStreams:
+					phaseProgress = fmt.Sprintf("streams %d/%d", progress.StreamsDone, progress.StreamsTotal)
+				case importer.PhaseActivityDetails:
+					phaseProgress = fmt.Sprintf("details %d/%d", progress.DetailsDone, progress.DetailsTotal)
+				case importer.PhaseSegmentDetails:
+					phaseProgress = fmt.Sprintf("segments %d/%d", progress.SegmentsDone, progress.SegmentsTotal)
+				case importer.PhasePhotos:
+					phaseProgress = fmt.Sprintf("photos %d/%d", progress.PhotosDone, progress.PhotosTotal)
+				default:
+					phaseProgress = string(progress.Phase)
+				}
+
 				slog.Info("Import progress",
-					"imported", progress.ImportedCount,
-					"total", progress.TotalActivities,
+					"phase", progress.Phase,
+					"progress", phaseProgress,
 					"failed", progress.FailedCount,
-					"page", progress.CurrentPage,
+					"eta", progress.EstimatedETA,
 				)
 			case importer.StatusCompleted:
 				slog.Info("Import completed",
-					"imported", progress.ImportedCount,
-					"total", progress.TotalActivities,
+					"activities", progress.ActivitiesDone,
+					"gear", progress.GearDone,
+					"streams", progress.StreamsDone,
+					"segments", progress.SegmentsDone,
+					"photos", progress.PhotosDone,
 					"failed", progress.FailedCount,
 					"duration", progress.CompletedAt.Sub(progress.StartedAt).Round(time.Second),
 				)
@@ -194,8 +223,9 @@ func runImport(fullSync, includeStreams, includeSegments, includeBestEfforts, in
 				return fmt.Errorf("import failed: %s", progress.Error)
 			case importer.StatusCanceled:
 				slog.Info("Import canceled",
-					"imported", progress.ImportedCount,
-					"total", progress.TotalActivities,
+					"phase", progress.Phase,
+					"activities", progress.ActivitiesDone,
+					"failed", progress.FailedCount,
 				)
 				return nil
 			}

@@ -2,18 +2,20 @@ import { useHeatmapData } from '@/lib/api'
 import { Heatmap, getActivitiesBounds } from '@/components/maps'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Link } from '@tanstack/react-router'
-import { Button } from '@/components/ui/button'
 import { useMemo, useState, useCallback, useRef } from 'react'
 import type { Map as LeafletMap } from 'leaflet'
+import { Filter, X, ChevronDown, Globe, MapPin } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export function HeatmapPage() {
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [sportType, setSportType] = useState('')
   const [after, setAfter] = useState('')
   const [before, setBefore] = useState('')
   const [commute, setCommute] = useState<'all' | 'yes' | 'no'>('all')
   const [workoutType, setWorkoutType] = useState<string>('')
   const [selectedCountry, setSelectedCountry] = useState<string>('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showCountries, setShowCountries] = useState(false)
   const mapRef = useRef<LeafletMap | null>(null)
 
   const apiFilters = useMemo(() => {
@@ -38,273 +40,270 @@ export function HeatmapPage() {
   }, [])
 
   // Handle country selection with flyTo
-  const handleCountrySelect = useCallback((country: string) => {
-    setSelectedCountry(country)
+  const handleCountrySelect = useCallback(
+    (country: string) => {
+      setSelectedCountry(country)
+      setShowCountries(false)
 
-    if (!mapRef.current || !data?.activities) return
+      if (!mapRef.current || !data?.activities) return
 
-    if (country === '') {
-      // Reset to all activities
+      if (country === '') {
+        // Reset to all activities
+        const bounds = getActivitiesBounds(data.activities)
+        if (bounds) {
+          mapRef.current.flyToBounds(bounds, { padding: [20, 20], duration: 1 })
+        }
+        return
+      }
+
       const bounds = getActivitiesBounds(data.activities)
       if (bounds) {
         mapRef.current.flyToBounds(bounds, { padding: [20, 20], duration: 1 })
       }
-      return
-    }
+    },
+    [data?.activities]
+  )
 
-    // This requires country info on activities - for now we'll use a simple approach
-    // Filter activities that likely belong to the selected country based on start coordinates
-    // A more accurate implementation would require geocoding data
-    const bounds = getActivitiesBounds(data.activities)
-    if (bounds) {
-      mapRef.current.flyToBounds(bounds, { padding: [20, 20], duration: 1 })
-    }
-  }, [data?.activities])
+  const hasActiveFilters = sportType || after || before || commute !== 'all' || workoutType
+
+  const clearFilters = () => {
+    setSportType('')
+    setAfter('')
+    setBefore('')
+    setCommute('all')
+    setWorkoutType('')
+    setSelectedCountry('')
+  }
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      <div className="border-b border-border bg-background px-4 py-4">
-        <div className="flex items-start justify-between gap-4">
+      {/* Filters Panel - Stacked Layout */}
+      <div className="border-b border-border bg-background px-4 py-3 space-y-3">
+        {/* Header row */}
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Heatmap</h1>
-            <p className="text-muted-foreground">Visualize all your activities on a map</p>
+            <h1 className="text-xl font-bold">Heatmap</h1>
+            <p className="text-sm text-muted-foreground">Visualize all your activities on a map</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="md:hidden"
-              onClick={() => setFiltersOpen(!filtersOpen)}
-            >
-              Filters
-            </Button>
-            {data && (
-              <div className="text-sm text-muted-foreground">
-                {data.total} {data.total === 1 ? 'route' : 'routes'}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="hidden w-80 shrink-0 border-r border-border bg-background p-4 md:block">
-          <FiltersPanel
-            sportType={sportType}
-            setSportType={setSportType}
-            after={after}
-            setAfter={setAfter}
-            before={before}
-            setBefore={setBefore}
-            commute={commute}
-            setCommute={setCommute}
-            workoutType={workoutType}
-            setWorkoutType={setWorkoutType}
-            onClear={() => {
-              setSportType('')
-              setAfter('')
-              setBefore('')
-              setCommute('all')
-              setWorkoutType('')
-            }}
-          />
-
-          <CountryPanel
-            countries={countryStats}
-            worldCoveragePct={worldCoveragePct}
-            selectedCountry={selectedCountry}
-            onCountrySelect={handleCountrySelect}
-          />
-        </div>
-
-        {/* Mobile filters overlay */}
-        {filtersOpen && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm md:hidden">
-            <div className="mx-auto mt-10 w-[calc(100%-2rem)] max-w-md rounded-lg border border-border bg-card p-4 shadow-lg">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="font-semibold">Filters</div>
-                <Button variant="ghost" size="sm" onClick={() => setFiltersOpen(false)}>
-                  Close
-                </Button>
-              </div>
-              <FiltersPanel
-                sportType={sportType}
-                setSportType={setSportType}
-                after={after}
-                setAfter={setAfter}
-                before={before}
-                setBefore={setBefore}
-                commute={commute}
-                setCommute={setCommute}
-                workoutType={workoutType}
-                setWorkoutType={setWorkoutType}
-                onClear={() => {
-                  setSportType('')
-                  setAfter('')
-                  setBefore('')
-                  setCommute('all')
-                  setWorkoutType('')
-                }}
-              />
-              <div className="mt-4">
-                <CountryPanel
-                  countries={countryStats}
-                  worldCoveragePct={worldCoveragePct}
-                  selectedCountry={selectedCountry}
-                  onCountrySelect={handleCountrySelect}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Map */}
-        <div className="flex-1">
-          {isLoading ? (
-            <Skeleton className="h-full w-full" />
-          ) : error ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <p className="mb-2 text-destructive">Failed to load heatmap data</p>
-                <p className="text-sm text-muted-foreground">
-                  Make sure you are{' '}
-                  <Link to="/settings" className="underline">
-                    connected to Strava
-                  </Link>
-                </p>
-              </div>
-            </div>
-          ) : data && data.activities.length > 0 ? (
-            <Heatmap
-              activities={data.activities}
-              className="h-full"
-              onMapReady={handleMapReady}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <p className="mb-2 text-muted-foreground">No activities with GPS data found</p>
-                <p className="text-sm text-muted-foreground">
-                  Import activities with GPS data to see them on the heatmap
-                </p>
-              </div>
+          {data && (
+            <div className="text-sm text-muted-foreground">
+              {data.total} {data.total === 1 ? 'route' : 'routes'}
             </div>
           )}
         </div>
-      </div>
-    </div>
-  )
-}
 
-function FiltersPanel({
-  sportType,
-  setSportType,
-  after,
-  setAfter,
-  before,
-  setBefore,
-  commute,
-  setCommute,
-  workoutType,
-  setWorkoutType,
-  onClear,
-}: {
-  sportType: string
-  setSportType: (v: string) => void
-  after: string
-  setAfter: (v: string) => void
-  before: string
-  setBefore: (v: string) => void
-  commute: 'all' | 'yes' | 'no'
-  setCommute: (v: 'all' | 'yes' | 'no') => void
-  workoutType: string
-  setWorkoutType: (v: string) => void
-  onClear: () => void
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <div className="mb-1 text-sm text-muted-foreground">Sport type</div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { label: 'All', value: '' },
-            { label: 'Ride', value: 'Ride' },
-            { label: 'Run', value: 'Run' },
-            { label: 'Walk', value: 'Walk' },
-            { label: 'Swim', value: 'Swim' },
-          ].map((o) => (
-            <label key={o.label} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="heatmap-sport"
-                checked={sportType === o.value}
-                onChange={() => setSportType(o.value)}
-              />
-              {o.label}
-            </label>
+        {/* Quick filters row */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sport type buttons */}
+          <button
+            onClick={() => setSportType('')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors',
+              !sportType
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            All
+          </button>
+          {['Ride', 'Run', 'Walk', 'Swim'].map((type) => (
+            <button
+              key={type}
+              onClick={() => setSportType(sportType === type ? '' : type)}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-sm transition-colors',
+                sportType === type
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              {type}
+            </button>
           ))}
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-border mx-1" />
+
+          {/* Countries dropdown */}
+          {countryStats.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowCountries(!showCountries)}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
+                  selectedCountry
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                )}
+              >
+                <Globe className="h-3.5 w-3.5" />
+                {selectedCountry || `${uniqueCountries} countries`}
+                <ChevronDown
+                  className={cn('h-3.5 w-3.5 transition-transform', showCountries && 'rotate-180')}
+                />
+              </button>
+
+              {/* Countries dropdown panel */}
+              {showCountries && (
+                <div className="absolute top-full left-0 mt-1 z-50 w-64 max-h-80 overflow-auto rounded-md border border-border bg-card shadow-lg">
+                  <div className="p-2 border-b border-border bg-muted/30">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{uniqueCountries} visited</span>
+                      <span className="text-muted-foreground">{worldCoveragePct}% world</span>
+                    </div>
+                  </div>
+                  <div className="p-1">
+                    <button
+                      onClick={() => handleCountrySelect('')}
+                      className={cn(
+                        'w-full px-3 py-2 text-left text-sm rounded-md transition-colors flex items-center gap-2',
+                        !selectedCountry ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+                      )}
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      All countries
+                    </button>
+                    {countryStats.slice(0, 20).map((c) => (
+                      <button
+                        key={c.country}
+                        onClick={() => handleCountrySelect(c.country)}
+                        className={cn(
+                          'w-full px-3 py-2 text-left text-sm rounded-md transition-colors flex items-center justify-between',
+                          selectedCountry === c.country
+                            ? 'bg-primary/10 text-primary'
+                            : 'hover:bg-muted'
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>{flagEmoji(c.iso2)}</span>
+                          <span className="truncate">{c.country}</span>
+                        </span>
+                        <span className="text-muted-foreground text-xs">{c.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* More filters button */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
+              showAdvanced || (hasActiveFilters && (after || before || commute !== 'all' || workoutType))
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            More
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 transition-transform', showAdvanced && 'rotate-180')}
+            />
+          </button>
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-1.5 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          )}
         </div>
-        <div className="mt-2">
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-            value={sportType}
-            onChange={(e) => setSportType(e.target.value)}
-            placeholder="Or enter comma-separated types (e.g. Ride,VirtualRide)"
-          />
-        </div>
+
+        {/* Advanced filters (collapsible) */}
+        {showAdvanced && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-border">
+            {/* Custom sport type */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Custom sport</label>
+              <input
+                type="text"
+                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={sportType}
+                onChange={(e) => setSportType(e.target.value)}
+                placeholder="e.g. Ride,VirtualRide"
+              />
+            </div>
+
+            {/* Date from */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">From</label>
+              <input
+                type="date"
+                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={after}
+                onChange={(e) => setAfter(e.target.value)}
+              />
+            </div>
+
+            {/* Date to */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">To</label>
+              <input
+                type="date"
+                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={before}
+                onChange={(e) => setBefore(e.target.value)}
+              />
+            </div>
+
+            {/* Commute */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Commute</label>
+              <select
+                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={commute}
+                onChange={(e) => setCommute(e.target.value as 'all' | 'yes' | 'no')}
+              >
+                <option value="all">All</option>
+                <option value="yes">Commute only</option>
+                <option value="no">Non-commute</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <div className="mb-1 text-sm text-muted-foreground">From</div>
-          <input
-            type="date"
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-            value={after}
-            onChange={(e) => setAfter(e.target.value)}
-          />
-        </div>
-        <div>
-          <div className="mb-1 text-sm text-muted-foreground">To</div>
-          <input
-            type="date"
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-            value={before}
-            onChange={(e) => setBefore(e.target.value)}
-          />
-        </div>
+      {/* Map */}
+      <div className="flex-1">
+        {isLoading ? (
+          <Skeleton className="h-full w-full" />
+        ) : error ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <p className="mb-2 text-destructive">Failed to load heatmap data</p>
+              <p className="text-sm text-muted-foreground">
+                Make sure you are{' '}
+                <Link to="/settings" className="underline">
+                  connected to Strava
+                </Link>
+              </p>
+            </div>
+          </div>
+        ) : data && data.activities.length > 0 ? (
+          <Heatmap activities={data.activities} className="h-full" onMapReady={handleMapReady} />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <p className="mb-2 text-muted-foreground">No activities with GPS data found</p>
+              <p className="text-sm text-muted-foreground">
+                Import activities with GPS data to see them on the heatmap
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div>
-        <div className="mb-1 text-sm text-muted-foreground">Commute</div>
-        <select
-          className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-          value={commute}
-          onChange={(e) => setCommute(e.target.value as 'all' | 'yes' | 'no')}
-        >
-          <option value="all">All</option>
-          <option value="yes">Commute</option>
-          <option value="no">Not commute</option>
-        </select>
-      </div>
-
-      <div>
-        <div className="mb-1 text-sm text-muted-foreground">Workout type</div>
-        <input
-          className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-          value={workoutType}
-          onChange={(e) => setWorkoutType(e.target.value)}
-          placeholder="e.g. 1"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Strava workout type integer (optional).
-        </p>
-      </div>
-
-      <Button variant="outline" onClick={onClear}>
-        Clear filters
-      </Button>
+      {/* Click outside to close dropdowns */}
+      {showCountries && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowCountries(false)} />
+      )}
     </div>
   )
 }
@@ -316,68 +315,4 @@ function flagEmoji(iso2?: string) {
     .split('')
     .map((c) => 127397 + c.charCodeAt(0))
   return String.fromCodePoint(...codePoints)
-}
-
-function CountryPanel({
-  countries,
-  worldCoveragePct,
-  selectedCountry,
-  onCountrySelect,
-}: {
-  countries: { country: string; iso2?: string; count: number }[]
-  worldCoveragePct: number
-  selectedCountry: string
-  onCountrySelect: (country: string) => void
-}) {
-  if (!countries.length) return null
-
-  const top = countries.slice(0, 12)
-
-  return (
-    <div className="mt-6 space-y-3">
-      <div className="rounded-lg border border-border bg-muted/30 p-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium">Countries</div>
-            <div className="text-xs text-muted-foreground">{countries.length} visited</div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-medium">{worldCoveragePct}%</div>
-            <div className="text-xs text-muted-foreground">world coverage</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Top countries</div>
-        {selectedCountry && (
-          <button
-            onClick={() => onCountrySelect('')}
-            className="text-xs text-terminal-green hover:underline"
-          >
-            Show all
-          </button>
-        )}
-      </div>
-      <div className="space-y-2">
-        {top.map((c) => (
-          <button
-            key={c.country}
-            onClick={() => onCountrySelect(c.country)}
-            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-              selectedCountry === c.country
-                ? 'border-terminal-green bg-terminal-green/10 text-terminal-green'
-                : 'border-border hover:border-terminal-green/50 hover:bg-muted/50'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <span>{flagEmoji(c.iso2)}</span>
-              <span className="truncate">{c.country}</span>
-            </span>
-            <span className="text-muted-foreground">{c.count}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
 }

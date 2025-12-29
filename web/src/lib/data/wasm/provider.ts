@@ -1124,22 +1124,51 @@ export class WasmProvider implements DataProvider {
       cancelled: 'canceled',
     }
 
+    const status = statusMap[progress.status] ?? 'idle'
+
     return {
-      status: statusMap[progress.status] ?? 'idle',
+      status,
+      // Current phase (WASM uses simplified single-phase import)
+      phase: status === 'completed' ? 'completed' : status === 'running' ? 'activities' : 'idle',
+
+      // Per-phase progress (mapped to activities phase for WASM)
+      activities_total: progress.total,
+      activities_done: progress.imported,
+      gear_total: 0,
+      gear_done: 0,
+      streams_total: 0,
+      streams_done: 0,
+      details_total: 0,
+      details_done: 0,
+      segments_total: 0,
+      segments_done: 0,
+      photos_total: 0,
+      photos_done: 0,
+
+      // Legacy fields
       total_activities: progress.total,
       imported_count: progress.imported,
       skipped_count: progress.skipped,
       failed_count: progress.failed,
       current_page: 0,
       error: progress.error,
+
+      // ETA and rate limits (not available in WASM mode)
+      remaining_api_calls: 0,
+      estimated_eta: undefined,
+      rate_limit_used_15min: 0,
+      rate_limit_limit_15min: 0,
+      rate_limit_used_daily: 0,
+      rate_limit_limit_daily: 0,
     }
   }
 
   async startImport(req?: StartImportRequest): Promise<{ message: string }> {
     // Start import in background (non-blocking)
+    // WASM importer uses inverted logic (include = !skip)
     stravaStartImport({
       fullSync: req?.full_sync,
-      includeStreams: req?.include_streams,
+      includeStreams: !req?.skip_streams,
     }).catch((err) => {
       console.error('[WasmProvider] Import error:', err)
     })

@@ -13,12 +13,13 @@ import {
   useUpsertHrZoneDefinition,
   useWeightHistory,
 } from '@/lib/data'
+import type { ImportProgress, ImportPhase } from '@/lib/api/import'
 import { useQueryClient } from '@tanstack/react-query'
 import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Check, X, AlertCircle } from 'lucide-react'
+import { Loader2, Check, X, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { LineChart } from '@/components/charts'
 import { useMemo, useState } from 'react'
 
@@ -31,10 +32,12 @@ export function SettingsPage() {
 
   const isAuthenticated = authStatus?.authenticated
   const isImporting = progress?.status === 'running'
+  // UI shows "include" checkboxes, but API uses "skip" flags (inverted)
   const [includeStreams, setIncludeStreams] = useState(true)
-  const [includeSegments, setIncludeSegments] = useState(false)
-  const [includeBestEfforts, setIncludeBestEfforts] = useState(false)
-  const [includePhotos, setIncludePhotos] = useState(false)
+  const [includeSegments, setIncludeSegments] = useState(true)
+  const [includeBestEfforts, setIncludeBestEfforts] = useState(true)
+  const [includePhotos, setIncludePhotos] = useState(true)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const { data: ftpHistory } = useFtpHistory()
   const updateFtp = useUpdateFtpHistory()
@@ -47,11 +50,12 @@ export function SettingsPage() {
   const updateAppSettings = useUpdateAppSettings()
 
   const handleStartImport = () => {
+    // API uses skip flags (inverted from UI include checkboxes)
     startImport.mutate({
-      include_streams: includeStreams,
-      include_segments: includeSegments,
-      include_best_efforts: includeBestEfforts,
-      include_photos: includePhotos,
+      skip_streams: !includeStreams,
+      skip_segments: !includeSegments,
+      skip_best_efforts: !includeBestEfforts,
+      skip_photos: !includePhotos,
     })
   }
 
@@ -136,7 +140,10 @@ export function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Data Import</CardTitle>
-            <CardDescription>Import activities from Strava</CardDescription>
+            <CardDescription>
+              Import activities from Strava. Activities load first for immediate dashboard access,
+              then streams, segments, and photos.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {!isAuthenticated ? (
@@ -165,43 +172,63 @@ export function SettingsPage() {
                   )}
                 </div>
 
-                <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={includeStreams}
-                      onChange={(e) => setIncludeStreams(e.target.checked)}
-                      disabled={isImporting}
-                    />
-                    Include activity streams (recommended for maps & charts)
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={includeSegments}
-                      onChange={(e) => setIncludeSegments(e.target.checked)}
-                      disabled={isImporting}
-                    />
-                    Include segments (slower; extra API calls)
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={includeBestEfforts}
-                      onChange={(e) => setIncludeBestEfforts(e.target.checked)}
-                      disabled={isImporting}
-                    />
-                    Include best efforts (extra API calls)
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={includePhotos}
-                      onChange={(e) => setIncludePhotos(e.target.checked)}
-                      disabled={isImporting}
-                    />
-                    Include photos (extra API calls)
-                  </label>
+                <div className="rounded-md border border-border bg-muted/30">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 p-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    disabled={isImporting}
+                  >
+                    {showAdvanced ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    Advanced options
+                  </button>
+                  {showAdvanced && (
+                    <div className="space-y-2 px-3 pb-3 border-t border-border pt-3">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        All data is imported by default. Uncheck to skip specific data types.
+                      </p>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={includeStreams}
+                          onChange={(e) => setIncludeStreams(e.target.checked)}
+                          disabled={isImporting}
+                        />
+                        Streams (GPS, heartrate, power - for maps & charts)
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={includeSegments}
+                          onChange={(e) => setIncludeSegments(e.target.checked)}
+                          disabled={isImporting}
+                        />
+                        Segments (segment efforts & leaderboards)
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={includeBestEfforts}
+                          onChange={(e) => setIncludeBestEfforts(e.target.checked)}
+                          disabled={isImporting}
+                        />
+                        Best efforts (PRs for standard distances)
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={includePhotos}
+                          onChange={(e) => setIncludePhotos(e.target.checked)}
+                          disabled={isImporting}
+                        />
+                        Photos (activity photos)
+                      </label>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1060,49 +1087,167 @@ function EddingtonDefinitionsEditor({
 }
 
 interface ImportStatusProps {
-  progress: {
-    status: string
-    total_activities: number
-    imported_count: number
-    failed_count: number
-    current_page: number
-    error?: string
+  progress: ImportProgress
+}
+
+// Phase order for display
+const PHASE_ORDER: ImportPhase[] = [
+  'activities',
+  'gear',
+  'streams',
+  'activity_details',
+  'segment_details',
+  'photos',
+]
+
+const PHASE_LABELS: Record<ImportPhase, string> = {
+  idle: 'Idle',
+  activities: 'Activities',
+  gear: 'Gear',
+  streams: 'Streams',
+  activity_details: 'Details',
+  segment_details: 'Segments',
+  photos: 'Photos',
+  completed: 'Completed',
+}
+
+function getPhaseProgress(
+  phase: ImportPhase,
+  progress: ImportProgress
+): { done: number; total: number } {
+  switch (phase) {
+    case 'activities':
+      return { done: progress.activities_done, total: progress.activities_total }
+    case 'gear':
+      return { done: progress.gear_done, total: progress.gear_total }
+    case 'streams':
+      return { done: progress.streams_done, total: progress.streams_total }
+    case 'activity_details':
+      return { done: progress.details_done, total: progress.details_total }
+    case 'segment_details':
+      return { done: progress.segments_done, total: progress.segments_total }
+    case 'photos':
+      return { done: progress.photos_done, total: progress.photos_total }
+    default:
+      return { done: 0, total: 0 }
   }
 }
 
+type PhaseStatus = 'pending' | 'running' | 'completed' | 'skipped'
+
+function getPhaseStatus(
+  phase: ImportPhase,
+  currentPhase: ImportPhase,
+  progress: ImportProgress
+): PhaseStatus {
+  const phaseIdx = PHASE_ORDER.indexOf(phase)
+  const currentIdx = PHASE_ORDER.indexOf(currentPhase)
+
+  if (currentPhase === 'completed') return 'completed'
+
+  const { total } = getPhaseProgress(phase, progress)
+
+  // If total is 0, this phase is skipped
+  if (total === 0 && phaseIdx < currentIdx) return 'skipped'
+  if (total === 0 && phase !== currentPhase) return 'pending'
+
+  if (phaseIdx < currentIdx) return 'completed'
+  if (phaseIdx === currentIdx) return 'running'
+  return 'pending'
+}
+
+function PhaseProgressBar({
+  phase,
+  progress,
+  isRunning,
+}: {
+  phase: ImportPhase
+  progress: ImportProgress
+  isRunning: boolean
+}) {
+  const { done, total } = getPhaseProgress(phase, progress)
+  const status = getPhaseStatus(phase, progress.phase, progress)
+  const percentage = total > 0 ? Math.round((done / total) * 100) : 0
+
+  // Don't show phases with 0 total (skipped)
+  if (total === 0 && status !== 'running') return null
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5">
+          {status === 'completed' && <Check className="h-3 w-3 text-green-600" />}
+          {status === 'running' && isRunning && (
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+          )}
+          {status === 'pending' && <div className="h-3 w-3" />}
+          <span className={status === 'running' ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+            {PHASE_LABELS[phase]}
+          </span>
+        </div>
+        <span className="text-muted-foreground tabular-nums">
+          {done}/{total}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full transition-all duration-300 ${
+            status === 'completed'
+              ? 'bg-green-600'
+              : status === 'running'
+                ? 'bg-primary'
+                : 'bg-muted-foreground/30'
+          }`}
+          style={{ width: `${status === 'pending' ? 0 : percentage}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 function ImportStatus({ progress }: ImportStatusProps) {
-  const percentage =
-    progress.total_activities > 0
-      ? Math.round((progress.imported_count / progress.total_activities) * 100)
-      : 0
+  const isRunning = progress.status === 'running'
 
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4">
-      <div className="flex items-center gap-2 mb-2">
-        {progress.status === 'running' && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-        {progress.status === 'completed' && <Check className="h-4 w-4 text-green-600" />}
-        {progress.status === 'failed' && <AlertCircle className="h-4 w-4 text-destructive" />}
-        <span className="font-medium capitalize">{progress.status}</span>
-      </div>
-
-      <div className="space-y-1 text-sm text-muted-foreground">
-        <p>
-          Imported: {progress.imported_count} / {progress.total_activities} activities
-          {progress.total_activities > 0 && ` (${percentage}%)`}
-        </p>
-        {progress.failed_count > 0 && (
-          <p className="text-destructive">Failed: {progress.failed_count}</p>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {progress.status === 'running' && (
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          )}
+          {progress.status === 'completed' && <Check className="h-4 w-4 text-green-600" />}
+          {progress.status === 'failed' && <AlertCircle className="h-4 w-4 text-destructive" />}
+          {progress.status === 'canceled' && <X className="h-4 w-4 text-muted-foreground" />}
+          <span className="font-medium capitalize">{progress.status}</span>
+        </div>
+        {isRunning && progress.estimated_eta && (
+          <span className="text-sm text-muted-foreground">ETA: {progress.estimated_eta}</span>
         )}
-        {progress.status === 'running' && <p>Page: {progress.current_page}</p>}
-        {progress.error && <p className="text-destructive">{progress.error}</p>}
       </div>
 
-      {progress.status === 'running' && progress.total_activities > 0 && (
-        <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${percentage}%` }}
-          />
+      {(isRunning || progress.status === 'completed') && (
+        <div className="space-y-2">
+          {PHASE_ORDER.map((phase) => (
+            <PhaseProgressBar
+              key={phase}
+              phase={phase}
+              progress={progress}
+              isRunning={isRunning}
+            />
+          ))}
+        </div>
+      )}
+
+      {progress.failed_count > 0 && (
+        <p className="text-sm text-destructive mt-3">Failed: {progress.failed_count}</p>
+      )}
+
+      {progress.error && <p className="text-sm text-destructive mt-2">{progress.error}</p>}
+
+      {isRunning && progress.rate_limit_limit_15min > 0 && (
+        <div className="mt-3 text-xs text-muted-foreground">
+          Rate limit: {progress.rate_limit_used_15min}/{progress.rate_limit_limit_15min} (15min),{' '}
+          {progress.rate_limit_used_daily}/{progress.rate_limit_limit_daily} (daily)
         </div>
       )}
     </div>
