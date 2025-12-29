@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -15,6 +16,11 @@ import (
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
+
+// urlEncode encodes a string for safe use in URL query parameters.
+func urlEncode(s string) string {
+	return url.QueryEscape(s)
+}
 
 // encodeJSON encodes data as JSON and logs any encoding errors.
 func encodeJSON(w http.ResponseWriter, data any) {
@@ -110,7 +116,12 @@ func (h *AuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	token, athlete, err := h.strava.ExchangeCode(r.Context(), code)
 	if err != nil {
 		slog.Error("failed to exchange code", "error", err)
-		http.Error(w, "Failed to exchange authorization code", http.StatusInternalServerError)
+		// Redirect to frontend with error message for better UX
+		errorRedirect := "/settings?auth_error=" + urlEncode(err.Error())
+		if h.cfg.Server.DevMode {
+			errorRedirect = "http://localhost:5173" + errorRedirect
+		}
+		http.Redirect(w, r, errorRedirect, http.StatusTemporaryRedirect)
 		return
 	}
 

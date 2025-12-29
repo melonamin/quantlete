@@ -84,6 +84,7 @@ import {
   getImportProgress as stravaGetImportProgress,
   getSyncHistory as stravaGetSyncHistory,
   getLatestSync as stravaGetLatestSync,
+  getRateLimitInfo,
 } from '@/lib/wasm/strava'
 import type { SyncRun as ApiSyncRun, SyncWatermark } from '@/lib/api/import'
 export class WasmProvider implements DataProvider {
@@ -2322,6 +2323,7 @@ export class WasmProvider implements DataProvider {
 
     const status = statusMap[progress.status] ?? 'idle'
     const phase = phaseMap[progress.phase] ?? 'idle'
+    const rateLimitInfo = getRateLimitInfo()
 
     return {
       status,
@@ -2349,18 +2351,18 @@ export class WasmProvider implements DataProvider {
       current_page: 0,
       error: progress.error,
 
-      // ETA and rate limits (not available in WASM mode)
+      // Rate limit info from WASM rate limiter
       remaining_api_calls: 0,
       estimated_eta: undefined,
-      rate_limit_used_15min: 0,
-      rate_limit_limit_15min: 0,
-      rate_limit_used_daily: 0,
-      rate_limit_limit_daily: 0,
+      rate_limit_used_15min: rateLimitInfo.usage15Min,
+      rate_limit_limit_15min: rateLimitInfo.limit15Min,
+      rate_limit_used_daily: rateLimitInfo.usageDaily,
+      rate_limit_limit_daily: rateLimitInfo.limitDaily,
 
-      // Rate limit waiting state (not applicable in WASM mode)
-      waiting_for_rate_limit: false,
-      waiting_until: undefined,
-      waiting_reason: undefined,
+      // Rate limit waiting state
+      waiting_for_rate_limit: rateLimitInfo.waitingForRateLimit,
+      waiting_until: rateLimitInfo.waitingUntil,
+      waiting_reason: rateLimitInfo.waitingReason,
     }
   }
 

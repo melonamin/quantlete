@@ -1,6 +1,43 @@
 package strava
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// FlexTime handles Strava's inconsistent date formats.
+// Some fields return RFC3339 (2021-08-17T10:30:00Z), others just date (2021-08-17).
+type FlexTime struct {
+	time.Time
+}
+
+// UnmarshalJSON implements flexible date parsing for Strava API responses.
+func (ft *FlexTime) UnmarshalJSON(data []byte) error {
+	s := strings.Trim(string(data), `"`)
+	if s == "" || s == "null" {
+		return nil
+	}
+
+	// Try RFC3339 first (most common)
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		ft.Time = t
+		return nil
+	}
+
+	// Try date-only format
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		ft.Time = t
+		return nil
+	}
+
+	// Fallback to standard parsing
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return err
+	}
+	ft.Time = t
+	return nil
+}
 
 // Athlete represents a Strava athlete.
 type Athlete struct {
@@ -106,10 +143,10 @@ type Segment struct {
 		Polyline string `json:"polyline"`
 	} `json:"map"`
 	AthleteSegmentStats struct {
-		EffortCount   int        `json:"effort_count"`
-		PRDate        *time.Time `json:"pr_date"`
-		PRElapsedTime int        `json:"pr_elapsed_time"`
-		KOMRank       *int       `json:"kom_rank"`
+		EffortCount   int       `json:"effort_count"`
+		PRDate        *FlexTime `json:"pr_date"`
+		PRElapsedTime int       `json:"pr_elapsed_time"`
+		KOMRank       *int      `json:"kom_rank"`
 	} `json:"athlete_segment_stats"`
 }
 

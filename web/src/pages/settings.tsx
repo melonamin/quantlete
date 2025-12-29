@@ -15,10 +15,12 @@ import {
   useWeightHistory,
 } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
+import { useSearch } from '@tanstack/react-router'
 import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ImportStatus } from '@/components/sync/import-status'
 import { SyncHistoryModal } from '@/components/sync/sync-history-modal'
 import { Loader2, Check, X, ChevronDown, ChevronRight, History, Clock, AlertCircle } from 'lucide-react'
@@ -26,8 +28,13 @@ import { LineChart } from '@/components/charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDistance } from 'date-fns'
 
+interface SettingsSearchParams {
+  auth_error?: string
+}
+
 export function SettingsPage() {
   const queryClient = useQueryClient()
+  const search = useSearch({ strict: false }) as SettingsSearchParams
   const { data: authStatus } = useAuthStatus()
   const { data: progress } = useImportProgress()
   const { data: latestSync } = useLatestSync()
@@ -43,6 +50,7 @@ export function SettingsPage() {
   const [includePhotos, setIncludePhotos] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(search.auth_error || null)
 
   const { data: ftpHistory } = useFtpHistory()
   const updateFtp = useUpdateFtpHistory()
@@ -93,6 +101,25 @@ export function SettingsPage() {
       </div>
 
       <div className="space-y-6 max-w-2xl">
+        {/* Auth Error Alert */}
+        {authError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Authentication Failed</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>{authError}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAuthError(null)}
+                className="h-6 px-2"
+              >
+                Dismiss
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Strava Connection */}
         <Card>
           <CardHeader>

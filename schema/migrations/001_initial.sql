@@ -1,5 +1,7 @@
 -- Stata: Complete SQLite Schema
--- Consolidated from migrations 001-019
+-- Consolidated schema with all tables, views, and indexes
+
+PRAGMA foreign_keys = ON;
 
 --------------------------------------------------------------------------------
 -- Athletes & Authentication
@@ -115,19 +117,22 @@ CREATE INDEX IF NOT EXISTS idx_activities_gear_id ON activities(gear_id);
 CREATE INDEX IF NOT EXISTS idx_activities_commute ON activities(commute);
 CREATE INDEX IF NOT EXISTS idx_activities_location_country ON activities(location_country);
 CREATE INDEX IF NOT EXISTS idx_activities_athlete_sport_date ON activities(athlete_id, sport_type, start_date DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_athlete_gear ON activities(athlete_id, gear_id);
+CREATE INDEX IF NOT EXISTS idx_activities_athlete_commute ON activities(athlete_id, commute);
+CREATE INDEX IF NOT EXISTS idx_activities_athlete_trainer ON activities(athlete_id, trainer);
 
 --------------------------------------------------------------------------------
 -- Activity Streams
 --------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS activity_streams (
-    activity_id INTEGER NOT NULL REFERENCES activities(id),
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
     stream_type TEXT NOT NULL,
     original_size INTEGER,
     resolution TEXT,
     series_type TEXT,
-    data TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    data BLOB,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (activity_id, stream_type)
 );
 
@@ -162,34 +167,40 @@ CREATE INDEX IF NOT EXISTS idx_gear_hashtag ON gear(hashtag);
 
 CREATE TABLE IF NOT EXISTS components (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    gear_id TEXT NOT NULL REFERENCES gear(id),
+    gear_id TEXT NOT NULL REFERENCES gear(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    image_url TEXT,
-    maintenance_hashtag TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS maintenance_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    component_id INTEGER NOT NULL REFERENCES components(id),
-    type TEXT NOT NULL,
-    threshold_value REAL NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS maintenance_log (
-    component_id INTEGER NOT NULL REFERENCES components(id),
-    activity_id INTEGER REFERENCES activities(id),
-    completed_at TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (component_id, completed_at)
+    description TEXT,
+    installed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    retired_at DATETIME,
+    initial_distance REAL DEFAULT 0,
+    initial_time INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_components_gear_id ON components(gear_id);
+
+CREATE TABLE IF NOT EXISTS maintenance_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+    metric TEXT NOT NULL CHECK(metric IN ('distance', 'time', 'interval')),
+    threshold_value REAL NOT NULL,
+    threshold_unit TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_maintenance_rules_component_id ON maintenance_rules(component_id);
+
+CREATE TABLE IF NOT EXISTS maintenance_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+    activity_id INTEGER REFERENCES activities(id) ON DELETE SET NULL,
+    completed_at DATETIME NOT NULL,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_maintenance_log_component_id ON maintenance_log(component_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_log_activity_id ON maintenance_log(activity_id);
 
 --------------------------------------------------------------------------------
 -- Segments
@@ -221,21 +232,21 @@ CREATE TABLE IF NOT EXISTS segments (
 
 CREATE TABLE IF NOT EXISTS segment_efforts (
     id INTEGER PRIMARY KEY,
-    segment_id INTEGER NOT NULL REFERENCES segments(id),
-    activity_id INTEGER NOT NULL REFERENCES activities(id),
-    athlete_id INTEGER NOT NULL REFERENCES athletes(id),
+    segment_id INTEGER NOT NULL REFERENCES segments(id) ON DELETE CASCADE,
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    athlete_id INTEGER NOT NULL,
     name TEXT,
     elapsed_time INTEGER,
     moving_time INTEGER,
-    start_date TEXT,
-    start_date_local TEXT,
+    start_date DATETIME,
+    start_date_local DATETIME,
     distance REAL,
     average_watts REAL,
     average_heartrate REAL,
     max_heartrate INTEGER,
     pr_rank INTEGER,
     country TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_segment_id ON segment_efforts(segment_id);
@@ -243,6 +254,7 @@ CREATE INDEX IF NOT EXISTS idx_segment_efforts_activity_id ON segment_efforts(ac
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_athlete_id ON segment_efforts(athlete_id);
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_pr_rank ON segment_efforts(pr_rank);
 CREATE INDEX IF NOT EXISTS idx_segment_efforts_country ON segment_efforts(country);
+CREATE INDEX IF NOT EXISTS idx_segment_efforts_athlete_country ON segment_efforts(athlete_id, country);
 
 --------------------------------------------------------------------------------
 -- Photos
@@ -250,17 +262,18 @@ CREATE INDEX IF NOT EXISTS idx_segment_efforts_country ON segment_efforts(countr
 
 CREATE TABLE IF NOT EXISTS photos (
     id TEXT PRIMARY KEY,
-    athlete_id INTEGER NOT NULL REFERENCES athletes(id),
-    activity_id INTEGER NOT NULL REFERENCES activities(id),
+    athlete_id INTEGER NOT NULL,
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
     thumbnail_url TEXT,
     caption TEXT,
-    location TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    location BLOB,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_photos_activity_id ON photos(activity_id);
 CREATE INDEX IF NOT EXISTS idx_photos_athlete_id ON photos(athlete_id);
+CREATE INDEX IF NOT EXISTS idx_photos_athlete_activity ON photos(athlete_id, activity_id);
 
 --------------------------------------------------------------------------------
 -- Challenges
@@ -272,6 +285,7 @@ CREATE TABLE IF NOT EXISTS challenges (
     name TEXT NOT NULL,
     slug TEXT,
     badge_url TEXT,
+    local_badge_url TEXT,
     completion_date TEXT,
     month TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -279,31 +293,30 @@ CREATE TABLE IF NOT EXISTS challenges (
 
 CREATE INDEX IF NOT EXISTS idx_challenges_athlete_id ON challenges(athlete_id);
 CREATE INDEX IF NOT EXISTS idx_challenges_month ON challenges(month);
+CREATE INDEX IF NOT EXISTS idx_challenges_athlete_completion ON challenges(athlete_id, completion_date);
 
 --------------------------------------------------------------------------------
 -- Best Efforts
 --------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS best_efforts (
-    athlete_id INTEGER NOT NULL REFERENCES athletes(id),
-    activity_id INTEGER NOT NULL REFERENCES activities(id),
-    sport_type TEXT,
+    athlete_id INTEGER NOT NULL,
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    sport_type TEXT NOT NULL,
     distance_type TEXT NOT NULL,
+    name TEXT NOT NULL,
     distance_m REAL NOT NULL,
     elapsed_time INTEGER NOT NULL,
+    moving_time INTEGER,
     start_index INTEGER,
     end_index INTEGER,
-    start_date TEXT,
-    name TEXT,
     pr_rank INTEGER,
-    moving_time INTEGER,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    start_date DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (athlete_id, activity_id, distance_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_best_efforts_athlete_distance ON best_efforts(athlete_id, distance_type);
-CREATE INDEX IF NOT EXISTS idx_best_efforts_distance_time ON best_efforts(distance_type, elapsed_time);
-CREATE INDEX IF NOT EXISTS idx_best_efforts_pr_rank ON best_efforts(athlete_id, pr_rank);
+CREATE INDEX IF NOT EXISTS idx_best_efforts_athlete_sport_distance ON best_efforts(athlete_id, sport_type, distance_type);
 
 --------------------------------------------------------------------------------
 -- Configuration & Settings
@@ -400,9 +413,252 @@ CREATE TABLE IF NOT EXISTS power_best_efforts (
 
 CREATE INDEX IF NOT EXISTS idx_power_best_efforts_athlete_duration ON power_best_efforts(athlete_id, duration_s);
 
--- App-level state for things like rate limiter state that need to survive restarts
+--------------------------------------------------------------------------------
+-- App State
+--------------------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+--------------------------------------------------------------------------------
+-- Sync History
+--------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS sync_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    athlete_id INTEGER NOT NULL REFERENCES athletes(id),
+
+    -- Timing
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    duration_seconds INTEGER,
+
+    -- Status
+    status TEXT NOT NULL DEFAULT 'running',
+    error TEXT,
+
+    -- Counts
+    activities_total INTEGER DEFAULT 0,
+    activities_imported INTEGER DEFAULT 0,
+    activities_skipped INTEGER DEFAULT 0,
+    gear_imported INTEGER DEFAULT 0,
+    streams_imported INTEGER DEFAULT 0,
+    segments_imported INTEGER DEFAULT 0,
+    photos_imported INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+
+    -- Options used
+    full_sync INTEGER DEFAULT 0,
+    skip_streams INTEGER DEFAULT 0,
+    skip_segments INTEGER DEFAULT 0,
+    skip_best_efforts INTEGER DEFAULT 0,
+    skip_photos INTEGER DEFAULT 0,
+
+    -- Watermark: newest activity date synced in this run
+    newest_activity_date TEXT,
+
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_history_athlete_id ON sync_history(athlete_id);
+CREATE INDEX IF NOT EXISTS idx_sync_history_started_at ON sync_history(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_history_status ON sync_history(status);
+
+--------------------------------------------------------------------------------
+-- Analytics VIEWs
+--------------------------------------------------------------------------------
+
+-- Daily distance aggregation for Eddington number calculation
+CREATE VIEW IF NOT EXISTS v_daily_distances AS
+SELECT
+    athlete_id,
+    DATE(start_date) AS date,
+    SUM(distance) / 1000.0 AS distance_km
+FROM activities
+GROUP BY athlete_id, DATE(start_date);
+
+-- Best effort rankings per distance type
+CREATE VIEW IF NOT EXISTS v_best_effort_rankings AS
+SELECT
+    be.athlete_id,
+    be.distance_type,
+    COALESCE(be.name, be.distance_type) AS name,
+    be.distance_m,
+    be.elapsed_time,
+    be.moving_time,
+    be.pr_rank,
+    a.id AS activity_id,
+    a.name AS activity_name,
+    a.sport_type,
+    a.start_date_local,
+    ROW_NUMBER() OVER (
+        PARTITION BY be.athlete_id, be.distance_type
+        ORDER BY be.elapsed_time ASC, a.start_date_local ASC
+    ) AS rn
+FROM best_efforts be
+JOIN activities a ON a.id = be.activity_id AND a.athlete_id = be.athlete_id;
+
+-- Peak power rankings per duration
+CREATE VIEW IF NOT EXISTS v_power_best_rankings AS
+SELECT
+    p.athlete_id,
+    p.duration_s,
+    p.best_avg_watts,
+    p.activity_id,
+    a.start_date,
+    a.name AS activity_name,
+    ROW_NUMBER() OVER (
+        PARTITION BY p.athlete_id, p.duration_s
+        ORDER BY p.best_avg_watts DESC
+    ) AS rn
+FROM power_best_efforts p
+JOIN activities a ON a.id = p.activity_id;
+
+-- Segment statistics with effort counts
+CREATE VIEW IF NOT EXISTS v_segment_stats AS
+SELECT
+    s.id,
+    s.name,
+    s.activity_type,
+    s.distance,
+    s.average_grade,
+    s.maximum_grade,
+    s.elevation_high,
+    s.elevation_low,
+    s.climb_category,
+    s.start_lat,
+    s.start_lng,
+    s.end_lat,
+    s.end_lng,
+    s.starred,
+    s.polyline,
+    s.athlete_kom_rank,
+    s.athlete_effort_count,
+    s.athlete_pr_elapsed_time,
+    s.athlete_pr_date,
+    e.athlete_id,
+    COUNT(e.id) AS times_completed,
+    MAX(e.start_date) AS last_effort_date,
+    MIN(NULLIF(e.elapsed_time, 0)) AS best_elapsed_time
+FROM segments s
+LEFT JOIN segment_efforts e ON e.segment_id = s.id
+GROUP BY s.id, e.athlete_id;
+
+-- Monthly activity aggregation by sport type
+CREATE VIEW IF NOT EXISTS v_monthly_stats AS
+SELECT
+    athlete_id,
+    strftime('%Y-%m', start_date) AS month,
+    sport_type,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+GROUP BY athlete_id, strftime('%Y-%m', start_date), sport_type;
+
+-- Yearly activity aggregation
+CREATE VIEW IF NOT EXISTS v_yearly_stats AS
+SELECT
+    athlete_id,
+    CAST(strftime('%Y', start_date) AS INTEGER) AS year,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+GROUP BY athlete_id, strftime('%Y', start_date);
+
+-- Daily TSS aggregation for training load calculations
+CREATE VIEW IF NOT EXISTS v_daily_tss AS
+SELECT
+    a.athlete_id,
+    DATE(a.start_date_local) AS day,
+    COALESCE(SUM(tl.tss), 0) AS tss
+FROM activities a
+LEFT JOIN activity_training_load tl ON tl.activity_id = a.id
+GROUP BY a.athlete_id, DATE(a.start_date_local);
+
+-- Weekly activity aggregation
+CREATE VIEW IF NOT EXISTS v_weekly_stats AS
+SELECT
+    athlete_id,
+    strftime('%Y-W%W', start_date) AS week,
+    strftime('%Y-%m-%d', start_date, 'weekday 0', '-6 days') AS week_start,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+GROUP BY athlete_id, strftime('%Y-W%W', start_date);
+
+-- Sport type statistics
+CREATE VIEW IF NOT EXISTS v_sport_type_stats AS
+SELECT
+    athlete_id,
+    sport_type,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+GROUP BY athlete_id, sport_type;
+
+-- Gear usage statistics
+CREATE VIEW IF NOT EXISTS v_gear_monthly_usage AS
+SELECT
+    g.id AS gear_id,
+    g.name AS gear_name,
+    g.source,
+    g.hashtag,
+    g.retired,
+    g.purchase_price,
+    g.purchase_currency,
+    g.athlete_id,
+    strftime('%Y-%m', a.start_date) AS month,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(a.distance), 0) AS distance,
+    COALESCE(SUM(a.moving_time), 0) AS moving_time
+FROM gear g
+LEFT JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
+GROUP BY g.id, strftime('%Y-%m', a.start_date);
+
+-- Segment country statistics
+CREATE VIEW IF NOT EXISTS v_segment_countries AS
+SELECT
+    athlete_id,
+    country,
+    COUNT(DISTINCT segment_id) AS segment_count
+FROM segment_efforts
+WHERE country IS NOT NULL AND country != ''
+GROUP BY athlete_id, country;
+
+-- Heatmap activity data
+CREATE VIEW IF NOT EXISTS v_heatmap_activities AS
+SELECT
+    id,
+    athlete_id,
+    sport_type,
+    summary_polyline,
+    COALESCE(start_lat, 0) AS start_lat,
+    COALESCE(start_lng, 0) AS start_lng,
+    start_date,
+    commute,
+    workout_type,
+    location_country
+FROM activities
+WHERE summary_polyline IS NOT NULL AND summary_polyline != '';
+
+-- Calendar day statistics
+CREATE VIEW IF NOT EXISTS v_calendar_days AS
+SELECT
+    athlete_id,
+    DATE(start_date) AS date,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time
+FROM activities
+GROUP BY athlete_id, DATE(start_date);

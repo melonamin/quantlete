@@ -162,8 +162,8 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 
 	// Persist rate limit state if persister is configured
 	if c.rateLimitPersist != nil {
-		if json, err := c.rateLimit.ToJSON(); err == nil {
-			_ = c.rateLimitPersist(json) // Best effort, don't fail request on persistence error
+		if jsonStr, err := c.rateLimit.ToJSON(); err == nil {
+			_ = c.rateLimitPersist(jsonStr) // Best effort, don't fail request on persistence error
 		}
 	}
 
@@ -189,7 +189,14 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 }
 
 // getAthleteWithToken fetches the athlete profile using the provided token.
+// This is called during OAuth callback, so it fails fast on rate limits rather than waiting.
 func (c *Client) getAthleteWithToken(ctx context.Context, token *oauth2.Token) (*Athlete, error) {
+	// Check if we're already at rate limit - fail fast for OAuth flow
+	if !c.rateLimit.CanMakeRequest() {
+		waitTime := c.rateLimit.TimeUntil15MinReset()
+		return nil, fmt.Errorf("rate limited, please try again in %v", waitTime.Round(time.Minute))
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+"/athlete", http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -202,6 +209,21 @@ func (c *Client) getAthleteWithToken(ctx context.Context, token *oauth2.Token) (
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// Update rate limits from response headers
+	c.rateLimit.UpdateFromHeaders(resp.Header)
+
+	// Persist rate limit state if persister is configured
+	if c.rateLimitPersist != nil {
+		if jsonStr, err := c.rateLimit.ToJSON(); err == nil {
+			_ = c.rateLimitPersist(jsonStr)
+		}
+	}
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		waitTime := c.rateLimit.TimeUntil15MinReset()
+		return nil, fmt.Errorf("rate limited by Strava, please try again in %v", waitTime.Round(time.Minute))
+	}
 
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("API error: %s", resp.Status)

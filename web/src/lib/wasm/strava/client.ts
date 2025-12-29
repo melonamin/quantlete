@@ -8,6 +8,7 @@
  */
 
 import { getDatabase } from '../db'
+import * as rateLimit from './ratelimit'
 
 // Configuration - these should be set for your deployment
 const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID || ''
@@ -160,44 +161,78 @@ export function getAthlete(): StravaAthlete | null {
 
 /**
  * Make an authenticated API call to Strava via the worker.
+ * Handles rate limiting with automatic waiting and retry.
  */
 export async function stravaFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  // Wait if we're approaching rate limit
+  await rateLimit.wait()
+
   const token = await getAccessToken()
 
-  const response = await fetch(`${WORKER_URL}/api${path}`, {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
+  const makeRequest = async (): Promise<Response> => {
+    const response = await fetch(`${WORKER_URL}/api${path}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      // Try to refresh and retry once
-      await refreshToken()
-      const retryToken = await getAccessToken()
+    // Update rate limit state from headers (if forwarded by worker)
+    rateLimit.updateFromHeaders(response.headers)
 
-      const retryResponse = await fetch(`${WORKER_URL}/api${path}`, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: `Bearer ${retryToken}`,
-          'Content-Type': 'application/json',
-        },
-      })
+    // Also increment usage locally as fallback
+    rateLimit.incrementUsage()
 
-      if (!retryResponse.ok) {
-        throw new Error(`Strava API error: ${retryResponse.status}`)
-      }
+    return response
+  }
 
-      return retryResponse.json()
+  let response = await makeRequest()
+
+  // Handle 401 - try to refresh token
+  if (response.status === 401) {
+    await refreshToken()
+    const retryToken = await getAccessToken()
+
+    response = await fetch(`${WORKER_URL}/api${path}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${retryToken}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    rateLimit.updateFromHeaders(response.headers)
+    rateLimit.incrementUsage()
+
+    if (!response.ok) {
+      throw new Error(`Strava API error: ${response.status}`)
     }
 
+    return response.json()
+  }
+
+  // Handle 429 - rate limit hit, wait and retry
+  if (response.status === 429) {
+    console.log('[Strava] 429 rate limit hit, waiting for reset...')
+    await rateLimit.waitForRetry()
+
+    // Retry the request
+    response = await makeRequest()
+
+    if (!response.ok) {
+      throw new Error(`Strava API error after retry: ${response.status}`)
+    }
+
+    return response.json()
+  }
+
+  if (!response.ok) {
     throw new Error(`Strava API error: ${response.status}`)
   }
 
@@ -213,6 +248,9 @@ export async function loadAuth(): Promise<boolean> {
     if (!db.isInitialized()) {
       return false
     }
+
+    // Load rate limit state
+    rateLimit.loadState()
 
     // Load token
     const tokenRow = db.queryOne<{
@@ -253,6 +291,13 @@ export async function loadAuth(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Get current rate limit info for UI display.
+ */
+export function getRateLimitInfo() {
+  return rateLimit.getRateLimitInfo()
 }
 
 /**

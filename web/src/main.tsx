@@ -7,11 +7,13 @@ import { DataProviderWrapper } from '@/lib/data/context'
 import { WelcomeModal } from '@/components/onboarding/welcome-modal'
 import { SyncProgressModal } from '@/components/sync/sync-progress-modal'
 import { useSyncProtection } from '@/hooks/use-sync-protection'
+import { useSyncInvalidation } from '@/hooks/use-sync-invalidation'
 import './index.css'
 
-// Prevents accidental page refresh/close during active sync
-function SyncProtection() {
-  useSyncProtection()
+// Global sync-related hooks
+function SyncEffects() {
+  useSyncProtection() // Prevents accidental page refresh during sync
+  useSyncInvalidation() // Auto-refresh UI when sync imports data
   return null
 }
 
@@ -31,7 +33,7 @@ createRoot(document.getElementById('root')!).render(
         <RouterProvider router={router} />
         <WelcomeModal />
         <SyncProgressModal />
-        <SyncProtection />
+        <SyncEffects />
       </DataProviderWrapper>
     </QueryClientProvider>
   </StrictMode>

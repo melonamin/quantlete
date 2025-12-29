@@ -14,6 +14,7 @@ export {
   stravaFetch,
   loadAuth,
   clearAuth,
+  getRateLimitInfo,
   type StravaToken,
   type StravaAthlete,
   type StravaAuthResponse,

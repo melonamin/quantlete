@@ -762,20 +762,20 @@ func (i *Importer) runActivityDetailsPhase(ctx context.Context, athleteID int64)
 			for _, effort := range detail.SegmentEfforts {
 				seg := effort.Segment
 
-				// Store segment effort
+				// Store segment first (basic info from effort) - required for FK constraint
+				if err := i.storeSegmentFromEffort(ctx, &seg); err != nil {
+					slog.Debug("failed to store segment", "segment_id", seg.ID, "error", err)
+				}
+
+				// Store segment effort (references segment_id)
 				if err := i.storeSegmentEffort(ctx, detail, &effort, athleteID); err != nil {
 					slog.Debug("failed to store segment effort", "effort_id", effort.ID, "error", err)
 				}
 
-				// Check if we need to fetch full segment detail
+				// Check if we need to fetch full segment detail later
 				if shouldFetchSegmentDetail(seg) {
 					if !containsInt64(i.state.SegmentIDsToFetch, seg.ID) {
 						i.state.SegmentIDsToFetch = append(i.state.SegmentIDsToFetch, seg.ID)
-					}
-				} else {
-					// We have enough data, store segment now
-					if err := i.storeSegmentFromEffort(ctx, &seg); err != nil {
-						slog.Debug("failed to store segment", "segment_id", seg.ID, "error", err)
 					}
 				}
 			}
@@ -1111,6 +1111,13 @@ func ptrSQLiteTime(t *time.Time) *storage.SQLiteTime {
 	return &storage.SQLiteTime{Time: *t}
 }
 
+func ptrSQLiteTimeFromFlex(t *strava.FlexTime) *storage.SQLiteTime {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	return &storage.SQLiteTime{Time: t.Time}
+}
+
 func floatSliceLatLng(latlng []float64) (lat *float64, lng *float64) {
 	if len(latlng) < 2 {
 		return nil, nil
@@ -1170,7 +1177,7 @@ func (i *Importer) importSegments(ctx context.Context, a *strava.Activity, athle
 			AthleteKOMRank:       segDetail.AthleteSegmentStats.KOMRank,
 			AthleteEffortCount:   effortCount,
 			AthletePRElapsedTime: prElapsed,
-			AthletePRDate:        ptrSQLiteTime(segDetail.AthleteSegmentStats.PRDate),
+			AthletePRDate:        ptrSQLiteTimeFromFlex(segDetail.AthleteSegmentStats.PRDate),
 		}
 		if err := i.segments.UpsertSegment(ctx, s); err != nil {
 			return fmt.Errorf("upserting segment %d: %w", segDetail.ID, err)
@@ -1447,7 +1454,7 @@ func (i *Importer) storeSegmentFromEffort(ctx context.Context, seg *strava.Segme
 		AthleteKOMRank:       seg.AthleteSegmentStats.KOMRank,
 		AthleteEffortCount:   effortCount,
 		AthletePRElapsedTime: prElapsed,
-		AthletePRDate:        ptrSQLiteTime(seg.AthleteSegmentStats.PRDate),
+		AthletePRDate:        ptrSQLiteTimeFromFlex(seg.AthleteSegmentStats.PRDate),
 	}
 	return i.segments.UpsertSegment(ctx, s)
 }
