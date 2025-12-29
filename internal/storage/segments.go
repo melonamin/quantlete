@@ -346,7 +346,12 @@ func (r *SegmentRepository) ListCountryStats(ctx context.Context, athleteID int6
 
 func (r *SegmentRepository) Count(ctx context.Context, athleteID int64) (int, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM segments").Scan(&count)
+	err := r.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT s.id)
+		FROM segments s
+		JOIN segment_efforts e ON e.segment_id = s.id
+		WHERE e.athlete_id = ?
+	`, athleteID).Scan(&count)
 	if err != nil && err != sql.ErrNoRows {
 		return 0, fmt.Errorf("counting segments: %w", err)
 	}

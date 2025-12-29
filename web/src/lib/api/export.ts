@@ -1,22 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
-
 export interface ExportStats {
   total_activities: number
   first_activity: string | null
   last_activity: string | null
 }
 
-export async function getExportStats(): Promise<ExportStats> {
-  return get<ExportStats>('/export/stats')
-}
-
-export function useExportStats() {
-  return useQuery({
-    queryKey: ['export', 'stats'],
-    queryFn: getExportStats,
-  })
-}
+export { useExportStats } from '@/lib/data'
 
 export function getExportCSVUrl(params?: {
   after?: string

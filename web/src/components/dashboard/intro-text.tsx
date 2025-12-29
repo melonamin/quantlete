@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useDashboard } from '@/lib/data'
+import { useDashboard } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Trophy, Activity, Route, Clock, Mountain, Flame } from 'lucide-react'

@@ -10,14 +10,15 @@ import (
 )
 
 type Challenge struct {
-	ID             string     `json:"id"`
-	AthleteID      int64      `json:"athlete_id"`
-	Name           string     `json:"name"`
-	Slug           string     `json:"slug,omitempty"`
-	BadgeURL       string     `json:"badge_url,omitempty"`
+	ID             string      `json:"id"`
+	AthleteID      int64       `json:"athlete_id"`
+	Name           string      `json:"name"`
+	Slug           string      `json:"slug,omitempty"`
+	BadgeURL       string      `json:"badge_url,omitempty"`
+	LocalBadgeURL  string      `json:"local_badge_url,omitempty"` // Local path to downloaded badge
 	CompletionDate *SQLiteTime `json:"completion_date,omitempty"`
-	Month          string     `json:"month,omitempty"` // YYYY-MM
-	CreatedAt            SQLiteTime  `json:"created_at"`
+	Month          string      `json:"month,omitempty"` // YYYY-MM
+	CreatedAt      SQLiteTime  `json:"created_at"`
 }
 
 type ChallengeRepository struct {
@@ -37,21 +38,22 @@ func (r *ChallengeRepository) Upsert(ctx context.Context, c *Challenge) error {
 		}
 	}
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO challenges (id, athlete_id, name, slug, badge_url, completion_date, month, created_at)
-		VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?)
+		INSERT INTO challenges (id, athlete_id, name, slug, badge_url, local_badge_url, completion_date, month, created_at)
+		VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?)
 		ON CONFLICT (id) DO UPDATE SET
 			name = EXCLUDED.name,
 			slug = EXCLUDED.slug,
 			badge_url = EXCLUDED.badge_url,
+			local_badge_url = COALESCE(NULLIF(EXCLUDED.local_badge_url, ''), challenges.local_badge_url),
 			completion_date = EXCLUDED.completion_date,
 			month = EXCLUDED.month
-	`, c.ID, c.AthleteID, c.Name, c.Slug, c.BadgeURL, c.CompletionDate, c.Month, SQLiteTime{Time: time.Now()})
+	`, c.ID, c.AthleteID, c.Name, c.Slug, c.BadgeURL, c.LocalBadgeURL, c.CompletionDate, c.Month, SQLiteTime{Time: time.Now()})
 	return err
 }
 
 func (r *ChallengeRepository) List(ctx context.Context, athleteID int64, month string) ([]Challenge, error) {
 	query := `
-		SELECT id, athlete_id, name, COALESCE(slug, ''), COALESCE(badge_url, ''), completion_date, COALESCE(month, ''), created_at
+		SELECT id, athlete_id, name, COALESCE(slug, ''), COALESCE(badge_url, ''), COALESCE(local_badge_url, ''), completion_date, COALESCE(month, ''), created_at
 		FROM challenges
 		WHERE athlete_id = ?
 	`
@@ -60,7 +62,7 @@ func (r *ChallengeRepository) List(ctx context.Context, athleteID int64, month s
 		query += " AND month = ?"
 		args = append(args, month)
 	}
-	query += " ORDER BY month DESC, completion_date DESC NULLS LAST, name ASC"
+	query += " ORDER BY month DESC, completion_date IS NULL, completion_date DESC, name ASC"
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -71,7 +73,7 @@ func (r *ChallengeRepository) List(ctx context.Context, athleteID int64, month s
 	var out []Challenge
 	for rows.Next() {
 		var c Challenge
-		if err := rows.Scan(&c.ID, &c.AthleteID, &c.Name, &c.Slug, &c.BadgeURL, &c.CompletionDate, &c.Month, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.AthleteID, &c.Name, &c.Slug, &c.BadgeURL, &c.LocalBadgeURL, &c.CompletionDate, &c.Month, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

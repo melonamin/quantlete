@@ -1,4 +1,4 @@
-import type { EChartsOption } from 'echarts'
+import type { EChartsOption, YAXisComponentOption } from 'echarts'
 import {
   EChartsWrapper,
   chartColors,
@@ -37,11 +37,11 @@ export function ActivityStreamProfileChart({
   const altitude = toNumberArray(streams.altitude)
 
   const series: NonNullable<EChartsOption['series']> = []
-  const yAxis: NonNullable<EChartsOption['yAxis']> = []
+  const yAxis: YAXisComponentOption[] = []
 
   const addAxis = (name: string, position: 'left' | 'right', offset: number, color: string) => {
-    const idx = Array.isArray(yAxis) ? yAxis.length : 0
-    ;(yAxis as any[]).push({
+    const idx = yAxis.length
+    yAxis.push({
       type: 'value',
       name,
       position,

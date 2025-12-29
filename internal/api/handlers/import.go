@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/sasha/stata/internal/importer"
@@ -39,9 +40,16 @@ type StartImportRequest struct {
 
 // Start handles POST /api/v1/import/start
 func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
 	var req StartImportRequest
 	if r.Body != nil {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 			return
 		}
@@ -58,7 +66,7 @@ func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
 
 	// Use background context since import runs asynchronously after HTTP request completes
 	if err := h.importer.Start(context.Background(), opts); err != nil {
-		writeJSON(w, http.StatusConflict, ErrorResponse{Error: err.Error()})
+		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "import already running or failed to start"})
 		return
 	}
 
@@ -69,12 +77,26 @@ func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
 
 // Progress handles GET /api/v1/import/progress
 func (h *ImportHandler) Progress(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
 	progress := h.importer.Progress()
 	writeJSON(w, http.StatusOK, progress)
 }
 
 // Cancel handles POST /api/v1/import/cancel
 func (h *ImportHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
 	h.importer.Cancel()
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "import cancellation requested",

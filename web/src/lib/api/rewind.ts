@@ -1,6 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
-
 export interface RewindMonth {
   month: string
   activities: number
@@ -77,25 +74,4 @@ export interface RewindReport {
   }
 }
 
-export const rewindKeys = {
-  all: ['rewind'] as const,
-  years: () => [...rewindKeys.all, 'years'] as const,
-  report: (year: number) => [...rewindKeys.all, 'report', year] as const,
-}
-
-export function useRewindYears() {
-  return useQuery({
-    queryKey: rewindKeys.years(),
-    queryFn: () => get<number[]>('/stats/rewind/years'),
-    retry: false,
-  })
-}
-
-export function useRewind(year: number, enabled = true) {
-  return useQuery({
-    queryKey: rewindKeys.report(year),
-    queryFn: () => get<RewindReport>(`/stats/rewind?year=${encodeURIComponent(String(year))}`),
-    enabled,
-    retry: false,
-  })
-}
+export { useRewindYears, useRewindReport as useRewind } from '@/lib/data'

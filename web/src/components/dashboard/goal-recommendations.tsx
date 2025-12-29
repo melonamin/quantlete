@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useMonthlyStats } from '@/lib/data'
+import { useMonthlyStats } from '@/lib/api'
 import { useTrainingGoals, useUpdateTrainingGoals } from '@/lib/api/goals'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'

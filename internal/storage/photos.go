@@ -167,11 +167,11 @@ func (r *PhotoRepository) List(ctx context.Context, athleteID int64, f PhotoList
 		return nil, err
 	}
 
-	countries, err := r.facets(ctx, athleteID, "COALESCE(a.location_country, '')", "COALESCE(a.location_country, '') != ''")
+	countries, err := r.facets(ctx, athleteID, facetCountry)
 	if err != nil {
 		return nil, err
 	}
-	sportTypes, err := r.facets(ctx, athleteID, "a.sport_type", "a.sport_type != ''")
+	sportTypes, err := r.facets(ctx, athleteID, facetSportType)
 	if err != nil {
 		return nil, err
 	}
@@ -184,15 +184,39 @@ func (r *PhotoRepository) List(ctx context.Context, athleteID int64, f PhotoList
 	}, nil
 }
 
-func (r *PhotoRepository) facets(ctx context.Context, athleteID int64, expr string, where string) ([]PhotoFacetCount, error) {
-	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT %s AS value, COUNT(*) AS count
-		FROM photos p
-		JOIN activities a ON a.id = p.activity_id
-		WHERE p.athlete_id = ? AND %s
-		GROUP BY value
-		ORDER BY count DESC, value ASC
-	`, expr, where), athleteID)
+type facetType string
+
+const (
+	facetCountry   facetType = "country"
+	facetSportType facetType = "sport_type"
+)
+
+func (r *PhotoRepository) facets(ctx context.Context, athleteID int64, facet facetType) ([]PhotoFacetCount, error) {
+	var query string
+	switch facet {
+	case facetCountry:
+		query = `
+			SELECT COALESCE(a.location_country, '') AS value, COUNT(*) AS count
+			FROM photos p
+			JOIN activities a ON a.id = p.activity_id
+			WHERE p.athlete_id = ? AND COALESCE(a.location_country, '') != ''
+			GROUP BY value
+			ORDER BY count DESC, value ASC
+		`
+	case facetSportType:
+		query = `
+			SELECT a.sport_type AS value, COUNT(*) AS count
+			FROM photos p
+			JOIN activities a ON a.id = p.activity_id
+			WHERE p.athlete_id = ? AND a.sport_type != ''
+			GROUP BY value
+			ORDER BY count DESC, value ASC
+		`
+	default:
+		return nil, fmt.Errorf("unknown facet type: %s", facet)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, athleteID)
 	if err != nil {
 		return nil, err
 	}

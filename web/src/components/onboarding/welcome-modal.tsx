@@ -1,4 +1,4 @@
-import { useAuthStatus } from '@/lib/data'
+import { useAuthStatus } from '@/lib/api'
 import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
 import { useOnboardingStore } from '@/stores'

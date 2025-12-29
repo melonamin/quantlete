@@ -520,9 +520,11 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 	query += " ORDER BY start_date DESC"
 
 	if filters.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", filters.Limit)
+		query += " LIMIT ?"
+		args = append(args, filters.Limit)
 		if filters.Offset > 0 {
-			query += fmt.Sprintf(" OFFSET %d", filters.Offset)
+			query += " OFFSET ?"
+			args = append(args, filters.Offset)
 		}
 	}
 

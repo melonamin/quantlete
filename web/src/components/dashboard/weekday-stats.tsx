@@ -1,5 +1,5 @@
 import { DonutChart } from '@/components/charts'
-import { useWeekdayDistribution } from '@/lib/data'
+import { useWeekdayDistribution } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 
 export function WeekdayStats() {

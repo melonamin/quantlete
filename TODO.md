@@ -20,7 +20,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
 | 10    | Feature Parity & Beyond | Gap features + unique enhancements       | ~90%        |
 | 11    | WASM Mode               | Browser-only version with SQLite-WASM    | ~70%        |
-| 12    | Polish                  | PWA, i18n, settings, badges              |             |
+| 12    | Polish                  | PWA, i18n, settings, badges, security    | ~40%        |
 
 ---
 
@@ -138,9 +138,11 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Request logging middleware
   - [x] CORS middleware (for dev mode)
   - [x] Recovery middleware
+  - [x] CSRF protection middleware
+  - [x] Security headers (CSP, X-Content-Type-Options, etc.)
 - [x] Create `cmd/stata/serve.go` command
 - [x] Implement graceful shutdown
-- [ ] Serve static files from embedded React build
+- [x] Serve static files from embedded React build
 - [x] Verify server starts and serves placeholder page
 
 ### 1.3 Strava OAuth Flow
@@ -205,14 +207,27 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Migration tracking table
   - [x] Run pending migrations
   - [ ] Rollback support (optional)
-- [x] Create `schema/migrations/001_initial.sql`:
+- [x] Create `schema/migrations/001_initial.sql` (consolidated schema):
   - [x] Athletes table
   - [x] Auth tokens table
-- [x] Create `schema/migrations/002_activities.sql`:
   - [x] Activities table with all fields
-  - [x] Indexes
-- [x] Create `schema/migrations/003_streams.sql`:
   - [x] Activity streams table
+  - [x] Gear and maintenance tables
+  - [x] Segments and segment efforts tables
+  - [x] Best efforts table
+  - [x] Photos table
+  - [x] Challenges table
+  - [x] Goals and HR zones tables
+  - [x] Dashboard config table
+  - [x] All indexes
+- [x] Create `schema/migrations/002_analytics_views.sql`:
+  - [x] Daily distances view (for Eddington)
+  - [x] Best effort rankings view
+  - [x] Monthly/yearly stats views
+- [x] Create `schema/migrations/003_sync_history.sql`:
+  - [x] Sync run records and watermarks
+- [x] Create `schema/migrations/004_additional_indexes.sql`
+- [x] Create `schema/migrations/005_cascade_constraints.sql`
 - [x] Embed migrations using `go:embed`
 
 ### 2.3 Activity Repository
@@ -290,7 +305,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Badge
   - [x] Skeleton
   - [x] Separator
-  - [ ] Dialog (add when needed)
+  - [x] Dialog
   - [ ] Dropdown Menu (add when needed)
   - [ ] Input (add when needed)
   - [ ] Select (add when needed)
@@ -334,8 +349,8 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 3.8 Integration
 
-- [ ] Embed React build in Go binary using `go:embed`
-- [ ] Serve React from Go server
+- [x] Embed React build in Go binary using `go:embed`
+- [x] Serve React from Go server
 - [x] Configure Vite proxy for API in dev mode
 - [x] Test full stack integration
 
@@ -354,11 +369,11 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Search
 - [x] Implement `GET /api/v1/activities/:id`:
   - [x] Full activity detail
-  - [ ] Include gear info
-- [ ] Implement `GET /api/v1/activities/:id/streams`:
-  - [ ] Return stream data
-- [ ] Implement `GET /api/v1/activities/:id/photos`:
-  - [ ] Return photo URLs
+  - [x] Include gear info
+- [x] Implement `GET /api/v1/activities/:id/streams`:
+  - [x] Return stream data
+- [x] Implement `GET /api/v1/activities/:id/photos`:
+  - [x] Return photo URLs
 
 ### 4.2 Activities List Page
 
@@ -366,13 +381,13 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] TanStack Query hook
   - [x] Filter state management
   - [x] Pagination state
-- [ ] Create `web/src/components/activities/activity-filters.tsx`:
-  - [ ] Sport type multi-select
-  - [ ] Date range picker
-  - [ ] Gear dropdown
-  - [ ] Commute toggle
-  - [ ] Search input
-  - [ ] Clear filters button
+- [x] Create `web/src/components/activities/activity-filters.tsx`:
+  - [x] Sport type quick filters
+  - [x] Date range picker (from/to)
+  - [x] Commute/Trainer toggles
+  - [x] Search input with debounce
+  - [x] Clear filters button
+  - [x] Advanced filters panel toggle
 - [x] Create `web/src/components/activities/activities-table.tsx`:
   - [x] Activity table with columns
   - [x] Loading skeleton
@@ -395,8 +410,8 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [x] Create `web/src/components/activities/activity-stats.tsx`:
   - [x] Grid of key metrics
   - [x] Conditional display based on sport type
-- [ ] Create `web/src/components/activities/activity-map.tsx`:
-  - [ ] Route visualization (Phase 7)
+- [x] Create `web/src/components/maps/activity-map.tsx`:
+  - [x] Route visualization (implemented in Phase 7)
 
 ### 4.4 Import Functionality
 
@@ -411,11 +426,11 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Import progress display
   - [x] Start/cancel import buttons
 
-### 4.5 Activity Streams (Preparation)
+### 4.5 Activity Streams (Preparation) ✓
 
-- [ ] Create stream data hooks
-- [ ] Create stream data types
-- [ ] Prepare for chart integration (Phase 6)
+- [x] Create stream data hooks
+- [x] Create stream data types
+- [x] Prepare for chart integration (Phase 6)
 
 ---
 
@@ -733,7 +748,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 8.1 Segments
 
-- [x] Create `schema/migrations/005_segments.sql`:
+- [x] Create segments schema (in `schema/migrations/001_initial.sql`):
   - [x] Segments table (id, name, distance, avg_grade, max_grade, climb_category, start_latlng, end_latlng, starred, polyline)
   - [x] Segment efforts table (segment_id, activity_id, elapsed_time, moving_time, start_date, pr_rank, avg_watts, avg_hr)
   - [x] Indexes for efficient queries
@@ -770,7 +785,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 8.2 Gear
 
-- [x] Create `schema/migrations/004_gear.sql`
+- [x] Create gear schema (in `schema/migrations/001_initial.sql`)
 - [x] Create `internal/storage/gear.go`
 - [x] Implement gear API endpoints
 - [x] Create `web/src/pages/gear.tsx`:
@@ -798,7 +813,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 8.3 Gear Maintenance
 
-- [x] Create `schema/migrations/006_maintenance.sql`:
+- [x] Create maintenance schema (in `schema/migrations/001_initial.sql`):
   - [x] Components table (id, gear_id, name, image_url, created_at)
   - [x] Maintenance rules table (component_id, type, threshold_value)
   - [x] Maintenance log table (component_id, activity_id, completed_at)
@@ -854,7 +869,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 8.5 Photos
 
-- [x] Create `schema/migrations/007_photos.sql`:
+- [x] Create photos schema (in `schema/migrations/001_initial.sql`):
   - [x] Photos table (id, activity_id, url, thumbnail_url, caption, location)
 - [x] Create `internal/strava/photos.go`:
   - [x] Fetch activity photos API call
@@ -877,8 +892,10 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ### 8.6 Challenges
 
-- [x] Create `schema/migrations/008_challenges.sql`:
+- [x] Create challenges schema (in `schema/migrations/001_initial.sql`):
   - [x] Challenges table (id, name, slug, badge_url, completion_date, month)
+- [x] Create `schema/migrations/006_challenge_local_badge.sql`:
+  - [x] Local badge caching support
 - [x] Create challenge scraping:
   - [x] Scrape visible challenges from public profile
   - [x] Parse trophy case HTML export (manual import option)
@@ -941,7 +958,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [x] Create `internal/strava/best_efforts.go`:
   - [x] Parse best_efforts from activity response
   - [x] Calculate best efforts for standard distances
-- [x] Create `schema/migrations/009_best_efforts.sql`:
+- [x] Create best efforts schema (in `schema/migrations/001_initial.sql`):
   - [x] Best efforts table (activity_id, distance_type, elapsed_time, start_index, end_index)
 - [x] Create `internal/storage/best_efforts.go`:
   - [x] Store best efforts per activity
@@ -1039,13 +1056,13 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 Compared against reference project (statistics-for-strava PHP implementation):
 
-| Category | Missing Features | Priority |
-|----------|-----------------|----------|
-| Dashboard Widgets | 6 widgets | High |
-| Pages | 2 pages | Medium |
-| Heatmap Features | 4 features | Medium |
-| UX Enhancements | 5 features | Medium |
-| Beyond Reference | 8 features | High |
+| Category | Status | Remaining |
+|----------|--------|-----------|
+| Dashboard Widgets | ✓ Complete | 0 |
+| Pages | ~95% | Badge Display Page |
+| Heatmap Features | ~75% | Route Preview on Hover |
+| UX Enhancements | ~80% | Connected Charts |
+| Beyond Reference | ~50% | Weather, Route Similarity, Training Plans, Social |
 
 ---
 
@@ -1510,25 +1527,25 @@ Comprehensive data export capabilities.
 - [ ] Configure installable prompt
 - [ ] Test PWA installation
 
-### 12.2 Unit System
+### 12.2 Unit System ✓
 
-- [ ] Create unit conversion utilities
-- [ ] Add unit system selector
-- [ ] Apply unit formatting throughout app
-- [ ] Persist preference
+- [x] Create unit conversion utilities (`web/src/lib/format.ts`)
+- [x] Add unit system selector (Settings store)
+- [x] Apply unit formatting throughout app
+- [x] Persist preference (Zustand persist middleware)
 
-### 12.3 Settings Page
+### 12.3 Settings Page ✓
 
-- [ ] Create `web/src/pages/settings.tsx`:
-  - [ ] Profile section (photo, name)
-  - [ ] Display settings (units, locale, theme)
-  - [ ] Import settings
-  - [ ] Heart rate zones configuration
-  - [ ] FTP history management
-  - [ ] Weight history management
-  - [ ] Dashboard configuration
+- [x] Create `web/src/pages/settings.tsx`:
+  - [x] Profile section (athlete name from Strava)
+  - [x] Strava connection status and OAuth
+  - [x] Import settings (streams, segments, best efforts, photos)
+  - [x] Heart rate zones configuration
+  - [x] FTP history management
+  - [x] Weight history management
+  - [x] Virtual world tile layer settings
+  - [ ] Theme selector (dark/light/system)
   - [ ] Notification settings
-  - [ ] Data export
 
 ### 12.4 SVG Badges
 
@@ -1566,7 +1583,17 @@ Comprehensive data export capabilities.
   - [ ] Maintenance due
   - [ ] New features (optional)
 
-### 12.8 Final Polish
+### 12.8 Security Hardening ✓
+
+- [x] CSRF protection middleware (Origin header validation)
+- [x] Content Security Policy (CSP) headers
+- [x] X-Frame-Options, X-Content-Type-Options headers
+- [x] SSRF protection for URL imports (allowlist validation)
+- [x] Authentication checks on export endpoints
+- [x] SQL injection prevention (parameterized queries)
+- [x] Export activity limits (MaxExportActivities)
+
+### 12.9 Final Polish
 
 - [ ] Accessibility audit:
   - [ ] ARIA labels

@@ -79,7 +79,7 @@ export function SegmentsPage() {
   }, [activityType, country, starredOnly, komOnly, search])
 
   const { data: segments, isLoading, error } = useSegments(apiFilters)
-  const { data: countries } = useSegmentCountries(true)
+  const { data: countries } = useSegmentCountries()
 
   const sportOptions = useMemo(() => {
     const types = new Set<string>()
@@ -101,7 +101,7 @@ export function SegmentsPage() {
     return list
   }, [segments, sortKey, sortDir])
 
-  const detailQuery = useSegmentDetail(selectedSegmentId ?? 0, selectedSegmentId != null)
+  const detailQuery = useSegmentDetail(selectedSegmentId, selectedSegmentId != null)
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {

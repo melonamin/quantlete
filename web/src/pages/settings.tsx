@@ -13,7 +13,7 @@ import {
   useUpdateWeightHistory,
   useUpsertHrZoneDefinition,
   useWeightHistory,
-} from '@/lib/data'
+} from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
@@ -23,7 +23,7 @@ import { ImportStatus } from '@/components/sync/import-status'
 import { SyncHistoryModal } from '@/components/sync/sync-history-modal'
 import { Loader2, Check, X, ChevronDown, ChevronRight, History, Clock, AlertCircle } from 'lucide-react'
 import { LineChart } from '@/components/charts'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDistance } from 'date-fns'
 
 export function SettingsPage() {
@@ -68,16 +68,22 @@ export function SettingsPage() {
     cancelImport.mutate()
   }
 
-  const handleImportComplete = () => {
-    // Invalidate activities data to refresh after import
-    queryClient.invalidateQueries({ queryKey: ['data', 'activities'] })
-    queryClient.invalidateQueries({ queryKey: ['data', 'dashboard'] })
-  }
+  // Track previous import status to detect completion
+  const prevImportStatusRef = useRef<string | undefined>(undefined)
 
   // Invalidate activities when import completes
-  if (progress?.status === 'completed' && startImport.isSuccess) {
-    handleImportComplete()
-  }
+  useEffect(() => {
+    const currentStatus = progress?.status
+    const prevStatus = prevImportStatusRef.current
+
+    // Detect transition to 'completed' status
+    if (currentStatus === 'completed' && prevStatus === 'running') {
+      queryClient.invalidateQueries({ queryKey: ['data', 'activities'] })
+      queryClient.invalidateQueries({ queryKey: ['data', 'dashboard'] })
+    }
+
+    prevImportStatusRef.current = currentStatus
+  }, [progress?.status, queryClient])
 
   return (
     <div className="container mx-auto px-4 py-8">

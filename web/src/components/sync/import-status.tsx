@@ -121,7 +121,14 @@ function RateLimitCountdown({ waitingUntil }: { waitingUntil: string }) {
   const [timeRemaining, setTimeRemaining] = useState('')
 
   useEffect(() => {
-    const targetTime = new Date(waitingUntil).getTime()
+    const targetDate = new Date(waitingUntil)
+    const targetTime = targetDate.getTime()
+
+    // Validate that the date is valid
+    if (Number.isNaN(targetTime)) {
+      setTimeRemaining('Unknown')
+      return
+    }
 
     const updateCountdown = () => {
       const now = Date.now()

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 
 // Suppress harmless echarts-for-react warnings in development mode:
@@ -86,14 +86,14 @@ export function EChartsWrapper({
 }: EChartsWrapperProps) {
   const chartRef = useRef<ReactEChartsCore>(null)
 
-  useEffect(() => {
-    const handleResize = () => {
-      chartRef.current?.getEchartsInstance()?.resize()
-    }
+  const handleResize = useCallback(() => {
+    chartRef.current?.getEchartsInstance()?.resize()
+  }, [])
 
+  useEffect(() => {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [handleResize])
 
   if (loading) {
     return (

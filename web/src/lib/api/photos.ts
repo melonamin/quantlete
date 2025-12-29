@@ -1,6 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
-
 export interface PhotoListItem {
   id: string
   activity_id: number
@@ -48,29 +45,4 @@ export interface ActivityPhoto {
   created_at: string
 }
 
-export const photoKeys = {
-  all: ['photos'] as const,
-  list: (filters: PhotosFilters) => [...photoKeys.all, 'list', filters] as const,
-  activity: (activityId: number) => [...photoKeys.all, 'activity', activityId] as const,
-}
-
-export function usePhotos(filters: PhotosFilters = {}) {
-  return useQuery({
-    queryKey: photoKeys.list(filters),
-    queryFn: () =>
-      get<PhotosListResponse>('/photos', {
-        sport_type: filters.sport_type,
-        country: filters.country,
-        page: filters.page,
-        per_page: filters.per_page,
-      }),
-  })
-}
-
-export function useActivityPhotos(activityId: number, enabled = true) {
-  return useQuery({
-    queryKey: photoKeys.activity(activityId),
-    queryFn: () => get<ActivityPhoto[]>(`/activities/${activityId}/photos`),
-    enabled: enabled && activityId > 0,
-  })
-}
+export { usePhotos, useActivityPhotos } from '@/lib/data'

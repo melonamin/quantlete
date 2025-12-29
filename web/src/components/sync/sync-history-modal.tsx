@@ -1,8 +1,9 @@
 /**
  * Sync History Modal - Shows past sync runs with their status and stats.
+ * When a sync is running, shows live progress at the top.
  */
 
-import { useSyncHistory } from '@/lib/data'
+import { useSyncHistory, useImportProgress, useCancelImport } from '@/lib/api'
 import { formatDistance } from 'date-fns'
 import { Clock, Check, X, AlertCircle, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
@@ -13,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { ImportStatus } from './import-status'
 
 interface SyncHistoryModalProps {
   open: boolean
@@ -21,7 +23,11 @@ interface SyncHistoryModalProps {
 
 export function SyncHistoryModal({ open, onOpenChange }: SyncHistoryModalProps) {
   const { data: history, isLoading } = useSyncHistory(20)
+  const { data: progress } = useImportProgress()
+  const cancelImport = useCancelImport()
   const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  const isRunning = progress?.status === 'running'
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '–'
@@ -64,21 +70,51 @@ export function SyncHistoryModal({ open, onOpenChange }: SyncHistoryModalProps) 
     }
   }
 
+  // Filter out the running entry from history when showing live progress
+  const filteredHistory = isRunning
+    ? history?.filter((run) => run.status !== 'running')
+    : history
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Sync History</DialogTitle>
+          <DialogTitle>{isRunning ? 'Sync Progress' : 'Sync History'}</DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {/* Live progress when sync is running */}
+          {isRunning && progress && (
+            <div className="mb-4">
+              <ImportStatus progress={progress} />
+              <div className="flex justify-end mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => cancelImport.mutate()}
+                  disabled={cancelImport.isPending}
+                >
+                  Cancel Sync
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* History list */}
           {isLoading ? (
             <div className="py-8 text-center text-muted-foreground">Loading...</div>
-          ) : !history || history.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No sync history yet</div>
+          ) : !filteredHistory || filteredHistory.length === 0 ? (
+            !isRunning && (
+              <div className="py-8 text-center text-muted-foreground">No sync history yet</div>
+            )
           ) : (
             <div className="space-y-2">
-              {history.map((run) => (
+              {isRunning && filteredHistory.length > 0 && (
+                <div className="text-xs text-muted-foreground font-medium pt-2 pb-1">
+                  Previous syncs
+                </div>
+              )}
+              {filteredHistory.map((run) => (
                 <div
                   key={run.id}
                   className="rounded-lg border border-border overflow-hidden"
@@ -166,7 +202,7 @@ export function SyncHistoryModal({ open, onOpenChange }: SyncHistoryModalProps) 
         </div>
 
         <div className="flex justify-end pt-4 border-t border-border -mx-6 px-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} autoFocus={false}>
             Close
           </Button>
         </div>

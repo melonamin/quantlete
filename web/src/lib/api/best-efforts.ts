@@ -1,6 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { get } from './client'
-
 export interface BestEffortPR {
   distance_type: string
   name: string
@@ -19,36 +16,4 @@ export interface BestEffortItem extends BestEffortPR {
   end_index?: number
 }
 
-export const bestEffortsKeys = {
-  all: ['bestEfforts'] as const,
-  prs: (sportType?: string) => [...bestEffortsKeys.all, 'prs', sportType] as const,
-  distance: (distanceType: string, sportType?: string) =>
-    [...bestEffortsKeys.all, 'distance', distanceType, sportType] as const,
-}
-
-export function useBestEffortPRs(sportType?: string) {
-  return useQuery({
-    queryKey: bestEffortsKeys.prs(sportType),
-    queryFn: () => {
-      const params = sportType ? `?sport_type=${encodeURIComponent(sportType)}` : ''
-      return get<BestEffortPR[]>(`/stats/best-efforts${params}`)
-    },
-  })
-}
-
-export function useBestEffortsForDistance(
-  distanceType: string,
-  sportType?: string,
-  enabled = true
-) {
-  return useQuery({
-    queryKey: bestEffortsKeys.distance(distanceType, sportType),
-    queryFn: () => {
-      const params = sportType ? `?sport_type=${encodeURIComponent(sportType)}` : ''
-      return get<BestEffortItem[]>(
-        `/stats/best-efforts/${encodeURIComponent(distanceType)}${params}`
-      )
-    },
-    enabled: enabled && !!distanceType,
-  })
-}
+export { useBestEffortPRs, useBestEffortsForDistance } from '@/lib/data'

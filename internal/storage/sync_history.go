@@ -108,7 +108,7 @@ func (r *SyncHistoryRepository) CompleteRun(ctx context.Context, runID int64, co
 		UPDATE sync_history SET
 			completed_at = ?,
 			duration_seconds = (
-				SELECT CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER)
+				SELECT CAST(strftime('%s', ?) - strftime('%s', started_at) AS INTEGER)
 				FROM sync_history WHERE id = ?
 			),
 			status = 'completed',
@@ -150,7 +150,7 @@ func (r *SyncHistoryRepository) FailRun(ctx context.Context, runID int64, errMsg
 		UPDATE sync_history SET
 			completed_at = ?,
 			duration_seconds = (
-				SELECT CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER)
+				SELECT CAST(strftime('%s', ?) - strftime('%s', started_at) AS INTEGER)
 				FROM sync_history WHERE id = ?
 			),
 			status = 'failed',
@@ -178,7 +178,7 @@ func (r *SyncHistoryRepository) CancelRun(ctx context.Context, runID int64, coun
 		UPDATE sync_history SET
 			completed_at = ?,
 			duration_seconds = (
-				SELECT CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER)
+				SELECT CAST(strftime('%s', ?) - strftime('%s', started_at) AS INTEGER)
 				FROM sync_history WHERE id = ?
 			),
 			status = 'canceled',
@@ -219,7 +219,7 @@ func (r *SyncHistoryRepository) GetLatest(ctx context.Context, athleteID int64, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var runs []SyncRun
 	for rows.Next() {

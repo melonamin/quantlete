@@ -394,6 +394,24 @@ export class ServerProvider implements DataProvider {
     return response.json()
   }
 
+  async importChallengesFromProfile(athleteId?: string): Promise<{ imported: number }> {
+    const params = new URLSearchParams()
+    if (athleteId) {
+      params.set('athlete_id', athleteId)
+    }
+    const url = `/api/v1/challenges/import-profile${params.toString() ? `?${params}` : ''}`
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      throw new Error(body?.error || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
   // ============================================================================
   // Goals
   // ============================================================================

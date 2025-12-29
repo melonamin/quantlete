@@ -1,5 +1,7 @@
-import type { EChartsOption } from 'echarts'
+import type { EChartsOption, TooltipComponentFormatterCallbackParams } from 'echarts'
 import { EChartsWrapper, defaultGridConfig, defaultTooltipConfig } from './echarts-wrapper'
+
+type LocationValue = [number, number, number] // [lng, lat, count]
 
 export function WorldLocationsChart({
   points,
@@ -11,7 +13,7 @@ export function WorldLocationsChart({
   loading?: boolean
 }) {
   const data = points.map((p) => ({
-    value: [p.lng, p.lat, p.count],
+    value: [p.lng, p.lat, p.count] as LocationValue,
   }))
 
   const option: EChartsOption = {
@@ -19,8 +21,9 @@ export function WorldLocationsChart({
     tooltip: {
       ...defaultTooltipConfig,
       trigger: 'item',
-      formatter: (params: any) => {
-        const v = params?.value as [number, number, number] | undefined
+      formatter: (params: TooltipComponentFormatterCallbackParams) => {
+        if (Array.isArray(params)) return ''
+        const v = params?.value as LocationValue | undefined
         if (!v) return ''
         return `Lat ${v[1].toFixed(2)}, Lng ${v[0].toFixed(2)}<br/>Activities: ${v[2]}`
       },
@@ -46,7 +49,7 @@ export function WorldLocationsChart({
         type: 'effectScatter',
         coordinateSystem: 'cartesian2d',
         data,
-        symbolSize: (val: any) => {
+        symbolSize: (val: number | number[]) => {
           const c = Array.isArray(val) ? Number(val[2]) : 1
           const s = Math.sqrt(Math.max(1, c)) * 3
           return Math.max(4, Math.min(28, s))

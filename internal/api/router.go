@@ -1,6 +1,10 @@
 package api
 
 import (
+	"fmt"
+	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -37,6 +41,96 @@ type Router struct {
 	exportHandler      *handlers.ExportHandler
 }
 
+// securityHeaders middleware adds security headers to all responses.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		// Content Security Policy for HTML responses
+		// Allows: same-origin scripts/styles, inline styles for React, images from anywhere (for Strava badges),
+		// and connections to Strava API
+		if r.Header.Get("Accept") == "" || r.URL.Path == "/" || !isAPIPath(r.URL.Path) {
+			csp := "default-src 'self'; " +
+				"script-src 'self'; " +
+				"style-src 'self' 'unsafe-inline'; " +
+				"img-src 'self' data: https:; " +
+				"font-src 'self' data:; " +
+				"connect-src 'self' https://www.strava.com https://strava.com; " +
+				"frame-ancestors 'none';"
+			w.Header().Set("Content-Security-Policy", csp)
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isAPIPath checks if the request path is an API endpoint.
+func isAPIPath(path string) bool {
+	return len(path) >= 5 && path[:5] == "/api/"
+}
+
+// csrfProtection middleware validates Origin header for state-changing requests.
+// This prevents CSRF attacks by ensuring requests come from the same origin.
+func csrfProtection(allowedOrigins []string) func(http.Handler) http.Handler {
+	originSet := make(map[string]bool, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		originSet[o] = true
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Only check state-changing methods
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Check Origin header
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				// Fallback to Referer if Origin not present (some browsers don't send Origin)
+				origin = r.Header.Get("Referer")
+				if origin != "" {
+					// Extract just the origin from referer URL
+					if len(origin) > 0 {
+						// Simple extraction: take everything up to the third slash
+						slashCount := 0
+						for i, c := range origin {
+							if c == '/' {
+								slashCount++
+								if slashCount == 3 {
+									origin = origin[:i]
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// If no origin provided and it's an API request with auth token, allow it
+			// Token-based auth is inherently CSRF-resistant since tokens must be explicitly sent
+			if origin == "" {
+				if r.Header.Get("Authorization") != "" {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			// Validate origin against allowlist
+			if origin != "" && !originSet[origin] {
+				http.Error(w, "CSRF validation failed: invalid origin", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // NewRouter creates a new HTTP router with all routes configured.
 func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, imp *importer.Importer) *Router {
 	r := chi.NewRouter()
@@ -47,17 +141,35 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(securityHeaders)
 
-	// CORS for development
+	// Configure allowed origins for CORS and CSRF
+	var allowedOrigins []string
 	if cfg.Server.DevMode {
+		allowedOrigins = []string{"http://localhost:5173", "http://localhost:8081"}
 		r.Use(cors.Handler(cors.Options{
-			AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:8081"},
+			AllowedOrigins:   allowedOrigins,
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 			AllowCredentials: true,
 			MaxAge:           300,
 		}))
+	} else {
+		// In production, allow same-origin requests
+		// The frontend is embedded and served from the same origin
+		host := cfg.Server.Host
+		if host == "" {
+			host = "localhost"
+		}
+		origin := "http://" + host
+		if cfg.Server.Port != 80 && cfg.Server.Port != 0 {
+			origin = fmt.Sprintf("http://%s:%d", host, cfg.Server.Port)
+		}
+		allowedOrigins = []string{origin}
 	}
+
+	// CSRF protection for state-changing requests
+	r.Use(csrfProtection(allowedOrigins))
 
 	// Create repositories
 	activityRepo := storage.NewActivityRepository(db)
@@ -95,7 +207,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	gearHandler := handlers.NewGearHandler(gearRepo, stravaClient)
 	maintenanceHandler := handlers.NewMaintenanceHandler(maintenanceRepo, stravaClient)
 	photosHandler := handlers.NewPhotosHandler(photoRepo, stravaClient)
-	challengesHandler := handlers.NewChallengesHandler(challengeRepo, stravaClient)
+	challengesHandler := handlers.NewChallengesHandler(challengeRepo, stravaClient, cfg.Storage.DataDir)
 	exportHandler := handlers.NewExportHandler(activityRepo, stravaClient)
 
 	router := &Router{
@@ -222,6 +334,7 @@ func (r *Router) mountRoutes() {
 		router.Route("/challenges", func(router chi.Router) {
 			router.Get("/", r.challengesHandler.List)
 			router.Post("/import", r.challengesHandler.Import)
+			router.Post("/import-profile", r.challengesHandler.ImportFromProfile)
 		})
 
 		// Segments routes
@@ -269,6 +382,26 @@ func (r *Router) mountRoutes() {
 		})
 	})
 
+	// Serve locally stored challenge badge images
+	// URL: /files/challenges/{filename} -> {dataDir}/challenges/{filename}
+	r.Get("/files/challenges/*", r.serveDataFile)
+
 	// Static file serving (placeholder for embedded files)
 	r.Get("/*", handlers.ServeFrontend)
+}
+
+// serveDataFile serves static files from the data directory.
+func (r *Router) serveDataFile(w http.ResponseWriter, req *http.Request) {
+	// Extract the file path from the URL
+	urlPath := strings.TrimPrefix(req.URL.Path, "/files/")
+	if urlPath == "" || strings.Contains(urlPath, "..") {
+		http.NotFound(w, req)
+		return
+	}
+
+	// Construct the full file path
+	filePath := filepath.Join(r.cfg.Storage.DataDir, urlPath)
+
+	// Serve the file
+	http.ServeFile(w, req, filePath)
 }

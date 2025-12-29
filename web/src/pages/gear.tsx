@@ -552,11 +552,11 @@ function CustomGearModal({
 }
 
 function MaintenancePanel({ gear }: { gear: Gear[] }) {
-  const { data: due, isLoading: dueLoading } = useMaintenanceDue(true)
+  const { data: due, isLoading: dueLoading } = useMaintenanceDue()
   const gearByID = useMemo(() => new Map(gear.map((g) => [g.id, g])), [gear])
 
   const [selectedGearId, setSelectedGearId] = useState(() => gear[0]?.id ?? '')
-  const { data: components } = useGearComponents(selectedGearId, !!selectedGearId)
+  const { data: components } = useGearComponents(selectedGearId)
 
   const createComponent = useCreateComponent()
   const updateComponent = useUpdateComponent()
@@ -733,9 +733,9 @@ function MaintenancePanel({ gear }: { gear: Gear[] }) {
           onClose={() => setComponentModal(null)}
           onCreate={(req) =>
             createComponent.mutate(
-              { gearId: selectedGearId, req },
-              { onSuccess: () => setComponentModal(null) }
-            )
+              { gearId: selectedGearId, body: req },
+                { onSuccess: () => setComponentModal(null) }
+              )
           }
           onUpdate={(id, req) =>
             updateComponent.mutate({ id, req }, { onSuccess: () => setComponentModal(null) })

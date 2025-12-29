@@ -23,6 +23,7 @@ import type {
   Challenge,
   ComponentWithRules,
   CreateComponentRequest,
+  UpdateComponentRequest,
   CustomGearCreateRequest,
   DashboardConfig,
   DashboardData,
@@ -396,7 +397,7 @@ export function useUpdateTrainingGoals() {
 // Activities
 // ============================================================================
 
-export function useActivities(filters: ActivityFilters) {
+export function useActivities(filters: ActivityFilters = {}) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -418,7 +419,7 @@ export function useActivity(id: number) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getActivity(id)
     },
-    enabled: initialized && !error && !!provider,
+    enabled: id > 0 && initialized && !error && !!provider,
   })
 }
 
@@ -431,7 +432,7 @@ export function useActivityStreams(id: number, enabled = true) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getActivityStreams(id)
     },
-    enabled: enabled && initialized && !error && !!provider,
+    enabled: enabled && id > 0 && initialized && !error && !!provider,
   })
 }
 
@@ -482,7 +483,7 @@ export function useEddingtonHistory(sportType?: string) {
 // Import
 // ============================================================================
 
-export function useImportProgress() {
+export function useImportProgress(enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -491,7 +492,7 @@ export function useImportProgress() {
       if (!provider) throw new Error('Provider not ready')
       return provider.getImportProgress()
     },
-    enabled: initialized && !error && !!provider,
+    enabled: enabled && initialized && !error && !!provider,
     refetchInterval: (query) => {
       const data = query.state.data
       if (data?.status === 'running') {
@@ -532,7 +533,7 @@ export function useCancelImport() {
   })
 }
 
-export function useSyncHistory(limit = 10) {
+export function useSyncHistory(limit = 10, opts: { enabled?: boolean } = {}) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -541,7 +542,7 @@ export function useSyncHistory(limit = 10) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getSyncHistory(limit)
     },
-    enabled: initialized && !error && !!provider,
+    enabled: (opts.enabled ?? true) && initialized && !error && !!provider,
   })
 }
 
@@ -558,7 +559,7 @@ export function useLatestSync() {
   })
 }
 
-export function useSyncWatermark(opts: { enabled?: boolean } = {}) {
+export function useSyncWatermark(enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -567,7 +568,7 @@ export function useSyncWatermark(opts: { enabled?: boolean } = {}) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getSyncWatermark()
     },
-    enabled: (opts.enabled ?? true) && initialized && !error && !!provider,
+    enabled: enabled && initialized && !error && !!provider,
   })
 }
 
@@ -834,7 +835,7 @@ export function useSegments(filters: SegmentsFilters = {}) {
   })
 }
 
-export function useSegmentCountries() {
+export function useSegmentCountries(enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -843,11 +844,11 @@ export function useSegmentCountries() {
       if (!provider) throw new Error('Provider not ready')
       return provider.getSegmentCountries()
     },
-    enabled: initialized && !error && !!provider,
+    enabled: enabled && initialized && !error && !!provider,
   })
 }
 
-export function useSegmentDetail(id: number | null) {
+export function useSegmentDetail(id: number | null, enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -856,7 +857,7 @@ export function useSegmentDetail(id: number | null) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getSegmentDetail(id!)
     },
-    enabled: !!id && initialized && !error && !!provider,
+    enabled: enabled && !!id && initialized && !error && !!provider,
   })
 }
 
@@ -877,7 +878,7 @@ export function useSegmentEfforts(id: number | null) {
 // Maintenance
 // ============================================================================
 
-export function useMaintenanceDue() {
+export function useMaintenanceDue(enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -886,7 +887,7 @@ export function useMaintenanceDue() {
       if (!provider) throw new Error('Provider not ready')
       return provider.getMaintenanceDue()
     },
-    enabled: initialized && !error && !!provider,
+    enabled: enabled && initialized && !error && !!provider,
   })
 }
 
@@ -903,14 +904,14 @@ export function useGearComponents(gearId: string | null) {
   })
 }
 
-export function useCreateComponent(gearId: string | null) {
+export function useCreateComponent() {
   const { provider, initialized } = useDataProviderStatus()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (req: CreateComponentRequest) => {
-      if (!provider || !initialized || !gearId) throw new Error('Provider not ready')
-      return provider.createComponent(gearId, req)
+    mutationFn: async (params: { gearId: string; body: CreateComponentRequest }) => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.createComponent(params.gearId, params.body)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'gear', 'components'] })
@@ -923,9 +924,9 @@ export function useUpdateComponent() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: { id: number; body: UpdateComponentRequest }) => {
+    mutationFn: async (params: { id: number; req: UpdateComponentRequest }) => {
       if (!provider || !initialized) throw new Error('Provider not ready')
-      return provider.updateComponent(params.id, params.body)
+      return provider.updateComponent(params.id, params.req)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'gear', 'components'] })
@@ -938,9 +939,9 @@ export function useDeleteComponent() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (params: { id: number }) => {
       if (!provider || !initialized) throw new Error('Provider not ready')
-      return provider.deleteComponent(id)
+      return provider.deleteComponent(params.id)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'gear', 'components'] })
@@ -980,7 +981,7 @@ export function usePhotos(filters: PhotosFilters = {}) {
   })
 }
 
-export function useActivityPhotos(activityId: number | null) {
+export function useActivityPhotos(activityId: number | null, enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -989,7 +990,7 @@ export function useActivityPhotos(activityId: number | null) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getActivityPhotos(activityId!)
     },
-    enabled: !!activityId && initialized && !error && !!provider,
+    enabled: enabled && !!activityId && activityId > 0 && initialized && !error && !!provider,
   })
 }
 
@@ -1010,7 +1011,7 @@ export function useBestEffortPRs(sportType?: string) {
   })
 }
 
-export function useBestEffortsForDistance(distanceType: string, sportType?: string) {
+export function useBestEffortsForDistance(distanceType: string, sportType?: string, enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -1019,7 +1020,7 @@ export function useBestEffortsForDistance(distanceType: string, sportType?: stri
       if (!provider) throw new Error('Provider not ready')
       return provider.getBestEffortsForDistance(distanceType, sportType)
     },
-    enabled: initialized && !error && !!provider,
+    enabled: enabled && !!distanceType && initialized && !error && !!provider,
   })
 }
 
@@ -1040,7 +1041,7 @@ export function useRewindYears() {
   })
 }
 
-export function useRewindReport(year: number) {
+export function useRewindReport(year: number, enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
@@ -1049,7 +1050,7 @@ export function useRewindReport(year: number) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getRewind(year)
     },
-    enabled: initialized && !error && !!provider,
+    enabled: enabled && initialized && !error && !!provider,
   })
 }
 
@@ -1079,9 +1080,24 @@ export function useImportChallenges() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (params: { file: File }) => {
       if (!provider || !initialized) throw new Error('Provider not ready')
-      return provider.importChallenges(file)
+      return provider.importChallenges(params.file)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['data', 'challenges'] })
+    },
+  })
+}
+
+export function useImportChallengesFromProfile() {
+  const { provider, initialized } = useDataProviderStatus()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params?: { athleteId?: string }) => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.importChallengesFromProfile(params?.athleteId)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'challenges'] })

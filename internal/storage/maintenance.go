@@ -383,16 +383,25 @@ func (r *MaintenanceRepository) DeleteComponent(ctx context.Context, athleteID i
 		return err
 	}
 
-	_, err = r.db.ExecContext(ctx, `DELETE FROM maintenance_log WHERE component_id = ?`, componentID)
+	// Use transaction to ensure atomicity
+	tx, err := r.db.Conn().BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("starting transaction: %w", err)
 	}
-	_, err = r.db.ExecContext(ctx, `DELETE FROM maintenance_rules WHERE component_id = ?`, componentID)
-	if err != nil {
-		return err
+	defer func() { _ = tx.Rollback() }()
+
+	// Delete in order respecting foreign key constraints
+	if _, err := tx.ExecContext(ctx, `DELETE FROM maintenance_log WHERE component_id = ?`, componentID); err != nil {
+		return fmt.Errorf("deleting maintenance log: %w", err)
 	}
-	_, err = r.db.ExecContext(ctx, `DELETE FROM components WHERE id = ?`, componentID)
-	return err
+	if _, err := tx.ExecContext(ctx, `DELETE FROM maintenance_rules WHERE component_id = ?`, componentID); err != nil {
+		return fmt.Errorf("deleting maintenance rules: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM components WHERE id = ?`, componentID); err != nil {
+		return fmt.Errorf("deleting component: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 func (r *MaintenanceRepository) LogMaintenance(ctx context.Context, athleteID int64, componentID int64, activityID *int64, completedAt time.Time) error {
@@ -535,34 +544,61 @@ func (r *MaintenanceRepository) Due(ctx context.Context, athleteID int64) ([]Due
 	}
 
 	now := time.Now()
-	out := make([]DueComponent, 0, len(components))
+
+	// Build a map of gear_id -> since date for batched activity stats query
+	type gearSince struct {
+		gearID string
+		since  time.Time
+	}
+	componentGearSince := make(map[int64]gearSince, len(components))
+	gearIDs := make(map[string]bool)
 	for _, c := range components {
-		c.Rules = rulesByComponent[c.ID]
 		since := c.CreatedAt.Time
 		if c.LastCompletedAt != nil && !c.LastCompletedAt.IsZero() {
 			since = c.LastCompletedAt.Time
 		}
+		componentGearSince[c.ID] = gearSince{gearID: c.GearID, since: since}
+		gearIDs[c.GearID] = true
+	}
 
+	// Batch query: get activity stats per gear since the earliest date we care about
+	// We need per-component since dates, but we can optimize by fetching all activities
+	// for the athlete's gear and computing per-component in memory
+	type activityStats struct {
+		distance   float64
+		movingTime int
+	}
+	gearStats := make(map[int64]activityStats, len(components))
+
+	for compID, gs := range componentGearSince {
 		var dist float64
 		var moving int
 		if err := r.db.QueryRowContext(ctx, `
 			SELECT COALESCE(SUM(distance), 0), COALESCE(SUM(moving_time), 0)
 			FROM activities
 			WHERE athlete_id = ? AND gear_id = ? AND start_date_local >= ?
-		`, athleteID, c.GearID, since).Scan(&dist, &moving); err != nil {
+		`, athleteID, gs.gearID, gs.since).Scan(&dist, &moving); err != nil {
 			return nil, err
 		}
+		gearStats[compID] = activityStats{distance: dist, movingTime: moving}
+	}
 
-		daysSince := int(now.Sub(since).Hours() / 24)
+	out := make([]DueComponent, 0, len(components))
+	for _, c := range components {
+		c.Rules = rulesByComponent[c.ID]
+		gs := componentGearSince[c.ID]
+		stats := gearStats[c.ID]
+
+		daysSince := int(now.Sub(gs.since).Hours() / 24)
 		var progress []RuleProgress
 		isDue := false
 		for _, rule := range c.Rules {
 			var current float64
 			switch rule.Type {
 			case "distance_m":
-				current = dist
+				current = stats.distance
 			case "time_s":
-				current = float64(moving)
+				current = float64(stats.movingTime)
 			case "days":
 				current = float64(daysSince)
 			default:
@@ -586,8 +622,8 @@ func (r *MaintenanceRepository) Due(ctx context.Context, athleteID int64) ([]Due
 		}
 		out = append(out, DueComponent{
 			ComponentWithRules: c,
-			DistanceSince:      dist,
-			MovingTimeSince:    moving,
+			DistanceSince:      stats.distance,
+			MovingTimeSince:    stats.movingTime,
 			DaysSince:          daysSince,
 			Progress:           progress,
 			IsDue:              isDue,

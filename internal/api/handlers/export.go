@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
+
+// MaxExportActivities is the maximum number of activities that can be exported at once.
+const MaxExportActivities = 50000
 
 // ExportHandler handles data export endpoints.
 type ExportHandler struct {
@@ -30,6 +34,12 @@ func NewExportHandler(activityRepo *storage.ActivityRepository, stravaClient *st
 // ExportActivitiesCSV exports activities as CSV.
 func (h *ExportHandler) ExportActivitiesCSV(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
 
 	// Parse optional filters
 	filters := storage.ActivityFilters{}
@@ -52,8 +62,8 @@ func (h *ExportHandler) ExportActivitiesCSV(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	// Fetch all activities (no pagination for export)
-	activities, _, err := h.activityRepo.List(ctx, filters, storage.Pagination{Page: 1, PerPage: 100000})
+	// Fetch activities with reasonable limit to prevent DoS
+	activities, _, err := h.activityRepo.List(ctx, filters, storage.Pagination{Page: 1, PerPage: MaxExportActivities})
 	if err != nil {
 		http.Error(w, "Failed to fetch activities", http.StatusInternalServerError)
 		return
@@ -164,6 +174,12 @@ func (h *ExportHandler) ExportActivitiesCSV(w http.ResponseWriter, r *http.Reque
 func (h *ExportHandler) ExportActivitiesJSON(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
 	// Parse optional filters
 	filters := storage.ActivityFilters{}
 
@@ -185,8 +201,8 @@ func (h *ExportHandler) ExportActivitiesJSON(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// Fetch all activities
-	activities, _, err := h.activityRepo.List(ctx, filters, storage.Pagination{Page: 1, PerPage: 100000})
+	// Fetch activities with reasonable limit to prevent DoS
+	activities, _, err := h.activityRepo.List(ctx, filters, storage.Pagination{Page: 1, PerPage: MaxExportActivities})
 	if err != nil {
 		http.Error(w, "Failed to fetch activities", http.StatusInternalServerError)
 		return
@@ -207,6 +223,12 @@ func (h *ExportHandler) ExportActivitiesJSON(w http.ResponseWriter, r *http.Requ
 // ExportStats returns export statistics (counts, date ranges).
 func (h *ExportHandler) ExportStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
 
 	filters := storage.ActivityFilters{}
 
@@ -253,5 +275,7 @@ func (h *ExportHandler) ExportStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("failed to encode export stats response", "error", err)
+	}
 }

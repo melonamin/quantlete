@@ -6,7 +6,14 @@ import { router } from '@/routes/router'
 import { DataProviderWrapper } from '@/lib/data/context'
 import { WelcomeModal } from '@/components/onboarding/welcome-modal'
 import { SyncProgressModal } from '@/components/sync/sync-progress-modal'
+import { useSyncProtection } from '@/hooks/use-sync-protection'
 import './index.css'
+
+// Prevents accidental page refresh/close during active sync
+function SyncProtection() {
+  useSyncProtection()
+  return null
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +31,7 @@ createRoot(document.getElementById('root')!).render(
         <RouterProvider router={router} />
         <WelcomeModal />
         <SyncProgressModal />
+        <SyncProtection />
       </DataProviderWrapper>
     </QueryClientProvider>
   </StrictMode>

@@ -1,4 +1,4 @@
-import type { SportTypeStat } from '@/lib/data'
+import type { SportTypeStat } from '@/lib/api'
 import { getSportIcon, formatSportType, getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'

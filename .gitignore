@@ -11,9 +11,13 @@ tmp/
 *.test
 coverage.out
 coverage.html
+*.prof
+*.bench
 
-# Go workspace
+# Go workspace & cache
 go.work
+go.work.sum
+.gocache/
 
 # Generated code
 *.gen.go

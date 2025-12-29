@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Sidebar, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_EXPANDED_WIDTH } from './sidebar'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useMediaQuery } from '@/lib/hooks'
+import { SyncRefresh } from '@/components/sync/sync-refresh'
 
 interface RootLayoutProps {
   children: ReactNode
@@ -15,6 +16,7 @@ export function RootLayout({ children }: RootLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <SyncRefresh />
       <Sidebar />
 
       {/* Main content area */}

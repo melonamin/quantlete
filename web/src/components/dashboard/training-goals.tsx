@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useTrainingGoals, useUpdateTrainingGoals, type GoalPeriod } from '@/lib/data'
+import { useTrainingGoals, useUpdateTrainingGoals, type GoalPeriod } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import { formatDistance, formatDuration } from '@/lib/format'

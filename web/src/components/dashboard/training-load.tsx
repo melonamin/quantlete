@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useTrainingLoad } from '@/lib/data'
+import { useTrainingLoad } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { LineChart } from '@/components/charts'
 import { Button } from '@/components/ui/button'

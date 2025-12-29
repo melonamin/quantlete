@@ -7,7 +7,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useDataProviderStatus, useStartImport } from '@/lib/data'
+import { useStartImport } from '@/lib/api'
+import { useDataProviderStatus } from '@/lib/data'
 import { isWasmMode } from '@/lib/mode'
 import { exchangeCode } from '@/lib/wasm/strava/client'
 import { useSyncModalStore, markOnboardingComplete } from '@/stores'
@@ -32,9 +33,19 @@ export function OAuthCallbackPage() {
   // Track if we've already processed this callback to prevent double execution
   const processedRef = useRef(false)
 
+  // Store callbacks in refs to avoid stale closures and prevent effect re-runs
+  const startImportRef = useRef(startImport)
+  const openSyncModalRef = useRef(openSyncModal)
+  const navigateRef = useRef(navigate)
+
+  // Keep refs up to date
+  startImportRef.current = startImport
+  openSyncModalRef.current = openSyncModal
+  navigateRef.current = navigate
+
   useEffect(() => {
     async function handleCallback() {
-      // Prevent double execution
+      // Prevent double execution - check before any async work
       if (processedRef.current) return
 
       console.log('[OAuth] handleCallback called', { initialized, hasProvider: !!provider, providerError })
@@ -48,7 +59,7 @@ export function OAuthCallbackPage() {
         return
       }
 
-      // Wait for provider to initialize
+      // Wait for provider to initialize - don't mark as processed yet
       if (!initialized || !provider) {
         setDebugInfo(`Waiting for provider... initialized=${initialized}`)
         return
@@ -78,7 +89,8 @@ export function OAuthCallbackPage() {
         return
       }
 
-      // Mark as processed before async work
+      // Mark as processed BEFORE starting async work to prevent re-entry
+      // If async fails, the error state will be shown but we won't retry automatically
       processedRef.current = true
 
       try {
@@ -98,7 +110,7 @@ export function OAuthCallbackPage() {
         // Start the initial sync
         setDebugInfo('Starting initial sync...')
         try {
-          await startImport.mutateAsync({})
+          await startImportRef.current.mutateAsync({})
           console.log('[OAuth] Import started')
         } catch (importErr) {
           console.error('[OAuth] Failed to start import:', importErr)
@@ -108,8 +120,8 @@ export function OAuthCallbackPage() {
         // Redirect to dashboard and open sync modal after a short delay
         setTimeout(() => {
           // Open sync modal after navigation
-          openSyncModal()
-          navigate({ to: '/' })
+          openSyncModalRef.current()
+          navigateRef.current({ to: '/' })
         }, 1500)
       } catch (err) {
         console.error('OAuth callback error:', err)
@@ -119,7 +131,9 @@ export function OAuthCallbackPage() {
     }
 
     handleCallback()
-  }, [initialized, provider, providerError, search.code, search.error, navigate, startImport, openSyncModal])
+    // Callbacks are stored in refs to avoid stale closures and prevent effect re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialized, provider, providerError, search.code, search.error])
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -164,7 +178,7 @@ export function OAuthCallbackPage() {
             <p className="mt-4 text-lg font-medium">Authentication failed</p>
             <p className="text-muted-foreground">{errorMessage}</p>
             <button
-              onClick={() => navigate({ to: '/' })}
+              onClick={() => navigateRef.current({ to: '/' })}
               className="mt-4 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
             >
               Back to Home

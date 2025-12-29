@@ -1,6 +1,3 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useDataProviderStatus } from '@/lib/data/context'
-
 // Sync run represents a single import/sync history entry.
 export interface SyncRun {
   id: number
@@ -108,84 +105,11 @@ export interface StartImportRequest {
   skip_photos?: boolean
 }
 
-export const importKeys = {
-  progress: ['import', 'progress'] as const,
-  history: ['import', 'history'] as const,
-  watermark: ['import', 'watermark'] as const,
-}
-
-export function useImportProgress(enabled = true) {
-  const { provider, initialized, error } = useDataProviderStatus()
-
-  return useQuery({
-    queryKey: importKeys.progress,
-    queryFn: async (): Promise<ImportProgress> => {
-      if (!provider) throw new Error('Data provider not ready')
-      return provider.getImportProgress()
-    },
-    refetchInterval: (query) => {
-      const data = query.state.data
-      if (data?.status === 'running') {
-        return 1000 // Poll every second while running
-      }
-      return false
-    },
-    enabled: enabled && initialized && !error && !!provider,
-  })
-}
-
-export function useStartImport() {
-  const queryClient = useQueryClient()
-  const { provider, initialized } = useDataProviderStatus()
-
-  return useMutation({
-    mutationFn: async (req: StartImportRequest = {}) => {
-      if (!provider || !initialized) throw new Error('Data provider not ready')
-      return provider.startImport(req)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: importKeys.progress })
-    },
-  })
-}
-
-export function useCancelImport() {
-  const queryClient = useQueryClient()
-  const { provider, initialized } = useDataProviderStatus()
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!provider || !initialized) throw new Error('Data provider not ready')
-      return provider.cancelImport()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: importKeys.progress })
-    },
-  })
-}
-
-export function useSyncHistory(enabled = true) {
-  const { provider, initialized, error } = useDataProviderStatus()
-
-  return useQuery({
-    queryKey: importKeys.history,
-    queryFn: async (): Promise<SyncRun[]> => {
-      if (!provider) throw new Error('Data provider not ready')
-      return provider.getSyncHistory()
-    },
-    enabled: enabled && initialized && !error && !!provider,
-  })
-}
-
-export function useSyncWatermark(enabled = true) {
-  const { provider, initialized, error } = useDataProviderStatus()
-
-  return useQuery({
-    queryKey: importKeys.watermark,
-    queryFn: async (): Promise<SyncWatermark | null> => {
-      if (!provider) throw new Error('Data provider not ready')
-      return provider.getSyncWatermark()
-    },
-    enabled: enabled && initialized && !error && !!provider,
-  })
-}
+export {
+  useImportProgress,
+  useStartImport,
+  useCancelImport,
+  useSyncHistory,
+  useLatestSync,
+  useSyncWatermark,
+} from '@/lib/data'

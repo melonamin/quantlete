@@ -6,7 +6,25 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
+
+// GenerateChallengeID creates a deterministic challenge ID from completion date and name.
+// Format: challenge-{YYYY-MM}_{sanitized_name}
+// This prevents duplicate imports of the same challenge.
+func GenerateChallengeID(completionDate time.Time, name string) string {
+	// Sanitize name: replace whitespace with underscores, lowercase, truncate to 250 chars
+	sanitized := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return '_'
+		}
+		return unicode.ToLower(r)
+	}, name)
+	if len(sanitized) > 250 {
+		sanitized = sanitized[:250]
+	}
+	return fmt.Sprintf("challenge-%s_%s", completionDate.Format("2006-01"), sanitized)
+}
 
 type ParsedChallenge struct {
 	Name           string
@@ -19,8 +37,8 @@ type ParsedChallenge struct {
 var (
 	monthHeadingRe  = regexp.MustCompile(`(?i)\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})\b`)
 	challengeHrefRe = regexp.MustCompile(`href=(?:"|')(?:(?:https?://www\.strava\.com)?/challenges/)([A-Za-z0-9_-]+)(?:/[^"']*)?(?:"|')`)
-	imgSrcRe        = regexp.MustCompile(`(?i)<img[^>]+src=(?:"|')([^"']+)(?:"|')`)
-	imgAltRe        = regexp.MustCompile(`(?i)<img[^>]+alt=(?:"|')([^"']+)(?:"|')`)
+	imgSrcRe        = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
+	imgAltRe        = regexp.MustCompile(`(?i)<img[^>]+alt=["']([^"']+)["']`)
 	datetimeRe      = regexp.MustCompile(`(?i)datetime=(?:"|')(\d{4}-\d{2}-\d{2})(?:[T ][^"']*)?(?:"|')`)
 	dateTextRe      = regexp.MustCompile(`(?i)\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2}),\s*(\d{4})\b`)
 )

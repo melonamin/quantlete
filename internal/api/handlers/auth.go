@@ -16,6 +16,13 @@ import (
 	"github.com/sasha/stata/internal/strava"
 )
 
+// encodeJSON encodes data as JSON and logs any encoding errors.
+func encodeJSON(w http.ResponseWriter, data any) {
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("failed to encode JSON response", "error", err)
+	}
+}
+
 const (
 	oauthStateCookieName = "stata_oauth_state"
 	oauthStateTTL        = 5 * time.Minute
@@ -145,7 +152,7 @@ func (h *AuthHandler) Status(w http.ResponseWriter, _ *http.Request) {
 		resp.ExpiresAt = token.Expiry.Unix()
 	}
 
-	_ = json.NewEncoder(w).Encode(resp)
+	encodeJSON(w, resp)
 }
 
 // RefreshToken handles POST /api/v1/auth/refresh.
@@ -180,7 +187,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		Athlete:       athlete,
 		ExpiresAt:     newToken.Expiry.Unix(),
 	}
-	_ = json.NewEncoder(w).Encode(resp)
+	encodeJSON(w, resp)
 }
 
 // persistAuth saves the athlete and token to the database.

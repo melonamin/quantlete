@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useChallenges } from '@/lib/data'
+import { useChallenges } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'

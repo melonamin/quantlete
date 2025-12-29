@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -82,7 +83,10 @@ func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	responses := make([]GearResponse, len(gear))
 	for i, g := range gear {
-		count, _ := h.repo.GetActivityCount(r.Context(), g.ID)
+		count, err := h.repo.GetActivityCount(r.Context(), g.ID)
+		if err != nil {
+			slog.Error("failed to get activity count for gear", "gear_id", g.ID, "error", err)
+		}
 		responses[i] = gearToResponse(g, count)
 	}
 
@@ -120,7 +124,10 @@ func (h *GearHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, _ := h.repo.GetActivityCount(r.Context(), gearID)
+	count, err := h.repo.GetActivityCount(r.Context(), gearID)
+	if err != nil {
+		slog.Error("failed to get activity count for gear", "gear_id", gearID, "error", err)
+	}
 
 	writeJSON(w, http.StatusOK, gearToResponse(*gear, count))
 }
@@ -150,7 +157,10 @@ func (h *GearHandler) ListCustom(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]GearResponse, 0, len(gear))
 	for _, g := range gear {
-		count, _ := h.repo.GetActivityCount(r.Context(), g.ID)
+		count, err := h.repo.GetActivityCount(r.Context(), g.ID)
+		if err != nil {
+			slog.Error("failed to get activity count for gear", "gear_id", g.ID, "error", err)
+		}
 		out = append(out, gearToResponse(g, count))
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -196,7 +206,10 @@ func (h *GearHandler) CreateCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, _ := h.repo.GetActivityCount(r.Context(), created.ID)
+	count, err := h.repo.GetActivityCount(r.Context(), created.ID)
+	if err != nil {
+		slog.Error("failed to get activity count for gear", "gear_id", created.ID, "error", err)
+	}
 	writeJSON(w, http.StatusCreated, gearToResponse(*created, count))
 }
 
@@ -298,7 +311,10 @@ func (h *GearHandler) UpdateCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, _ := h.repo.GetActivityCount(r.Context(), updated.ID)
+	count, err := h.repo.GetActivityCount(r.Context(), updated.ID)
+	if err != nil {
+		slog.Error("failed to get activity count for gear", "gear_id", updated.ID, "error", err)
+	}
 	writeJSON(w, http.StatusOK, gearToResponse(*updated, count))
 }
 

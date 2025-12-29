@@ -121,6 +121,12 @@ func (h *ActivitiesHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ActivitiesHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -136,6 +142,12 @@ func (h *ActivitiesHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	if activity == nil {
 		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "activity not found"})
+		return
+	}
+
+	// Verify the activity belongs to the authenticated athlete
+	if activity.AthleteID != athlete.ID {
+		writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "access denied"})
 		return
 	}
 
@@ -155,10 +167,31 @@ type ActivityStreamResponse struct {
 func (h *ActivitiesHandler) GetStreams(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid activity ID"})
+		return
+	}
+
+	// Verify the activity belongs to the authenticated athlete
+	activity, err := h.repo.GetByID(ctx, id)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch activity"})
+		return
+	}
+	if activity == nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "activity not found"})
+		return
+	}
+	if activity.AthleteID != athlete.ID {
+		writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "access denied"})
 		return
 	}
 

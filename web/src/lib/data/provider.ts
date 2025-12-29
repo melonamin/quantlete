@@ -191,6 +191,7 @@ export interface DataProvider {
   // ============================================================================
   getChallenges(month?: string): Promise<Challenge[]>
   importChallenges(file: File): Promise<{ imported: number }>
+  importChallengesFromProfile(athleteId?: string): Promise<{ imported: number }>
 
   // ============================================================================
   // Goals

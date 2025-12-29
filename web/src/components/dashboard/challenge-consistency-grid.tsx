@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useTrainingGoals } from '@/lib/data'
+import { useTrainingGoals } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'

@@ -1,7 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useSidebarStore, useSyncModalStore } from '@/stores'
-import { useAppSettings, useAuthStatus, useImportProgress } from '@/lib/data'
+import { useAppSettings, useAuthStatus, useImportProgress } from '@/lib/api'
 import { isWasmMode } from '@/lib/mode'
 import {
   LayoutDashboard,

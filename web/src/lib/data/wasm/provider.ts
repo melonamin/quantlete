@@ -127,9 +127,6 @@ export class WasmProvider implements DataProvider {
     return this.athleteId
   }
 
-  private notImplemented(method: string): never {
-    throw new Error(`[WasmProvider] ${method} not yet implemented. Waiting for generated queries.`)
-  }
 
   // ============================================================================
   // Auth
@@ -191,7 +188,7 @@ export class WasmProvider implements DataProvider {
   }
 
   // ============================================================================
-  // Activities - STUB
+  // Activities
   // ============================================================================
   async getActivities(filters: ActivityFilters): Promise<ActivitiesResponse> {
     const db = this.assertInitialized()
@@ -835,7 +832,7 @@ export class WasmProvider implements DataProvider {
   }
 
   // ============================================================================
-  // Rewind - STUB
+  // Rewind
   // ============================================================================
   async getRewindYears(): Promise<number[]> {
     const db = this.assertInitialized()
@@ -852,58 +849,737 @@ export class WasmProvider implements DataProvider {
     return rows.map((r) => parseInt(r.year, 10))
   }
 
-  async getRewind(_year: number): Promise<RewindReport> {
-    this.notImplemented('getRewind')
+  async getRewind(year: number): Promise<RewindReport> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const yearStr = String(year)
+    const rangeStart = `${yearStr}-01-01`
+    const rangeEnd = `${yearStr}-12-31`
+
+    // Get totals for the year
+    const totals = db.queryOne<{
+      activities: number
+      distance_m: number
+      elevation_m: number
+      moving_time_s: number
+      kudos: number
+      commute_distance_m: number
+    }>(
+      `SELECT
+        COUNT(*) as activities,
+        COALESCE(SUM(distance), 0) as distance_m,
+        COALESCE(SUM(total_elevation_gain), 0) as elevation_m,
+        COALESCE(SUM(moving_time), 0) as moving_time_s,
+        COALESCE(SUM(kudos_count), 0) as kudos,
+        COALESCE(SUM(CASE WHEN commute = 1 THEN distance ELSE 0 END), 0) as commute_distance_m
+      FROM activities
+      WHERE athlete_id = ? AND strftime('%Y', start_date) = ?`,
+      [athleteId, yearStr]
+    )
+
+    // Calculate carbon saved (assuming 0.21 kg CO2/km for car)
+    const carbonSavedKg = ((totals?.commute_distance_m || 0) / 1000) * 0.21
+
+    // Get active days count
+    const activeDays = db.queryOne<{ count: number }>(
+      `SELECT COUNT(DISTINCT DATE(start_date)) as count
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?`,
+      [athleteId, yearStr]
+    )
+
+    // Calculate total days and rest days
+    const totalDays = year === new Date().getFullYear()
+      ? Math.floor((Date.now() - new Date(rangeStart).getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : 365 + (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 1 : 0)
+    const active = activeDays?.count || 0
+    const restDays = totalDays - active
+
+    // Monthly stats
+    const months = db.query<{
+      month: string
+      activities: number
+      distance_m: number
+      elevation_m: number
+    }>(
+      `SELECT
+        strftime('%Y-%m', start_date) as month,
+        COUNT(*) as activities,
+        COALESCE(SUM(distance), 0) as distance_m,
+        COALESCE(SUM(total_elevation_gain), 0) as elevation_m
+      FROM activities
+      WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+      GROUP BY month
+      ORDER BY month`,
+      [athleteId, yearStr]
+    )
+
+    // Get PR counts per month from best_efforts (pr_rank = 1)
+    const prsByMonth = db.query<{ month: string; prs: number }>(
+      `SELECT
+        strftime('%Y-%m', a.start_date) as month,
+        COUNT(*) as prs
+      FROM best_efforts be
+      JOIN activities a ON a.id = be.activity_id
+      WHERE a.athlete_id = ? AND strftime('%Y', a.start_date) = ? AND be.pr_rank = 1
+      GROUP BY month`,
+      [athleteId, yearStr]
+    )
+    const prsMap = new Map(prsByMonth.map((p) => [p.month, p.prs]))
+
+    const monthsWithPrs = months.map((m) => ({
+      month: m.month,
+      activities: m.activities,
+      distance_m: m.distance_m,
+      elevation_m: m.elevation_m,
+      prs: prsMap.get(m.month) || 0,
+    }))
+
+    // Moving time by sport
+    const sportTimes = db.query<{ sport_type: string; moving_time_s: number }>(
+      `SELECT sport_type, COALESCE(SUM(moving_time), 0) as moving_time_s
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       GROUP BY sport_type
+       ORDER BY moving_time_s DESC`,
+      [athleteId, yearStr]
+    )
+
+    // Start times by hour
+    const hourCounts = db.query<{ hour: number; count: number }>(
+      `SELECT CAST(strftime('%H', start_date_local) AS INTEGER) as hour, COUNT(*) as count
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       GROUP BY hour
+       ORDER BY hour`,
+      [athleteId, yearStr]
+    )
+
+    // Locations (start points with counts)
+    const locations = db.query<{ lat: number; lng: number; count: number }>(
+      `SELECT
+        ROUND(start_lat, 2) as lat,
+        ROUND(start_lng, 2) as lng,
+        COUNT(*) as count
+      FROM activities
+      WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+        AND start_lat IS NOT NULL AND start_lng IS NOT NULL
+      GROUP BY lat, lng
+      ORDER BY count DESC
+      LIMIT 100`,
+      [athleteId, yearStr]
+    )
+
+    // Streaks calculation
+    const activityDates = db.query<{ date: string }>(
+      `SELECT DISTINCT DATE(start_date) as date
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       ORDER BY date`,
+      [athleteId, yearStr]
+    )
+
+    const dateSet = new Set(activityDates.map((d) => d.date))
+    let longestActiveDays = 0
+    let longestRestDays = 0
+    let currentActiveStreak = 0
+    let currentRestStreak = 0
+
+    // Iterate through all days of the year
+    const startDate = new Date(rangeStart)
+    const endDate = new Date(Math.min(new Date(rangeEnd).getTime(), Date.now()))
+
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().slice(0, 10)
+      if (dateSet.has(dateStr)) {
+        currentActiveStreak++
+        longestActiveDays = Math.max(longestActiveDays, currentActiveStreak)
+        if (currentRestStreak > 0) {
+          longestRestDays = Math.max(longestRestDays, currentRestStreak)
+          currentRestStreak = 0
+        }
+      } else {
+        currentRestStreak++
+        longestRestDays = Math.max(longestRestDays, currentRestStreak)
+        if (currentActiveStreak > 0) {
+          longestActiveDays = Math.max(longestActiveDays, currentActiveStreak)
+          currentActiveStreak = 0
+        }
+      }
+    }
+
+    // Biggest activities
+    const longestDistance = db.queryOne<{
+      activity_id: number
+      name: string
+      sport_type: string
+      start_date_local: string
+      value: number
+    }>(
+      `SELECT id as activity_id, name, sport_type, start_date_local, distance as value
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       ORDER BY distance DESC
+       LIMIT 1`,
+      [athleteId, yearStr]
+    )
+
+    const mostElevation = db.queryOne<{
+      activity_id: number
+      name: string
+      sport_type: string
+      start_date_local: string
+      value: number
+    }>(
+      `SELECT id as activity_id, name, sport_type, start_date_local, total_elevation_gain as value
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       ORDER BY total_elevation_gain DESC
+       LIMIT 1`,
+      [athleteId, yearStr]
+    )
+
+    const longestDuration = db.queryOne<{
+      activity_id: number
+      name: string
+      sport_type: string
+      start_date_local: string
+      value: number
+    }>(
+      `SELECT id as activity_id, name, sport_type, start_date_local, moving_time as value
+       FROM activities
+       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       ORDER BY moving_time DESC
+       LIMIT 1`,
+      [athleteId, yearStr]
+    )
+
+    // Random photo from the year
+    const randomPhoto = db.queryOne<{
+      id: string
+      activity_id: number
+      url: string
+      caption: string | null
+    }>(
+      `SELECT p.id, p.activity_id, p.url, p.caption
+       FROM photos p
+       JOIN activities a ON a.id = p.activity_id
+       WHERE a.athlete_id = ? AND strftime('%Y', a.start_date) = ?
+       ORDER BY RANDOM()
+       LIMIT 1`,
+      [athleteId, yearStr]
+    )
+
+    return {
+      year,
+      range_start: rangeStart,
+      range_end: rangeEnd,
+      total_days: totalDays,
+      active_days: active,
+      rest_days: restDays,
+      totals: {
+        activities: totals?.activities || 0,
+        distance_m: totals?.distance_m || 0,
+        elevation_m: totals?.elevation_m || 0,
+        moving_time_s: totals?.moving_time_s || 0,
+        kudos: totals?.kudos || 0,
+        commute_distance_m: totals?.commute_distance_m || 0,
+        carbon_saved_kg: carbonSavedKg,
+      },
+      months: monthsWithPrs,
+      moving_time_by_sport: sportTimes,
+      start_times_by_hour: hourCounts,
+      locations,
+      streaks: {
+        longest_active_days: longestActiveDays,
+        longest_rest_days: longestRestDays,
+      },
+      random_photo: randomPhoto
+        ? {
+            id: randomPhoto.id,
+            activity_id: randomPhoto.activity_id,
+            url: randomPhoto.url,
+            caption: randomPhoto.caption ?? undefined,
+          }
+        : undefined,
+      biggest: {
+        longest_distance: longestDistance ?? undefined,
+        most_elevation: mostElevation ?? undefined,
+        longest_duration: longestDuration ?? undefined,
+      },
+    }
   }
 
   // ============================================================================
-  // Gear - STUB
+  // Gear
   // ============================================================================
-  async getGear(_includeRetired?: boolean): Promise<Gear[]> {
-    this.notImplemented('getGear')
+  async getGear(includeRetired = true): Promise<Gear[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const retiredFilter = includeRetired ? '' : 'AND g.retired = 0'
+    const rows = db.query<{
+      id: string
+      name: string
+      is_primary: number
+      retired: number
+      distance: number
+      brand_name: string | null
+      model_name: string | null
+      description: string | null
+      source: string
+      hashtag: string | null
+      purchase_price: number | null
+      purchase_currency: string | null
+      activity_count: number
+    }>(
+      `SELECT g.id, g.name, g.is_primary, g.retired, g.distance,
+              g.brand_name, g.model_name, g.description, g.source,
+              g.hashtag, g.purchase_price, g.purchase_currency,
+              COUNT(a.id) as activity_count
+       FROM gear g
+       LEFT JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
+       WHERE g.athlete_id = ? ${retiredFilter}
+       GROUP BY g.id
+       ORDER BY g.distance DESC`,
+      [athleteId]
+    )
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      primary: r.is_primary === 1,
+      retired: r.retired === 1,
+      distance: r.distance,
+      brand_name: r.brand_name ?? undefined,
+      model_name: r.model_name ?? undefined,
+      description: r.description ?? undefined,
+      source: r.source,
+      hashtag: r.hashtag ?? undefined,
+      purchase_price: r.purchase_price ?? undefined,
+      purchase_currency: r.purchase_currency ?? undefined,
+      activity_count: r.activity_count,
+    }))
   }
 
-  async getGearDetail(_id: string): Promise<Gear> {
-    this.notImplemented('getGearDetail')
+  async getGearDetail(id: string): Promise<Gear> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const row = db.queryOne<{
+      id: string
+      name: string
+      is_primary: number
+      retired: number
+      distance: number
+      brand_name: string | null
+      model_name: string | null
+      description: string | null
+      source: string
+      hashtag: string | null
+      purchase_price: number | null
+      purchase_currency: string | null
+      activity_count: number
+    }>(
+      `SELECT g.id, g.name, g.is_primary, g.retired, g.distance,
+              g.brand_name, g.model_name, g.description, g.source,
+              g.hashtag, g.purchase_price, g.purchase_currency,
+              COUNT(a.id) as activity_count
+       FROM gear g
+       LEFT JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
+       WHERE g.id = ? AND g.athlete_id = ?
+       GROUP BY g.id`,
+      [id, athleteId]
+    )
+
+    if (!row) {
+      throw new Error(`Gear not found: ${id}`)
+    }
+
+    return {
+      id: row.id,
+      name: row.name,
+      primary: row.is_primary === 1,
+      retired: row.retired === 1,
+      distance: row.distance,
+      brand_name: row.brand_name ?? undefined,
+      model_name: row.model_name ?? undefined,
+      description: row.description ?? undefined,
+      source: row.source,
+      hashtag: row.hashtag ?? undefined,
+      purchase_price: row.purchase_price ?? undefined,
+      purchase_currency: row.purchase_currency ?? undefined,
+      activity_count: row.activity_count,
+    }
   }
 
-  async getCustomGear(_includeRetired?: boolean): Promise<Gear[]> {
-    this.notImplemented('getCustomGear')
+  async getCustomGear(includeRetired = true): Promise<Gear[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const retiredFilter = includeRetired ? '' : 'AND g.retired = 0'
+    const rows = db.query<{
+      id: string
+      name: string
+      is_primary: number
+      retired: number
+      distance: number
+      brand_name: string | null
+      model_name: string | null
+      description: string | null
+      source: string
+      hashtag: string | null
+      purchase_price: number | null
+      purchase_currency: string | null
+      activity_count: number
+    }>(
+      `SELECT g.id, g.name, g.is_primary, g.retired, g.distance,
+              g.brand_name, g.model_name, g.description, g.source,
+              g.hashtag, g.purchase_price, g.purchase_currency,
+              COUNT(a.id) as activity_count
+       FROM gear g
+       LEFT JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
+       WHERE g.athlete_id = ? AND g.source = 'custom' ${retiredFilter}
+       GROUP BY g.id
+       ORDER BY g.name`,
+      [athleteId]
+    )
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      primary: r.is_primary === 1,
+      retired: r.retired === 1,
+      distance: r.distance,
+      brand_name: r.brand_name ?? undefined,
+      model_name: r.model_name ?? undefined,
+      description: r.description ?? undefined,
+      source: r.source,
+      hashtag: r.hashtag ?? undefined,
+      purchase_price: r.purchase_price ?? undefined,
+      purchase_currency: r.purchase_currency ?? undefined,
+      activity_count: r.activity_count,
+    }))
   }
 
-  async createCustomGear(_req: CustomGearCreateRequest): Promise<Gear> {
-    this.notImplemented('createCustomGear')
+  async createCustomGear(req: CustomGearCreateRequest): Promise<Gear> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+    db.exec(
+      `INSERT INTO gear (id, athlete_id, name, hashtag, retired, purchase_price, purchase_currency, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'custom')`,
+      [id, athleteId, req.name, req.hashtag, req.retired ? 1 : 0, req.purchase_price ?? null, req.purchase_currency ?? null]
+    )
+    await db.persist()
+
+    return this.getGearDetail(id)
   }
 
-  async updateCustomGear(_id: string, _patch: Partial<CustomGearCreateRequest>): Promise<Gear> {
-    this.notImplemented('updateCustomGear')
+  async updateCustomGear(id: string, patch: Partial<CustomGearCreateRequest>): Promise<Gear> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const sets: string[] = []
+    const values: unknown[] = []
+
+    if (patch.name !== undefined) {
+      sets.push('name = ?')
+      values.push(patch.name)
+    }
+    if (patch.hashtag !== undefined) {
+      sets.push('hashtag = ?')
+      values.push(patch.hashtag)
+    }
+    if (patch.retired !== undefined) {
+      sets.push('retired = ?')
+      values.push(patch.retired ? 1 : 0)
+    }
+    if (patch.purchase_price !== undefined) {
+      sets.push('purchase_price = ?')
+      values.push(patch.purchase_price)
+    }
+    if (patch.purchase_currency !== undefined) {
+      sets.push('purchase_currency = ?')
+      values.push(patch.purchase_currency)
+    }
+
+    if (sets.length > 0) {
+      sets.push('updated_at = CURRENT_TIMESTAMP')
+      values.push(id, athleteId)
+      db.exec(
+        `UPDATE gear SET ${sets.join(', ')} WHERE id = ? AND athlete_id = ? AND source = 'custom'`,
+        values
+      )
+      await db.persist()
+    }
+
+    return this.getGearDetail(id)
   }
 
-  async deleteCustomGear(_id: string, _force?: boolean): Promise<{ deleted: boolean }> {
-    this.notImplemented('deleteCustomGear')
+  async deleteCustomGear(id: string, _force?: boolean): Promise<{ deleted: boolean }> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    db.exec(
+      `DELETE FROM gear WHERE id = ? AND athlete_id = ? AND source = 'custom'`,
+      [id, athleteId]
+    )
+    await db.persist()
+
+    return { deleted: true }
   }
 
-  async getGearMonthlyUsage(_includeRetired?: boolean): Promise<GearMonthlyUsage[]> {
-    this.notImplemented('getGearMonthlyUsage')
+  async getGearMonthlyUsage(includeRetired = true): Promise<GearMonthlyUsage[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const retiredFilter = includeRetired ? '' : 'AND g.retired = 0'
+    const rows = db.query<{
+      month: string
+      gear_id: string
+      gear_name: string
+      source: string
+      hashtag: string | null
+      retired: number
+      purchase_price: number | null
+      purchase_currency: string | null
+      activity_count: number
+      distance: number
+      moving_time: number
+    }>(
+      `SELECT
+         strftime('%Y-%m', a.start_date) AS month,
+         g.id AS gear_id,
+         g.name AS gear_name,
+         g.source,
+         g.hashtag,
+         g.retired,
+         g.purchase_price,
+         g.purchase_currency,
+         COUNT(*) AS activity_count,
+         COALESCE(SUM(a.distance), 0) AS distance,
+         COALESCE(SUM(a.moving_time), 0) AS moving_time
+       FROM gear g
+       JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
+       WHERE g.athlete_id = ? ${retiredFilter}
+       GROUP BY month, g.id
+       ORDER BY month DESC, g.name`,
+      [athleteId]
+    )
+
+    return rows.map((r) => ({
+      month: r.month,
+      gear_id: r.gear_id,
+      gear_name: r.gear_name,
+      source: r.source,
+      hashtag: r.hashtag ?? undefined,
+      retired: r.retired === 1,
+      purchase_price: r.purchase_price ?? undefined,
+      purchase_currency: r.purchase_currency ?? undefined,
+      activity_count: r.activity_count,
+      distance: r.distance,
+      moving_time: r.moving_time,
+    }))
   }
 
   // ============================================================================
-  // Segments - STUB
+  // Segments
   // ============================================================================
-  async getSegments(_filters?: SegmentsFilters): Promise<SegmentListItem[]> {
-    this.notImplemented('getSegments')
+  async getSegments(filters?: SegmentsFilters): Promise<SegmentListItem[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    // Build query based on filters
+    let rows: Array<{
+      id: number
+      name: string
+      activity_type: string
+      distance: number
+      average_grade: number
+      maximum_grade: number
+      elevation_high: number
+      elevation_low: number
+      climb_category: number
+      starred: number
+      athlete_kom_rank: number | null
+      athlete_effort_count: number | null
+      athlete_pr_elapsed_time: number | null
+      athlete_pr_date: string | null
+      times_completed: number
+      last_effort_date: string | null
+      best_elapsed_time: number | null
+    }>
+
+    if (filters?.country) {
+      rows = queries.getSegmentsByCountry(db, athleteId, filters.country)
+    } else {
+      rows = queries.getSegments(db, athleteId)
+    }
+
+    // Apply additional filters in-memory
+    let result = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      activity_type: r.activity_type,
+      distance: r.distance,
+      average_grade: r.average_grade,
+      maximum_grade: r.maximum_grade,
+      elevation_high: r.elevation_high,
+      elevation_low: r.elevation_low,
+      climb_category: r.climb_category,
+      starred: Boolean(r.starred),
+      athlete_kom_rank: r.athlete_kom_rank ?? undefined,
+      athlete_effort_count: r.athlete_effort_count ?? undefined,
+      athlete_pr_elapsed_time: r.athlete_pr_elapsed_time ?? undefined,
+      athlete_pr_date: r.athlete_pr_date ?? undefined,
+      times_completed: r.times_completed || 0,
+      last_effort_date: r.last_effort_date ?? undefined,
+      best_elapsed_time: r.best_elapsed_time ?? undefined,
+    }))
+
+    // Activity type filter
+    if (filters?.activity_type) {
+      result = result.filter((s) => s.activity_type === filters.activity_type)
+    }
+
+    // Starred filter
+    if (filters?.starred) {
+      result = result.filter((s) => s.starred)
+    }
+
+    // KOM only filter
+    if (filters?.kom_only) {
+      result = result.filter((s) => s.athlete_kom_rank === 1)
+    }
+
+    // Search filter
+    if (filters?.search) {
+      const searchLower = filters.search.toLowerCase()
+      result = result.filter((s) => s.name.toLowerCase().includes(searchLower))
+    }
+
+    // Limit
+    if (filters?.limit && filters.limit > 0) {
+      result = result.slice(0, filters.limit)
+    }
+
+    return result
   }
 
   async getSegmentCountries(): Promise<SegmentCountryStat[]> {
-    this.notImplemented('getSegmentCountries')
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const rows = queries.getSegmentCountries<{
+      country: string
+      segment_count: number
+    }>(db, athleteId)
+
+    return rows.map((r) => ({
+      country: r.country,
+      count: r.segment_count,
+    }))
   }
 
-  async getSegmentDetail(_id: number): Promise<SegmentDetailResponse> {
-    this.notImplemented('getSegmentDetail')
+  async getSegmentDetail(id: number): Promise<SegmentDetailResponse> {
+    const db = this.assertInitialized()
+    this.getAthleteId() // Ensure authenticated
+
+    const segment = queries.getSegmentDetail<{
+      id: number
+      name: string
+      activity_type: string
+      distance: number
+      average_grade: number
+      maximum_grade: number
+      elevation_high: number
+      elevation_low: number
+      climb_category: number
+      start_lat: number | null
+      start_lng: number | null
+      end_lat: number | null
+      end_lng: number | null
+      starred: number
+      polyline: string | null
+      athlete_kom_rank: number | null
+      athlete_effort_count: number | null
+      athlete_pr_elapsed_time: number | null
+      athlete_pr_date: string | null
+    }>(db, id)
+
+    if (!segment) {
+      throw new Error(`Segment ${id} not found`)
+    }
+
+    const efforts = await this.getSegmentEfforts(id)
+
+    return {
+      segment: {
+        id: segment.id,
+        name: segment.name,
+        activity_type: segment.activity_type,
+        distance: segment.distance,
+        average_grade: segment.average_grade,
+        maximum_grade: segment.maximum_grade,
+        elevation_high: segment.elevation_high,
+        elevation_low: segment.elevation_low,
+        climb_category: segment.climb_category,
+        start_lat: segment.start_lat ?? undefined,
+        start_lng: segment.start_lng ?? undefined,
+        end_lat: segment.end_lat ?? undefined,
+        end_lng: segment.end_lng ?? undefined,
+        starred: Boolean(segment.starred),
+        polyline: segment.polyline ?? undefined,
+        athlete_kom_rank: segment.athlete_kom_rank ?? undefined,
+        athlete_effort_count: segment.athlete_effort_count ?? undefined,
+        athlete_pr_elapsed_time: segment.athlete_pr_elapsed_time ?? undefined,
+        athlete_pr_date: segment.athlete_pr_date ?? undefined,
+      },
+      efforts,
+    }
   }
 
-  async getSegmentEfforts(_id: number): Promise<SegmentEffort[]> {
-    this.notImplemented('getSegmentEfforts')
+  async getSegmentEfforts(id: number): Promise<SegmentEffort[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const rows = queries.getSegmentEfforts<{
+      id: number
+      segment_id: number
+      activity_id: number
+      athlete_id: number
+      name: string | null
+      elapsed_time: number
+      moving_time: number
+      start_date: string | null
+      start_date_local: string | null
+      distance: number
+      average_watts: number | null
+      average_heartrate: number | null
+      max_heartrate: number | null
+      pr_rank: number | null
+    }>(db, id, athleteId)
+
+    return rows.map((r) => ({
+      id: r.id,
+      segment_id: r.segment_id,
+      activity_id: r.activity_id,
+      athlete_id: r.athlete_id,
+      name: r.name ?? undefined,
+      elapsed_time: r.elapsed_time,
+      moving_time: r.moving_time,
+      start_date: r.start_date ?? undefined,
+      start_date_local: r.start_date_local ?? undefined,
+      distance: r.distance,
+      average_watts: r.average_watts ?? undefined,
+      average_heartrate: r.average_heartrate ?? undefined,
+      max_heartrate: r.max_heartrate ?? undefined,
+      pr_rank: r.pr_rank ?? undefined,
+    }))
   }
 
   // ============================================================================
@@ -991,25 +1667,246 @@ export class WasmProvider implements DataProvider {
   }
 
   // ============================================================================
-  // Photos - STUB
+  // Photos
   // ============================================================================
-  async getPhotos(_filters?: PhotosFilters): Promise<PhotosListResponse> {
-    return { data: [], total: 0, page: 1, per_page: 50, total_pages: 0, countries: [], sport_types: [] }
+  async getPhotos(filters?: PhotosFilters): Promise<PhotosListResponse> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const page = filters?.page ?? 1
+    const perPage = filters?.per_page ?? 50
+    const offset = (page - 1) * perPage
+
+    // Build WHERE clause based on filters
+    const conditions = ['p.athlete_id = ?']
+    const params: unknown[] = [athleteId]
+
+    if (filters?.sport_type) {
+      conditions.push('a.sport_type = ?')
+      params.push(filters.sport_type)
+    }
+
+    if (filters?.country) {
+      conditions.push('a.location_country = ?')
+      params.push(filters.country)
+    }
+
+    const whereClause = conditions.join(' AND ')
+
+    // Get total count
+    const countRow = db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count
+       FROM photos p
+       JOIN activities a ON a.id = p.activity_id
+       WHERE ${whereClause}`,
+      params
+    )
+    const total = countRow?.count ?? 0
+    const totalPages = Math.ceil(total / perPage)
+
+    // Get paginated photos
+    const rows = db.query<{
+      id: string
+      activity_id: number
+      url: string
+      thumbnail_url: string | null
+      caption: string | null
+      created_at: string
+      activity_name: string
+      sport_type: string
+      start_date_local: string
+      location_country: string | null
+    }>(
+      `SELECT
+        p.id,
+        p.activity_id,
+        p.url,
+        p.thumbnail_url,
+        p.caption,
+        p.created_at,
+        a.name as activity_name,
+        a.sport_type,
+        a.start_date_local,
+        a.location_country
+       FROM photos p
+       JOIN activities a ON a.id = p.activity_id
+       WHERE ${whereClause}
+       ORDER BY a.start_date DESC
+       LIMIT ? OFFSET ?`,
+      [...params, perPage, offset]
+    )
+
+    // Get country facets
+    const countryFacets = db.query<{ country: string; count: number }>(
+      `SELECT a.location_country as country, COUNT(*) as count
+       FROM photos p
+       JOIN activities a ON a.id = p.activity_id
+       WHERE p.athlete_id = ? AND a.location_country IS NOT NULL AND a.location_country != ''
+       GROUP BY a.location_country
+       ORDER BY count DESC`,
+      [athleteId]
+    )
+
+    // Get sport type facets
+    const sportFacets = db.query<{ sport_type: string; count: number }>(
+      `SELECT a.sport_type, COUNT(*) as count
+       FROM photos p
+       JOIN activities a ON a.id = p.activity_id
+       WHERE p.athlete_id = ?
+       GROUP BY a.sport_type
+       ORDER BY count DESC`,
+      [athleteId]
+    )
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        activity_id: r.activity_id,
+        url: r.url,
+        thumbnail_url: r.thumbnail_url ?? undefined,
+        caption: r.caption ?? undefined,
+        created_at: r.created_at,
+        activity_name: r.activity_name,
+        sport_type: r.sport_type,
+        start_date_local: r.start_date_local,
+        location_country: r.location_country ?? undefined,
+      })),
+      total,
+      page,
+      per_page: perPage,
+      total_pages: totalPages,
+      countries: countryFacets.map((f) => ({ value: f.country, count: f.count })),
+      sport_types: sportFacets.map((f) => ({ value: f.sport_type, count: f.count })),
+    }
   }
 
-  async getActivityPhotos(_activityId: number): Promise<ActivityPhoto[]> {
-    return []
+  async getActivityPhotos(activityId: number): Promise<ActivityPhoto[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const rows = db.query<{
+      id: string
+      athlete_id: number
+      activity_id: number
+      url: string
+      thumbnail_url: string | null
+      caption: string | null
+      location: string | null
+      created_at: string
+    }>(
+      `SELECT id, athlete_id, activity_id, url, thumbnail_url, caption, location, created_at
+       FROM photos
+       WHERE activity_id = ? AND athlete_id = ?
+       ORDER BY created_at`,
+      [activityId, athleteId]
+    )
+
+    return rows.map((r) => ({
+      id: r.id,
+      athlete_id: r.athlete_id,
+      activity_id: r.activity_id,
+      url: r.url,
+      thumbnail_url: r.thumbnail_url ?? undefined,
+      caption: r.caption ?? undefined,
+      location: r.location ? JSON.parse(r.location) : undefined,
+      created_at: r.created_at,
+    }))
   }
 
   // ============================================================================
-  // Challenges - STUB
+  // Challenges
   // ============================================================================
-  async getChallenges(_month?: string): Promise<Challenge[]> {
-    return []
+  async getChallenges(month?: string): Promise<Challenge[]> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    let rows: Array<{
+      id: string
+      name: string
+      slug: string | null
+      badge_url: string | null
+      completion_date: string | null
+      month: string | null
+    }>
+
+    if (month) {
+      rows = db.query(
+        `SELECT id, name, slug, badge_url, completion_date, month
+         FROM challenges
+         WHERE athlete_id = ? AND month = ?
+         ORDER BY completion_date DESC`,
+        [athleteId, month]
+      )
+    } else {
+      rows = db.query(
+        `SELECT id, name, slug, badge_url, completion_date, month
+         FROM challenges
+         WHERE athlete_id = ?
+         ORDER BY completion_date DESC`,
+        [athleteId]
+      )
+    }
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug ?? undefined,
+      badge_url: r.badge_url ?? undefined,
+      completion_date: r.completion_date ?? undefined,
+      month: r.month ?? undefined,
+    }))
   }
 
-  async importChallenges(_file: File): Promise<{ imported: number }> {
-    return { imported: 0 }
+  async importChallenges(file: File): Promise<{ imported: number }> {
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const text = await file.text()
+    let challenges: Array<{
+      id?: string
+      name: string
+      slug?: string
+      badge_url?: string
+      completion_date?: string
+      month?: string
+    }>
+
+    try {
+      challenges = JSON.parse(text)
+      if (!Array.isArray(challenges)) {
+        throw new Error('Expected an array of challenges')
+      }
+    } catch {
+      throw new Error('Invalid JSON file')
+    }
+
+    let imported = 0
+    for (const challenge of challenges) {
+      if (!challenge.name) continue
+
+      const id = challenge.id || `${athleteId}-${challenge.name}-${challenge.completion_date || Date.now()}`
+      const month = challenge.month || (challenge.completion_date ? challenge.completion_date.slice(0, 7) : null)
+
+      db.exec(
+        `INSERT INTO challenges (id, athlete_id, name, slug, badge_url, completion_date, month)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           slug = EXCLUDED.slug,
+           badge_url = EXCLUDED.badge_url,
+           completion_date = EXCLUDED.completion_date,
+           month = EXCLUDED.month`,
+        [id, athleteId, challenge.name, challenge.slug ?? null, challenge.badge_url ?? null, challenge.completion_date ?? null, month]
+      )
+      imported++
+    }
+
+    await db.persist()
+    return { imported }
+  }
+
+  async importChallengesFromProfile(_athleteId?: string): Promise<{ imported: number }> {
+    throw new Error('Importing challenges from public profile is not available in WASM mode')
   }
 
   // ============================================================================
@@ -1047,30 +1944,313 @@ export class WasmProvider implements DataProvider {
   }
 
   // ============================================================================
-  // Maintenance - STUB
+  // Maintenance
   // ============================================================================
+
+  private async getComponentWithRules(componentId: number): Promise<ComponentWithRules | null> {
+    const db = this.assertInitialized()
+
+    const component = db.queryOne<{
+      id: number
+      gear_id: string
+      name: string
+      image_url: string | null
+      maintenance_hashtag: string | null
+      created_at: string
+      updated_at: string
+    }>(
+      'SELECT id, gear_id, name, image_url, maintenance_hashtag, created_at, updated_at FROM components WHERE id = ?',
+      [componentId]
+    )
+
+    if (!component) return null
+
+    const rules = db.query<{
+      id: number
+      component_id: number
+      type: string
+      threshold_value: number
+      created_at: string
+      updated_at: string
+    }>('SELECT id, component_id, type, threshold_value, created_at, updated_at FROM maintenance_rules WHERE component_id = ?', [
+      componentId,
+    ])
+
+    const lastLog = db.queryOne<{ completed_at: string }>(
+      'SELECT completed_at FROM maintenance_log WHERE component_id = ? ORDER BY completed_at DESC LIMIT 1',
+      [componentId]
+    )
+
+    return {
+      id: component.id,
+      gear_id: component.gear_id,
+      name: component.name,
+      image_url: component.image_url ?? undefined,
+      maintenance_hashtag: component.maintenance_hashtag ?? undefined,
+      created_at: component.created_at,
+      updated_at: component.updated_at,
+      last_completed_at: lastLog?.completed_at,
+      rules: rules.map((r) => ({
+        id: r.id,
+        component_id: r.component_id,
+        type: r.type as 'distance_m' | 'time_s' | 'days',
+        threshold_value: r.threshold_value,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      })),
+    }
+  }
+
   async getMaintenanceDue(): Promise<DueComponent[]> {
-    return []
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    // Get all components for this athlete's gear
+    const components = db.query<{
+      id: number
+      gear_id: string
+      name: string
+      image_url: string | null
+      maintenance_hashtag: string | null
+      created_at: string
+      updated_at: string
+    }>(
+      `SELECT c.id, c.gear_id, c.name, c.image_url, c.maintenance_hashtag, c.created_at, c.updated_at
+       FROM components c
+       JOIN gear g ON g.id = c.gear_id
+       WHERE g.athlete_id = ?`,
+      [athleteId]
+    )
+
+    const dueComponents: DueComponent[] = []
+
+    for (const comp of components) {
+      // Get rules for this component
+      const rules = db.query<{
+        id: number
+        component_id: number
+        type: string
+        threshold_value: number
+        created_at: string
+        updated_at: string
+      }>('SELECT id, component_id, type, threshold_value, created_at, updated_at FROM maintenance_rules WHERE component_id = ?', [
+        comp.id,
+      ])
+
+      if (rules.length === 0) continue
+
+      // Get last maintenance date
+      const lastLog = db.queryOne<{ completed_at: string }>(
+        'SELECT completed_at FROM maintenance_log WHERE component_id = ? ORDER BY completed_at DESC LIMIT 1',
+        [comp.id]
+      )
+      const lastCompletedAt = lastLog?.completed_at
+
+      // Calculate stats since last maintenance
+      let distanceSince = 0
+      let movingTimeSince = 0
+      let daysSince = 0
+
+      if (lastCompletedAt) {
+        // Get activity stats since last maintenance for this gear
+        const stats = db.queryOne<{ distance: number; moving_time: number }>(
+          `SELECT COALESCE(SUM(distance), 0) as distance, COALESCE(SUM(moving_time), 0) as moving_time
+           FROM activities
+           WHERE athlete_id = ? AND gear_id = ? AND start_date > ?`,
+          [athleteId, comp.gear_id, lastCompletedAt]
+        )
+        distanceSince = stats?.distance || 0
+        movingTimeSince = stats?.moving_time || 0
+        daysSince = Math.floor((Date.now() - new Date(lastCompletedAt).getTime()) / (1000 * 60 * 60 * 24))
+      } else {
+        // No maintenance logged - calculate from all time for this gear
+        const stats = db.queryOne<{ distance: number; moving_time: number; first_date: string | null }>(
+          `SELECT COALESCE(SUM(distance), 0) as distance, COALESCE(SUM(moving_time), 0) as moving_time, MIN(start_date) as first_date
+           FROM activities
+           WHERE athlete_id = ? AND gear_id = ?`,
+          [athleteId, comp.gear_id]
+        )
+        distanceSince = stats?.distance || 0
+        movingTimeSince = stats?.moving_time || 0
+        if (stats?.first_date) {
+          daysSince = Math.floor((Date.now() - new Date(stats.first_date).getTime()) / (1000 * 60 * 60 * 24))
+        }
+      }
+
+      // Calculate progress for each rule
+      const progress = rules.map((rule) => {
+        let currentValue = 0
+        if (rule.type === 'distance_m') currentValue = distanceSince
+        else if (rule.type === 'time_s') currentValue = movingTimeSince
+        else if (rule.type === 'days') currentValue = daysSince
+
+        const percent = rule.threshold_value > 0 ? Math.min(100, (currentValue / rule.threshold_value) * 100) : 0
+
+        return {
+          type: rule.type as 'distance_m' | 'time_s' | 'days',
+          threshold_value: rule.threshold_value,
+          current_value: currentValue,
+          percent,
+          due: percent >= 100,
+        }
+      })
+
+      const isDue = progress.some((p) => p.due)
+
+      dueComponents.push({
+        id: comp.id,
+        gear_id: comp.gear_id,
+        name: comp.name,
+        image_url: comp.image_url ?? undefined,
+        maintenance_hashtag: comp.maintenance_hashtag ?? undefined,
+        created_at: comp.created_at,
+        updated_at: comp.updated_at,
+        last_completed_at: lastCompletedAt,
+        rules: rules.map((r) => ({
+          id: r.id,
+          component_id: r.component_id,
+          type: r.type as 'distance_m' | 'time_s' | 'days',
+          threshold_value: r.threshold_value,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        })),
+        distance_since: distanceSince,
+        moving_time_since: movingTimeSince,
+        days_since: daysSince,
+        progress,
+        is_due: isDue,
+      })
+    }
+
+    // Return only due components, sorted by most overdue first
+    return dueComponents
+      .filter((c) => c.is_due)
+      .sort((a, b) => {
+        const aMax = Math.max(...a.progress.map((p) => p.percent))
+        const bMax = Math.max(...b.progress.map((p) => p.percent))
+        return bMax - aMax
+      })
   }
 
-  async getGearComponents(_gearId: string): Promise<ComponentWithRules[]> {
-    return []
+  async getGearComponents(gearId: string): Promise<ComponentWithRules[]> {
+    const db = this.assertInitialized()
+
+    const components = db.query<{ id: number }>(
+      'SELECT id FROM components WHERE gear_id = ?',
+      [gearId]
+    )
+
+    const result: ComponentWithRules[] = []
+    for (const comp of components) {
+      const withRules = await this.getComponentWithRules(comp.id)
+      if (withRules) result.push(withRules)
+    }
+
+    return result
   }
 
-  async createComponent(_gearId: string, _req: CreateComponentRequest): Promise<ComponentWithRules> {
-    this.notImplemented('createComponent')
+  async createComponent(gearId: string, req: CreateComponentRequest): Promise<ComponentWithRules> {
+    const db = this.assertInitialized()
+    const now = new Date().toISOString()
+
+    // Insert component
+    db.exec(
+      `INSERT INTO components (gear_id, name, image_url, maintenance_hashtag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [gearId, req.name, req.image_url ?? null, req.maintenance_hashtag ?? null, now, now]
+    )
+
+    const result = db.queryOne<{ id: number }>('SELECT last_insert_rowid() as id')
+    const componentId = result!.id
+
+    // Insert rules
+    if (req.rules && req.rules.length > 0) {
+      for (const rule of req.rules) {
+        db.exec(
+          `INSERT INTO maintenance_rules (component_id, type, threshold_value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [componentId, rule.type, rule.threshold_value, now, now]
+        )
+      }
+    }
+
+    await db.persist()
+
+    const component = await this.getComponentWithRules(componentId)
+    if (!component) throw new Error('Failed to create component')
+    return component
   }
 
-  async updateComponent(_id: number, _req: UpdateComponentRequest): Promise<ComponentWithRules> {
-    this.notImplemented('updateComponent')
+  async updateComponent(id: number, req: UpdateComponentRequest): Promise<ComponentWithRules> {
+    const db = this.assertInitialized()
+    const now = new Date().toISOString()
+
+    // Update component fields
+    const updates: string[] = ['updated_at = ?']
+    const params: unknown[] = [now]
+
+    if (req.name !== undefined) {
+      updates.push('name = ?')
+      params.push(req.name)
+    }
+    if (req.image_url !== undefined) {
+      updates.push('image_url = ?')
+      params.push(req.image_url)
+    }
+    if (req.maintenance_hashtag !== undefined) {
+      updates.push('maintenance_hashtag = ?')
+      params.push(req.maintenance_hashtag)
+    }
+
+    params.push(id)
+    db.exec(`UPDATE components SET ${updates.join(', ')} WHERE id = ?`, params)
+
+    // Replace rules if provided
+    if (req.rules !== undefined) {
+      db.exec('DELETE FROM maintenance_rules WHERE component_id = ?', [id])
+      for (const rule of req.rules) {
+        db.exec(
+          `INSERT INTO maintenance_rules (component_id, type, threshold_value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [id, rule.type, rule.threshold_value, now, now]
+        )
+      }
+    }
+
+    await db.persist()
+
+    const component = await this.getComponentWithRules(id)
+    if (!component) throw new Error('Component not found')
+    return component
   }
 
-  async deleteComponent(_id: number): Promise<{ deleted: boolean }> {
-    return { deleted: false }
+  async deleteComponent(id: number): Promise<{ deleted: boolean }> {
+    const db = this.assertInitialized()
+
+    // Delete rules and logs first (foreign key)
+    db.exec('DELETE FROM maintenance_rules WHERE component_id = ?', [id])
+    db.exec('DELETE FROM maintenance_log WHERE component_id = ?', [id])
+    db.exec('DELETE FROM components WHERE id = ?', [id])
+
+    await db.persist()
+    return { deleted: true }
   }
 
-  async logMaintenance(_componentId: number, _req?: LogMaintenanceRequest): Promise<{ logged: boolean }> {
-    return { logged: false }
+  async logMaintenance(componentId: number, req?: LogMaintenanceRequest): Promise<{ logged: boolean }> {
+    const db = this.assertInitialized()
+
+    const completedAt = req?.completed_at || new Date().toISOString()
+    const activityId = req?.activity_id ?? null
+
+    db.exec(
+      `INSERT INTO maintenance_log (component_id, activity_id, completed_at, created_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT (component_id, completed_at) DO NOTHING`,
+      [componentId, activityId, completedAt]
+    )
+
+    await db.persist()
+    return { logged: true }
   }
 
   // ============================================================================
@@ -1128,32 +2308,44 @@ export class WasmProvider implements DataProvider {
       cancelled: 'canceled',
     }
 
+    // Map phase names (WASM uses 'details'/'segments', API uses 'activity_details'/'segment_details')
+    const phaseMap: Record<string, ImportProgress['phase']> = {
+      idle: 'idle',
+      activities: 'activities',
+      gear: 'gear',
+      streams: 'streams',
+      details: 'activity_details',
+      segments: 'segment_details',
+      photos: 'photos',
+      complete: 'completed',
+    }
+
     const status = statusMap[progress.status] ?? 'idle'
+    const phase = phaseMap[progress.phase] ?? 'idle'
 
     return {
       status,
-      // Current phase (WASM uses simplified single-phase import)
-      phase: status === 'completed' ? 'completed' : status === 'running' ? 'activities' : 'idle',
+      phase,
 
-      // Per-phase progress (mapped to activities phase for WASM)
-      activities_total: progress.total,
-      activities_done: progress.imported,
-      gear_total: 0,
-      gear_done: 0,
-      streams_total: 0,
-      streams_done: 0,
-      details_total: 0,
-      details_done: 0,
-      segments_total: 0,
-      segments_done: 0,
-      photos_total: 0,
-      photos_done: 0,
+      // Per-phase progress (direct mapping from WASM importer)
+      activities_total: progress.activities_total,
+      activities_done: progress.activities_done,
+      gear_total: progress.gear_total,
+      gear_done: progress.gear_done,
+      streams_total: progress.streams_total,
+      streams_done: progress.streams_done,
+      details_total: progress.details_total,
+      details_done: progress.details_done,
+      segments_total: progress.segments_total,
+      segments_done: progress.segments_done,
+      photos_total: progress.photos_total,
+      photos_done: progress.photos_done,
 
       // Legacy fields
-      total_activities: progress.total,
-      imported_count: progress.imported,
-      skipped_count: progress.skipped,
-      failed_count: progress.failed,
+      total_activities: progress.activities_total,
+      imported_count: progress.activities_done,
+      skipped_count: 0,
+      failed_count: progress.failed_count,
       current_page: 0,
       error: progress.error,
 
@@ -1174,10 +2366,11 @@ export class WasmProvider implements DataProvider {
 
   async startImport(req?: StartImportRequest): Promise<{ message: string }> {
     // Start import in background (non-blocking)
-    // WASM importer uses inverted logic (include = !skip)
     stravaStartImport({
       fullSync: req?.full_sync,
-      includeStreams: !req?.skip_streams,
+      skipStreams: req?.skip_streams,
+      skipSegments: req?.skip_segments,
+      skipPhotos: req?.skip_photos,
     }).catch((err) => {
       console.error('[WasmProvider] Import error:', err)
     })
@@ -1251,7 +2444,15 @@ export class WasmProvider implements DataProvider {
   }
 
   async getSyncWatermark(): Promise<SyncWatermark | null> {
-    return null
+    const latestSync = await this.getLatestSync()
+    if (!latestSync || latestSync.status !== 'completed') {
+      return null
+    }
+
+    return {
+      last_synced_at: latestSync.completed_at || latestSync.started_at,
+      newest_activity_date: latestSync.newest_activity_date,
+    }
   }
 
   async getExportStats(): Promise<ExportStats> {

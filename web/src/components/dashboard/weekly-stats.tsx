@@ -1,4 +1,4 @@
-import type { WeeklyStat } from '@/lib/data'
+import type { WeeklyStat } from '@/lib/api'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { getSportIcon, formatSportType, getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'

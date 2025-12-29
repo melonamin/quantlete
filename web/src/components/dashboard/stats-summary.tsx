@@ -1,4 +1,4 @@
-import type { DashboardStats } from '@/lib/data'
+import type { DashboardStats } from '@/lib/api'
 import { formatDistance, formatDuration, formatElevation } from '@/lib/format'
 import { Card, CardContent, CardHeader, CardTitle, CardValue } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'

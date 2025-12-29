@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useAuthStatus, useDashboard, useImportProgress } from '@/lib/data'
+import { useAuthStatus, useDashboard, useImportProgress } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 import { isWasmMode } from '@/lib/mode'
 import { shouldShowOnboarding } from '@/components/onboarding/welcome-modal'
@@ -172,6 +172,28 @@ export function DashboardPage() {
 
       <WidgetGrid
         widgets={[
+          // Row 1: Welcome + Weekly progress + Insights
+          {
+            id: 'intro_text',
+            title: 'Welcome',
+            defaultWidth: 4,
+            defaultHeight: 1,
+            render: () => <IntroText />,
+          },
+          {
+            id: 'weekly_stats',
+            title: 'Weekly Stats',
+            defaultWidth: 4,
+            render: () => <WeeklyStats stats={dashboard?.weekly_stats} isLoading={isLoading} />,
+          },
+          {
+            id: 'activity_insights',
+            title: 'Insights',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            render: () => <ActivityInsights />,
+          },
+          // Row 2: Recent activities + Sport breakdown
           {
             id: 'recent_activities',
             title: 'Recent Activities',
@@ -181,11 +203,14 @@ export function DashboardPage() {
             ),
           },
           {
-            id: 'weekly_stats',
-            title: 'Weekly Stats',
+            id: 'sport_breakdown',
+            title: 'Sport Breakdown',
             defaultWidth: 4,
-            render: () => <WeeklyStats stats={dashboard?.weekly_stats} isLoading={isLoading} />,
+            render: () => (
+              <SportBreakdown stats={dashboard?.sport_type_stats} isLoading={isLoading} />
+            ),
           },
+          // Row 3: Monthly chart + Goals
           {
             id: 'monthly_chart',
             title: 'Monthly Chart',
@@ -194,32 +219,49 @@ export function DashboardPage() {
             render: () => <MonthlyChart />,
           },
           {
-            id: 'sport_breakdown',
-            title: 'Sport Breakdown',
-            defaultWidth: 4,
-            render: () => (
-              <SportBreakdown stats={dashboard?.sport_type_stats} isLoading={isLoading} />
-            ),
-          },
-          {
-            id: 'sport_chart',
-            title: 'Sport Distribution',
-            defaultWidth: 4,
-            defaultHeight: 2,
-            render: () => <SportChart />,
-          },
-          {
             id: 'training_goals',
             title: 'Training Goals',
             defaultWidth: 4,
             render: () => <TrainingGoals />,
           },
+          // Row 4: Full-width calendar
           {
             id: 'activity_calendar',
             title: 'Activity Calendar',
             defaultWidth: 12,
             defaultHeight: 3,
             render: () => <ActivityCalendar />,
+          },
+          // Row 5: Yearly comparison + Timing patterns
+          {
+            id: 'yearly_stats',
+            title: 'Yearly Comparison',
+            defaultWidth: 8,
+            defaultHeight: 2,
+            render: () => <YearlyStats />,
+          },
+          {
+            id: 'daytime_stats',
+            title: 'Time of Day',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            render: () => <DaytimeStats />,
+          },
+          {
+            id: 'weekday_stats',
+            title: 'Weekday',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            render: () => <WeekdayStats />,
+          },
+          // Hidden by default: Niche or equipment-dependent widgets
+          {
+            id: 'sport_chart',
+            title: 'Sport Distribution',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <SportChart />,
           },
           {
             id: 'peak_power_outputs',
@@ -246,22 +288,6 @@ export function DashboardPage() {
             render: () => <TrainingLoad />,
           },
           {
-            id: 'daytime_stats',
-            title: 'Time of Day',
-            defaultWidth: 4,
-            defaultHeight: 2,
-            defaultHidden: true,
-            render: () => <DaytimeStats />,
-          },
-          {
-            id: 'weekday_stats',
-            title: 'Weekday',
-            defaultWidth: 4,
-            defaultHeight: 2,
-            defaultHidden: true,
-            render: () => <WeekdayStats />,
-          },
-          {
             id: 'recent_challenges',
             title: 'Recent Challenges',
             defaultWidth: 4,
@@ -284,14 +310,6 @@ export function DashboardPage() {
             defaultHeight: 2,
             defaultHidden: true,
             render: () => <EddingtonWidget />,
-          },
-          {
-            id: 'yearly_stats',
-            title: 'Yearly Comparison',
-            defaultWidth: 8,
-            defaultHeight: 2,
-            defaultHidden: true,
-            render: () => <YearlyStats />,
           },
           {
             id: 'distance_breakdown',
@@ -318,28 +336,12 @@ export function DashboardPage() {
             render: () => <ZwiftStats />,
           },
           {
-            id: 'intro_text',
-            title: 'Welcome',
-            defaultWidth: 4,
-            defaultHeight: 1,
-            defaultHidden: true,
-            render: () => <IntroText />,
-          },
-          {
             id: 'goal_recommendations',
             title: 'Goal Suggestions',
             defaultWidth: 4,
             defaultHeight: 2,
             defaultHidden: true,
             render: () => <GoalRecommendations />,
-          },
-          {
-            id: 'activity_insights',
-            title: 'Insights',
-            defaultWidth: 4,
-            defaultHeight: 2,
-            defaultHidden: true,
-            render: () => <ActivityInsights />,
           },
         ]}
       />

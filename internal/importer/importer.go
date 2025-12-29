@@ -1295,42 +1295,42 @@ func (i *Importer) importStreams(ctx context.Context, activityID int64) error {
 
 	// Store each stream type
 	if streams.Time != nil {
-		if err := i.storeStream(ctx, activityID, streams.Time); err != nil {
+		if err := i.storeStream(ctx, activityID, "time", streams.Time); err != nil {
 			return err
 		}
 	}
 	if streams.Distance != nil {
-		if err := i.storeStream(ctx, activityID, streams.Distance); err != nil {
+		if err := i.storeStream(ctx, activityID, "distance", streams.Distance); err != nil {
 			return err
 		}
 	}
 	if streams.Altitude != nil {
-		if err := i.storeStream(ctx, activityID, streams.Altitude); err != nil {
+		if err := i.storeStream(ctx, activityID, "altitude", streams.Altitude); err != nil {
 			return err
 		}
 	}
 	if streams.Heartrate != nil {
-		if err := i.storeStream(ctx, activityID, streams.Heartrate); err != nil {
+		if err := i.storeStream(ctx, activityID, "heartrate", streams.Heartrate); err != nil {
 			return err
 		}
 	}
 	if streams.Watts != nil {
-		if err := i.storeStream(ctx, activityID, streams.Watts); err != nil {
+		if err := i.storeStream(ctx, activityID, "watts", streams.Watts); err != nil {
 			return err
 		}
 	}
 	if streams.Cadence != nil {
-		if err := i.storeStream(ctx, activityID, streams.Cadence); err != nil {
+		if err := i.storeStream(ctx, activityID, "cadence", streams.Cadence); err != nil {
 			return err
 		}
 	}
 	if streams.VelocitySmooth != nil {
-		if err := i.storeStream(ctx, activityID, streams.VelocitySmooth); err != nil {
+		if err := i.storeStream(ctx, activityID, "velocity_smooth", streams.VelocitySmooth); err != nil {
 			return err
 		}
 	}
 	if streams.Latlng != nil {
-		if err := i.storeStream(ctx, activityID, streams.Latlng); err != nil {
+		if err := i.storeStream(ctx, activityID, "latlng", streams.Latlng); err != nil {
 			return err
 		}
 	}
@@ -1339,17 +1339,20 @@ func (i *Importer) importStreams(ctx context.Context, activityID int64) error {
 }
 
 // storeStream stores a single stream.
-func (i *Importer) storeStream(ctx context.Context, activityID int64, s *strava.Stream) error {
+func (i *Importer) storeStream(ctx context.Context, activityID int64, streamType string, s *strava.Stream) error {
 	if s == nil || len(s.Data) == 0 {
 		return nil
 	}
 
 	stream := &storage.ActivityStream{
 		ActivityID:   activityID,
-		StreamType:   s.Type,
+		StreamType:   streamType,
 		OriginalSize: s.OriginalSize,
 		Resolution:   s.Resolution,
 		SeriesType:   s.SeriesType,
+	}
+	if stream.StreamType == "" {
+		stream.StreamType = s.Type
 	}
 
 	// Encode data as JSON

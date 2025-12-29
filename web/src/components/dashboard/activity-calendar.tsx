@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useCalendarData, useYearlyStats } from '@/lib/data'
+import { useCalendarData, useYearlyStats } from '@/lib/api'
 import { ActivityCalendarChart } from '@/components/charts/activity-charts'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'

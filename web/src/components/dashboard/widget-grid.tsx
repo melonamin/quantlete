@@ -20,7 +20,7 @@ import {
   type DashboardWidgetConfig,
   type WidgetWidth,
   type WidgetHeight,
-} from '@/lib/data'
+} from '@/lib/api'
 import { useDashboardLayoutStore } from '@/stores/dashboard'
 import { SortableWidget } from './sortable-widget'
 import { WidgetPanel } from './widget-panel'
@@ -137,16 +137,23 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
   useEffect(() => {
     if (!hasLoadedRef.current) return
     if (!config) return
-    const next = JSON.stringify(config)
-    if (next === lastSavedRef.current) return
+    const configSnapshot = JSON.stringify(config)
+    if (configSnapshot === lastSavedRef.current) return
 
     if (saveTimer.current) window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
+      // Capture the snapshot that was used to trigger this save
+      const snapshotToSave = configSnapshot
       save.mutate(config, {
         onSuccess: () => {
-          // Just update the saved ref - don't overwrite local state
-          // The local store is the source of truth
-          lastSavedRef.current = next
+          // Only update lastSavedRef if we're saving the same snapshot
+          // This prevents race conditions where newer changes arrive during save
+          if (lastSavedRef.current !== snapshotToSave) {
+            // A newer change has been made, don't update the ref
+            // The newer change will trigger its own save
+            return
+          }
+          lastSavedRef.current = snapshotToSave
         },
       })
     }, 650)
@@ -154,7 +161,7 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current)
     }
-  }, [config, save, setConfig])
+  }, [config, save])
 
   // Keyboard shortcut to exit edit mode
   useEffect(() => {

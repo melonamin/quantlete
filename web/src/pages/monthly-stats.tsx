@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useMonthlyStats, useSportTypeStats } from '@/lib/data'
+import { useMonthlyStats, useSportTypeStats } from '@/lib/api'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { AccordionTable, type AccordionTableColumn, type AccordionTableGroup } from '@/components/ui/accordion-table'
 import { Skeleton } from '@/components/ui/skeleton'

@@ -1,4 +1,4 @@
-import { useYearlyStats } from '@/lib/data'
+import { useYearlyStats } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react'

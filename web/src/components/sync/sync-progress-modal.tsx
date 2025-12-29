@@ -1,4 +1,4 @@
-import { useImportProgress, useCancelImport } from '@/lib/data'
+import { useImportProgress, useCancelImport } from '@/lib/api'
 import { useSyncModalStore } from '@/stores'
 import { Button } from '@/components/ui/button'
 import {

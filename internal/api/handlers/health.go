@@ -28,7 +28,9 @@ type ErrorResponse struct {
 func HealthCheck(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := HealthResponse{Status: "ok"}
-	_ = json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		slog.Error("failed to encode health response", "error", err)
+	}
 }
 
 // NotImplemented returns a 501 Not Implemented response.
@@ -92,18 +94,17 @@ func serveEmbeddedFile(w http.ResponseWriter, r *http.Request, filePath string) 
 		return false
 	}
 
-	f, err := frontendFS.Open(filePath)
+	data, err := fs.ReadFile(frontendFS, filePath)
 	if err != nil {
 		return false
 	}
-	defer func() { _ = f.Close() }()
 
-	info, err := f.Stat()
-	if err != nil || info.IsDir() {
-		return false
+	modTime := time.Now()
+	if info, statErr := fs.Stat(frontendFS, filePath); statErr == nil && !info.IsDir() {
+		modTime = info.ModTime()
 	}
 
-	http.ServeContent(w, r, filePath, info.ModTime(), f)
+	http.ServeContent(w, r, filePath, modTime, bytes.NewReader(data))
 	return true
 }
 

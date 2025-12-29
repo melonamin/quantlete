@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,12 +16,17 @@ import (
 )
 
 type ChallengesHandler struct {
-	repo   *storage.ChallengeRepository
-	strava *strava.Client
+	repo       *storage.ChallengeRepository
+	strava     *strava.Client
+	downloader *challenges.BadgeDownloader
 }
 
-func NewChallengesHandler(repo *storage.ChallengeRepository, stravaClient *strava.Client) *ChallengesHandler {
-	return &ChallengesHandler{repo: repo, strava: stravaClient}
+func NewChallengesHandler(repo *storage.ChallengeRepository, stravaClient *strava.Client, dataDir string) *ChallengesHandler {
+	return &ChallengesHandler{
+		repo:       repo,
+		strava:     stravaClient,
+		downloader: challenges.NewBadgeDownloader(dataDir),
+	}
 }
 
 type challengeResponse struct {
@@ -27,6 +34,7 @@ type challengeResponse struct {
 	Name           string  `json:"name"`
 	Slug           string  `json:"slug,omitempty"`
 	BadgeURL       string  `json:"badge_url,omitempty"`
+	LocalBadgeURL  string  `json:"local_badge_url,omitempty"`
 	CompletionDate *string `json:"completion_date,omitempty"` // YYYY-MM-DD
 	Month          string  `json:"month,omitempty"`
 }
@@ -42,6 +50,7 @@ func challengeToResponse(c storage.Challenge) challengeResponse {
 		Name:           c.Name,
 		Slug:           c.Slug,
 		BadgeURL:       c.BadgeURL,
+		LocalBadgeURL:  c.LocalBadgeURL,
 		CompletionDate: completion,
 		Month:          c.Month,
 	}
@@ -112,7 +121,12 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSpace(body.HTML) != "" {
 			htmlBytes = []byte(body.HTML)
 		} else if strings.TrimSpace(body.URL) != "" {
-			resp, err := http.Get(body.URL) //nolint:gosec // user-provided URL for optional import
+			// Validate URL to prevent SSRF attacks
+			if err := ValidateImportURL(body.URL); err != nil {
+				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+				return
+			}
+			resp, err := http.Get(body.URL) //nolint:gosec // URL validated by ValidateImportURL
 			if err != nil {
 				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to fetch url"})
 				return
@@ -145,13 +159,97 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 		if name == "" {
 			continue
 		}
+
+		// Generate deterministic ID based on completion date and name
+		completionDate := time.Now()
+		if p.CompletionDate != nil {
+			completionDate = *p.CompletionDate
+		}
+		challengeID := challenges.GenerateChallengeID(completionDate, name)
+
+		// Download badge image locally
+		var localBadgeURL string
+		if badgeURL := strings.TrimSpace(p.BadgeURL); badgeURL != "" {
+			if path, err := h.downloader.Download(badgeURL); err != nil {
+				slog.Warn("failed to download challenge badge", "challenge", name, "error", err)
+			} else {
+				localBadgeURL = path
+			}
+		}
+
 		c := &storage.Challenge{
+			ID:             challengeID,
 			AthleteID:      athlete.ID,
 			Name:           name,
 			Slug:           strings.TrimSpace(p.Slug),
 			BadgeURL:       strings.TrimSpace(p.BadgeURL),
+			LocalBadgeURL:  localBadgeURL,
 			CompletionDate: ptrSQLiteTime(p.CompletionDate),
 			Month:          strings.TrimSpace(p.Month),
+			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
+		}
+		if err := h.repo.Upsert(r.Context(), c); err != nil {
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to store challenges"})
+			return
+		}
+		imported++
+	}
+
+	writeJSON(w, http.StatusOK, importResponse{Imported: imported})
+}
+
+// ImportFromProfile handles POST /api/v1/challenges/import-profile
+// Scrapes challenges from a Strava public profile page.
+func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Request) {
+	athlete := h.strava.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	// Get athlete ID from query param or use the logged-in athlete's ID
+	athleteID := strconv.FormatInt(athlete.ID, 10)
+	if qID := strings.TrimSpace(r.URL.Query().Get("athlete_id")); qID != "" {
+		athleteID = qID
+	}
+
+	parsed, err := challenges.FetchPublicProfile(athleteID)
+	if err != nil {
+		slog.Error("failed to fetch public profile", "error", err, "athlete_id", athleteID)
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to fetch public profile: " + err.Error()})
+		return
+	}
+
+	imported := 0
+	for _, p := range parsed {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			continue
+		}
+
+		// Generate deterministic ID based on completion date and name
+		challengeID := challenges.GenerateChallengeID(p.CompletedOn, name)
+
+		// Download badge image locally
+		var localBadgeURL string
+		if badgeURL := strings.TrimSpace(p.BadgeURL); badgeURL != "" {
+			if path, err := h.downloader.Download(badgeURL); err != nil {
+				slog.Warn("failed to download challenge badge", "challenge", name, "error", err)
+			} else {
+				localBadgeURL = path
+			}
+		}
+
+		month := p.CompletedOn.Format("2006-01")
+		c := &storage.Challenge{
+			ID:             challengeID,
+			AthleteID:      athlete.ID,
+			Name:           name,
+			Slug:           strings.TrimSpace(p.Slug),
+			BadgeURL:       strings.TrimSpace(p.BadgeURL),
+			LocalBadgeURL:  localBadgeURL,
+			CompletionDate: &storage.SQLiteTime{Time: p.CompletedOn},
+			Month:          month,
 			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
 		}
 		if err := h.repo.Upsert(r.Context(), c); err != nil {

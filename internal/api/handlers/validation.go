@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -73,4 +75,101 @@ func ValidateCustomGearRequest(name, hashtag, currency string, isCreate bool) er
 		return err
 	}
 	return nil
+}
+
+// allowedImportHosts restricts which hosts can be fetched for challenge import.
+// This prevents SSRF attacks by only allowing trusted external hosts.
+var allowedImportHosts = map[string]bool{
+	"www.strava.com": true,
+	"strava.com":     true,
+}
+
+// ValidateImportURL validates a URL for challenge import to prevent SSRF attacks.
+// Only HTTPS URLs to trusted hosts (Strava) are allowed.
+func ValidateImportURL(rawURL string) error {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return fmt.Errorf("URL is required")
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL format")
+	}
+
+	// Only allow HTTPS
+	if parsed.Scheme != "https" {
+		return fmt.Errorf("only HTTPS URLs are allowed")
+	}
+
+	// Normalize hostname
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" {
+		return fmt.Errorf("URL must include a hostname")
+	}
+
+	// Check against allowlist
+	if !allowedImportHosts[host] {
+		return fmt.Errorf("URL must be from strava.com")
+	}
+
+	// Validate the host doesn't resolve to internal IPs (defense in depth)
+	if err := validateExternalHost(host); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateExternalHost ensures a hostname doesn't resolve to internal/private IPs.
+func validateExternalHost(host string) error {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("failed to resolve hostname")
+	}
+
+	for _, ip := range ips {
+		if isPrivateIP(ip) {
+			return fmt.Errorf("URL resolves to internal address")
+		}
+	}
+
+	return nil
+}
+
+// isPrivateIP checks if an IP address is private, loopback, or otherwise internal.
+func isPrivateIP(ip net.IP) bool {
+	// Check for loopback (127.x.x.x)
+	if ip.IsLoopback() {
+		return true
+	}
+
+	// Check for link-local (169.254.x.x for IPv4, fe80::/10 for IPv6)
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+
+	// Check for private ranges
+	if ip.IsPrivate() {
+		return true
+	}
+
+	// Check for unspecified (0.0.0.0 or ::)
+	if ip.IsUnspecified() {
+		return true
+	}
+
+	// Block IPv6 unique local addresses (fc00::/7)
+	if ip.To4() == nil && len(ip) == net.IPv6len {
+		if ip[0] == 0xfc || ip[0] == 0xfd {
+			return true
+		}
+	}
+
+	// Block cloud metadata IP (169.254.169.254)
+	if ip.Equal(net.ParseIP("169.254.169.254")) {
+		return true
+	}
+
+	return false
 }

@@ -36,49 +36,9 @@ func NewGearRepository(db *DB) *GearRepository {
 	return &GearRepository{db: db}
 }
 
-// Upsert inserts or updates gear.
+// Upsert inserts or updates gear using INSERT ON CONFLICT to avoid race conditions.
 func (r *GearRepository) Upsert(ctx context.Context, g *Gear) error {
 	now := SQLiteTime{Time: time.Now()}
-	res, err := r.db.ExecContext(ctx, `
-		UPDATE gear
-		SET
-			athlete_id = ?,
-			name = ?,
-			is_primary = ?,
-			retired = ?,
-			distance = ?,
-			brand_name = ?,
-			model_name = ?,
-			description = ?,
-			source = COALESCE(NULLIF(?, ''), source),
-			hashtag = COALESCE(NULLIF(?, ''), hashtag),
-			purchase_price = COALESCE(?, purchase_price),
-			purchase_currency = COALESCE(NULLIF(?, ''), purchase_currency),
-			updated_at = ?
-		WHERE id = ?
-	`,
-		g.AthleteID,
-		g.Name,
-		g.Primary,
-		g.Retired,
-		g.Distance,
-		g.BrandName,
-		g.ModelName,
-		g.Description,
-		g.Source,
-		g.Hashtag,
-		g.PurchasePrice,
-		g.PurchaseCurrency,
-		now,
-		g.ID,
-	)
-	if err != nil {
-		return err
-	}
-	updated, _ := res.RowsAffected()
-	if updated > 0 {
-		return nil
-	}
 
 	source := g.Source
 	if source == "" {
@@ -93,13 +53,27 @@ func (r *GearRepository) Upsert(ctx context.Context, g *Gear) error {
 		currency = g.PurchaseCurrency
 	}
 
-	_, err = r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO gear (
 			id, athlete_id, name, is_primary, retired, distance,
 			brand_name, model_name, description,
 			source, hashtag, purchase_price, purchase_currency,
 			created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			athlete_id = excluded.athlete_id,
+			name = excluded.name,
+			is_primary = excluded.is_primary,
+			retired = excluded.retired,
+			distance = excluded.distance,
+			brand_name = excluded.brand_name,
+			model_name = excluded.model_name,
+			description = excluded.description,
+			source = COALESCE(NULLIF(excluded.source, ''), gear.source),
+			hashtag = COALESCE(excluded.hashtag, gear.hashtag),
+			purchase_price = COALESCE(excluded.purchase_price, gear.purchase_price),
+			purchase_currency = COALESCE(NULLIF(excluded.purchase_currency, ''), gear.purchase_currency),
+			updated_at = excluded.updated_at
 	`,
 		g.ID,
 		g.AthleteID,

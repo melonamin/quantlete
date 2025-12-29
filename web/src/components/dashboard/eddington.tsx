@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useQueries } from '@tanstack/react-query'
-import { useAppSettings, useDataProviderStatus, type EddingtonResult } from '@/lib/data'
+import { useAppSettings, type EddingtonResult } from '@/lib/api'
+import { useDataProviderStatus } from '@/lib/data'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useActivities } from '@/lib/data'
+import { useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { BarChart } from '@/components/charts'
 import { formatDistance, formatDuration } from '@/lib/format'

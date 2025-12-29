@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useDashboard, useMonthlyStats, useActivities } from '@/lib/data'
+import { useDashboard, useMonthlyStats, useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { formatDistance } from '@/lib/format'
 import {
