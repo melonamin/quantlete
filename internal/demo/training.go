@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // Standard power durations for best efforts (in seconds).

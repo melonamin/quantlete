@@ -2,7 +2,7 @@ import SwiftUI
 import ServiceManagement
 
 @main
-struct StataApp: App {
+struct QuantleteApp: App {
     @StateObject private var serverManager = ServerManager()
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore = false
     @State private var isLoginItemEnabled = SMAppService.mainApp.status == .enabled
@@ -11,7 +11,7 @@ struct StataApp: App {
         MenuBarExtra {
             menuContent
         } label: {
-            Label("Stata", systemImage: iconName)
+            Label("Quantlete", systemImage: iconName)
         }
     }
 
@@ -109,7 +109,7 @@ struct StataApp: App {
 
     @ViewBuilder
     private var appSection: some View {
-        Button("About Stata") {
+        Button("About Quantlete") {
             showAbout()
         }
         Button("Quit") {
@@ -139,7 +139,7 @@ struct StataApp: App {
     private func showAbout() {
         NSApplication.shared.orderFrontStandardAboutPanel(
             options: [
-                .applicationName: "Stata",
+                .applicationName: "Quantlete",
                 .applicationVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                 .credits: NSAttributedString(string: "A self-hosted analytics dashboard for Strava activities.")
             ]

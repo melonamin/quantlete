@@ -1,5 +1,5 @@
 /**
- * Stata Strava Proxy Worker
+ * Quantlete Strava Proxy Worker
  *
  * Handles:
  * - OAuth token exchange (browser sends code, worker exchanges for token)

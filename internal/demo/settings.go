@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // generateAthleteSettings creates demo athlete settings with useful defaults.

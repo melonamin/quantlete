@@ -24,7 +24,7 @@ export function ExportPage() {
     // Trigger download
     const link = document.createElement('a')
     link.href = url
-    link.download = `stata-activities.${format}`
+    link.download = `quantlete-activities.${format}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/sasha/stata/internal/importer"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // ImportHandler handles import-related endpoints.

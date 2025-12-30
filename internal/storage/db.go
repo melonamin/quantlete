@@ -29,7 +29,7 @@ func Open(dataDir, dbFile string) (*DB, error) {
 
 	filename := dbFile
 	if strings.TrimSpace(filename) == "" {
-		filename = "stata.db"
+		filename = "quantlete.db"
 	}
 	dbPath := filepath.Join(dataDir, filename)
 

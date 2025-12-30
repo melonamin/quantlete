@@ -112,7 +112,7 @@ export function WelcomeModal() {
         {step === 'welcome' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-2xl">Welcome to Stata</DialogTitle>
+              <DialogTitle className="text-2xl">Welcome to Quantlete</DialogTitle>
               <DialogDescription>Your private Strava analytics dashboard</DialogDescription>
             </DialogHeader>
 
@@ -318,7 +318,7 @@ export function WelcomeModal() {
             <DialogHeader>
               <DialogTitle className="text-2xl">Connect to Strava</DialogTitle>
               <DialogDescription>
-                Authorize Stata to access your activities
+                Authorize Quantlete to access your activities
               </DialogDescription>
             </DialogHeader>
 
@@ -330,7 +330,7 @@ export function WelcomeModal() {
                 <div>
                   <p className="font-medium">Read-only access</p>
                   <p className="text-sm text-muted-foreground">
-                    Stata only reads your activities. It cannot modify anything on Strava.
+                    Quantlete only reads your activities. It cannot modify anything on Strava.
                   </p>
                 </div>
               </div>

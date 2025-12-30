@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/sasha/stata/internal/weather"
+	"github.com/melonamin/quantlete/internal/weather"
 )
 
 // WeatherRepository handles activity weather data storage.

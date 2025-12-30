@@ -5,8 +5,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/weather"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/weather"
 )
 
 // WMO weather codes for common conditions.

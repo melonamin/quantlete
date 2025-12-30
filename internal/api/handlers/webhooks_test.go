@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sasha/stata/internal/config"
+	"github.com/melonamin/quantlete/internal/config"
 )
 
 func TestStravaWebhookHandler_Validate(t *testing.T) {

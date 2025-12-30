@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // Options configures demo data generation.

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sasha/stata/schema/migrations"
+	"github.com/melonamin/quantlete/schema/migrations"
 )
 
 var migrationsFS = migrations.FS

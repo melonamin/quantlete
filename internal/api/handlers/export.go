@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // MaxExportActivities is the maximum number of activities that can be exported at once.
@@ -70,7 +70,7 @@ func (h *ExportHandler) ExportActivitiesCSV(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Set headers for CSV download
-	filename := fmt.Sprintf("stata-activities-%s.csv", time.Now().Format("2006-01-02"))
+	filename := fmt.Sprintf("quantlete-activities-%s.csv", time.Now().Format("2006-01-02"))
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 
@@ -209,7 +209,7 @@ func (h *ExportHandler) ExportActivitiesJSON(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Set headers for JSON download
-	filename := fmt.Sprintf("stata-activities-%s.json", time.Now().Format("2006-01-02"))
+	filename := fmt.Sprintf("quantlete-activities-%s.json", time.Now().Format("2006-01-02"))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 

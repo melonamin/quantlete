@@ -3,7 +3,7 @@ package demo
 import (
 	"fmt"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // generateGear creates demo gear (bikes and running shoes).

@@ -1,10 +1,10 @@
-# Stata - Project Guidelines
+# Quantlete - Project Guidelines
 
-This is the Stata project - a self-hosted analytics dashboard for Strava activities.
+This is the Quantlete project - a self-hosted analytics dashboard for Strava activities.
 
 ## Project Structure
 
-- `cmd/stata/` - Go CLI entry points (main, serve, import commands)
+- `cmd/quantlete/` - Go CLI entry points (main, serve, import commands)
 - `internal/` - Go internal packages (api, storage, strava client, importer)
 - `web/` - React frontend (Vite + TypeScript)
 - `schema/migrations/` - SQLite database migrations

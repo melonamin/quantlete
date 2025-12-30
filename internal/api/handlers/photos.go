@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/sasha/stata/internal/geo"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/geo"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 type PhotosHandler struct {

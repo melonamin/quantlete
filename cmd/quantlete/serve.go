@@ -12,13 +12,13 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
-	"github.com/sasha/stata/internal/api"
-	"github.com/sasha/stata/internal/api/handlers"
-	"github.com/sasha/stata/internal/config"
-	"github.com/sasha/stata/internal/importer"
-	"github.com/sasha/stata/internal/scheduler"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/api"
+	"github.com/melonamin/quantlete/internal/api/handlers"
+	"github.com/melonamin/quantlete/internal/config"
+	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/scheduler"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 func newServeCmd() *cobra.Command {
@@ -28,7 +28,7 @@ func newServeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the web server",
-		Long: `Start the Stata web server to serve the dashboard.
+		Long: `Start the Quantlete web server to serve the dashboard.
 
 In development mode (--dev), the server expects the React dev server
 to be running separately and will proxy API requests.`,

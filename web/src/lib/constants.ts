@@ -9,4 +9,4 @@ export const PAGINATION = {
 } as const
 
 // Storage key for settings - keep in sync with web/index.html (inline theme script)
-export const SETTINGS_STORAGE_KEY = 'stata-settings'
+export const SETTINGS_STORAGE_KEY = 'quantlete-settings'

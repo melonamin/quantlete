@@ -5,8 +5,8 @@
  * making it ideal for storing the SQLite database in the browser.
  */
 
-const DB_FILE_NAME = 'stata.db'
-const DB_DIRECTORY = 'stata-data'
+const DB_FILE_NAME = 'quantlete.db'
+const DB_DIRECTORY = 'quantlete-data'
 
 export interface OPFSStorageOptions {
   fileName?: string
@@ -155,7 +155,7 @@ export class IndexedDBStorage {
   private dbName: string
   private storeName = 'database'
 
-  constructor(dbName = 'stata-storage') {
+  constructor(dbName = 'quantlete-storage') {
     this.dbName = dbName
   }
 

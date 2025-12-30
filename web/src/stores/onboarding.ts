@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-const ONBOARDING_STORAGE_KEY = 'stata_onboarding_seen'
+const ONBOARDING_STORAGE_KEY = 'quantlete_onboarding_seen'
 
 interface OnboardingState {
   dismissed: boolean

@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // Challenge templates - real Strava challenges with realistic badge URLs.

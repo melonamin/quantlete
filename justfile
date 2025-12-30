@@ -1,4 +1,4 @@
-# Stata - Statistics for Strava
+# Quantlete - Statistics for Strava
 # Task runner using just (https://github.com/casey/just)
 
 # Load .env file if it exists
@@ -95,11 +95,11 @@ build-web-wasm:
 
 # Build Go binary (requires web to be built first)
 build-go:
-    go build -o bin/stata ./cmd/stata
+    go build -o bin/quantlete ./cmd/quantlete
 
 # Build with version info
 build-release version="dev":
-    go build -ldflags "-X main.version={{version}} -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/stata ./cmd/stata
+    go build -ldflags "-X main.version={{version}} -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/quantlete ./cmd/quantlete
 
 # Clean build artifacts
 clean:
@@ -194,11 +194,11 @@ db-migrate:
 
 # Build Docker image
 docker-build:
-    docker build -t stata:latest .
+    docker build -t quantlete:latest .
 
 # Run Docker container
 docker-run:
-    docker run -p 8080:8080 -v stata-data:/data stata:latest
+    docker run -p 8080:8080 -v quantlete-data:/data quantlete:latest
 
 # ============================================================================
 # Release
@@ -218,7 +218,7 @@ release-snapshot:
 
 # Deploy WASM mode to Cloudflare Pages
 deploy-wasm: build-web-wasm
-    cd web && npx wrangler pages deploy dist-wasm --project-name=stata
+    cd web && npx wrangler pages deploy dist-wasm --project-name=quantlete
 
 # Deploy worker to Cloudflare Workers
 deploy-worker:
@@ -263,12 +263,12 @@ setup-tools:
 
 # Show version
 version:
-    @./bin/stata version 2>/dev/null || go run ./cmd/stata version
+    @./bin/quantlete version 2>/dev/null || go run ./cmd/quantlete version
 
 # Run the server
 run: build
-    ./bin/stata serve
+    ./bin/quantlete serve
 
 # Import activities from Strava
 import:
-    go run ./cmd/stata import
+    go run ./cmd/quantlete import

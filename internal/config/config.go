@@ -60,7 +60,7 @@ func Default() *Config {
 		},
 		Storage: StorageConfig{
 			DataDir: "./data",
-			DBFile:  "stata.db",
+			DBFile:  "quantlete.db",
 		},
 		Log: LogConfig{
 			Level:  "info",

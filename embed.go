@@ -1,5 +1,5 @@
-// Package stata provides the embedded web assets for the Stata application.
-package stata
+// Package quantlete provides the embedded web assets for the Quantlete application.
+package quantlete
 
 import "embed"
 

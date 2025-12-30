@@ -3,8 +3,8 @@ package importer
 import (
 	"encoding/json"
 
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // convertActivity converts a Strava activity to a storage activity.

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sasha/stata"
+	"github.com/melonamin/quantlete"
 )
 
 // HealthResponse represents the health check response.
@@ -71,7 +71,7 @@ var (
 
 func ensureFrontendAssets() error {
 	frontendOnce.Do(func() {
-		sub, err := fs.Sub(stata.WebAssets, "web/dist")
+		sub, err := fs.Sub(quantlete.WebAssets, "web/dist")
 		if err != nil {
 			frontendInitErr = err
 			return

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sasha/stata/internal/pagination"
+	"github.com/melonamin/quantlete/internal/pagination"
 )
 
 var hashtagTokenRe = regexp.MustCompile(`#([A-Za-z0-9][A-Za-z0-9_-]{0,63})`)

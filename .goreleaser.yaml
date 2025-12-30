@@ -5,9 +5,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: stata
-    main: ./cmd/stata
-    binary: stata
+  - id: quantlete
+    main: ./cmd/quantlete
+    binary: quantlete
     env:
       - CGO_ENABLED=1
     goos:
@@ -47,8 +47,8 @@ changelog:
 
 dockers:
   - image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/stata:{{ .Version }}"
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/stata:latest"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/quantlete:{{ .Version }}"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/quantlete:latest"
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/amd64"

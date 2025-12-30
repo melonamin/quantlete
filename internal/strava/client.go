@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/sasha/stata/internal/config"
+	"github.com/melonamin/quantlete/internal/config"
 )
 
 const (

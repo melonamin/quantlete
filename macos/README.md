@@ -1,6 +1,6 @@
-# Stata macOS App
+# Quantlete macOS App
 
-A lightweight menu bar application that manages the Stata server on macOS.
+A lightweight menu bar application that manages the Quantlete server on macOS.
 
 ## Requirements
 
@@ -23,26 +23,26 @@ just build-macos
 
 ```bash
 # For Apple Silicon
-GOOS=darwin GOARCH=arm64 go build -o bin/stata-darwin-arm64 ./cmd/stata
+GOOS=darwin GOARCH=arm64 go build -o bin/quantlete-darwin-arm64 ./cmd/quantlete
 
 # For Intel
-GOOS=darwin GOARCH=amd64 go build -o bin/stata-darwin-amd64 ./cmd/stata
+GOOS=darwin GOARCH=amd64 go build -o bin/quantlete-darwin-amd64 ./cmd/quantlete
 
 # Create universal binary (optional)
-lipo -create -output bin/stata bin/stata-darwin-arm64 bin/stata-darwin-amd64
+lipo -create -output bin/quantlete bin/quantlete-darwin-arm64 bin/quantlete-darwin-amd64
 ```
 
 2. **Build the Swift app:**
 
 ```bash
 cd macos
-xcodebuild -project Stata.xcodeproj -scheme Stata -configuration Release build
+xcodebuild -project Quantlete.xcodeproj -scheme Quantlete -configuration Release build
 ```
 
 3. **Copy server binary into app bundle:**
 
 ```bash
-cp bin/stata ~/Library/Developer/Xcode/DerivedData/Stata-*/Build/Products/Release/Stata.app/Contents/Resources/
+cp bin/quantlete ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Release/Quantlete.app/Contents/Resources/
 ```
 
 ## Development
@@ -50,7 +50,7 @@ cp bin/stata ~/Library/Developer/Xcode/DerivedData/Stata-*/Build/Products/Releas
 Open the project in Xcode:
 
 ```bash
-open macos/Stata.xcodeproj
+open macos/Quantlete.xcodeproj
 ```
 
 For development, you can run the Go server separately and the Swift app will detect it:
@@ -72,60 +72,60 @@ For local testing, the app works without code signing. macOS may show a warning 
 ### Release (signed & notarized)
 
 1. **Set your Team ID in Xcode:**
-   - Open `Stata.xcodeproj`
-   - Select the Stata target
+   - Open `Quantlete.xcodeproj`
+   - Select the Quantlete target
    - Go to Signing & Capabilities
    - Select your Development Team
 
 2. **Build for release:**
 
 ```bash
-xcodebuild -project Stata.xcodeproj \
-  -scheme Stata \
+xcodebuild -project Quantlete.xcodeproj \
+  -scheme Quantlete \
   -configuration Release \
-  -archivePath build/Stata.xcarchive \
+  -archivePath build/Quantlete.xcarchive \
   archive
 
 xcodebuild -exportArchive \
-  -archivePath build/Stata.xcarchive \
-  -exportPath build/Stata \
+  -archivePath build/Quantlete.xcarchive \
+  -exportPath build/Quantlete \
   -exportOptionsPlist ExportOptions.plist
 ```
 
 3. **Notarize:**
 
 ```bash
-xcrun notarytool submit build/Stata/Stata.app \
+xcrun notarytool submit build/Quantlete/Quantlete.app \
   --apple-id YOUR_APPLE_ID \
   --team-id YOUR_TEAM_ID \
   --password YOUR_APP_SPECIFIC_PASSWORD \
   --wait
 
-xcrun stapler staple build/Stata/Stata.app
+xcrun stapler staple build/Quantlete/Quantlete.app
 ```
 
 4. **Create DMG:**
 
 ```bash
-hdiutil create -volname Stata -srcfolder build/Stata/Stata.app -ov -format UDZO Stata.dmg
+hdiutil create -volname Quantlete -srcfolder build/Quantlete/Quantlete.app -ov -format UDZO Quantlete.dmg
 ```
 
 ## Architecture
 
 ```
-Stata.app/
+Quantlete.app/
 ├── Contents/
 │   ├── MacOS/
-│   │   └── Stata          # SwiftUI menu bar app
+│   │   └── Quantlete          # SwiftUI menu bar app
 │   ├── Resources/
-│   │   └── stata          # Go server binary
+│   │   └── quantlete          # Go server binary
 │   ├── Info.plist
 │   └── Entitlements
 ```
 
 The Swift app:
-- Locates the embedded `stata` binary in Resources
-- Sets `STATA_STORAGE_DATA_DIR` to `~/Library/Application Support/Stata/`
+- Locates the embedded `quantlete` binary in Resources
+- Sets `QUANTLETE_STORAGE_DATA_DIR` to `~/Library/Application Support/Quantlete/`
 - Spawns the server as a child process
 - Monitors health via `http://localhost:8081/api/v1/health`
 - Provides menu bar controls (start/stop/restart)
@@ -135,8 +135,8 @@ The Swift app:
 
 All data is stored in:
 ```
-~/Library/Application Support/Stata/
-├── stata.db      # SQLite database
+~/Library/Application Support/Quantlete/
+├── quantlete.db      # SQLite database
 ```
 
 ## Troubleshooting
@@ -152,11 +152,11 @@ lsof -i :8081
 
 The app logs to the unified logging system. View in Console.app:
 ```bash
-log stream --predicate 'subsystem == "app.stata"'
+log stream --predicate 'subsystem == "app.quantlete"'
 ```
 
 ### Reset all data
 
 ```bash
-rm -rf ~/Library/Application\ Support/Stata/
+rm -rf ~/Library/Application\ Support/Quantlete/
 ```

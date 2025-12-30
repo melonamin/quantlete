@@ -1,4 +1,4 @@
-module github.com/sasha/stata
+module github.com/melonamin/quantlete
 
 go 1.25.4
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sasha/stata/internal/pagination"
+	"github.com/melonamin/quantlete/internal/pagination"
 )
 
 // Activity represents a stored activity record.

@@ -55,7 +55,7 @@ export function IntroText() {
   }, [data?.stats])
 
   const welcomeMessage = useMemo(() => {
-    if (!data?.stats) return 'Welcome to Stata!'
+    if (!data?.stats) return 'Welcome to Quantlete!'
 
     const activities = data.stats.total_activities
     if (activities === 0) {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sasha/stata/internal/geo"
+	"github.com/melonamin/quantlete/internal/geo"
 )
 
 // DashboardStats represents aggregated statistics for the dashboard.

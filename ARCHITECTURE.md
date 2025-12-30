@@ -42,13 +42,13 @@ This document describes the technical architecture for implementing the Statisti
 │  │             │             │  │  │               ▼                 │  │
 │  │             ▼             │  │  │  ┌─────────────────────────┐    │  │
 │  │  ┌─────────────────────┐  │  │  │  │   OPFS (Browser FS)     │    │  │
-│  │  │       SQLite        │  │  │  │  │   stata.db              │    │  │
+│  │  │       SQLite        │  │  │  │  │   quantlete.db              │    │  │
 │  │  │  (pure Go driver)   │  │  │  │  └─────────────────────────┘    │  │
 │  │  └─────────────────────┘  │  │  └─────────────────────────────────┘  │
 │  │             │             │  │                 │                     │
 │  │             ▼             │  │                 │                     │
 │  │  ┌─────────────────────┐  │  │                 │                     │
-│  │  │     stata.db        │  │  │                 │                     │
+│  │  │     quantlete.db        │  │  │                 │                     │
 │  │  │   (local file)      │  │  │                 │                     │
 │  │  └─────────────────────┘  │  │                 │                     │
 │  └───────────────────────────┘  │                 │                     │
@@ -130,7 +130,7 @@ SQLite was chosen for its simplicity and reliability:
 ## 3. Project Structure
 
 ```
-stata/
+quantlete/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml              # Test and lint on PR
@@ -143,13 +143,13 @@ stata/
 ├── CLAUDE.md                   # Project-specific AI instructions
 │
 ├── cmd/
-│   └── stata/
+│   └── quantlete/
 │       ├── main.go             # Entry point
 │       ├── root.go             # Root cobra command
-│       ├── serve.go            # `stata serve` - start web server
-│       ├── import.go           # `stata import` - manual import
-│       ├── export.go           # `stata export` - export data
-│       └── version.go          # `stata version`
+│       ├── serve.go            # `quantlete serve` - start web server
+│       ├── import.go           # `quantlete import` - manual import
+│       ├── export.go           # `quantlete export` - export data
+│       └── version.go          # `quantlete version`
 │
 ├── internal/
 │   ├── api/
@@ -948,7 +948,7 @@ dev:
     just dev-web
 
 dev-api:
-    go run ./cmd/stata serve --dev --port 8080
+    go run ./cmd/quantlete serve --dev --port 8080
 
 dev-web:
     cd web && yarn dev --port 5173
@@ -960,7 +960,7 @@ build-web:
     cd web && yarn build
 
 build-go: build-web
-    CGO_ENABLED=1 go build -o bin/stata ./cmd/stata
+    CGO_ENABLED=1 go build -o bin/quantlete ./cmd/quantlete
 
 # Run tests
 test: test-go test-web
@@ -1000,9 +1000,9 @@ before:
     - cd web && yarn install && yarn build
 
 builds:
-  - id: stata
-    main: ./cmd/stata
-    binary: stata
+  - id: quantlete
+    main: ./cmd/quantlete
+    binary: quantlete
     env:
       - CGO_ENABLED=1
     goos:
@@ -1043,8 +1043,8 @@ archives:
 
 dockers:
   - image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/stata:{{ .Version }}"
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/stata:latest"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/quantlete:{{ .Version }}"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/quantlete:latest"
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -1065,20 +1065,20 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 go build -o stata ./cmd/stata
+RUN CGO_ENABLED=1 go build -o quantlete ./cmd/quantlete
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/stata /usr/local/bin/stata
+COPY --from=builder /app/quantlete /usr/local/bin/quantlete
 
 VOLUME /data
-ENV STATA_DATA_DIR=/data
+ENV QUANTLETE_DATA_DIR=/data
 
 EXPOSE 8080
-CMD ["stata", "serve"]
+CMD ["quantlete", "serve"]
 ```
 
 ---
@@ -1144,7 +1144,7 @@ export class WasmDataSource implements DataSource {
     // Try to load existing database from OPFS
     const opfsRoot = await navigator.storage.getDirectory();
     try {
-      const fileHandle = await opfsRoot.getFileHandle('stata.db');
+      const fileHandle = await opfsRoot.getFileHandle('quantlete.db');
       const file = await fileHandle.getFile();
       const buffer = await file.arrayBuffer();
       this.db = new SQL.Database(new Uint8Array(buffer));
@@ -1175,7 +1175,7 @@ export class WasmDataSource implements DataSource {
     // Save database to OPFS
     const data = this.db!.export();
     const opfsRoot = await navigator.storage.getDirectory();
-    const fileHandle = await opfsRoot.getFileHandle('stata.db', { create: true });
+    const fileHandle = await opfsRoot.getFileHandle('quantlete.db', { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(data);
     await writable.close();

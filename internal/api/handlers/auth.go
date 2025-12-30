@@ -12,9 +12,9 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/sasha/stata/internal/config"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/config"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // urlEncode encodes a string for safe use in URL query parameters.
@@ -30,7 +30,7 @@ func encodeJSON(w http.ResponseWriter, data any) {
 }
 
 const (
-	oauthStateCookieName = "stata_oauth_state"
+	oauthStateCookieName = "quantlete_oauth_state"
 	oauthStateTTL        = 5 * time.Minute
 )
 

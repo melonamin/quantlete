@@ -19,7 +19,7 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Printf("stata %s\n", version)
+			fmt.Printf("quantlete %s\n", version)
 			fmt.Printf("  commit:     %s\n", commit)
 			fmt.Printf("  built:      %s\n", buildDate)
 			fmt.Printf("  go version: %s\n", runtime.Version())

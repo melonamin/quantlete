@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/sasha/stata/internal/config"
-	"github.com/sasha/stata/internal/importer"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/config"
+	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 func newImportCmd() *cobra.Command {
@@ -70,7 +70,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 
 	// Check Strava configuration
 	if cfg.Strava.ClientID == "" || cfg.Strava.ClientSecret == "" {
-		return fmt.Errorf("strava credentials not configured, set STATA_STRAVA_CLIENT_ID and STATA_STRAVA_CLIENT_SECRET environment variables")
+		return fmt.Errorf("strava credentials not configured, set QUANTLETE_STRAVA_CLIENT_ID and QUANTLETE_STRAVA_CLIENT_SECRET environment variables")
 	}
 
 	// Open database
@@ -119,7 +119,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	if !stravaClient.IsAuthenticated() {
 		slog.Info("Not authenticated with Strava")
 		slog.Info("Please start the server and authenticate via the web interface first:")
-		slog.Info("  stata serve --dev")
+		slog.Info("  quantlete serve --dev")
 		slog.Info("  Then visit http://localhost:8081/api/v1/auth/strava")
 		return fmt.Errorf("not authenticated with Strava")
 	}

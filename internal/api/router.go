@@ -13,11 +13,11 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
 
-	"github.com/sasha/stata/internal/api/handlers"
-	"github.com/sasha/stata/internal/config"
-	"github.com/sasha/stata/internal/importer"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/api/handlers"
+	"github.com/melonamin/quantlete/internal/config"
+	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // badgeRateLimitRequests is the maximum number of badge requests per IP per window.

@@ -5,15 +5,15 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  bin = "./tmp/stata"
-  cmd = "go build -o ./tmp/stata ./cmd/stata"
+  bin = "./tmp/quantlete"
+  cmd = "go build -o ./tmp/quantlete ./cmd/quantlete"
   delay = 1000
   exclude_dir = ["tmp", "web", "node_modules", "bin", ".git", "schema"]
   exclude_file = []
   exclude_regex = ["_test\\.go"]
   exclude_unchanged = false
   follow_symlink = false
-  full_bin = "./tmp/stata serve --dev --port 8081"
+  full_bin = "./tmp/quantlete serve --dev --port 8081"
   include_dir = []
   include_ext = ["go", "tpl", "tmpl", "html"]
   include_file = []

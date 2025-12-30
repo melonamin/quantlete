@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 func TestCronSpecForPullSchedule(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/sasha/stata/internal/pagination"
+	"github.com/melonamin/quantlete/internal/pagination"
 )
 
 type Challenge struct {

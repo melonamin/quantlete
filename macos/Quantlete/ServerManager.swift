@@ -34,7 +34,7 @@ class ServerManager: ObservableObject {
     private let maxRestartAttempts = 3
     private let restartBackoffSeconds: [Double] = [1, 2, 5]
 
-    private let logger = Logger(subsystem: "app.stata", category: "ServerManager")
+    private let logger = Logger(subsystem: "app.quantlete", category: "ServerManager")
 
     private var hasOpenedDashboard = false
 
@@ -143,11 +143,11 @@ class ServerManager: ObservableObject {
     }
 
     private func locateBinary() -> String? {
-        if let bundlePath = Bundle.main.path(forResource: "stata", ofType: nil) {
+        if let bundlePath = Bundle.main.path(forResource: "quantlete", ofType: nil) {
             return bundlePath
         }
 
-        let resourcesPath = Bundle.main.bundlePath + "/Contents/Resources/stata"
+        let resourcesPath = Bundle.main.bundlePath + "/Contents/Resources/quantlete"
         if FileManager.default.fileExists(atPath: resourcesPath) {
             return resourcesPath
         }
@@ -157,8 +157,8 @@ class ServerManager: ObservableObject {
 
     private func buildEnvironment() -> [String: String] {
         var env = ProcessInfo.processInfo.environment
-        env["STATA_STORAGE_DATA_DIR"] = dataDirectory()
-        env["STATA_SERVER_PORT"] = "\(port)"
+        env["QUANTLETE_STORAGE_DATA_DIR"] = dataDirectory()
+        env["QUANTLETE_SERVER_PORT"] = "\(port)"
         return env
     }
 
@@ -168,7 +168,7 @@ class ServerManager: ObservableObject {
             in: .userDomainMask
         ).first!
 
-        return appSupport.appendingPathComponent("Stata").path
+        return appSupport.appendingPathComponent("Quantlete").path
     }
 
     private func ensureDataDirectory() {

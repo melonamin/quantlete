@@ -1,6 +1,6 @@
 {
-  "name": "Stata - Strava Analytics",
-  "short_name": "Stata",
+  "name": "Quantlete - Strava Analytics",
+  "short_name": "Quantlete",
   "description": "Local-first Strava analytics dashboard.",
   "start_url": "/",
   "scope": "/",

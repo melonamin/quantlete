@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/sasha/stata/internal/config"
-	"github.com/sasha/stata/internal/demo"
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/config"
+	"github.com/melonamin/quantlete/internal/demo"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 func newDemoCmd() *cobra.Command {
@@ -21,15 +21,15 @@ func newDemoCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "demo",
 		Short: "Generate demo data for the dashboard",
-		Long: `Generate realistic fake data for demonstrating the Stata dashboard.
+		Long: `Generate realistic fake data for demonstrating the Quantlete dashboard.
 
 This command creates a sample athlete with activities, gear, segments,
 and training load data. It wipes any existing data before generating.
 
 Examples:
-  stata demo                              # Generate 100 activities over 12 months
-  stata demo --activities=200 --months=24 # Generate 200 activities over 2 years
-  stata demo --athlete="Jane Doe"         # Custom athlete name`,
+  quantlete demo                              # Generate 100 activities over 12 months
+  quantlete demo --activities=200 --months=24 # Generate 200 activities over 2 years
+  quantlete demo --athlete="Jane Doe"         # Custom athlete name`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runDemo(activities, months, athleteName)
 		},

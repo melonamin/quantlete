@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sasha/stata/internal/challenges"
-	"github.com/sasha/stata/internal/pagination"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/challenges"
+	"github.com/melonamin/quantlete/internal/pagination"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 type challengesListResponse struct {

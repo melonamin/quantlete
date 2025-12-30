@@ -3,7 +3,7 @@
 // to maintain backwards compatibility with existing code.
 package analysis
 
-import algorithms "github.com/sasha/stata/algorithms/go"
+import algorithms "github.com/melonamin/quantlete/algorithms/go"
 
 // RollingMaxAverage finds the maximum rolling average over a given window.
 func RollingMaxAverage(values []float64, windowSeconds int) float64 {

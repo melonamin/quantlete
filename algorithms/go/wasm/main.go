@@ -7,7 +7,7 @@ package main
 import (
 	"unsafe"
 
-	algorithms "github.com/sasha/stata/algorithms/go"
+	algorithms "github.com/melonamin/quantlete/algorithms/go"
 )
 
 // Buffer size for input/output arrays (64K elements should be plenty)

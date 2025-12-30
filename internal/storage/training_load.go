@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sasha/stata/internal/analysis"
+	"github.com/melonamin/quantlete/internal/analysis"
 )
 
 type DailyTrainingLoadPoint struct {

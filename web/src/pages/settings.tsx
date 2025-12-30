@@ -455,7 +455,7 @@ export function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Install</p>
-                <p className="text-sm text-muted-foreground">Add Stata to your home screen</p>
+                <p className="text-sm text-muted-foreground">Add Quantlete to your home screen</p>
               </div>
               {isInstalled ? (
                 <span className="text-sm text-muted-foreground">Installed</span>

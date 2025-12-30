@@ -1,4 +1,4 @@
--- Stata: Complete SQLite Schema
+-- Quantlete: Complete SQLite Schema
 -- Consolidated schema with all tables, views, and indexes
 
 PRAGMA foreign_keys = ON;

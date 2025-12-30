@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stata-pwa-v1'
+const CACHE_NAME = 'quantlete-pwa-v1'
 
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png']
 

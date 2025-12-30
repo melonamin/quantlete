@@ -8,9 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sasha/stata/internal/config"
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/config"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 const (

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // Status represents the current import status.

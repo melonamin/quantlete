@@ -6,13 +6,13 @@ import (
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "stata",
+		Use:   "quantlete",
 		Short: "Statistics for Strava - Analytics dashboard for your activities",
-		Long: `Stata is a self-hosted analytics dashboard for Strava athletes.
+		Long: `Quantlete is a self-hosted analytics dashboard for Strava athletes.
 It provides comprehensive statistics, visualizations, and insights
 into your training data.
 
-Run 'stata serve' to start the web server, or use other commands
+Run 'quantlete serve' to start the web server, or use other commands
 for data import and management.`,
 	}
 

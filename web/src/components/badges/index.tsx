@@ -1,4 +1,4 @@
-import { forwardRef, RefObject } from 'react'
+import { forwardRef, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { Download, Copy, Check } from 'lucide-react'
 import { useState } from 'react'

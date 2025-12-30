@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // restoreAuth restores authentication from the database on startup.

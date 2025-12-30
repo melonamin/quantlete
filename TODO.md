@@ -47,9 +47,9 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] `golang.org/x/oauth2`
   - [x] `github.com/robfig/cron/v3`
   - [x] `github.com/stretchr/testify`
-- [x] Create basic `cmd/stata/main.go` entry point
-- [x] Create `cmd/stata/root.go` with cobra root command
-- [x] Create `cmd/stata/version.go` command
+- [x] Create basic `cmd/quantlete/main.go` entry point
+- [x] Create `cmd/quantlete/root.go` with cobra root command
+- [x] Create `cmd/quantlete/version.go` command
 - [x] Verify `go build` works
 
 ### 0.3 React Project Setup
@@ -140,7 +140,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Recovery middleware
   - [x] CSRF protection middleware
   - [x] Security headers (CSP, X-Content-Type-Options, etc.)
-- [x] Create `cmd/stata/serve.go` command
+- [x] Create `cmd/quantlete/serve.go` command
 - [x] Implement graceful shutdown
 - [x] Serve static files from embedded React build
 - [x] Verify server starts and serves placeholder page
@@ -251,7 +251,7 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Fetch activities in batches
   - [x] Transform Strava → domain model
   - [x] Persist to database
-- [x] Create `cmd/stata/import.go` command:
+- [x] Create `cmd/quantlete/import.go` command:
   - [x] Trigger manual import
   - [x] Show progress
 - [x] Test importing real activities
@@ -1324,7 +1324,7 @@ Performance optimization for large tables.
 
 ### 10.5 Beyond Reference - Unique Features
 
-These features go beyond the reference implementation to make Stata superior.
+These features go beyond the reference implementation to make Quantlete superior.
 
 #### 10.5.1 AI-Powered Activity Insights ✓
 Automatic insights generated from activity data.
@@ -1667,8 +1667,8 @@ Comprehensive data export capabilities.
 
 Generate realistic demo data for testing and demonstrations without Strava connection.
 
-- [x] Create `cmd/stata/demo.go` CLI command:
-  - [x] `stata demo` - generates 100 activities over 12 months
+- [x] Create `cmd/quantlete/demo.go` CLI command:
+  - [x] `quantlete demo` - generates 100 activities over 12 months
   - [x] `--activities=N` - custom activity count
   - [x] `--months=N` - time span for activities
   - [x] `--athlete="Name"` - custom athlete name

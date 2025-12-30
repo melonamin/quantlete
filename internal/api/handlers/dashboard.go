@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sasha/stata/internal/storage"
-	"github.com/sasha/stata/internal/strava"
+	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // DashboardHandler handles dashboard-related endpoints.

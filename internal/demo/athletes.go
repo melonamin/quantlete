@@ -3,7 +3,7 @@ package demo
 import (
 	"strings"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // generateAthlete creates a demo athlete profile.

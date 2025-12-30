@@ -1,4 +1,4 @@
-# Stata - Statistics for Strava
+# Quantlete - Statistics for Strava
 
 A self-hosted analytics dashboard for Strava athletes. Get comprehensive statistics, visualizations, and insights into your training data.
 
@@ -22,19 +22,19 @@ A self-hosted analytics dashboard for Strava athletes. Get comprehensive statist
 ```bash
 docker run -d \
   -p 8081:8081 \
-  -v stata-data:/data \
+  -v quantlete-data:/data \
   -e STRAVA_CLIENT_ID=your_client_id \
   -e STRAVA_CLIENT_SECRET=your_client_secret \
-  ghcr.io/user/stata:latest
+  ghcr.io/user/quantlete:latest
 ```
 
 ### Using Binary
 
-Download the latest release for your platform from the [Releases](https://github.com/user/stata/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/user/quantlete/releases) page.
 
 ```bash
 # Start the server
-./stata serve --port 8081
+./quantlete serve --port 8081
 ```
 
 ### From Source
@@ -46,8 +46,8 @@ Requirements:
 
 ```bash
 # Clone the repository
-git clone https://github.com/user/stata.git
-cd stata
+git clone https://github.com/user/quantlete.git
+cd quantlete
 
 # Install dependencies
 just setup
@@ -69,8 +69,8 @@ STRAVA_CLIENT_ID=your_client_id
 STRAVA_CLIENT_SECRET=your_client_secret
 
 # Optional
-STATA_PORT=8081
-STATA_DATA_DIR=/path/to/data
+QUANTLETE_PORT=8081
+QUANTLETE_DATA_DIR=/path/to/data
 ```
 
 ### Getting Strava API Credentials

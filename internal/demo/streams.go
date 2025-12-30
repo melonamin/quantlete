@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/sasha/stata/internal/storage"
+	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // generateActivityStreams creates synthetic time-series data for activities.

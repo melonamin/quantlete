@@ -21,7 +21,7 @@ export const useSidebarStore = create<SidebarState>()(
       toggleMobileOpen: () => set({ mobileOpen: !get().mobileOpen }),
     }),
     {
-      name: 'stata-sidebar',
+      name: 'quantlete-sidebar',
       partialize: (state) => ({ collapsed: state.collapsed }),
     }
   )

@@ -1,9 +1,9 @@
-# Stata Strava Proxy Worker
+# Quantlete Strava Proxy Worker
 #
 # This worker acts as a stateless CORS proxy for Strava API calls.
 # Credentials (client_id, client_secret) are sent by the browser with each request.
 #
-name = "stata-strava-proxy"
+name = "quantlete-strava-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
