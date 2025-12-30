@@ -57,9 +57,9 @@ export function RecentChallenges() {
       {isLoading ? (
         <div className="flex gap-3 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex-shrink-0 w-[100px] space-y-2">
-              <Skeleton className="h-[100px] w-full" />
-              <Skeleton className="h-3 w-20" />
+            <div key={i} className="flex-shrink-0 w-24 md:w-28 space-y-2">
+              <Skeleton className="aspect-square w-full" />
+              <Skeleton className="h-3 w-16" />
             </div>
           ))}
         </div>
@@ -76,10 +76,10 @@ export function RecentChallenges() {
               href={c.slug ? `https://www.strava.com/challenges/${c.slug}` : undefined}
               target="_blank"
               rel="noreferrer"
-              className="flex-shrink-0 w-[100px] rounded-md border border-border bg-background p-2 hover:bg-accent/30 transition-colors"
+              className="flex-shrink-0 w-24 md:w-28 rounded-md border border-border bg-background p-2 hover:bg-accent/30 transition-colors"
               title={c.name}
             >
-              <div className="h-[80px] overflow-hidden rounded-md bg-muted">
+              <div className="aspect-[4/5] overflow-hidden rounded-md bg-muted">
                 {c.badge_url ? (
                   <img
                     src={c.badge_url}

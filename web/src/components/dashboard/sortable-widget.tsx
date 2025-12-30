@@ -10,7 +10,9 @@ import {
   Columns4,
   Square,
   ChevronsUpDown,
+  MoreHorizontal,
 } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { ReactNode, CSSProperties } from 'react'
 
 interface SortableWidgetProps {
@@ -80,6 +82,72 @@ export function SortableWidget({
     opacity: isDragging ? 0.3 : 1,
   }
 
+  // Use compact mode for narrowest widgets (col-span-4 = ~300px)
+  const isCompact = width === 4
+
+  // Compact controls popover content
+  const CompactControls = () => (
+    <div className="flex flex-col gap-3 p-3">
+      {/* Width controls */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Width</span>
+        <div className="flex gap-1">
+          {WIDTH_OPTIONS.map((opt) => {
+            const Icon = opt.icon
+            const isActive = width === opt.value
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onWidthChange(opt.value)}
+                className={cn(
+                  'flex items-center justify-center w-8 h-8 rounded-sm transition-colors',
+                  isActive
+                    ? 'bg-terminal-green/20 text-terminal-green'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+                title={opt.label}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      {/* Height controls */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Height</span>
+        <div className="flex gap-1">
+          {HEIGHT_OPTIONS.map((opt) => {
+            const isActive = height === opt.value
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onHeightChange(opt.value)}
+                className={cn(
+                  'flex items-center justify-center w-8 h-8 rounded-sm text-[10px] font-medium transition-colors',
+                  isActive
+                    ? 'bg-terminal-green/20 text-terminal-green'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+                title={opt.label}
+              >
+                {opt.value}×
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      {/* Hide button */}
+      <button
+        onClick={onHide}
+        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-sm text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+      >
+        <EyeOff className="h-3.5 w-3.5" />
+        Hide widget
+      </button>
+    </div>
+  )
+
   return (
     <>
       {/* Drop indicator before this widget */}
@@ -133,18 +201,40 @@ export function SortableWidget({
                   className={cn(
                     'flex items-center gap-2 px-3 py-2 cursor-grab active:cursor-grabbing',
                     'text-muted-foreground hover:text-terminal-green transition-colors',
-                    'border-r border-border'
+                    'border-r border-border',
+                    isCompact && 'flex-1'
                   )}
                 >
                   <GripVertical className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wider">{title}</span>
+                  <span className={cn(
+                    'text-xs font-medium uppercase tracking-wider',
+                    isCompact && 'truncate max-w-[80px]'
+                  )}>
+                    {title}
+                  </span>
                 </button>
 
-                {/* Width Controls */}
-                <div className="flex items-center">
-                  <div className="flex items-center border-r border-border">
-                    {WIDTH_OPTIONS.map((opt) => {
-                      const Icon = opt.icon
+                {/* Controls: Compact (popover) or Full (inline) */}
+                {isCompact ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="flex items-center justify-center w-10 h-10 text-muted-foreground hover:text-terminal-green transition-colors"
+                        title="Widget settings"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-auto p-0">
+                      <CompactControls />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  /* Full mode: inline controls */
+                  <div className="flex items-center">
+                    <div className="flex items-center border-r border-border">
+                      {WIDTH_OPTIONS.map((opt) => {
+                        const Icon = opt.icon
                       const isActive = width === opt.value
                       return (
                         <button
@@ -196,6 +286,7 @@ export function SortableWidget({
                     <EyeOff className="h-3.5 w-3.5" />
                   </button>
                 </div>
+                )}
               </div>
             )}
 

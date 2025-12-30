@@ -13,13 +13,13 @@ import {
   MapPin,
   Zap,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { PAGINATION } from '@/lib/constants'
+import { iconColors, uiColors } from '@/components/charts'
 
 interface Insight {
   id: string
   type: 'achievement' | 'trend' | 'observation' | 'streak' | 'record'
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
   iconColor: string
   title: string
   description: string
@@ -64,7 +64,7 @@ export function ActivityInsights() {
         id: 'streak',
         type: 'streak',
         icon: Flame,
-        iconColor: 'text-orange-500',
+        iconColor: iconColors.fire,
         title: `${streak}-day streak!`,
         description:
           streak >= 7
@@ -86,7 +86,7 @@ export function ActivityInsights() {
             id: 'distance-up',
             type: 'trend',
             icon: TrendingUp,
-            iconColor: 'text-green-500',
+            iconColor: iconColors.trend,
             title: `${Math.round(distanceChange)}% more distance`,
             description: `You've covered ${formatDistance(thisMonth.total_distance)} this month, up from ${formatDistance(lastMonth.total_distance)} last month.`,
           })
@@ -95,7 +95,7 @@ export function ActivityInsights() {
             id: 'distance-down',
             type: 'observation',
             icon: TrendingDown,
-            iconColor: 'text-yellow-500',
+            iconColor: uiColors.warning,
             title: 'Quieter month',
             description: `You're at ${formatDistance(thisMonth.total_distance)} so far. Last month you did ${formatDistance(lastMonth.total_distance)}.`,
           })
@@ -116,7 +116,7 @@ export function ActivityInsights() {
           id: 'long-activity',
           type: 'achievement',
           icon: Trophy,
-          iconColor: 'text-yellow-500',
+          iconColor: iconColors.trophy,
           title: 'Big effort!',
           description: `Your ${longestRecent.name} (${formatDistance(longestRecent.distance)}) was ${Math.round((longestRecent.distance / avgDistance - 1) * 100)}% longer than your average.`,
         })
@@ -138,7 +138,7 @@ export function ActivityInsights() {
         id: 'morning-person',
         type: 'observation',
         icon: Clock,
-        iconColor: 'text-sky-500',
+        iconColor: iconColors.clock,
         title: 'Early bird',
         description: `${morningActivities} of your recent ${activities.length} activities started in the morning.`,
       })
@@ -147,7 +147,7 @@ export function ActivityInsights() {
         id: 'evening-person',
         type: 'observation',
         icon: Clock,
-        iconColor: 'text-purple-500',
+        iconColor: '#a78bfa', // purple for evening
         title: 'Evening athlete',
         description: `You prefer evening workouts, with ${eveningActivities} recent sessions after 5pm.`,
       })
@@ -164,7 +164,7 @@ export function ActivityInsights() {
         id: 'locations',
         type: 'observation',
         icon: MapPin,
-        iconColor: 'text-teal-500',
+        iconColor: iconColors.location,
         title: `Active in ${locations.size} countries`,
         description: `You've recently recorded activities in ${Array.from(locations).slice(0, 3).join(', ')}.`,
       })
@@ -188,7 +188,7 @@ export function ActivityInsights() {
             id: 'power-up',
             type: 'trend',
             icon: Zap,
-            iconColor: 'text-yellow-400',
+            iconColor: iconColors.power,
             title: 'Power increasing',
             description: `Your recent average power is ${Math.round(powerChange)}% higher (${Math.round(avgPower)}W vs ${Math.round(olderAvgPower)}W).`,
           })
@@ -206,7 +206,7 @@ export function ActivityInsights() {
             id: 'milestone',
             type: 'record',
             icon: Trophy,
-            iconColor: 'text-amber-500',
+            iconColor: iconColors.trophy,
             title: `${milestone.toLocaleString()} km milestone!`,
             description: `You've covered ${formatDistance(stats.total_distance)} in total. Amazing!`,
           })
@@ -227,7 +227,7 @@ export function ActivityInsights() {
             id: 'activity-milestone',
             type: 'record',
             icon: Calendar,
-            iconColor: 'text-blue-500',
+            iconColor: iconColors.calendar,
             title: `${milestone} activities!`,
             description: `You've recorded ${stats.total_activities} total activities. Impressive dedication!`,
           })
@@ -264,7 +264,10 @@ export function ActivityInsights() {
                   key={insight.id}
                   className="flex items-start gap-3 p-2 rounded-sm bg-muted/30"
                 >
-                  <Icon className={cn('h-4 w-4 mt-0.5 shrink-0', insight.iconColor)} />
+                  <Icon
+                    className="h-4 w-4 mt-0.5 shrink-0"
+                    style={{ color: insight.iconColor }}
+                  />
                   <div className="min-w-0">
                     <div className="font-medium text-sm">{insight.title}</div>
                     <p className="text-xs text-muted-foreground">{insight.description}</p>

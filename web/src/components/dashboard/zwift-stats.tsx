@@ -97,7 +97,7 @@ export function ZwiftStats() {
       ) : (
         <div className="h-full flex flex-col">
           {/* Summary stats */}
-          <div className="grid grid-cols-4 gap-2 mb-4 flex-shrink-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 flex-shrink-0">
             <div className="flex items-center gap-1.5">
               <Bike className="h-3.5 w-3.5 text-muted-foreground" />
               <div>

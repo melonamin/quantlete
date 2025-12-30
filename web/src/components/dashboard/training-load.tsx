@@ -36,15 +36,15 @@ export function TrainingLoad() {
       <div className="h-full flex flex-col gap-3">
         {data?.summary && (
           <div className="grid grid-cols-3 gap-2 text-center flex-shrink-0">
-            <div className="rounded-md border border-border p-2">
+            <div className="rounded-md border border-border p-2.5">
               <div className="text-xs text-muted-foreground">CTL</div>
               <div className="font-semibold">{data.summary.ctl.toFixed(1)}</div>
             </div>
-            <div className="rounded-md border border-border p-2">
+            <div className="rounded-md border border-border p-2.5">
               <div className="text-xs text-muted-foreground">ATL</div>
               <div className="font-semibold">{data.summary.atl.toFixed(1)}</div>
             </div>
-            <div className="rounded-md border border-border p-2">
+            <div className="rounded-md border border-border p-2.5">
               <div className="text-xs text-muted-foreground">TSB</div>
               <div className="font-semibold">{data.summary.tsb.toFixed(1)}</div>
             </div>

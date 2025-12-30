@@ -298,6 +298,8 @@ type CalendarDay struct {
 	Date          string  `json:"date"` // YYYY-MM-DD format
 	ActivityCount int     `json:"activity_count"`
 	TotalDistance float64 `json:"total_distance"`
+	TotalTime     int     `json:"total_time"`     // moving_time in seconds
+	TotalCalories float64 `json:"total_calories"`
 }
 
 // CalendarActivity represents an activity summary for the calendar view.
@@ -317,7 +319,9 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 		SELECT
 			strftime('%Y-%m-%d', start_date) as date,
 			COUNT(*) as activity_count,
-			COALESCE(SUM(distance), 0) as total_distance
+			COALESCE(SUM(distance), 0) as total_distance,
+			COALESCE(SUM(moving_time), 0) as total_time,
+			COALESCE(SUM(calories), 0) as total_calories
 		FROM activities
 		WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
 		GROUP BY date
@@ -331,7 +335,7 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 	var days []CalendarDay
 	for rows.Next() {
 		var d CalendarDay
-		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance); err != nil {
+		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance, &d.TotalTime, &d.TotalCalories); err != nil {
 			return nil, err
 		}
 		days = append(days, d)

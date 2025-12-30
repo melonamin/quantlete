@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTrainingGoals } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { Check, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { uiColors } from '@/components/charts'
 
 function getRecentMonths(count: number): { key: string; label: string }[] {
   const months: { key: string; label: string }[] = []
@@ -118,21 +118,23 @@ export function ChallengeConsistencyGrid() {
                           <span className="text-muted-foreground/30">—</span>
                         ) : status ? (
                           <span
-                            className={cn(
-                              'inline-flex items-center justify-center w-5 h-5 rounded',
-                              'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                            )}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded"
+                            style={{
+                              backgroundColor: `${uiColors.success}20`,
+                              color: uiColors.success,
+                            }}
                           >
-                            <Check className="h-3 w-3" />
+                            <Check className="h-3.5 w-3.5" />
                           </span>
                         ) : (
                           <span
-                            className={cn(
-                              'inline-flex items-center justify-center w-5 h-5 rounded',
-                              'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                            )}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded"
+                            style={{
+                              backgroundColor: `${uiColors.danger}20`,
+                              color: uiColors.danger,
+                            }}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </span>
                         )}
                       </td>

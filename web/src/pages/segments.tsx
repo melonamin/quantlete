@@ -10,7 +10,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@
 import { SegmentMap } from '@/components/maps'
 import { SegmentPRChart } from '@/components/charts/segment-pr-chart'
 import { Pagination } from '@/components/activities'
-import { Search, X, Filter, Star, Crown, List, LayoutGrid } from 'lucide-react'
+import { Search, X, Filter, Star, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PAGINATION } from '@/lib/constants'
 
@@ -41,7 +41,6 @@ export function SegmentsPage() {
 
   // Pagination state
   const [page, setPage] = useState(1)
-  const [viewAll, setViewAll] = useState(false)
 
   // Debounce search
   useEffect(() => {
@@ -64,12 +63,12 @@ export function SegmentsPage() {
       starred: starredOnly ? true : undefined,
       kom_only: komOnly ? true : undefined,
       search: search || undefined,
-      page: viewAll ? 1 : page,
-      per_page: viewAll ? PAGINATION.VIEW_ALL_LIMIT : PAGINATION.DEFAULT_PER_PAGE,
+      page,
+      per_page: PAGINATION.DEFAULT_PER_PAGE,
       order_by: sortKey,
       order_dir: sortDir,
     }
-  }, [activityType, country, starredOnly, komOnly, search, page, viewAll, sortKey, sortDir])
+  }, [activityType, country, starredOnly, komOnly, search, page, sortKey, sortDir])
 
   const { data: segmentsResponse, isLoading, error } = useSegments(apiFilters)
   const { data: countries } = useSegmentCountries()
@@ -114,29 +113,9 @@ export function SegmentsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Segments</h1>
-          <p className="text-muted-foreground">Your segment efforts and PRs</p>
-        </div>
-        <Button
-          variant={viewAll ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setViewAll((prev) => !prev)}
-          className="gap-2"
-        >
-          {viewAll ? (
-            <>
-              <LayoutGrid className="h-4 w-4" />
-              Paginated
-            </>
-          ) : (
-            <>
-              <List className="h-4 w-4" />
-              View All
-            </>
-          )}
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Segments</h1>
+        <p className="text-muted-foreground">Your segment efforts and PRs</p>
       </div>
 
       {/* Filters Panel - Stacked Layout */}
@@ -422,7 +401,7 @@ export function SegmentsPage() {
       )}
 
       {/* Pagination */}
-      {!isLoading && total > 0 && !viewAll && (
+      {!isLoading && total > 0 && (
         <Pagination
           page={currentPage}
           totalPages={totalPages}

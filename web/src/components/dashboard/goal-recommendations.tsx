@@ -5,7 +5,7 @@ import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Target, TrendingUp, Zap, Trophy } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { uiColors } from '@/components/charts'
 
 type Difficulty = 'easy' | 'moderate' | 'stretch'
 
@@ -21,9 +21,9 @@ interface GoalRecommendation {
 
 const DIFFICULTY_CONFIG: Record<Difficulty, { label: string; color: string; icon: typeof Target }> =
   {
-    easy: { label: 'Easy', color: 'text-green-500', icon: Target },
-    moderate: { label: 'Moderate', color: 'text-yellow-500', icon: TrendingUp },
-    stretch: { label: 'Stretch', color: 'text-orange-500', icon: Zap },
+    easy: { label: 'Easy', color: uiColors.success, icon: Target },
+    moderate: { label: 'Moderate', color: uiColors.warning, icon: TrendingUp },
+    stretch: { label: 'Stretch', color: uiColors.accent, icon: Zap },
   }
 
 export function GoalRecommendations() {
@@ -236,13 +236,13 @@ export function GoalRecommendations() {
                   key={rec.id}
                   className="flex items-start gap-3 p-2 rounded-sm bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
-                  <Icon className={cn('h-4 w-4 mt-0.5 shrink-0', color)} />
+                  <Icon className="h-4 w-4 mt-0.5 shrink-0" style={{ color }} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">
                         {formatTarget(rec)} / {rec.period}
                       </span>
-                      <span className={cn('text-[10px] uppercase', color)}>{label}</span>
+                      <span className="text-[10px] uppercase" style={{ color }}>{label}</span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{rec.reason}</p>
                     <div className="text-[10px] text-muted-foreground/70">

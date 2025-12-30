@@ -44,11 +44,11 @@ export function MonthlyChart() {
       }
     >
       <div className="h-full flex flex-col">
-        <div className="mb-3 flex gap-1 flex-shrink-0">
+        <div className="mb-3 flex gap-1.5 flex-shrink-0">
           <Button
             variant={metric === 'distance' ? 'secondary' : 'ghost'}
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-7 px-2.5 text-xs"
             onClick={() => setMetric('distance')}
           >
             Distance
@@ -56,7 +56,7 @@ export function MonthlyChart() {
           <Button
             variant={metric === 'count' ? 'secondary' : 'ghost'}
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-7 px-2.5 text-xs"
             onClick={() => setMetric('count')}
           >
             Activities
@@ -64,7 +64,7 @@ export function MonthlyChart() {
           <Button
             variant={metric === 'time' ? 'secondary' : 'ghost'}
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-7 px-2.5 text-xs"
             onClick={() => setMetric('time')}
           >
             Time

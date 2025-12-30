@@ -2,9 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useHrZones, useHrZoneDefinitions } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
-import { StackedBarChart } from '@/components/charts'
-
-const ZONE_COLORS = ['#7dd3fc', '#22c55e', '#eab308', '#f97316', '#ef4444']
+import { StackedBarChart, zoneColorsArray } from '@/components/charts'
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -23,7 +21,7 @@ export function HeartRateZones() {
   const series = seconds.map((s, idx) => ({
     name: `Z${idx + 1}`,
     data: [s],
-    color: ZONE_COLORS[idx],
+    color: zoneColorsArray[idx],
   }))
 
   return (
@@ -51,7 +49,7 @@ export function HeartRateZones() {
                 <span className="flex items-center gap-2">
                   <span
                     className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: ZONE_COLORS[idx] }}
+                    style={{ backgroundColor: zoneColorsArray[idx] }}
                   />
                   Z{idx + 1}
                 </span>

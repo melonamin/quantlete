@@ -71,6 +71,8 @@ export interface CalendarDay {
   date: string
   activity_count: number
   total_distance: number
+  total_time: number // moving_time in seconds
+  total_calories: number
 }
 
 export interface CalendarActivity {

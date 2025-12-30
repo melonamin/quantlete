@@ -3,6 +3,7 @@ import { WidgetWrapper } from './widget-wrapper'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { uiColors } from '@/components/charts'
 
 interface YearlyStatWithDelta {
   year: number
@@ -60,14 +61,10 @@ function DeltaIndicator({ value, className }: { value: number | null; className?
     )
   }
 
+  const color = isPositive ? uiColors.success : uiColors.danger
+
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-0.5',
-        isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
-        className
-      )}
-    >
+    <span className={cn('inline-flex items-center gap-0.5', className)} style={{ color }}>
       {isPositive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
       <span className="text-xs">{Math.abs(value).toFixed(0)}%</span>
     </span>

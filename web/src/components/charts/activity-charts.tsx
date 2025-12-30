@@ -1,7 +1,9 @@
+import { useRef, useEffect, useState } from 'react'
 import type { EChartsOption } from 'echarts'
 import {
   EChartsWrapper,
   chartColors,
+  calendarPalettes,
   defaultGridConfig,
   defaultTooltipConfig,
 } from './echarts-wrapper'
@@ -132,6 +134,28 @@ export function SportDistributionChart({
   loading = false,
   className,
 }: SportDistributionChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [dimensions, setDimensions] = useState({ width: 400, height: 250 })
+
+  // Track container dimensions for responsive layout
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry) {
+        setDimensions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        })
+      }
+    })
+
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
   const getValue = (d: SportData) => (metric === 'count' ? d.count : d.distance)
 
   const sportColorMap: Record<string, string> = {
@@ -150,6 +174,43 @@ export function SportDistributionChart({
     Snowboard: chartColors.winter,
   }
 
+  // Responsive layout logic based on container dimensions
+  const isCompact = dimensions.height < 200 || dimensions.width < 280
+  const isNarrow = dimensions.width < 350
+
+  // Adapt chart configuration based on size
+  const chartConfig = isCompact
+    ? {
+        // Compact mode: no legend, centered chart, smaller radius
+        radius: ['35%', '60%'] as [string, string],
+        center: ['50%', '50%'] as [string, string],
+        showLegend: false,
+        legendPosition: {} as Record<string, unknown>,
+      }
+    : isNarrow
+      ? {
+          // Narrow mode: horizontal legend below chart
+          radius: ['40%', '65%'] as [string, string],
+          center: ['50%', '40%'] as [string, string],
+          showLegend: true,
+          legendPosition: {
+            bottom: 0,
+            left: 'center',
+            orient: 'horizontal' as const,
+          },
+        }
+      : {
+          // Full mode: vertical legend on right side
+          radius: ['40%', '70%'] as [string, string],
+          center: ['40%', '50%'] as [string, string],
+          showLegend: true,
+          legendPosition: {
+            right: '5%',
+            top: 'center',
+            orient: 'vertical' as const,
+          },
+        }
+
   const option: EChartsOption = {
     tooltip: {
       ...defaultTooltipConfig,
@@ -160,17 +221,23 @@ export function SportDistributionChart({
         return `${p.name}<br/>${valueStr} (${p.percent.toFixed(1)}%)`
       },
     },
-    legend: {
-      orient: 'vertical',
-      right: '5%',
-      top: 'center',
-      textStyle: { color: '#888' },
-    },
+    legend: chartConfig.showLegend
+      ? {
+          ...chartConfig.legendPosition,
+          textStyle: {
+            color: '#888',
+            fontSize: isNarrow ? 10 : 12,
+          },
+          itemWidth: isNarrow ? 10 : 14,
+          itemHeight: isNarrow ? 10 : 14,
+          itemGap: isNarrow ? 6 : 10,
+        }
+      : undefined,
     series: [
       {
         type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['35%', '50%'],
+        radius: chartConfig.radius,
+        center: chartConfig.center,
         avoidLabelOverlap: true,
         itemStyle: {
           borderRadius: 4,
@@ -182,8 +249,8 @@ export function SportDistributionChart({
         },
         emphasis: {
           label: {
-            show: true,
-            fontSize: 14,
+            show: !isCompact,
+            fontSize: isCompact ? 10 : 14,
             fontWeight: 'bold',
           },
         },
@@ -200,19 +267,28 @@ export function SportDistributionChart({
     ],
   }
 
-  return <EChartsWrapper option={option} height={height} loading={loading} className={className} />
+  return (
+    <div ref={containerRef} className={className} style={{ height }}>
+      <EChartsWrapper option={option} height="100%" loading={loading} />
+    </div>
+  )
 }
 
 // Activity calendar heatmap
+export type CalendarMetric = 'count' | 'distance' | 'time' | 'calories'
+
 interface CalendarData {
   date: string
   count: number
   distance?: number
+  time?: number // seconds
+  calories?: number
 }
 
 interface ActivityCalendarChartProps {
   data: CalendarData[]
   year: number
+  metric?: CalendarMetric
   height?: number | string
   loading?: boolean
   className?: string
@@ -221,28 +297,60 @@ interface ActivityCalendarChartProps {
 export function ActivityCalendarChart({
   data,
   year,
+  metric = 'count',
   height = 180,
   loading = false,
   className,
 }: ActivityCalendarChartProps) {
-  const maxCount = Math.max(...data.map((d) => d.count), 1)
+  // Get value based on selected metric
+  const getValue = (d: CalendarData): number => {
+    switch (metric) {
+      case 'count':
+        return d.count
+      case 'distance':
+        return (d.distance ?? 0) / 1000 // Convert to km
+      case 'time':
+        return (d.time ?? 0) / 60 // Convert to minutes
+      case 'calories':
+        return d.calories ?? 0
+    }
+  }
+
+  // Format tooltip based on metric
+  const formatTooltip = (date: string, value: number): string => {
+    switch (metric) {
+      case 'count':
+        return `${date}<br/>${Math.round(value)} ${value === 1 ? 'activity' : 'activities'}`
+      case 'distance':
+        return `${date}<br/>${value.toFixed(1)} km`
+      case 'time': {
+        const hours = Math.floor(value / 60)
+        const mins = Math.round(value % 60)
+        return `${date}<br/>${hours > 0 ? `${hours}h ` : ''}${mins}m`
+      }
+      case 'calories':
+        return `${date}<br/>${Math.round(value)} kcal`
+    }
+  }
+
+  const values = data.map((d) => getValue(d))
+  const maxValue = Math.max(...values, 1)
+  const palette = calendarPalettes[metric]
 
   const option: EChartsOption = {
     tooltip: {
       ...defaultTooltipConfig,
       formatter: (params: unknown) => {
         const p = params as { data: [string, number] }
-        const date = p.data[0]
-        const count = p.data[1]
-        return `${date}<br/>${count} ${count === 1 ? 'activity' : 'activities'}`
+        return formatTooltip(p.data[0], p.data[1])
       },
     },
     visualMap: {
       show: false,
       min: 0,
-      max: maxCount,
+      max: maxValue,
       inRange: {
-        color: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
+        color: palette,
       },
     },
     calendar: {
@@ -272,7 +380,7 @@ export function ActivityCalendarChart({
       {
         type: 'heatmap',
         coordinateSystem: 'calendar',
-        data: data.map((d) => [d.date, d.count]),
+        data: data.map((d) => [d.date, getValue(d)]),
       },
     ],
   }

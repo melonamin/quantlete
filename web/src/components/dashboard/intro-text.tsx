@@ -3,6 +3,7 @@ import { useDashboard } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Trophy, Activity, Route, Clock, Mountain, Flame } from 'lucide-react'
+import { iconColors } from '@/components/charts'
 
 interface StatHighlight {
   icon: React.ComponentType<{ className?: string }>
@@ -100,7 +101,7 @@ export function IntroText() {
         {/* Welcome Header */}
         <div className="mb-4 flex-shrink-0">
           <div className="flex items-center gap-2 mb-1">
-            <Flame className="h-5 w-5 text-strava" />
+            <Flame className="h-5 w-5" style={{ color: iconColors.fire }} />
             <span className="text-lg font-semibold">{welcomeMessage}</span>
           </div>
           <p className="text-sm text-muted-foreground italic">"{motivationalQuote}"</p>
@@ -138,7 +139,7 @@ export function IntroText() {
         {data?.stats && data.stats.total_activities >= 100 && (
           <div className="mt-3 pt-3 border-t border-border flex-shrink-0">
             <div className="flex items-center gap-2 text-sm">
-              <Trophy className="h-4 w-4 text-yellow-500" />
+              <Trophy className="h-4 w-4" style={{ color: iconColors.trophy }} />
               <span className="text-muted-foreground">
                 {data.stats.total_activities >= 1000
                   ? 'Master Athlete'

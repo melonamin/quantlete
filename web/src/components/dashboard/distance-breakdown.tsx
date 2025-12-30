@@ -3,7 +3,7 @@ import { useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { BarChart } from '@/components/charts'
 import { formatDistance, formatDuration } from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface DistanceZone {
   label: string
@@ -69,28 +69,22 @@ export function DistanceBreakdown() {
       isLoading={isLoading}
       action={
         <div className="flex gap-1">
-          <button
+          <Button
+            variant={viewMode === 'chart' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-2.5 text-xs"
             onClick={() => setViewMode('chart')}
-            className={cn(
-              'px-2 py-1 text-xs rounded',
-              viewMode === 'chart'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
           >
             Chart
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-2.5 text-xs"
             onClick={() => setViewMode('table')}
-            className={cn(
-              'px-2 py-1 text-xs rounded',
-              viewMode === 'table'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
           >
             Table
-          </button>
+          </Button>
         </div>
       }
     >
