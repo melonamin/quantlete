@@ -25,6 +25,9 @@ import {
   Loader2,
   Clock,
   Tag,
+  User,
+  HeartPulse,
+  Zap,
 } from 'lucide-react'
 import { useEffect, useCallback } from 'react'
 
@@ -65,6 +68,8 @@ export function Sidebar() {
     { name: 'Challenges', href: '/challenges', icon: Award },
     ...(showEddington ? [{ name: 'Eddington', href: '/eddington', icon: TrendingUp }] : []),
     { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
+    { name: 'Training Load', href: '/training-load', icon: HeartPulse },
+    { name: 'Power', href: '/power', icon: Zap },
     { name: 'Rewind', href: '/rewind', icon: History },
     { name: 'Badges', href: '/badges', icon: Tag },
     { name: 'Export', href: '/export', icon: Download },
@@ -214,6 +219,27 @@ export function Sidebar() {
               </span>
             </Link>
           )}
+
+          <Link
+            to="/athlete"
+            className={cn(
+              'group flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition-colors',
+              currentPath === '/athlete'
+                ? 'bg-sidebar-accent text-terminal-green'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            )}
+            title={collapsed ? 'Athlete' : undefined}
+          >
+            <User className="h-4 w-4 shrink-0" />
+            <span
+              className={cn(
+                'truncate transition-opacity duration-200',
+                collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+              )}
+            >
+              Athlete
+            </span>
+          </Link>
 
           <Link
             to="/settings"

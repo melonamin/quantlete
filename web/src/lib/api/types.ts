@@ -68,6 +68,7 @@ export interface ActivityFilters {
 
 export interface AuthStatus {
   authenticated: boolean
+  demo_mode?: boolean
   athlete?: {
     id: number
     username: string

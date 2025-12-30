@@ -11,6 +11,7 @@ import { EddingtonPage } from '@/pages/eddington'
 import { BestEffortsPage } from '@/pages/best-efforts'
 import { RewindPage } from '@/pages/rewind'
 import { SettingsPage } from '@/pages/settings'
+import { AthletePage } from '@/pages/athlete'
 import { TrainingLoadPage } from '@/pages/training-load'
 import { PowerPage } from '@/pages/power'
 import { PhotosPage } from '@/pages/photos'
@@ -106,6 +107,13 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
+// Athlete Profile
+const athleteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/athlete',
+  component: AthletePage,
+})
+
 // Training Load
 const trainingLoadRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -178,6 +186,7 @@ const routeTree = rootRoute.addChildren([
   powerRoute,
   photosRoute,
   challengesRoute,
+  athleteRoute,
   settingsRoute,
   oauthCallbackRoute,
   monthlyStatsRoute,
