@@ -55,6 +55,8 @@ export type {
 // Gear types
 export type {
   Gear,
+  GearFilters,
+  GearResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
 } from '@/lib/api/gear'
@@ -66,7 +68,10 @@ export type {
   SegmentEffort,
   SegmentCountryStat,
   SegmentsFilters,
+  SegmentsResponse,
   SegmentDetailResponse,
+  SegmentEffortsFilters,
+  SegmentEffortsResponse,
 } from '@/lib/api/segments'
 
 // Athlete types
@@ -91,7 +96,11 @@ export type {
 } from '@/lib/api/photos'
 
 // Challenge types
-export type { Challenge } from '@/lib/api/challenges'
+export type {
+  Challenge,
+  ChallengesFilters,
+  ChallengesResponse,
+} from '@/lib/api/challenges'
 
 // Goals types
 export type {
@@ -108,6 +117,8 @@ export type {
   CreateComponentRequest,
   UpdateComponentRequest,
   LogMaintenanceRequest,
+  ComponentsFilters,
+  ComponentsResponse,
 } from '@/lib/api/maintenance'
 
 // Settings types
@@ -124,3 +135,9 @@ export type {
 
 // Export helpers
 export type { ExportStats } from '@/lib/api/export'
+
+// Weather types
+export type { ActivityWeather } from '@/lib/api/weather'
+
+// Setup types
+export type { CredentialsStatus, UpdateCredentialsRequest } from '@/lib/api/setup'

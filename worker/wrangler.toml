@@ -1,12 +1,16 @@
 # Stata Strava Proxy Worker
+#
+# This worker acts as a stateless CORS proxy for Strava API calls.
+# Credentials (client_id, client_secret) are sent by the browser with each request.
+#
 name = "stata-strava-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
-# Environment variables (set these via Cloudflare dashboard or wrangler secret)
-# STRAVA_CLIENT_ID - Your Strava app client ID
-# STRAVA_CLIENT_SECRET - Your Strava app client secret
-# ALLOWED_ORIGIN - The frontend URL (e.g., https://stata.pages.dev)
+# Optional environment variables (for backwards compatibility only)
+# STRAVA_CLIENT_ID - Falls back if not provided in request body
+# STRAVA_CLIENT_SECRET - Falls back if not provided in request body
+# ALLOWED_ORIGIN - The frontend URL for CORS (default: * in dev)
 
 [vars]
 STRAVA_API_BASE = "https://www.strava.com/api/v3"

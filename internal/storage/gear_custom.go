@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/sasha/stata/internal/pagination"
 )
 
 var hashtagTokenRe = regexp.MustCompile(`#([A-Za-z0-9][A-Za-z0-9_-]{0,63})`)
@@ -120,6 +122,76 @@ func (r *GearRepository) ListCustom(ctx context.Context, athleteID int64, includ
 		out = append(out, g)
 	}
 	return out, rows.Err()
+}
+
+// ListCustomPaginated returns a paginated list of custom gear for an athlete.
+func (r *GearRepository) ListCustomPaginated(ctx context.Context, athleteID int64, f GearFilters) (GearListResult, error) {
+	// Build WHERE clause
+	where := "athlete_id = ? AND COALESCE(source, 'strava') = 'custom'"
+	args := []any{athleteID}
+	if !f.IncludeRetired {
+		where += " AND retired = FALSE"
+	}
+
+	// Count total
+	var total int
+	countQuery := "SELECT COUNT(*) FROM gear WHERE " + where
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil && !isNotFound(err) {
+		return GearListResult{}, fmt.Errorf("counting custom gear: %w", err)
+	}
+
+	// Normalize pagination params
+	p := pagination.NewParams(f.Page, f.PerPage)
+
+	// Build ORDER BY with validation
+	validOrderBy := map[string]string{
+		"name":     "name",
+		"distance": "distance",
+	}
+	orderBy := pagination.BuildOrderClause(f.OrderBy, f.OrderDir, validOrderBy, "name ASC")
+
+	query := fmt.Sprintf(`
+		SELECT id, athlete_id, name, is_primary, retired, distance,
+			brand_name, model_name, description,
+			COALESCE(source, ''), COALESCE(hashtag, ''), purchase_price, COALESCE(purchase_currency, ''),
+			created_at, updated_at
+		FROM gear
+		WHERE %s
+		ORDER BY %s
+		LIMIT ? OFFSET ?
+	`, where, orderBy)
+
+	args = append(args, p.PerPage, p.Offset())
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return GearListResult{}, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []Gear
+	for rows.Next() {
+		var g Gear
+		if err := rows.Scan(
+			&g.ID, &g.AthleteID, &g.Name, &g.Primary, &g.Retired, &g.Distance,
+			&g.BrandName, &g.ModelName, &g.Description,
+			&g.Source, &g.Hashtag, &g.PurchasePrice, &g.PurchaseCurrency,
+			&g.CreatedAt, &g.UpdatedAt,
+		); err != nil {
+			return GearListResult{}, fmt.Errorf("scanning custom gear: %w", err)
+		}
+		items = append(items, g)
+	}
+	if err := rows.Err(); err != nil {
+		return GearListResult{}, err
+	}
+
+	return GearListResult{
+		Items:      items,
+		Total:      total,
+		Page:       p.Page,
+		PerPage:    p.PerPage,
+		TotalPages: p.TotalPages(total),
+	}, nil
 }
 
 type CustomGearCreate struct {

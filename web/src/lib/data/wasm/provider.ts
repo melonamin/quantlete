@@ -28,6 +28,7 @@ import type {
   EddingtonHistoryPoint,
   DashboardConfig,
   ActivityStream,
+  ActivityWeather,
   PowerStatsResponse,
   HrZonesResponse,
   TrainingLoadResponse,
@@ -35,13 +36,16 @@ import type {
   HrZoneDefinition,
   DistributionSlice,
   Gear,
+  GearFilters,
+  GearResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
-  SegmentListItem,
   SegmentCountryStat,
   SegmentDetailResponse,
-  SegmentEffort,
+  SegmentEffortsFilters,
+  SegmentEffortsResponse,
   SegmentsFilters,
+  SegmentsResponse,
   FTPHistoryResponse,
   WeightHistoryResponse,
   BestEffortPR,
@@ -50,10 +54,13 @@ import type {
   PhotosListResponse,
   PhotosFilters,
   ActivityPhoto,
-  Challenge,
+  ChallengesFilters,
+  ChallengesResponse,
   TrainingGoalsConfig,
   TrainingGoalsResponse,
   ComponentWithRules,
+  ComponentsFilters,
+  ComponentsResponse,
   DueComponent,
   CreateComponentRequest,
   UpdateComponentRequest,
@@ -62,6 +69,8 @@ import type {
   ImportProgress,
   StartImportRequest,
   ExportStats,
+  CredentialsStatus,
+  UpdateCredentialsRequest,
 } from '../types'
 import { WasmDatabase, initializeDatabase } from '@/lib/wasm/db'
 import { queries } from '@/lib/wasm/queries.gen'
@@ -87,6 +96,8 @@ import {
   getRateLimitInfo,
 } from '@/lib/wasm/strava'
 import type { SyncRun as ApiSyncRun, SyncWatermark } from '@/lib/api/import'
+import { fetchOpenMeteoWeather, computeFromTempStream } from '@/lib/wasm/weather'
+import { getCredentials, saveCredentials, hasCredentials } from '@/lib/wasm/strava/credentials'
 export class WasmProvider implements DataProvider {
   private db: WasmDatabase | null = null
   private athleteId: number | null = null
@@ -257,6 +268,134 @@ export class WasmProvider implements DataProvider {
       series_type: row.series_type,
       data: JSON.parse(row.data),
     }))
+  }
+
+  async getActivityWeather(id: number): Promise<ActivityWeather | null> {
+    const db = this.assertInitialized()
+
+    // Check cache first
+    type WeatherRow = {
+      activity_id: number
+      source: string
+      temperature_c: number | null
+      feels_like_c: number | null
+      humidity_percent: number | null
+      wind_speed_mps: number | null
+      wind_direction_deg: number | null
+      precipitation_mm: number | null
+      weather_code: number | null
+      temp_min_c: number | null
+      temp_max_c: number | null
+      temp_avg_c: number | null
+      temp_stream: string | null
+      fetched_at: string
+    }
+
+    const row = db.queryOne<WeatherRow>(
+      `SELECT * FROM activity_weather WHERE activity_id = ?`,
+      [id]
+    )
+
+    if (row) {
+      return {
+        activity_id: row.activity_id,
+        source: row.source as 'strava' | 'open-meteo',
+        temperature_c: row.temperature_c ?? undefined,
+        feels_like_c: row.feels_like_c ?? undefined,
+        humidity_percent: row.humidity_percent ?? undefined,
+        wind_speed_mps: row.wind_speed_mps ?? undefined,
+        wind_direction_deg: row.wind_direction_deg ?? undefined,
+        precipitation_mm: row.precipitation_mm ?? undefined,
+        weather_code: row.weather_code ?? undefined,
+        temp_min_c: row.temp_min_c ?? undefined,
+        temp_max_c: row.temp_max_c ?? undefined,
+        temp_avg_c: row.temp_avg_c ?? undefined,
+        temp_stream: row.temp_stream ? JSON.parse(row.temp_stream) : undefined,
+        fetched_at: row.fetched_at,
+      }
+    }
+
+    // Try to get temp stream from local data
+    const streams = await this.getActivityStreams(id)
+    const tempStream = streams.find((s) => s.stream_type === 'temp')
+
+    if (tempStream && Array.isArray(tempStream.data)) {
+      const weather = computeFromTempStream(tempStream.data)
+      if (weather) {
+        weather.activity_id = id
+        this.cacheWeather(weather)
+        return weather
+      }
+    }
+
+    // Fall back to Open-Meteo
+    const activity = await this.getActivity(id)
+    if (activity.start_lat && activity.start_lng) {
+      const activityDate = new Date(activity.start_date)
+      // Don't fetch for activities older than 2 years (Open-Meteo archive limit)
+      const twoYearsAgo = new Date()
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
+
+      if (activityDate > twoYearsAgo) {
+        const weather = await fetchOpenMeteoWeather(
+          activity.start_lat,
+          activity.start_lng,
+          activityDate
+        )
+        if (weather) {
+          weather.activity_id = id
+          this.cacheWeather(weather)
+          return weather
+        }
+      }
+    }
+
+    return null
+  }
+
+  private cacheWeather(weather: ActivityWeather): void {
+    const db = this.assertInitialized()
+    try {
+      db.exec(
+        `INSERT INTO activity_weather (
+          activity_id, source, temperature_c, feels_like_c, humidity_percent,
+          wind_speed_mps, wind_direction_deg, precipitation_mm, weather_code,
+          temp_min_c, temp_max_c, temp_avg_c, temp_stream, fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(activity_id) DO UPDATE SET
+          source = excluded.source,
+          temperature_c = excluded.temperature_c,
+          feels_like_c = excluded.feels_like_c,
+          humidity_percent = excluded.humidity_percent,
+          wind_speed_mps = excluded.wind_speed_mps,
+          wind_direction_deg = excluded.wind_direction_deg,
+          precipitation_mm = excluded.precipitation_mm,
+          weather_code = excluded.weather_code,
+          temp_min_c = excluded.temp_min_c,
+          temp_max_c = excluded.temp_max_c,
+          temp_avg_c = excluded.temp_avg_c,
+          temp_stream = excluded.temp_stream,
+          fetched_at = excluded.fetched_at`,
+        [
+          weather.activity_id,
+          weather.source,
+          weather.temperature_c ?? null,
+          weather.feels_like_c ?? null,
+          weather.humidity_percent ?? null,
+          weather.wind_speed_mps ?? null,
+          weather.wind_direction_deg ?? null,
+          weather.precipitation_mm ?? null,
+          weather.weather_code ?? null,
+          weather.temp_min_c ?? null,
+          weather.temp_max_c ?? null,
+          weather.temp_avg_c ?? null,
+          weather.temp_stream ? JSON.stringify(weather.temp_stream) : null,
+          weather.fetched_at,
+        ]
+      )
+    } catch (err) {
+      console.warn('Failed to cache weather:', err)
+    }
   }
 
   // ============================================================================
@@ -515,6 +654,8 @@ export class WasmProvider implements DataProvider {
       id: number
       name: string
       sport_type: string
+      start_date: string
+      distance: number
       summary_polyline: string
       start_lat: number
       start_lng: number
@@ -544,6 +685,8 @@ export class WasmProvider implements DataProvider {
         id: a.id,
         name: a.name ?? '',
         sport_type: a.sport_type,
+        start_date: a.start_date,
+        distance: a.distance ?? 0,
         summary_polyline: a.summary_polyline,
         start_lat: a.start_lat,
         start_lng: a.start_lng,
@@ -1115,11 +1258,29 @@ export class WasmProvider implements DataProvider {
   // ============================================================================
   // Gear
   // ============================================================================
-  async getGear(includeRetired = true): Promise<Gear[]> {
+  async getGear(filters?: GearFilters): Promise<GearResponse> {
     const db = this.assertInitialized()
     const athleteId = this.getAthleteId()
 
+    const includeRetired = filters?.include_retired ?? true
+    const page = filters?.page ?? 1
+    const perPage = filters?.per_page ?? 50
+    const orderBy = filters?.order_by ?? 'distance'
+    const orderDir = filters?.order_dir ?? 'desc'
+
     const retiredFilter = includeRetired ? '' : 'AND g.retired = 0'
+    const orderColumn = orderBy === 'name' ? 'g.name' : 'g.distance'
+    const orderDirection = orderDir === 'asc' ? 'ASC' : 'DESC'
+
+    // Get total count
+    const countResult = db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM gear g WHERE g.athlete_id = ? ${retiredFilter}`,
+      [athleteId]
+    )
+    const total = countResult?.count ?? 0
+    const totalPages = Math.ceil(total / perPage)
+    const offset = (page - 1) * perPage
+
     const rows = db.query<{
       id: string
       name: string
@@ -1143,11 +1304,12 @@ export class WasmProvider implements DataProvider {
        LEFT JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
        WHERE g.athlete_id = ? ${retiredFilter}
        GROUP BY g.id
-       ORDER BY g.distance DESC`,
-      [athleteId]
+       ORDER BY ${orderColumn} ${orderDirection}
+       LIMIT ? OFFSET ?`,
+      [athleteId, perPage, offset]
     )
 
-    return rows.map((r) => ({
+    const data = rows.map((r) => ({
       id: r.id,
       name: r.name,
       primary: r.is_primary === 1,
@@ -1162,6 +1324,8 @@ export class WasmProvider implements DataProvider {
       purchase_currency: r.purchase_currency ?? undefined,
       activity_count: r.activity_count,
     }))
+
+    return { data, total, page, per_page: perPage, total_pages: totalPages }
   }
 
   async getGearDetail(id: string): Promise<Gear> {
@@ -1215,11 +1379,29 @@ export class WasmProvider implements DataProvider {
     }
   }
 
-  async getCustomGear(includeRetired = true): Promise<Gear[]> {
+  async getCustomGear(filters?: GearFilters): Promise<GearResponse> {
     const db = this.assertInitialized()
     const athleteId = this.getAthleteId()
 
+    const includeRetired = filters?.include_retired ?? true
+    const page = filters?.page ?? 1
+    const perPage = filters?.per_page ?? 50
+    const orderBy = filters?.order_by ?? 'name'
+    const orderDir = filters?.order_dir ?? 'asc'
+
     const retiredFilter = includeRetired ? '' : 'AND g.retired = 0'
+    const orderColumn = orderBy === 'distance' ? 'g.distance' : 'g.name'
+    const orderDirection = orderDir === 'asc' ? 'ASC' : 'DESC'
+
+    // Get total count
+    const countResult = db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM gear g WHERE g.athlete_id = ? AND g.source = 'custom' ${retiredFilter}`,
+      [athleteId]
+    )
+    const total = countResult?.count ?? 0
+    const totalPages = Math.ceil(total / perPage)
+    const offset = (page - 1) * perPage
+
     const rows = db.query<{
       id: string
       name: string
@@ -1243,11 +1425,12 @@ export class WasmProvider implements DataProvider {
        LEFT JOIN activities a ON a.gear_id = g.id AND a.athlete_id = g.athlete_id
        WHERE g.athlete_id = ? AND g.source = 'custom' ${retiredFilter}
        GROUP BY g.id
-       ORDER BY g.name`,
-      [athleteId]
+       ORDER BY ${orderColumn} ${orderDirection}
+       LIMIT ? OFFSET ?`,
+      [athleteId, perPage, offset]
     )
 
-    return rows.map((r) => ({
+    const data = rows.map((r) => ({
       id: r.id,
       name: r.name,
       primary: r.is_primary === 1,
@@ -1262,6 +1445,8 @@ export class WasmProvider implements DataProvider {
       purchase_currency: r.purchase_currency ?? undefined,
       activity_count: r.activity_count,
     }))
+
+    return { data, total, page, per_page: perPage, total_pages: totalPages }
   }
 
   async createCustomGear(req: CustomGearCreateRequest): Promise<Gear> {
@@ -1390,7 +1575,7 @@ export class WasmProvider implements DataProvider {
   // ============================================================================
   // Segments
   // ============================================================================
-  async getSegments(filters?: SegmentsFilters): Promise<SegmentListItem[]> {
+  async getSegments(filters?: SegmentsFilters): Promise<SegmentsResponse> {
     const db = this.assertInitialized()
     const athleteId = this.getAthleteId()
 
@@ -1463,12 +1648,64 @@ export class WasmProvider implements DataProvider {
       result = result.filter((s) => s.name.toLowerCase().includes(searchLower))
     }
 
-    // Limit
-    if (filters?.limit && filters.limit > 0) {
-      result = result.slice(0, filters.limit)
-    }
+    // Get total after filtering but before pagination
+    const total = result.length
 
-    return result
+    // Sorting
+    const orderBy = filters?.order_by || 'times_completed'
+    const orderDir = filters?.order_dir || 'desc'
+    const multiplier = orderDir === 'asc' ? 1 : -1
+
+    result.sort((a, b) => {
+      let av: number | string = 0
+      let bv: number | string = 0
+
+      switch (orderBy) {
+        case 'name':
+          av = a.name.toLowerCase()
+          bv = b.name.toLowerCase()
+          break
+        case 'distance':
+          av = a.distance ?? 0
+          bv = b.distance ?? 0
+          break
+        case 'maximum_grade':
+          av = a.maximum_grade ?? 0
+          bv = b.maximum_grade ?? 0
+          break
+        case 'times_completed':
+          av = a.times_completed ?? 0
+          bv = b.times_completed ?? 0
+          break
+        case 'last_effort_date':
+          av = a.last_effort_date ? new Date(a.last_effort_date).getTime() : 0
+          bv = b.last_effort_date ? new Date(b.last_effort_date).getTime() : 0
+          break
+        case 'best_elapsed_time':
+          av = a.best_elapsed_time ?? Number.MAX_SAFE_INTEGER
+          bv = b.best_elapsed_time ?? Number.MAX_SAFE_INTEGER
+          break
+      }
+
+      if (av < bv) return -1 * multiplier
+      if (av > bv) return 1 * multiplier
+      return a.id - b.id
+    })
+
+    // Pagination
+    const page = filters?.page && filters.page > 0 ? filters.page : 1
+    const perPage = filters?.per_page && filters.per_page > 0 ? Math.min(filters.per_page, 200) : 50
+    const totalPages = Math.max(1, Math.ceil(total / perPage))
+    const offset = (page - 1) * perPage
+    const paginatedResult = result.slice(offset, offset + perPage)
+
+    return {
+      data: paginatedResult,
+      total,
+      page,
+      per_page: perPage,
+      total_pages: totalPages,
+    }
   }
 
   async getSegmentCountries(): Promise<SegmentCountryStat[]> {
@@ -1516,7 +1753,8 @@ export class WasmProvider implements DataProvider {
       throw new Error(`Segment ${id} not found`)
     }
 
-    const efforts = await this.getSegmentEfforts(id)
+    const effortsResult = await this.getSegmentEfforts(id)
+    const efforts = effortsResult.data
 
     return {
       segment: {
@@ -1544,11 +1782,28 @@ export class WasmProvider implements DataProvider {
     }
   }
 
-  async getSegmentEfforts(id: number): Promise<SegmentEffort[]> {
+  async getSegmentEfforts(id: number, filters?: SegmentEffortsFilters): Promise<SegmentEffortsResponse> {
     const db = this.assertInitialized()
     const athleteId = this.getAthleteId()
 
-    const rows = queries.getSegmentEfforts<{
+    const page = filters?.page ?? 1
+    const perPage = filters?.per_page ?? 50
+    const orderBy = filters?.order_by ?? 'start_date'
+    const orderDir = filters?.order_dir ?? 'desc'
+
+    const orderColumn = orderBy === 'elapsed_time' ? 'elapsed_time' : 'start_date'
+    const orderDirection = orderDir === 'asc' ? 'ASC' : 'DESC'
+
+    // Get total count
+    const countResult = db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM segment_efforts WHERE segment_id = ? AND athlete_id = ?`,
+      [id, athleteId]
+    )
+    const total = countResult?.count ?? 0
+    const totalPages = Math.ceil(total / perPage)
+    const offset = (page - 1) * perPage
+
+    const rows = db.query<{
       id: number
       segment_id: number
       activity_id: number
@@ -1563,9 +1818,18 @@ export class WasmProvider implements DataProvider {
       average_heartrate: number | null
       max_heartrate: number | null
       pr_rank: number | null
-    }>(db, id, athleteId)
+    }>(
+      `SELECT id, segment_id, activity_id, athlete_id, name, elapsed_time, moving_time,
+              start_date, start_date_local, distance, average_watts,
+              average_heartrate, max_heartrate, pr_rank
+       FROM segment_efforts
+       WHERE segment_id = ? AND athlete_id = ?
+       ORDER BY ${orderColumn} ${orderDirection}
+       LIMIT ? OFFSET ?`,
+      [id, athleteId, perPage, offset]
+    )
 
-    return rows.map((r) => ({
+    const data = rows.map((r) => ({
       id: r.id,
       segment_id: r.segment_id,
       activity_id: r.activity_id,
@@ -1581,6 +1845,8 @@ export class WasmProvider implements DataProvider {
       max_heartrate: r.max_heartrate ?? undefined,
       pr_rank: r.pr_rank ?? undefined,
     }))
+
+    return { data, total, page, per_page: perPage, total_pages: totalPages }
   }
 
   // ============================================================================
@@ -1817,38 +2083,51 @@ export class WasmProvider implements DataProvider {
   // ============================================================================
   // Challenges
   // ============================================================================
-  async getChallenges(month?: string): Promise<Challenge[]> {
+  async getChallenges(filters?: ChallengesFilters): Promise<ChallengesResponse> {
     const db = this.assertInitialized()
     const athleteId = this.getAthleteId()
 
-    let rows: Array<{
+    const month = filters?.month
+    const page = filters?.page ?? 1
+    const perPage = filters?.per_page ?? 50
+    const orderBy = filters?.order_by ?? 'completion_date'
+    const orderDir = filters?.order_dir ?? 'desc'
+
+    const monthFilter = month ? 'AND month = ?' : ''
+    const params: unknown[] = month ? [athleteId, month] : [athleteId]
+
+    // Map order_by to column
+    let orderColumn = 'completion_date'
+    if (orderBy === 'name') orderColumn = 'name'
+    else if (orderBy === 'month') orderColumn = 'month'
+    const orderDirection = orderDir === 'asc' ? 'ASC' : 'DESC'
+
+    // Get total count
+    const countResult = db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM challenges WHERE athlete_id = ? ${monthFilter}`,
+      params
+    )
+    const total = countResult?.count ?? 0
+    const totalPages = Math.ceil(total / perPage)
+    const offset = (page - 1) * perPage
+
+    const rows = db.query<{
       id: string
       name: string
       slug: string | null
       badge_url: string | null
       completion_date: string | null
       month: string | null
-    }>
+    }>(
+      `SELECT id, name, slug, badge_url, completion_date, month
+       FROM challenges
+       WHERE athlete_id = ? ${monthFilter}
+       ORDER BY ${orderColumn} ${orderDirection}
+       LIMIT ? OFFSET ?`,
+      [...params, perPage, offset]
+    )
 
-    if (month) {
-      rows = db.query(
-        `SELECT id, name, slug, badge_url, completion_date, month
-         FROM challenges
-         WHERE athlete_id = ? AND month = ?
-         ORDER BY completion_date DESC`,
-        [athleteId, month]
-      )
-    } else {
-      rows = db.query(
-        `SELECT id, name, slug, badge_url, completion_date, month
-         FROM challenges
-         WHERE athlete_id = ?
-         ORDER BY completion_date DESC`,
-        [athleteId]
-      )
-    }
-
-    return rows.map((r) => ({
+    const data = rows.map((r) => ({
       id: r.id,
       name: r.name,
       slug: r.slug ?? undefined,
@@ -1856,6 +2135,8 @@ export class WasmProvider implements DataProvider {
       completion_date: r.completion_date ?? undefined,
       month: r.month ?? undefined,
     }))
+
+    return { data, total, page, per_page: perPage, total_pages: totalPages }
   }
 
   async importChallenges(file: File): Promise<{ imported: number }> {
@@ -1877,7 +2158,8 @@ export class WasmProvider implements DataProvider {
       if (!Array.isArray(challenges)) {
         throw new Error('Expected an array of challenges')
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to parse challenges JSON', error)
       throw new Error('Invalid JSON file')
     }
 
@@ -2133,21 +2415,40 @@ export class WasmProvider implements DataProvider {
       })
   }
 
-  async getGearComponents(gearId: string): Promise<ComponentWithRules[]> {
+  async getGearComponents(gearId: string, filters?: ComponentsFilters): Promise<ComponentsResponse> {
     const db = this.assertInitialized()
 
-    const components = db.query<{ id: number }>(
-      'SELECT id FROM components WHERE gear_id = ?',
+    const page = filters?.page ?? 1
+    const perPage = filters?.per_page ?? 50
+    const orderBy = filters?.order_by ?? 'name'
+    const orderDir = filters?.order_dir ?? 'asc'
+
+    const orderColumn = orderBy === 'created_at' ? 'created_at' : 'name'
+    const orderDirection = orderDir === 'asc' ? 'ASC' : 'DESC'
+
+    // Get total count
+    const countResult = db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM components WHERE gear_id = ?`,
       [gearId]
     )
+    const total = countResult?.count ?? 0
+    const totalPages = Math.ceil(total / perPage)
+    const offset = (page - 1) * perPage
 
-    const result: ComponentWithRules[] = []
+    const components = db.query<{ id: number }>(
+      `SELECT id FROM components WHERE gear_id = ?
+       ORDER BY ${orderColumn} ${orderDirection}
+       LIMIT ? OFFSET ?`,
+      [gearId, perPage, offset]
+    )
+
+    const data: ComponentWithRules[] = []
     for (const comp of components) {
       const withRules = await this.getComponentWithRules(comp.id)
-      if (withRules) result.push(withRules)
+      if (withRules) data.push(withRules)
     }
 
-    return result
+    return { data, total, page, per_page: perPage, total_pages: totalPages }
   }
 
   async createComponent(gearId: string, req: CreateComponentRequest): Promise<ComponentWithRules> {
@@ -2472,5 +2773,25 @@ export class WasmProvider implements DataProvider {
       first_activity: row?.first_activity ?? null,
       last_activity: row?.last_activity ?? null,
     }
+  }
+
+  // ============================================================================
+  // Setup (Strava Credentials)
+  // ============================================================================
+  async getCredentialsStatus(): Promise<CredentialsStatus> {
+    const configured = hasCredentials()
+    const credentials = getCredentials()
+
+    return {
+      configured,
+      client_id: credentials ? `${credentials.clientId.slice(0, 4)}****` : undefined,
+      source: 'browser',
+      redirect_uri: `${window.location.origin}/oauth/callback`,
+    }
+  }
+
+  async updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus> {
+    await saveCredentials(req.client_id, req.client_secret)
+    return this.getCredentialsStatus()
   }
 }

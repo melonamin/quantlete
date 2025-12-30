@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useSegmentCountries, useSegmentDetail, useSegments, type SegmentListItem } from '@/lib/api'
+import { useSegmentCountries, useSegmentDetail, useSegments } from '@/lib/api'
+import type { SegmentsFilters } from '@/lib/api/segments'
 import { formatDate, formatDistance, formatDuration } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,16 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table'
 import { SegmentMap } from '@/components/maps'
 import { SegmentPRChart } from '@/components/charts/segment-pr-chart'
-import { Search, X, Filter, Star, Crown } from 'lucide-react'
+import { Pagination } from '@/components/activities'
+import { Search, X, Filter, Star, Crown, List, LayoutGrid } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PAGINATION } from '@/lib/constants'
 
-type SortKey =
-  | 'name'
-  | 'distance'
-  | 'maximum_grade'
-  | 'times_completed'
-  | 'last_effort_date'
-  | 'best_elapsed_time'
+type SortKey = NonNullable<SegmentsFilters['order_by']>
 
 function flagEmoji(iso2?: string) {
   if (!iso2 || iso2.length !== 2) return ''
@@ -26,23 +23,6 @@ function flagEmoji(iso2?: string) {
     .split('')
     .map((c) => 127397 + c.charCodeAt(0))
   return String.fromCodePoint(...codePoints)
-}
-
-function sortValueForSegment(seg: SegmentListItem, key: SortKey) {
-  switch (key) {
-    case 'name':
-      return seg.name.toLowerCase()
-    case 'distance':
-      return seg.distance ?? 0
-    case 'maximum_grade':
-      return seg.maximum_grade ?? 0
-    case 'times_completed':
-      return seg.times_completed ?? 0
-    case 'last_effort_date':
-      return seg.last_effort_date ? new Date(seg.last_effort_date).getTime() : 0
-    case 'best_elapsed_time':
-      return seg.best_elapsed_time ?? Number.POSITIVE_INFINITY
-  }
 }
 
 export function SegmentsPage() {
@@ -59,6 +39,10 @@ export function SegmentsPage() {
 
   const [selectedSegmentId, setSelectedSegmentId] = useState<number | null>(null)
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [viewAll, setViewAll] = useState(false)
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -67,39 +51,44 @@ export function SegmentsPage() {
     return () => clearTimeout(timer)
   }, [localSearch])
 
-  const apiFilters = useMemo(() => {
+  // Reset page when filters change (but not when page itself or viewAll changes)
+  useEffect(() => {
+    setPage(1)
+  }, [activityType, country, starredOnly, komOnly, search, sortKey, sortDir])
+
+  // Build API filters with pagination and sorting
+  const apiFilters = useMemo((): SegmentsFilters => {
     return {
       activity_type: activityType || undefined,
       country: country || undefined,
       starred: starredOnly ? true : undefined,
       kom_only: komOnly ? true : undefined,
       search: search || undefined,
-      limit: 5000,
+      page: viewAll ? 1 : page,
+      per_page: viewAll ? PAGINATION.VIEW_ALL_LIMIT : PAGINATION.DEFAULT_PER_PAGE,
+      order_by: sortKey,
+      order_dir: sortDir,
     }
-  }, [activityType, country, starredOnly, komOnly, search])
+  }, [activityType, country, starredOnly, komOnly, search, page, viewAll, sortKey, sortDir])
 
-  const { data: segments, isLoading, error } = useSegments(apiFilters)
+  const { data: segmentsResponse, isLoading, error } = useSegments(apiFilters)
   const { data: countries } = useSegmentCountries()
 
+  // Extract data from response
+  const segments = segmentsResponse?.data ?? []
+  const total = segmentsResponse?.total ?? 0
+  const totalPages = segmentsResponse?.total_pages ?? 1
+  const currentPage = segmentsResponse?.page ?? 1
+  const perPage = segmentsResponse?.per_page ?? PAGINATION.DEFAULT_PER_PAGE
+
+  // Get sport options from first page for filter dropdown (or use a separate endpoint)
   const sportOptions = useMemo(() => {
     const types = new Set<string>()
-    for (const s of segments ?? []) {
+    for (const s of segments) {
       if (s.activity_type) types.add(s.activity_type)
     }
     return Array.from(types).sort()
   }, [segments])
-
-  const sorted = useMemo(() => {
-    const list = [...(segments ?? [])]
-    list.sort((a, b) => {
-      const av = sortValueForSegment(a, sortKey)
-      const bv = sortValueForSegment(b, sortKey)
-      if (av < bv) return sortDir === 'asc' ? -1 : 1
-      if (av > bv) return sortDir === 'asc' ? 1 : -1
-      return a.id - b.id
-    })
-    return list
-  }, [segments, sortKey, sortDir])
 
   const detailQuery = useSegmentDetail(selectedSegmentId, selectedSegmentId != null)
 
@@ -125,9 +114,29 @@ export function SegmentsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Segments</h1>
-        <p className="text-muted-foreground">Your segment efforts and PRs</p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Segments</h1>
+          <p className="text-muted-foreground">Your segment efforts and PRs</p>
+        </div>
+        <Button
+          variant={viewAll ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewAll((prev) => !prev)}
+          className="gap-2"
+        >
+          {viewAll ? (
+            <>
+              <LayoutGrid className="h-4 w-4" />
+              Paginated
+            </>
+          ) : (
+            <>
+              <List className="h-4 w-4" />
+              View All
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Filters Panel - Stacked Layout */}
@@ -316,7 +325,7 @@ export function SegmentsPage() {
       {/* Table */}
       {isLoading ? (
         <SegmentsSkeleton />
-      ) : sorted.length === 0 ? (
+      ) : total === 0 ? (
         <div className="rounded-lg border border-border bg-card p-8 text-center">
           <p className="text-muted-foreground">No segments found.</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -376,7 +385,7 @@ export function SegmentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.map((seg) => (
+              {segments.map((seg) => (
                 <TableRow
                   key={seg.id}
                   className="cursor-pointer hover:bg-accent/30"
@@ -410,6 +419,18 @@ export function SegmentsPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && total > 0 && !viewAll && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          perPage={perPage}
+          onPageChange={setPage}
+          itemLabel="segments"
+        />
       )}
 
       {/* Segment Detail Modal */}

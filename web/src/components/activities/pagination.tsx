@@ -7,9 +7,17 @@ interface PaginationProps {
   total: number
   perPage: number
   onPageChange: (page: number) => void
+  itemLabel?: string
 }
 
-export function Pagination({ page, totalPages, total, perPage, onPageChange }: PaginationProps) {
+export function Pagination({
+  page,
+  totalPages,
+  total,
+  perPage,
+  onPageChange,
+  itemLabel = 'activities',
+}: PaginationProps) {
   const start = (page - 1) * perPage + 1
   const end = Math.min(page * perPage, total)
 
@@ -18,7 +26,7 @@ export function Pagination({ page, totalPages, total, perPage, onPageChange }: P
       <p className="text-sm text-muted-foreground">
         Showing <span className="font-medium">{start}</span> to{' '}
         <span className="font-medium">{end}</span> of <span className="font-medium">{total}</span>{' '}
-        activities
+        {itemLabel}
       </p>
       <div className="flex items-center gap-2">
         <Button

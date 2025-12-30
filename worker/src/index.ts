@@ -8,8 +8,9 @@
  */
 
 interface Env {
-  STRAVA_CLIENT_ID: string
-  STRAVA_CLIENT_SECRET: string
+  // Optional - for backwards compatibility. If not set, credentials must come from request body.
+  STRAVA_CLIENT_ID?: string
+  STRAVA_CLIENT_SECRET?: string
   STRAVA_API_BASE: string
   STRAVA_TOKEN_URL: string
   ALLOWED_ORIGIN?: string
@@ -80,7 +81,9 @@ export default {
 /**
  * Exchange OAuth authorization code for tokens.
  * POST /oauth/exchange
- * Body: { code: string, redirect_uri: string }
+ * Body: { code: string, redirect_uri: string, client_id: string, client_secret: string }
+ *
+ * Client credentials can be provided in the request body or via env vars (for backwards compat).
  */
 async function handleOAuthExchange(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') {
@@ -90,7 +93,12 @@ async function handleOAuthExchange(request: Request, env: Env): Promise<Response
     })
   }
 
-  const body = (await request.json()) as { code: string; redirect_uri: string }
+  const body = (await request.json()) as {
+    code: string
+    redirect_uri: string
+    client_id?: string
+    client_secret?: string
+  }
 
   if (!body.code) {
     return new Response(JSON.stringify({ error: 'Missing code' }), {
@@ -99,12 +107,26 @@ async function handleOAuthExchange(request: Request, env: Env): Promise<Response
     })
   }
 
+  // Use credentials from request body, fall back to env vars for backwards compatibility
+  const clientId = body.client_id || env.STRAVA_CLIENT_ID
+  const clientSecret = body.client_secret || env.STRAVA_CLIENT_SECRET
+
+  if (!clientId || !clientSecret) {
+    return new Response(
+      JSON.stringify({ error: 'Missing client credentials. Provide client_id and client_secret in request body.' }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  }
+
   const tokenResponse = await fetch(env.STRAVA_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_id: env.STRAVA_CLIENT_ID,
-      client_secret: env.STRAVA_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       code: body.code,
       grant_type: 'authorization_code',
     }),
@@ -131,7 +153,9 @@ async function handleOAuthExchange(request: Request, env: Env): Promise<Response
 /**
  * Refresh an expired access token.
  * POST /oauth/refresh
- * Body: { refresh_token: string }
+ * Body: { refresh_token: string, client_id: string, client_secret: string }
+ *
+ * Client credentials can be provided in the request body or via env vars (for backwards compat).
  */
 async function handleTokenRefresh(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') {
@@ -141,7 +165,11 @@ async function handleTokenRefresh(request: Request, env: Env): Promise<Response>
     })
   }
 
-  const body = (await request.json()) as { refresh_token: string }
+  const body = (await request.json()) as {
+    refresh_token: string
+    client_id?: string
+    client_secret?: string
+  }
 
   if (!body.refresh_token) {
     return new Response(JSON.stringify({ error: 'Missing refresh_token' }), {
@@ -150,12 +178,26 @@ async function handleTokenRefresh(request: Request, env: Env): Promise<Response>
     })
   }
 
+  // Use credentials from request body, fall back to env vars for backwards compatibility
+  const clientId = body.client_id || env.STRAVA_CLIENT_ID
+  const clientSecret = body.client_secret || env.STRAVA_CLIENT_SECRET
+
+  if (!clientId || !clientSecret) {
+    return new Response(
+      JSON.stringify({ error: 'Missing client credentials. Provide client_id and client_secret in request body.' }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  }
+
   const tokenResponse = await fetch(env.STRAVA_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_id: env.STRAVA_CLIENT_ID,
-      client_secret: env.STRAVA_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       refresh_token: body.refresh_token,
       grant_type: 'refresh_token',
     }),

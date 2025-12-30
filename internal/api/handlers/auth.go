@@ -60,6 +60,7 @@ func NewAuthHandler(
 // AuthStatusResponse represents the auth status response.
 type AuthStatusResponse struct {
 	Authenticated bool            `json:"authenticated"`
+	DemoMode      bool            `json:"demo_mode,omitempty"`
 	Athlete       *strava.Athlete `json:"athlete,omitempty"`
 	ExpiresAt     int64           `json:"expires_at,omitempty"`
 }
@@ -154,13 +155,19 @@ func (h *AuthHandler) Status(w http.ResponseWriter, _ *http.Request) {
 	token := h.strava.GetToken()
 	athlete := h.strava.GetAthlete()
 
+	// Demo mode: athlete exists but no token (set by demo command)
+	isDemoMode := athlete != nil && token == nil
+
 	resp := AuthStatusResponse{
-		Authenticated: token != nil && token.Valid(),
+		Authenticated: (token != nil && token.Valid()) || isDemoMode,
+		DemoMode:      isDemoMode,
 	}
 
-	if resp.Authenticated && athlete != nil {
+	if athlete != nil {
 		resp.Athlete = athlete
-		resp.ExpiresAt = token.Expiry.Unix()
+		if token != nil {
+			resp.ExpiresAt = token.Expiry.Unix()
+		}
 	}
 
 	encodeJSON(w, resp)

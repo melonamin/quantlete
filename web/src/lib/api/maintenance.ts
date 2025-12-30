@@ -59,6 +59,21 @@ export interface LogMaintenanceRequest {
   completed_at?: string
 }
 
+export interface ComponentsFilters {
+  page?: number
+  per_page?: number
+  order_by?: 'name' | 'created_at'
+  order_dir?: 'asc' | 'desc'
+}
+
+export interface ComponentsResponse {
+  data: ComponentWithRules[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
 export {
   useMaintenanceDue,
   useGearComponents,

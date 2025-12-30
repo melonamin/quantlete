@@ -170,22 +170,28 @@ CREATE TABLE IF NOT EXISTS components (
     gear_id TEXT NOT NULL REFERENCES gear(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
+    image_url TEXT,
+    maintenance_hashtag TEXT,
     installed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     retired_at DATETIME,
     initial_distance REAL DEFAULT 0,
     initial_time INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_components_gear_id ON components(gear_id);
+CREATE INDEX IF NOT EXISTS idx_components_gear_created ON components(gear_id, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS maintenance_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
     metric TEXT NOT NULL CHECK(metric IN ('distance', 'time', 'interval')),
+    type TEXT,
     threshold_value REAL NOT NULL,
     threshold_unit TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_maintenance_rules_component_id ON maintenance_rules(component_id);
@@ -196,7 +202,8 @@ CREATE TABLE IF NOT EXISTS maintenance_log (
     activity_id INTEGER REFERENCES activities(id) ON DELETE SET NULL,
     completed_at DATETIME NOT NULL,
     notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_maintenance_log_component_id ON maintenance_log(component_id);
@@ -662,3 +669,54 @@ SELECT
     COALESCE(SUM(moving_time), 0) AS total_time
 FROM activities
 GROUP BY athlete_id, DATE(start_date);
+
+--------------------------------------------------------------------------------
+-- Activity Weather
+--------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS activity_weather (
+    activity_id INTEGER PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,
+    source TEXT NOT NULL,  -- 'strava' for temp stream, 'open-meteo' for fallback
+
+    -- Current conditions at activity start
+    temperature_c REAL,
+    feels_like_c REAL,
+    humidity_percent REAL,
+    wind_speed_mps REAL,
+    wind_direction_deg REAL,
+    precipitation_mm REAL,
+    weather_code INTEGER,  -- WMO weather interpretation codes
+
+    -- Temperature range from Strava stream or Open-Meteo
+    temp_min_c REAL,
+    temp_max_c REAL,
+    temp_avg_c REAL,
+
+    -- Raw temperature stream data (JSON array, only for Strava source)
+    temp_stream TEXT,
+
+    -- Metadata
+    fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_weather_source ON activity_weather(source);
+
+--------------------------------------------------------------------------------
+-- Additional Pagination Indexes
+--------------------------------------------------------------------------------
+
+-- Segment efforts: composite index for paginated queries
+CREATE INDEX IF NOT EXISTS idx_segment_efforts_athlete_segment_date
+    ON segment_efforts(athlete_id, segment_id, start_date DESC);
+
+-- Challenges: composite index for sorted pagination
+CREATE INDEX IF NOT EXISTS idx_challenges_athlete_month_date
+    ON challenges(athlete_id, month DESC, completion_date DESC);
+
+-- Gear: composite index for sorted pagination
+CREATE INDEX IF NOT EXISTS idx_gear_athlete_distance
+    ON gear(athlete_id, distance DESC);
+
+-- Gear: index for custom gear filtering
+CREATE INDEX IF NOT EXISTS idx_gear_athlete_source
+    ON gear(athlete_id, source);

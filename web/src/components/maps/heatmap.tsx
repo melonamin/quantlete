@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback } from 'react'
-import { Polyline, Popup, useMapEvents, CircleMarker } from 'react-leaflet'
+import { useMemo, useState, useCallback, memo } from 'react'
+import { Polyline, Popup, useMapEvents, CircleMarker, Tooltip } from 'react-leaflet'
 import type { LeafletMouseEvent, Map as LeafletMap } from 'leaflet'
 import { BaseMap } from './base-map'
 import { decodePolyline, getBounds } from '@/lib/maps'
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import type { HeatmapActivity } from '@/lib/api'
 import { getSportHexColor, getSportEmoji } from '@/lib/sport-types'
 import { Link } from '@tanstack/react-router'
-import { formatDistance } from '@/lib/format'
+import { formatDistance, formatRelativeDate } from '@/lib/format'
 
 interface HeatmapProps {
   activities: HeatmapActivity[]
@@ -83,6 +83,56 @@ function MapClickHandler({
   return null
 }
 
+// Memoized polyline component for performance
+const RoutePolyline = memo(function RoutePolyline({
+  route,
+  activity,
+  isHovered,
+  colorByActivity,
+  strokeWeight,
+  onHover,
+  onLeave,
+}: {
+  route: { id: number; sportType: string; points: [number, number][] }
+  activity: HeatmapActivity
+  isHovered: boolean
+  colorByActivity: boolean
+  strokeWeight: number
+  onHover: () => void
+  onLeave: () => void
+}) {
+  const color = colorByActivity ? getSportHexColor(route.sportType) : '#fc4c02'
+
+  return (
+    <Polyline
+      positions={route.points}
+      pathOptions={{
+        color,
+        weight: isHovered ? strokeWeight + 2 : strokeWeight,
+        opacity: isHovered ? 0.9 : 0.6,
+      }}
+      eventHandlers={{
+        mouseover: onHover,
+        mouseout: onLeave,
+      }}
+    >
+      {isHovered && (
+        <Tooltip permanent direction="top" className="heatmap-route-tooltip">
+          <div className="text-sm">
+            <div className="font-medium flex items-center gap-1">
+              <span>{getSportEmoji(activity.sport_type)}</span>
+              <span className="truncate max-w-[180px]">{activity.name}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {formatRelativeDate(activity.start_date)} • {formatDistance(activity.distance / 1000)}
+            </div>
+          </div>
+        </Tooltip>
+      )}
+    </Polyline>
+  )
+})
+
 export function Heatmap({
   activities,
   className,
@@ -91,6 +141,12 @@ export function Heatmap({
   onMapReady,
 }: HeatmapProps) {
   const [clickedPoint, setClickedPoint] = useState<ClickedPoint | null>(null)
+  const [hoveredActivityId, setHoveredActivityId] = useState<number | null>(null)
+
+  // Create activity lookup map for quick access
+  const activityMap = useMemo(() => {
+    return new Map(activities.map((a) => [a.id, a]))
+  }, [activities])
 
   const { decodedRoutes, bounds } = useMemo(() => {
     const routes = activities
@@ -112,6 +168,20 @@ export function Heatmap({
     }
   }, [activities])
 
+  // Memoized hover handlers - use a Map to cache callbacks by id
+  // This prevents creating new function instances on each render
+  const hoverHandlers = useMemo(() => {
+    const handlers = new Map<number, () => void>()
+    decodedRoutes.forEach((route) => {
+      handlers.set(route.id, () => setHoveredActivityId(route.id))
+    })
+    return handlers
+  }, [decodedRoutes])
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredActivityId(null)
+  }, [])
+
   const handleClickResult = useCallback((result: ClickedPoint | null) => {
     setClickedPoint(result)
   }, [])
@@ -132,17 +202,24 @@ export function Heatmap({
           onClickResult={handleClickResult}
         />
 
-        {decodedRoutes.map((route) => (
-          <Polyline
-            key={route.id}
-            positions={route.points}
-            pathOptions={{
-              color: colorByActivity ? getSportHexColor(route.sportType) : '#fc4c02',
-              weight: strokeWeight,
-              opacity: 0.6,
-            }}
-          />
-        ))}
+        {decodedRoutes.map((route) => {
+          const activity = activityMap.get(route.id)
+          if (!activity) return null
+          const onHover = hoverHandlers.get(route.id)
+          if (!onHover) return null
+          return (
+            <RoutePolyline
+              key={route.id}
+              route={route}
+              activity={activity}
+              isHovered={hoveredActivityId === route.id}
+              colorByActivity={colorByActivity}
+              strokeWeight={strokeWeight}
+              onHover={onHover}
+              onLeave={handleMouseLeave}
+            />
+          )
+        })}
 
         {/* Click marker with nearby activities popup */}
         {clickedPoint && (

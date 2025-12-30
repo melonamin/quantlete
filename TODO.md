@@ -18,9 +18,9 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 7     | Maps & Heatmap          | Leaflet integration, route visualization | ✓           |
 | 8     | Advanced Features       | Segments, gear, maintenance, calendar    | ✓           |
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
-| 10    | Feature Parity & Beyond | Gap features + unique enhancements       | ~90%        |
+| 10    | Feature Parity & Beyond | Gap features + unique enhancements       | ~95%        |
 | 11    | WASM Mode               | Browser-only version with SQLite-WASM    | ~70%        |
-| 12    | Polish                  | PWA, i18n, settings, badges, security    | ~40%        |
+| 12    | Polish                  | PWA, i18n, settings, badges, security    | ~50%        |
 
 ---
 
@@ -263,6 +263,21 @@ This document provides a phased implementation plan for the Statistics for Strav
   - [x] Store/retrieve OAuth tokens
 - [x] Update OAuth flow to persist tokens
 - [x] Retrieve tokens on server start
+
+### 2.6 Pagination Utilities ✓
+
+- [x] Create `internal/pagination/pagination.go`:
+  - [x] `Params` struct with Page/PerPage
+  - [x] `NewParams()` - normalized pagination with constraints
+  - [x] `Offset()` - SQL OFFSET calculation
+  - [x] `TotalPages()` - page count from total
+  - [x] `Result` struct for paginated responses
+  - [x] `OrderDirection` type (ASC/DESC)
+  - [x] `ValidateOrderBy()` - safe column validation
+  - [x] `BuildOrderClause()` - safe ORDER BY construction
+  - [x] `ParseFromQuery()` - URL query parameter parsing
+  - [x] `ParseSortFromQuery()` - sort parameter parsing
+- [x] Constraints: DefaultPage=1, DefaultPerPage=50, MaxPerPage=200
 
 ---
 
@@ -1062,7 +1077,7 @@ Compared against reference project (statistics-for-strava PHP implementation):
 | Pages | ~95% | Badge Display Page |
 | Heatmap Features | ~75% | Route Preview on Hover |
 | UX Enhancements | ~80% | Connected Charts |
-| Beyond Reference | ~50% | Weather, Route Similarity, Training Plans, Social |
+| Beyond Reference | ~70% | Route Similarity, Training Plans, Social |
 
 ---
 
@@ -1133,6 +1148,19 @@ Visual grid showing monthly goal achievement with checkmarks.
   - [x] Color-coded cells (green/red background)
   - [x] Year selector
 - [x] Uses existing goals data
+- [x] Add widget to dashboard registry
+
+#### 10.1.7 Kudos Leaders Widget ✓
+Display most kudos'd activities.
+
+- [x] Create `web/src/components/dashboard/kudos-leaders.tsx`:
+  - [x] Top 5 activities sorted by kudos count
+  - [x] Sport type icons with colored backgrounds
+  - [x] Activity name and relative date
+  - [x] Kudos count with thumbs-up icon
+  - [x] Links to activity detail pages
+  - [x] Loading skeleton state
+  - [x] Empty state handling
 - [x] Add widget to dashboard registry
 
 ---
@@ -1304,19 +1332,29 @@ Automatic insights generated from activity data.
   - [x] Distance/activity milestones
 - [x] Add widget to dashboard registry
 
-#### 10.5.2 Weather Overlay for Activities
+#### 10.5.2 Weather Overlay for Activities ✓
 Show weather conditions during activities.
 
-- [ ] Integrate weather API (Open-Meteo):
-  - [ ] Historical weather lookup by date/location
-  - [ ] Temperature, wind, precipitation
-- [ ] Create `web/src/components/activities/weather-badge.tsx`:
-  - [ ] Weather icon
-  - [ ] Temperature range
-  - [ ] Wind speed/direction
-  - [ ] Conditions (sunny, cloudy, rainy)
-- [ ] Add weather to activity detail page
-- [ ] Store weather data in database (cache)
+- [x] Integrate weather API (Open-Meteo):
+  - [x] Historical weather lookup by date/location
+  - [x] Temperature, wind, precipitation
+  - [x] Strava temperature stream extraction (when available)
+  - [x] WMO weather code mappings
+- [x] Create `web/src/components/activities/weather-badge.tsx`:
+  - [x] Weather icon (based on WMO codes)
+  - [x] Temperature range
+  - [x] Wind speed/direction
+  - [x] Conditions (sunny, cloudy, rainy)
+  - [x] Humidity display
+  - [x] Feels-like temperature
+- [x] Add weather to activity detail page
+- [x] Store weather data in database (cache)
+- [x] Create `internal/weather/` package:
+  - [x] `service.go` - Weather calculation logic
+  - [x] `types.go` - ActivityWeather struct
+  - [x] `openmeteo.go` - Open-Meteo API integration
+- [x] Create `internal/storage/weather.go` - WeatherRepository
+- [x] Create `GET /api/v1/activities/{id}/weather` endpoint
 
 #### 10.5.3 Route Similarity Finder
 Find similar routes to a given activity.
@@ -1367,16 +1405,19 @@ Smart goal suggestions based on historical data.
   - [x] Distance, elevation, and time metrics
 - [x] Add widget to dashboard registry
 
-#### 10.5.7 Strava Comments & Kudos Integration
+#### 10.5.7 Strava Comments & Kudos Integration (Partial)
 Display social interactions from Strava.
 
-- [ ] Import kudos count per activity
+- [x] Import kudos count per activity
 - [ ] Import comments (text only)
+- [x] Create `web/src/components/dashboard/kudos-leaders.tsx`:
+  - [x] Top 5 most kudos'd activities widget
+  - [x] Kudos count with thumbs-up icon
+  - [x] Activity links and sport icons
 - [ ] Create `web/src/components/activities/social-stats.tsx`:
-  - [ ] Kudos count with heart icon
   - [ ] Comments list
-  - [ ] "Most kudos'd activities" widget
-- [ ] Add to activity detail page
+  - [ ] Full social interaction display
+- [ ] Add comments to activity detail page
 
 #### 10.5.8 Export & Backup Features ✓
 Comprehensive data export capabilities.
@@ -1416,11 +1457,12 @@ Comprehensive data export capabilities.
 3. ✓ Accordion Tables
 4. ✓ Clustered Table Rendering
 
-**Sprint 4 - Beyond Reference:** (Partial)
+**Sprint 4 - Beyond Reference:** ✓
 1. ✓ AI-Powered Insights
-2. [ ] Weather Overlay
+2. ✓ Weather Overlay
 3. ✓ Goal Recommendations
-4. [ ] Route Similarity Finder
+4. ✓ Kudos Leaders Widget
+5. [ ] Route Similarity Finder (deferred)
 
 **Sprint 5 - Advanced Features:**
 1. [ ] Badge Display Page
@@ -1453,6 +1495,11 @@ Comprehensive data export capabilities.
   - [x] Direct Strava API calls from browser
   - [x] OAuth implicit flow handling
 - [x] Create `web/src/lib/wasm/strava/index.ts` for auth management
+- [x] Create `web/src/lib/wasm/strava/credentials.ts`:
+  - [x] Strava credentials storage in database
+  - [x] Client ID/Secret management
+  - [x] In-memory cache for fast access
+  - [x] Persist to OPFS/IndexedDB
 - [x] Handle token storage (localStorage)
 - [x] Rate limit tracking in browser
 
@@ -1503,6 +1550,7 @@ Comprehensive data export capabilities.
 - [x] Training load (via WASM algorithms)
 - [x] Best efforts
 - [x] Import functionality
+- [x] Weather (via Open-Meteo API, `web/src/lib/wasm/weather.ts`)
 
 **Stubbed (return empty data):**
 - [ ] Segments and segment efforts
@@ -1539,6 +1587,7 @@ Comprehensive data export capabilities.
 - [x] Create `web/src/pages/settings.tsx`:
   - [x] Profile section (athlete name from Strava)
   - [x] Strava connection status and OAuth
+  - [x] Strava credentials configuration (Client ID/Secret)
   - [x] Import settings (streams, segments, best efforts, photos)
   - [x] Heart rate zones configuration
   - [x] FTP history management
@@ -1546,6 +1595,9 @@ Comprehensive data export capabilities.
   - [x] Virtual world tile layer settings
   - [ ] Theme selector (dark/light/system)
   - [ ] Notification settings
+- [x] Create `web/src/components/settings/strava-credentials-form.tsx`
+- [x] Create `internal/api/handlers/setup.go` - credentials API
+- [x] Create `web/src/lib/api/setup.ts` - TypeScript types
 
 ### 12.4 SVG Badges
 
@@ -1593,7 +1645,31 @@ Comprehensive data export capabilities.
 - [x] SQL injection prevention (parameterized queries)
 - [x] Export activity limits (MaxExportActivities)
 
-### 12.9 Final Polish
+### 12.9 Demo Mode ✓
+
+Generate realistic demo data for testing and demonstrations without Strava connection.
+
+- [x] Create `cmd/stata/demo.go` CLI command:
+  - [x] `stata demo` - generates 100 activities over 12 months
+  - [x] `--activities=N` - custom activity count
+  - [x] `--months=N` - time span for activities
+  - [x] `--athlete="Name"` - custom athlete name
+- [x] Create `internal/demo/` package:
+  - [x] `generator.go` - core generation orchestration
+  - [x] `athletes.go` - demo athlete profiles
+  - [x] `activities.go` - realistic activity generation
+  - [x] `routes.go` - polyline generation for maps
+  - [x] `streams.go` - heart rate, power, cadence streams
+  - [x] `segments.go` - segment and effort generation
+  - [x] `best_efforts.go` - PR data generation
+  - [x] `gear.go` - bikes, shoes, equipment
+  - [x] `maintenance.go` - component wear data
+  - [x] `challenges.go` - Strava challenge badges
+  - [x] `training.go` - TSS and training load
+  - [x] `weather.go` - weather conditions per activity
+  - [x] `settings.go` - demo configuration defaults
+
+### 12.10 Final Polish
 
 - [ ] Accessibility audit:
   - [ ] ARIA labels

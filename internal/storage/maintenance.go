@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/sasha/stata/internal/pagination"
 )
 
 type Component struct {
@@ -209,6 +211,139 @@ func (r *MaintenanceRepository) ListComponents(ctx context.Context, athleteID in
 	}
 
 	return items, nil
+}
+
+// ComponentFilters contains pagination parameters for components.
+type ComponentFilters struct {
+	pagination.QueryParams
+}
+
+// ComponentListResult contains paginated component results.
+type ComponentListResult struct {
+	Items      []ComponentWithRules
+	Total      int
+	Page       int
+	PerPage    int
+	TotalPages int
+}
+
+// ListComponentsPaginated returns a paginated list of components for a gear item.
+func (r *MaintenanceRepository) ListComponentsPaginated(ctx context.Context, athleteID int64, gearID string, f ComponentFilters) (ComponentListResult, error) {
+	ok, err := r.ensureGearOwner(ctx, athleteID, gearID)
+	if err != nil {
+		return ComponentListResult{}, err
+	}
+	if !ok {
+		return ComponentListResult{}, nil
+	}
+
+	// Count total
+	var total int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM components WHERE gear_id = ?`, gearID,
+	).Scan(&total); err != nil {
+		return ComponentListResult{}, fmt.Errorf("counting components: %w", err)
+	}
+
+	// Normalize pagination params
+	p := pagination.NewParams(f.Page, f.PerPage)
+
+	// Build ORDER BY with validation
+	validOrderBy := map[string]string{
+		"name":       "name",
+		"created_at": "created_at",
+	}
+	orderBy := pagination.BuildOrderClause(f.OrderBy, f.OrderDir, validOrderBy, "created_at ASC")
+	query := fmt.Sprintf(`
+		SELECT
+			c.id, c.gear_id, c.name, COALESCE(c.image_url, ''), COALESCE(c.maintenance_hashtag, ''),
+			c.created_at, c.updated_at,
+			(
+				SELECT MAX(completed_at)
+				FROM maintenance_log ml
+				WHERE ml.component_id = c.id
+			) AS last_completed_at
+		FROM components c
+		WHERE c.gear_id = ?
+		ORDER BY %s
+		LIMIT ? OFFSET ?
+	`, orderBy)
+
+	rows, err := r.db.QueryContext(ctx, query, gearID, p.PerPage, p.Offset())
+	if err != nil {
+		return ComponentListResult{}, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []ComponentWithRules
+	componentIDs := make([]int64, 0, 16)
+	for rows.Next() {
+		var it ComponentWithRules
+		if err := rows.Scan(
+			&it.ID,
+			&it.GearID,
+			&it.Name,
+			&it.ImageURL,
+			&it.MaintenanceHashtag,
+			&it.CreatedAt,
+			&it.UpdatedAt,
+			&it.LastCompletedAt,
+		); err != nil {
+			return ComponentListResult{}, err
+		}
+		if it.MaintenanceHashtag != "" {
+			it.MaintenanceHashtag = normalizeTag(it.MaintenanceHashtag)
+		}
+		componentIDs = append(componentIDs, it.ID)
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return ComponentListResult{}, err
+	}
+
+	// Fetch rules for all components
+	if len(items) > 0 {
+		placeholders := make([]string, 0, len(componentIDs))
+		args := make([]any, 0, len(componentIDs))
+		for _, id := range componentIDs {
+			placeholders = append(placeholders, "?")
+			args = append(args, id)
+		}
+		rulesRows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
+			SELECT id, component_id, type, threshold_value, created_at, updated_at
+			FROM maintenance_rules
+			WHERE component_id IN (%s)
+			ORDER BY component_id ASC, id ASC
+		`, strings.Join(placeholders, ",")), args...)
+		if err != nil {
+			return ComponentListResult{}, err
+		}
+		defer func() { _ = rulesRows.Close() }()
+
+		rulesByComponent := make(map[int64][]MaintenanceRule, len(componentIDs))
+		for rulesRows.Next() {
+			var mr MaintenanceRule
+			if err := rulesRows.Scan(&mr.ID, &mr.ComponentID, &mr.Type, &mr.ThresholdValue, &mr.CreatedAt, &mr.UpdatedAt); err != nil {
+				return ComponentListResult{}, err
+			}
+			rulesByComponent[mr.ComponentID] = append(rulesByComponent[mr.ComponentID], mr)
+		}
+		if err := rulesRows.Err(); err != nil {
+			return ComponentListResult{}, err
+		}
+
+		for idx := range items {
+			items[idx].Rules = rulesByComponent[items[idx].ID]
+		}
+	}
+
+	return ComponentListResult{
+		Items:      items,
+		Total:      total,
+		Page:       p.Page,
+		PerPage:    p.PerPage,
+		TotalPages: p.TotalPages(total),
+	}, nil
 }
 
 type CreateComponentInput struct {

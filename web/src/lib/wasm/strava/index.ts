@@ -30,3 +30,12 @@ export {
   type ImportProgress,
   type SyncRun,
 } from './importer'
+
+export {
+  getCredentials,
+  saveCredentials,
+  hasCredentials,
+  clearCredentialsCache,
+  deleteCredentials,
+  type StravaCredentials,
+} from './credentials'

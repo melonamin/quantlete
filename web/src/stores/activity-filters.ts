@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ActivityFilters } from '@/lib/api'
+import { PAGINATION } from '@/lib/constants'
 
 interface ActivityFiltersState {
   filters: ActivityFilters
@@ -8,8 +9,8 @@ interface ActivityFiltersState {
 }
 
 const defaultFilters: ActivityFilters = {
-  page: 1,
-  per_page: 50,
+  page: PAGINATION.DEFAULT_PAGE,
+  per_page: PAGINATION.DEFAULT_PER_PAGE,
   order_by: 'start_date',
   order_dir: 'desc',
 }

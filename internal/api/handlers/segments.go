@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/sasha/stata/internal/geo"
+	"github.com/sasha/stata/internal/pagination"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
@@ -146,6 +147,22 @@ func segmentEffortToResponse(e storage.SegmentEffort) segmentEffortResponse {
 	}
 }
 
+type segmentsListResponse struct {
+	Data       []segmentListItemResponse `json:"data"`
+	Total      int                       `json:"total"`
+	Page       int                       `json:"page"`
+	PerPage    int                       `json:"per_page"`
+	TotalPages int                       `json:"total_pages"`
+}
+
+type segmentEffortsListResponse struct {
+	Data       []segmentEffortResponse `json:"data"`
+	Total      int                     `json:"total"`
+	Page       int                     `json:"page"`
+	PerPage    int                     `json:"per_page"`
+	TotalPages int                     `json:"total_pages"`
+}
+
 // List handles GET /api/v1/segments
 func (h *SegmentsHandler) List(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
@@ -155,37 +172,37 @@ func (h *SegmentsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	var f storage.SegmentFilters
-	f.ActivityType = q.Get("activity_type")
-	f.Country = q.Get("country")
-	f.Search = q.Get("search")
-
+	f := storage.SegmentFilters{
+		ActivityType: q.Get("activity_type"),
+		Country:      q.Get("country"),
+		Search:       q.Get("search"),
+		KOMOnly:      q.Get("kom_only") == "true" || q.Get("kom_only") == "1",
+		QueryParams:  pagination.ParseQueryParams(q),
+	}
 	if v := q.Get("starred"); v != "" {
 		b := v == "true" || v == "1"
 		f.Starred = &b
 	}
-	f.KOMOnly = q.Get("kom_only") == "true" || q.Get("kom_only") == "1"
 
-	limit := 500
-	if l := q.Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 5000 {
-			limit = parsed
-		}
-	}
-
-	items, err := h.segments.List(r.Context(), athlete.ID, f, limit)
+	result, err := h.segments.List(r.Context(), athlete.ID, f)
 	if err != nil {
-		slog.Error("failed to list segments", "error", err, "athlete_id", athlete.ID)
+		slog.Error("failed to list segments", "error", err, "athlete_id", athlete.ID, "filters", f)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list segments"})
 		return
 	}
 
-	out := make([]segmentListItemResponse, 0, len(items))
-	for _, it := range items {
+	out := make([]segmentListItemResponse, 0, len(result.Items))
+	for _, it := range result.Items {
 		out = append(out, segmentListItemToResponse(it))
 	}
 
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, segmentsListResponse{
+		Data:       out,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // GetByID handles GET /api/v1/segments/:id
@@ -246,23 +263,30 @@ func (h *SegmentsHandler) ListEfforts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 200
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 5000 {
-			limit = parsed
-		}
+	q := r.URL.Query()
+	f := storage.SegmentEffortFilters{
+		QueryParams: pagination.ParseQueryParams(q),
 	}
 
-	efforts, err := h.segments.ListEfforts(r.Context(), athlete.ID, id, limit)
+	result, err := h.segments.ListEffortsPaginated(r.Context(), athlete.ID, id, f)
 	if err != nil {
+		slog.Error("failed to list segment efforts", "error", err, "athlete_id", athlete.ID, "segment_id", id, "filters", f)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch efforts"})
 		return
 	}
-	out := make([]segmentEffortResponse, 0, len(efforts))
-	for _, e := range efforts {
+
+	out := make([]segmentEffortResponse, 0, len(result.Items))
+	for _, e := range result.Items {
 		out = append(out, segmentEffortToResponse(e))
 	}
-	writeJSON(w, http.StatusOK, out)
+
+	writeJSON(w, http.StatusOK, segmentEffortsListResponse{
+		Data:       out,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // Countries handles GET /api/v1/segments/countries

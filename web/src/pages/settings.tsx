@@ -2,6 +2,7 @@ import {
   useAppSettings,
   useAuthStatus,
   useCancelImport,
+  useCredentialsStatus,
   useDeleteHrZoneDefinition,
   useFtpHistory,
   useHrZoneDefinitions,
@@ -13,11 +14,11 @@ import {
   useUpdateWeightHistory,
   useUpsertHrZoneDefinition,
   useWeightHistory,
-} from '@/lib/api'
+} from '@/lib/data/hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearch } from '@tanstack/react-router'
-import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
+import { StravaCredentialsForm } from '@/components/settings/strava-credentials-form'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -36,12 +37,14 @@ export function SettingsPage() {
   const queryClient = useQueryClient()
   const search = useSearch({ strict: false }) as SettingsSearchParams
   const { data: authStatus } = useAuthStatus()
+  const { data: credentials } = useCredentialsStatus()
   const { data: progress } = useImportProgress()
   const { data: latestSync } = useLatestSync()
   const startImport = useStartImport()
   const cancelImport = useCancelImport()
 
   const isAuthenticated = authStatus?.authenticated
+  const credentialsConfigured = credentials?.configured ?? false
   const isImporting = progress?.status === 'running'
   // UI shows "include" checkboxes, but API uses "skip" flags (inverted)
   const [includeStreams, setIncludeStreams] = useState(true)
@@ -120,6 +123,9 @@ export function SettingsPage() {
           </Alert>
         )}
 
+        {/* Strava App Configuration */}
+        <StravaCredentialsForm />
+
         {/* Strava Connection */}
         <Card>
           <CardHeader>
@@ -158,17 +164,25 @@ export function SettingsPage() {
                 )}
               </div>
               {!isAuthenticated && (
-                <Button asChild className="bg-strava hover:bg-strava/90">
-                  <a
-                    href={
-                      isWasmMode()
-                        ? getAuthUrl(`${window.location.origin}/oauth/callback`)
-                        : '/api/v1/auth/strava'
-                    }
-                  >
-                    Connect Strava
-                  </a>
-                </Button>
+                !credentialsConfigured ? (
+                  <Button disabled className="bg-strava/50">
+                    Configure credentials first
+                  </Button>
+                ) : credentials?.source === 'env' ? (
+                  <Button asChild className="bg-strava hover:bg-strava/90">
+                    <a href="/api/v1/auth/strava">
+                      Connect Strava
+                    </a>
+                  </Button>
+                ) : (
+                  <Button asChild className="bg-strava hover:bg-strava/90">
+                    <a
+                      href={getAuthUrl(`${window.location.origin}/oauth/callback`)}
+                    >
+                      Connect Strava
+                    </a>
+                  </Button>
+                )
               )}
             </div>
           </CardContent>

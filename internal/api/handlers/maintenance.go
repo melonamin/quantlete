@@ -2,15 +2,25 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/sasha/stata/internal/pagination"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
+
+type componentsListResponse struct {
+	Data       []storage.ComponentWithRules `json:"data"`
+	Total      int                          `json:"total"`
+	Page       int                          `json:"page"`
+	PerPage    int                          `json:"per_page"`
+	TotalPages int                          `json:"total_pages"`
+}
 
 type MaintenanceHandler struct {
 	repo   *storage.MaintenanceRepository
@@ -47,15 +57,30 @@ func (h *MaintenanceHandler) ListGearComponents(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	items, err := h.repo.ListComponents(r.Context(), athlete.ID, gearID)
+	q := r.URL.Query()
+	f := storage.ComponentFilters{
+		QueryParams: pagination.ParseQueryParams(q),
+	}
+
+	result, err := h.repo.ListComponentsPaginated(r.Context(), athlete.ID, gearID, f)
 	if err != nil {
+		slog.Error("failed to list gear components", "error", err, "athlete_id", athlete.ID, "gear_id", gearID, "filters", f)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch components"})
 		return
 	}
+
+	items := result.Items
 	if items == nil {
 		items = []storage.ComponentWithRules{}
 	}
-	writeJSON(w, http.StatusOK, items)
+
+	writeJSON(w, http.StatusOK, componentsListResponse{
+		Data:       items,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // CreateGearComponent handles POST /api/v1/gear/{id}/components

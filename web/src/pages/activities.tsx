@@ -9,13 +9,16 @@ import {
 } from '@/components/activities'
 import { Button } from '@/components/ui/button'
 import { List, LayoutGrid } from 'lucide-react'
+import { PAGINATION } from '@/lib/constants'
 
 export function ActivitiesPage() {
   const { filters, setFilters, resetFilters } = useActivityFiltersStore()
   const [viewAll, setViewAll] = useState(false)
 
-  // When viewAll is true, fetch all activities (up to 2000)
-  const effectiveFilters = viewAll ? { ...filters, per_page: 2000, page: 1 } : filters
+  // When viewAll is true, fetch all activities (up to VIEW_ALL_LIMIT)
+  const effectiveFilters = viewAll
+    ? { ...filters, per_page: PAGINATION.VIEW_ALL_LIMIT, page: 1 }
+    : filters
   const { data, isLoading, error } = useActivities(effectiveFilters)
 
   const handlePageChange = (page: number) => {

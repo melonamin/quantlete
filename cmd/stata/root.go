@@ -19,6 +19,7 @@ for data import and management.`,
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newServeCmd())
 	cmd.AddCommand(newImportCmd())
+	cmd.AddCommand(newDemoCmd())
 
 	return cmd
 }

@@ -70,18 +70,31 @@ func (r *TrainingLoadRepository) EnsureComputedForRange(ctx context.Context, ath
 	if err != nil {
 		return err
 	}
-	defer func() { _ = rows.Close() }()
 
+	// Collect all activities first to avoid nested queries with open rows cursor.
+	// SQLite with single connection can deadlock if we query while rows are open.
+	var activities []ActivityForLoad
 	for rows.Next() {
 		var a ActivityForLoad
 		if err := rows.Scan(&a.ID, &a.SportType, &a.StartDate, &a.MovingTimeS); err != nil {
+			_ = rows.Close()
 			return err
 		}
+		activities = append(activities, a)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	_ = rows.Close()
+
+	// Now process each activity with the cursor closed
+	for _, a := range activities {
 		if err := r.computeAndUpsertActivity(ctx, athleteID, a); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, athleteID int64, a ActivityForLoad) error {

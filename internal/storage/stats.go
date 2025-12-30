@@ -428,13 +428,17 @@ type YearStat struct {
 }
 
 // HeatmapActivity represents an activity for the heatmap visualization.
+// IMPORTANT: Field order must match the SELECT column order in GetHeatmapData.
+// When modifying fields, update both the struct and the SQL query together.
 type HeatmapActivity struct {
-	ID              int64   `json:"id"`
-	Name            string  `json:"name"`
-	SportType       string  `json:"sport_type"`
-	SummaryPolyline string  `json:"summary_polyline"`
-	StartLat        float64 `json:"start_lat"`
-	StartLng        float64 `json:"start_lng"`
+	ID              int64   `json:"id"`              // Column 1
+	Name            string  `json:"name"`            // Column 2
+	SportType       string  `json:"sport_type"`      // Column 3
+	StartDate       string  `json:"start_date"`      // Column 4
+	Distance        float64 `json:"distance"`        // Column 5
+	SummaryPolyline string  `json:"summary_polyline"` // Column 6
+	StartLat        float64 `json:"start_lat"`       // Column 7
+	StartLng        float64 `json:"start_lng"`       // Column 8
 }
 
 // HeatmapFilters contains filters for heatmap queries.
@@ -480,9 +484,12 @@ func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) (
 }
 
 // GetHeatmapData returns activities with polylines for heatmap visualization.
+// NOTE: The SELECT column order must match HeatmapActivity field order for rows.Scan.
 func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, filters HeatmapFilters) ([]HeatmapActivity, error) {
+	// Column order: id, name, sport_type, start_date, distance, summary_polyline, start_lat, start_lng
+	// Must match HeatmapActivity struct field order for rows.Scan to work correctly.
 	query := `
-		SELECT id, name, sport_type, summary_polyline, COALESCE(start_lat, 0), COALESCE(start_lng, 0)
+		SELECT id, name, sport_type, start_date, COALESCE(distance, 0), summary_polyline, COALESCE(start_lat, 0), COALESCE(start_lng, 0)
 		FROM activities
 		WHERE athlete_id = ? AND summary_polyline IS NOT NULL AND summary_polyline != ''
 	`
@@ -537,7 +544,7 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 	var activities []HeatmapActivity
 	for rows.Next() {
 		var a HeatmapActivity
-		if err := rows.Scan(&a.ID, &a.Name, &a.SportType, &a.SummaryPolyline, &a.StartLat, &a.StartLng); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.SportType, &a.StartDate, &a.Distance, &a.SummaryPolyline, &a.StartLat, &a.StartLng); err != nil {
 			return nil, err
 		}
 		activities = append(activities, a)

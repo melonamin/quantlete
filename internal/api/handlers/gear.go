@@ -8,9 +8,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/sasha/stata/internal/pagination"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
+
+type gearListResponse struct {
+	Data       []GearResponse `json:"data"`
+	Total      int            `json:"total"`
+	Page       int            `json:"page"`
+	PerPage    int            `json:"per_page"`
+	TotalPages int            `json:"total_pages"`
+}
 
 // GearHandler handles gear-related endpoints.
 type GearHandler struct {
@@ -73,24 +82,42 @@ func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeRetired := r.URL.Query().Get("include_retired") == "true"
+	q := r.URL.Query()
+	f := storage.GearFilters{
+		IncludeRetired: q.Get("include_retired") == "true",
+		QueryParams:    pagination.ParseQueryParams(q),
+	}
 
-	gear, err := h.repo.GetByAthleteID(r.Context(), athlete.ID, includeRetired)
+	result, err := h.repo.ListPaginated(r.Context(), athlete.ID, f)
 	if err != nil {
+		slog.Error("failed to list gear", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch gear"})
 		return
 	}
 
-	responses := make([]GearResponse, len(gear))
-	for i, g := range gear {
-		count, err := h.repo.GetActivityCount(r.Context(), g.ID)
-		if err != nil {
-			slog.Error("failed to get activity count for gear", "gear_id", g.ID, "error", err)
-		}
-		responses[i] = gearToResponse(g, count)
+	// Batch fetch activity counts to avoid N+1 queries
+	gearIDs := make([]string, len(result.Items))
+	for i, g := range result.Items {
+		gearIDs[i] = g.ID
+	}
+	activityCounts, err := h.repo.GetActivityCountsBatch(r.Context(), gearIDs)
+	if err != nil {
+		slog.Error("failed to get activity counts", "error", err, "athlete_id", athlete.ID)
+		activityCounts = make(map[string]int)
 	}
 
-	writeJSON(w, http.StatusOK, responses)
+	responses := make([]GearResponse, 0, len(result.Items))
+	for _, g := range result.Items {
+		responses = append(responses, gearToResponse(g, activityCounts[g.ID]))
+	}
+
+	writeJSON(w, http.StatusOK, gearListResponse{
+		Data:       responses,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // GetByID handles GET /api/v1/gear/{id}
@@ -148,22 +175,42 @@ func (h *GearHandler) ListCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeRetired := r.URL.Query().Get("include_retired") == "true"
-	gear, err := h.repo.ListCustom(r.Context(), athlete.ID, includeRetired)
+	q := r.URL.Query()
+	f := storage.GearFilters{
+		IncludeRetired: q.Get("include_retired") == "true",
+		QueryParams:    pagination.ParseQueryParams(q),
+	}
+
+	result, err := h.repo.ListCustomPaginated(r.Context(), athlete.ID, f)
 	if err != nil {
+		slog.Error("failed to list custom gear", "error", err, "athlete_id", athlete.ID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch custom gear"})
 		return
 	}
 
-	out := make([]GearResponse, 0, len(gear))
-	for _, g := range gear {
-		count, err := h.repo.GetActivityCount(r.Context(), g.ID)
-		if err != nil {
-			slog.Error("failed to get activity count for gear", "gear_id", g.ID, "error", err)
-		}
-		out = append(out, gearToResponse(g, count))
+	// Batch fetch activity counts to avoid N+1 queries
+	gearIDs := make([]string, len(result.Items))
+	for i, g := range result.Items {
+		gearIDs[i] = g.ID
 	}
-	writeJSON(w, http.StatusOK, out)
+	activityCounts, err := h.repo.GetActivityCountsBatch(r.Context(), gearIDs)
+	if err != nil {
+		slog.Error("failed to get activity counts", "error", err, "athlete_id", athlete.ID)
+		activityCounts = make(map[string]int)
+	}
+
+	responses := make([]GearResponse, 0, len(result.Items))
+	for _, g := range result.Items {
+		responses = append(responses, gearToResponse(g, activityCounts[g.ID]))
+	}
+
+	writeJSON(w, http.StatusOK, gearListResponse{
+		Data:       responses,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // CreateCustom handles POST /api/v1/gear/custom

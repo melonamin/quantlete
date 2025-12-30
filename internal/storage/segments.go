@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/sasha/stata/internal/pagination"
 )
 
 type Segment struct {
@@ -141,14 +143,74 @@ type SegmentFilters struct {
 	Starred      *bool
 	KOMOnly      bool
 	Search       string
+	pagination.QueryParams
 }
 
-func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f SegmentFilters, limit int) ([]SegmentListItem, error) {
-	if limit <= 0 || limit > 5000 {
-		limit = 500
+type SegmentListResult struct {
+	Items      []SegmentListItem
+	Total      int
+	Page       int
+	PerPage    int
+	TotalPages int
+}
+
+func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f SegmentFilters) (SegmentListResult, error) {
+	// Normalize pagination params
+	p := pagination.NewParams(f.Page, f.PerPage)
+
+	// Build WHERE clause
+	whereClause := "WHERE 1=1"
+	args := []any{athleteID}
+
+	if f.ActivityType != "" {
+		whereClause += " AND s.activity_type = ?"
+		args = append(args, f.ActivityType)
+	}
+	if f.Country != "" {
+		whereClause += " AND e.country = ?"
+		args = append(args, f.Country)
+	}
+	if f.Starred != nil {
+		whereClause += " AND s.starred = ?"
+		args = append(args, *f.Starred)
+	}
+	if f.KOMOnly {
+		whereClause += " AND s.athlete_kom_rank = 1"
+	}
+	if f.Search != "" {
+		whereClause += " AND s.name LIKE ? COLLATE NOCASE"
+		args = append(args, "%"+f.Search+"%")
 	}
 
-	query := `
+	// Count query (with GROUP BY, count distinct segments)
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*) FROM (
+			SELECT s.id
+			FROM segments s
+			LEFT JOIN segment_efforts e ON e.segment_id = s.id AND e.athlete_id = ?
+			%s
+			GROUP BY s.id
+		)
+	`, whereClause)
+
+	var total int
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return SegmentListResult{}, fmt.Errorf("counting segments: %w", err)
+	}
+
+	// Build ORDER BY with validation (some columns need NULLS LAST for proper sorting)
+	validOrderBy := map[string]pagination.OrderColumn{
+		"name":              {Column: "s.name"},
+		"distance":          {Column: "s.distance"},
+		"maximum_grade":     {Column: "s.maximum_grade"},
+		"times_completed":   {Column: "times_completed"},
+		"last_effort_date":  {Column: "last_effort_date", NullsLast: true},
+		"best_elapsed_time": {Column: "best_elapsed_time", NullsLast: true},
+	}
+	orderBy := pagination.BuildOrderClauseExt(f.OrderBy, f.OrderDir, validOrderBy, "times_completed DESC, s.distance DESC")
+
+	// Main query
+	query := fmt.Sprintf(`
 		SELECT
 			s.id, s.name, s.activity_type, s.distance, s.average_grade, s.maximum_grade,
 			s.elevation_high, s.elevation_low, s.climb_category,
@@ -161,31 +223,7 @@ func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f Segment
 			MIN(NULLIF(e.elapsed_time, 0)) AS best_elapsed_time
 		FROM segments s
 		LEFT JOIN segment_efforts e ON e.segment_id = s.id AND e.athlete_id = ?
-		WHERE 1=1
-	`
-	args := []any{athleteID}
-
-	if f.ActivityType != "" {
-		query += " AND s.activity_type = ?"
-		args = append(args, f.ActivityType)
-	}
-	if f.Country != "" {
-		query += " AND e.country = ?"
-		args = append(args, f.Country)
-	}
-	if f.Starred != nil {
-		query += " AND s.starred = ?"
-		args = append(args, *f.Starred)
-	}
-	if f.KOMOnly {
-		query += " AND s.athlete_kom_rank = 1"
-	}
-	if f.Search != "" {
-		query += " AND s.name LIKE ? COLLATE NOCASE"
-		args = append(args, "%"+f.Search+"%")
-	}
-
-	query += `
+		%s
 		GROUP BY
 			s.id, s.name, s.activity_type, s.distance, s.average_grade, s.maximum_grade,
 			s.elevation_high, s.elevation_low, s.climb_category,
@@ -193,14 +231,15 @@ func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f Segment
 			s.starred, s.polyline,
 			s.athlete_kom_rank, s.athlete_effort_count, s.athlete_pr_elapsed_time, s.athlete_pr_date,
 			s.created_at, s.updated_at
-		ORDER BY times_completed DESC, s.distance DESC
-		LIMIT ?
-	`
-	args = append(args, limit)
+		ORDER BY %s
+		LIMIT ? OFFSET ?
+	`, whereClause, orderBy)
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	queryArgs := append(args, p.PerPage, p.Offset())
+
+	rows, err := r.db.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
-		return nil, err
+		return SegmentListResult{}, err
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -217,11 +256,21 @@ func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f Segment
 			&it.TimesCompleted, &it.LastEffortDate, &it.BestElapsedTime,
 		)
 		if err != nil {
-			return nil, err
+			return SegmentListResult{}, err
 		}
 		items = append(items, it)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return SegmentListResult{}, err
+	}
+
+	return SegmentListResult{
+		Items:      items,
+		Total:      total,
+		Page:       p.Page,
+		PerPage:    p.PerPage,
+		TotalPages: p.TotalPages(total),
+	}, nil
 }
 
 func (r *SegmentRepository) GetByID(ctx context.Context, id int64) (*Segment, error) {
@@ -290,6 +339,85 @@ func (r *SegmentRepository) ListEfforts(ctx context.Context, athleteID int64, se
 		efforts = append(efforts, e)
 	}
 	return efforts, rows.Err()
+}
+
+// SegmentEffortFilters contains pagination parameters for segment efforts.
+type SegmentEffortFilters struct {
+	pagination.QueryParams
+}
+
+// SegmentEffortListResult contains paginated segment effort results.
+type SegmentEffortListResult struct {
+	Items      []SegmentEffort
+	Total      int
+	Page       int
+	PerPage    int
+	TotalPages int
+}
+
+// ListEffortsPaginated returns a paginated list of segment efforts.
+func (r *SegmentRepository) ListEffortsPaginated(ctx context.Context, athleteID int64, segmentID int64, f SegmentEffortFilters) (SegmentEffortListResult, error) {
+	// Count total
+	var total int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM segment_efforts WHERE athlete_id = ? AND segment_id = ?`,
+		athleteID, segmentID,
+	).Scan(&total); err != nil {
+		return SegmentEffortListResult{}, fmt.Errorf("counting segment efforts: %w", err)
+	}
+
+	// Normalize pagination params
+	p := pagination.NewParams(f.Page, f.PerPage)
+
+	// Build ORDER BY with validation
+	validOrderBy := map[string]string{
+		"start_date":   "start_date",
+		"elapsed_time": "elapsed_time",
+	}
+	orderBy := pagination.BuildOrderClause(f.OrderBy, f.OrderDir, validOrderBy, "start_date DESC")
+	query := fmt.Sprintf(`
+		SELECT
+			id, segment_id, activity_id, athlete_id, name,
+			elapsed_time, moving_time, start_date, start_date_local,
+			distance, average_watts, average_heartrate, max_heartrate,
+			pr_rank, COALESCE(country, ''), created_at
+		FROM segment_efforts
+		WHERE athlete_id = ? AND segment_id = ?
+		ORDER BY %s
+		LIMIT ? OFFSET ?
+	`, orderBy)
+
+	rows, err := r.db.QueryContext(ctx, query, athleteID, segmentID, p.PerPage, p.Offset())
+	if err != nil {
+		return SegmentEffortListResult{}, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []SegmentEffort
+	for rows.Next() {
+		var e SegmentEffort
+		err := rows.Scan(
+			&e.ID, &e.SegmentID, &e.ActivityID, &e.AthleteID, &e.Name,
+			&e.ElapsedTime, &e.MovingTime, &e.StartDate, &e.StartDateLocal,
+			&e.Distance, &e.AverageWatts, &e.AverageHeartrate, &e.MaxHeartrate,
+			&e.PRRank, &e.Country, &e.CreatedAt,
+		)
+		if err != nil {
+			return SegmentEffortListResult{}, err
+		}
+		items = append(items, e)
+	}
+	if err := rows.Err(); err != nil {
+		return SegmentEffortListResult{}, err
+	}
+
+	return SegmentEffortListResult{
+		Items:      items,
+		Total:      total,
+		Page:       p.Page,
+		PerPage:    p.PerPage,
+		TotalPages: p.TotalPages(total),
+	}, nil
 }
 
 func (r *SegmentRepository) GetCountries(ctx context.Context, athleteID int64) ([]string, error) {

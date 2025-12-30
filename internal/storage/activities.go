@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/sasha/stata/internal/pagination"
 )
 
 // Activity represents a stored activity record.
@@ -272,26 +274,11 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 		return nil, 0, fmt.Errorf("counting activities: %w", err)
 	}
 
-	// Build ORDER BY
-	orderBy := "start_date"
-	if val := sanitizeActivityOrderBy(page.OrderBy); val != "" {
-		orderBy = val
-	}
-	orderDir := "DESC"
-	if strings.EqualFold(page.OrderDir, "asc") {
-		orderDir = "ASC"
-	} else if strings.EqualFold(page.OrderDir, "desc") {
-		orderDir = "DESC"
-	}
+	// Build ORDER BY with validation
+	orderBy := pagination.BuildOrderClause(page.OrderBy, page.OrderDir, allowedActivityOrderColumns, "start_date DESC")
 
-	// Calculate offset
-	if page.PerPage <= 0 {
-		page.PerPage = 50
-	}
-	if page.Page <= 0 {
-		page.Page = 1
-	}
-	offset := (page.Page - 1) * page.PerPage
+	// Normalize pagination params
+	p := pagination.NewParams(page.Page, page.PerPage)
 
 	// Query activities
 	query := fmt.Sprintf(`
@@ -311,11 +298,11 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 			polyline, summary_polyline,
 			created_at, updated_at
 		FROM activities %s
-		ORDER BY %s %s
+		ORDER BY %s
 		LIMIT ? OFFSET ?
-	`, where, orderBy, orderDir)
+	`, where, orderBy)
 
-	args = append(args, page.PerPage, offset)
+	args = append(args, p.PerPage, p.Offset())
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -516,17 +503,6 @@ var allowedActivityOrderColumns = map[string]string{
 	"calories":              "calories",
 	"created_at":            "created_at",
 	"updated_at":            "updated_at",
-}
-
-func sanitizeActivityOrderBy(column string) string {
-	col := strings.TrimSpace(strings.ToLower(column))
-	if col == "" {
-		return ""
-	}
-	if allowed, ok := allowedActivityOrderColumns[col]; ok {
-		return allowed
-	}
-	return ""
 }
 
 // StreamRepository handles activity stream persistence.

@@ -14,6 +14,22 @@ export interface Gear {
   activity_count: number
 }
 
+export interface GearFilters {
+  include_retired?: boolean
+  page?: number
+  per_page?: number
+  order_by?: 'name' | 'distance'
+  order_dir?: 'asc' | 'desc'
+}
+
+export interface GearResponse {
+  data: Gear[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
 export interface CustomGearCreateRequest {
   name: string
   hashtag: string

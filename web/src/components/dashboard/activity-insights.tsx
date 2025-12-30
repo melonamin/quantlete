@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PAGINATION } from '@/lib/constants'
 
 interface Insight {
   id: string
@@ -28,7 +29,7 @@ export function ActivityInsights() {
   const { data: dashboard, isLoading: dashboardLoading } = useDashboard()
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyStats()
   const { data: recentActivities, isLoading: activitiesLoading } = useActivities({
-    per_page: 50,
+    per_page: PAGINATION.DEFAULT_PER_PAGE,
     order_by: 'start_date',
     order_dir: 'desc',
   })

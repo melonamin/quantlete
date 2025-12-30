@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/sasha/stata/internal/api"
+	"github.com/sasha/stata/internal/api/handlers"
 	"github.com/sasha/stata/internal/config"
 	"github.com/sasha/stata/internal/importer"
 	"github.com/sasha/stata/internal/storage"
@@ -74,6 +75,19 @@ func runServe(port int, dev bool) error {
 	// Create Strava client
 	stravaClient := strava.NewClient(&cfg.Strava)
 
+	// Check for demo mode early
+	appStateRepo := storage.NewAppStateRepository(db)
+	demoMode, err := appStateRepo.Get(context.Background(), storage.AppStateDemoMode)
+	if err != nil {
+		slog.Warn("failed to check demo mode", "error", err)
+	}
+	if demoMode == "true" {
+		slog.Info("Running in demo mode - Strava API calls disabled")
+		if err := loadDemoAthlete(context.Background(), stravaClient, appStateRepo, storage.NewAthleteRepository(db)); err != nil {
+			slog.Warn("failed to load demo athlete", "error", err)
+		}
+	}
+
 	// Create repositories
 	activityRepo := storage.NewActivityRepository(db)
 	athleteRepo := storage.NewAthleteRepository(db)
@@ -84,21 +98,28 @@ func runServe(port int, dev bool) error {
 	bestEffortsRepo := storage.NewBestEffortsRepository(db)
 	maintenanceRepo := storage.NewMaintenanceRepository(db)
 	photoRepo := storage.NewPhotoRepository(db)
-	appStateRepo := storage.NewAppStateRepository(db)
 
-	// Restore rate limit state from database
-	if err := restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
-		slog.Warn("failed to restore rate limit state", "error", err)
-	}
+	// Only do Strava auth setup if not in demo mode
+	if demoMode != "true" {
+		// Load credentials from database if not set via environment variables
+		if err := handlers.LoadCredentialsFromDB(context.Background(), appStateRepo, cfg, stravaClient); err != nil {
+			slog.Warn("failed to load credentials from database", "error", err)
+		}
 
-	// Set up rate limit persistence
-	stravaClient.SetRateLimitPersister(func(json string) error {
-		return appStateRepo.Set(context.Background(), "strava_rate_limit", json)
-	})
+		// Restore rate limit state from database
+		if err := restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
+			slog.Warn("failed to restore rate limit state", "error", err)
+		}
 
-	// Restore tokens from database
-	if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
-		slog.Warn("failed to restore auth from database", "error", err)
+		// Set up rate limit persistence
+		stravaClient.SetRateLimitPersister(func(json string) error {
+			return appStateRepo.Set(context.Background(), storage.AppStateStravaRateLimit, json)
+		})
+
+		// Restore tokens from database
+		if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
+			slog.Warn("failed to restore auth from database", "error", err)
+		}
 	}
 
 	// Create sync history repository

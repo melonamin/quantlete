@@ -138,18 +138,31 @@ func (r *PowerRepository) EnsureComputedForRange(ctx context.Context, athleteID 
 	if err != nil {
 		return err
 	}
-	defer func() { _ = rows.Close() }()
 
+	// Collect all activity IDs first to avoid nested queries with open rows cursor.
+	// SQLite with single connection can deadlock if we query while rows are open.
+	var activityIDs []int64
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
 			return err
 		}
+		activityIDs = append(activityIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	_ = rows.Close()
+
+	// Now process each activity with the cursor closed
+	for _, id := range activityIDs {
 		if err := r.EnsureActivityComputed(ctx, athleteID, id, durations); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func (r *PowerRepository) GetBest(ctx context.Context, athleteID int64, durations []int, after, before *time.Time, sportTypes []string) ([]PeakPowerBest, error) {

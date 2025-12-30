@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+// App state keys for well-known configuration values.
+const (
+	// AppStateDemoMode indicates whether the app is running in demo mode.
+	AppStateDemoMode = "demo_mode"
+	// AppStateDemoAthleteID stores the athlete ID used in demo mode.
+	AppStateDemoAthleteID = "demo_athlete_id"
+	// AppStateStravaRateLimit stores the serialized Strava rate limit state.
+	AppStateStravaRateLimit = "strava_rate_limit"
+)
+
 // AppStateRepository provides access to app-level state storage.
 type AppStateRepository struct {
 	db *DB

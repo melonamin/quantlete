@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useAuthStatus, useDashboard, useImportProgress } from '@/lib/api'
+import { useAuthStatus, useDashboard, useImportProgress, useCredentialsStatus } from '@/lib/data/hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { isWasmMode } from '@/lib/mode'
-import { shouldShowOnboarding } from '@/components/onboarding/welcome-modal'
+import { shouldShowOnboarding } from '@/components/onboarding/utils'
 import { useOnboardingStore, useSyncModalStore } from '@/stores'
 import {
   StatsSummary,
@@ -30,6 +30,7 @@ import {
   IntroText,
   GoalRecommendations,
   ActivityInsights,
+  KudosLeaders,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,10 +48,12 @@ function getStravaAuthUrl(): string {
 export function DashboardPage() {
   const queryClient = useQueryClient()
   const { data: authStatus, isLoading: authLoading } = useAuthStatus()
+  const { data: credentials, isLoading: credentialsLoading } = useCredentialsStatus()
   const { data: dashboard, isLoading, error } = useDashboard()
   const { data: importProgress } = useImportProgress()
 
   const isAuthenticated = authStatus?.authenticated ?? false
+  const credentialsConfigured = credentials?.configured ?? false
   const onboardingDismissed = useOnboardingStore((s) => s.dismissed)
   const syncModalOpen = useSyncModalStore((s) => s.open)
 
@@ -71,9 +74,15 @@ export function DashboardPage() {
     prevStatusRef.current = currentStatus
   }, [importProgress?.status, queryClient])
 
-  // In WASM mode, if onboarding modal is showing, don't show the Get Started card
+  // If onboarding modal is showing, don't show the Get Started card
   // (the modal handles the login flow)
-  const onboardingShowing = shouldShowOnboarding(isAuthenticated, authLoading, onboardingDismissed)
+  const onboardingShowing = shouldShowOnboarding(
+    isAuthenticated,
+    authLoading,
+    onboardingDismissed,
+    credentialsConfigured,
+    credentialsLoading
+  )
 
   // Don't show Get Started if sync modal is open (user is already syncing)
   const syncInProgress = syncModalOpen || importProgress?.status === 'running'
@@ -342,6 +351,14 @@ export function DashboardPage() {
             defaultHeight: 2,
             defaultHidden: true,
             render: () => <GoalRecommendations />,
+          },
+          {
+            id: 'kudos_leaders',
+            title: 'Most Kudos\'d',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <KudosLeaders />,
           },
         ]}
       />

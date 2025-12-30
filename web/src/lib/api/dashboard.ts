@@ -99,6 +99,8 @@ export interface HeatmapActivity {
   id: number
   name: string
   sport_type: string
+  start_date: string
+  distance: number
   summary_polyline: string
   start_lat: number
   start_lng: number

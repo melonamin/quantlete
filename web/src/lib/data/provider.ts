@@ -32,6 +32,8 @@ import type {
   DashboardConfig,
   // Activity streams
   ActivityStream,
+  // Weather
+  ActivityWeather,
   // Stats
   PowerStatsResponse,
   HrZonesResponse,
@@ -41,14 +43,17 @@ import type {
   DistributionSlice,
   // Gear
   Gear,
+  GearFilters,
+  GearResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
   // Segments
-  SegmentListItem,
   SegmentCountryStat,
   SegmentDetailResponse,
-  SegmentEffort,
+  SegmentEffortsFilters,
+  SegmentEffortsResponse,
   SegmentsFilters,
+  SegmentsResponse,
   // Athlete
   FTPHistoryResponse,
   WeightHistoryResponse,
@@ -63,12 +68,15 @@ import type {
   ActivityPhoto,
   ExportStats,
   // Challenges
-  Challenge,
+  ChallengesFilters,
+  ChallengesResponse,
   // Goals
   TrainingGoalsConfig,
   TrainingGoalsResponse,
   // Maintenance
   ComponentWithRules,
+  ComponentsFilters,
+  ComponentsResponse,
   DueComponent,
   CreateComponentRequest,
   UpdateComponentRequest,
@@ -78,6 +86,9 @@ import type {
   // Import
   ImportProgress,
   StartImportRequest,
+  // Setup
+  CredentialsStatus,
+  UpdateCredentialsRequest,
 } from './types'
 
 // Import SyncRun from API types
@@ -96,6 +107,7 @@ export interface DataProvider {
   getActivities(filters: ActivityFilters): Promise<ActivitiesResponse>
   getActivity(id: number): Promise<Activity>
   getActivityStreams(id: number): Promise<ActivityStream[]>
+  getActivityWeather(id: number): Promise<ActivityWeather | null>
 
   // ============================================================================
   // Dashboard
@@ -156,9 +168,9 @@ export interface DataProvider {
   // ============================================================================
   // Gear
   // ============================================================================
-  getGear(includeRetired?: boolean): Promise<Gear[]>
+  getGear(filters?: GearFilters): Promise<GearResponse>
   getGearDetail(id: string): Promise<Gear>
-  getCustomGear(includeRetired?: boolean): Promise<Gear[]>
+  getCustomGear(filters?: GearFilters): Promise<GearResponse>
   createCustomGear(req: CustomGearCreateRequest): Promise<Gear>
   updateCustomGear(id: string, patch: Partial<CustomGearCreateRequest>): Promise<Gear>
   deleteCustomGear(id: string, force?: boolean): Promise<{ deleted: boolean }>
@@ -167,10 +179,10 @@ export interface DataProvider {
   // ============================================================================
   // Segments
   // ============================================================================
-  getSegments(filters?: SegmentsFilters): Promise<SegmentListItem[]>
+  getSegments(filters?: SegmentsFilters): Promise<SegmentsResponse>
   getSegmentCountries(): Promise<SegmentCountryStat[]>
   getSegmentDetail(id: number): Promise<SegmentDetailResponse>
-  getSegmentEfforts(id: number): Promise<SegmentEffort[]>
+  getSegmentEfforts(id: number, filters?: SegmentEffortsFilters): Promise<SegmentEffortsResponse>
 
   // ============================================================================
   // Athlete (FTP/Weight)
@@ -189,7 +201,7 @@ export interface DataProvider {
   // ============================================================================
   // Challenges
   // ============================================================================
-  getChallenges(month?: string): Promise<Challenge[]>
+  getChallenges(filters?: ChallengesFilters): Promise<ChallengesResponse>
   importChallenges(file: File): Promise<{ imported: number }>
   importChallengesFromProfile(athleteId?: string): Promise<{ imported: number }>
 
@@ -203,7 +215,7 @@ export interface DataProvider {
   // Maintenance
   // ============================================================================
   getMaintenanceDue(): Promise<DueComponent[]>
-  getGearComponents(gearId: string): Promise<ComponentWithRules[]>
+  getGearComponents(gearId: string, filters?: ComponentsFilters): Promise<ComponentsResponse>
   createComponent(gearId: string, req: CreateComponentRequest): Promise<ComponentWithRules>
   updateComponent(id: number, req: UpdateComponentRequest): Promise<ComponentWithRules>
   deleteComponent(id: number): Promise<{ deleted: boolean }>
@@ -229,4 +241,10 @@ export interface DataProvider {
   // Export
   // ============================================================================
   getExportStats(): Promise<ExportStats>
+
+  // ============================================================================
+  // Setup (Strava Credentials)
+  // ============================================================================
+  getCredentialsStatus(): Promise<CredentialsStatus>
+  updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus>
 }

@@ -11,9 +11,18 @@ import (
 	"time"
 
 	"github.com/sasha/stata/internal/challenges"
+	"github.com/sasha/stata/internal/pagination"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
+
+type challengesListResponse struct {
+	Data       []challengeResponse `json:"data"`
+	Total      int                 `json:"total"`
+	Page       int                 `json:"page"`
+	PerPage    int                 `json:"per_page"`
+	TotalPages int                 `json:"total_pages"`
+}
 
 type ChallengesHandler struct {
 	repo       *storage.ChallengeRepository
@@ -64,17 +73,31 @@ func (h *ChallengesHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	month := strings.TrimSpace(r.URL.Query().Get("month"))
-	items, err := h.repo.List(r.Context(), athlete.ID, month)
+	q := r.URL.Query()
+	f := storage.ChallengeFilters{
+		Month:       strings.TrimSpace(q.Get("month")),
+		QueryParams: pagination.ParseQueryParams(q),
+	}
+
+	result, err := h.repo.ListPaginated(r.Context(), athlete.ID, f)
 	if err != nil {
+		slog.Error("failed to list challenges", "error", err, "athlete_id", athlete.ID, "filters", f)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch challenges"})
 		return
 	}
-	out := make([]challengeResponse, 0, len(items))
-	for _, c := range items {
+
+	out := make([]challengeResponse, 0, len(result.Items))
+	for _, c := range result.Items {
 		out = append(out, challengeToResponse(c))
 	}
-	writeJSON(w, http.StatusOK, out)
+
+	writeJSON(w, http.StatusOK, challengesListResponse{
+		Data:       out,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 type importResponse struct {

@@ -505,7 +505,30 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to query activities"})
 		return
 	}
-	defer func() { _ = rows.Close() }()
+
+	// Collect all activity info first to avoid nested queries with open rows cursor.
+	// SQLite with single connection can deadlock if we query while rows are open.
+	type activityInfo struct {
+		id        int64
+		sportType string
+		start     storage.SQLiteTime
+	}
+	var activities []activityInfo
+	for rows.Next() {
+		var a activityInfo
+		if err := rows.Scan(&a.id, &a.sportType, &a.start); err != nil {
+			_ = rows.Close()
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to scan activities"})
+			return
+		}
+		activities = append(activities, a)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to iterate activities"})
+		return
+	}
+	_ = rows.Close()
 
 	secondsByZone := make([]int, 5)
 	totalSeconds := 0
@@ -514,17 +537,10 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 	var cfg storage.HRZoneConfig
 	cfgSet := false
 
-	for rows.Next() {
-		var id int64
-		var sportType string
-		var start time.Time
-		if err := rows.Scan(&id, &sportType, &start); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to scan activities"})
-			return
-		}
-
-		group := sportGroup(sportType)
-		def, zcfg, err := h.zones.GetApplicableHR(r.Context(), athlete.ID, group, start)
+	// Now process each activity with the cursor closed
+	for _, a := range activities {
+		group := sportGroup(a.sportType)
+		def, zcfg, err := h.zones.GetApplicableHR(r.Context(), athlete.ID, group, a.start.Time)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load zone definition"})
 			return
@@ -538,7 +554,7 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 			cfgSet = true
 		}
 
-		streams, err := h.streams.GetByActivityID(r.Context(), id)
+		streams, err := h.streams.GetByActivityID(r.Context(), a.id)
 		if err != nil {
 			continue
 		}
@@ -624,23 +640,33 @@ func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to query activities"})
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	var ftpUsed float64
+	// Collect all activity info first to avoid nested queries with open rows cursor.
+	// SQLite with single connection can deadlock if we query while rows are open.
+	type activityInfo struct {
+		id    int64
+		start storage.SQLiteTime
+	}
+	var activities []activityInfo
 	for rows.Next() {
-		var id int64
-		var start time.Time
-		if err := rows.Scan(&id, &start); err != nil {
+		var a activityInfo
+		if err := rows.Scan(&a.id, &a.start); err != nil {
 			continue
 		}
-		ftpPoint, err := h.metrics.LatestBefore(r.Context(), athlete.ID, "ftp_cycling_watts", start)
+		activities = append(activities, a)
+	}
+	_ = rows.Close()
+
+	var ftpUsed float64
+	for _, a := range activities {
+		ftpPoint, err := h.metrics.LatestBefore(r.Context(), athlete.ID, "ftp_cycling_watts", a.start.Time)
 		if err != nil || ftpPoint == nil || ftpPoint.Value <= 0 {
 			continue
 		}
 		ftp := ftpPoint.Value
 		ftpUsed = ftp
 
-		streams, err := h.streams.GetByActivityID(r.Context(), id)
+		streams, err := h.streams.GetByActivityID(r.Context(), a.id)
 		if err != nil {
 			continue
 		}

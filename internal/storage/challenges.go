@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/sasha/stata/internal/pagination"
 )
 
 type Challenge struct {
@@ -88,4 +90,82 @@ func (r *ChallengeRepository) Count(ctx context.Context, athleteID int64) (int, 
 		return 0, fmt.Errorf("counting challenges: %w", err)
 	}
 	return cnt, nil
+}
+
+// ChallengeFilters contains pagination and filter parameters.
+type ChallengeFilters struct {
+	Month string
+	pagination.QueryParams
+}
+
+// ChallengeListResult contains paginated challenge results.
+type ChallengeListResult struct {
+	Items      []Challenge
+	Total      int
+	Page       int
+	PerPage    int
+	TotalPages int
+}
+
+// ListPaginated returns a paginated list of challenges for an athlete.
+func (r *ChallengeRepository) ListPaginated(ctx context.Context, athleteID int64, f ChallengeFilters) (ChallengeListResult, error) {
+	// Build WHERE clause
+	where := "athlete_id = ?"
+	args := []any{athleteID}
+	if f.Month != "" {
+		where += " AND month = ?"
+		args = append(args, f.Month)
+	}
+
+	// Count total
+	var total int
+	countQuery := "SELECT COUNT(*) FROM challenges WHERE " + where
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil && err != sql.ErrNoRows {
+		return ChallengeListResult{}, fmt.Errorf("counting challenges: %w", err)
+	}
+
+	// Normalize pagination params
+	p := pagination.NewParams(f.Page, f.PerPage)
+
+	// Build ORDER BY with validation
+	validOrderBy := map[string]string{
+		"name":            "name",
+		"completion_date": "completion_date",
+		"month":           "month",
+	}
+	orderBy := pagination.BuildOrderClause(f.OrderBy, f.OrderDir, validOrderBy, "month DESC, completion_date IS NULL, completion_date DESC, name ASC")
+	query := fmt.Sprintf(`
+		SELECT id, athlete_id, name, COALESCE(slug, ''), COALESCE(badge_url, ''), COALESCE(local_badge_url, ''), completion_date, COALESCE(month, ''), created_at
+		FROM challenges
+		WHERE %s
+		ORDER BY %s
+		LIMIT ? OFFSET ?
+	`, where, orderBy)
+
+	args = append(args, p.PerPage, p.Offset())
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return ChallengeListResult{}, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []Challenge
+	for rows.Next() {
+		var c Challenge
+		if err := rows.Scan(&c.ID, &c.AthleteID, &c.Name, &c.Slug, &c.BadgeURL, &c.LocalBadgeURL, &c.CompletionDate, &c.Month, &c.CreatedAt); err != nil {
+			return ChallengeListResult{}, err
+		}
+		items = append(items, c)
+	}
+	if err := rows.Err(); err != nil {
+		return ChallengeListResult{}, err
+	}
+
+	return ChallengeListResult{
+		Items:      items,
+		Total:      total,
+		Page:       p.Page,
+		PerPage:    p.PerPage,
+		TotalPages: p.TotalPages(total),
+	}, nil
 }

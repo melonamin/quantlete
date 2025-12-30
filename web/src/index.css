@@ -155,3 +155,22 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Leaflet tooltip styling for heatmap hover */
+.heatmap-route-tooltip {
+  background: oklch(0.16 0.005 240 / 0.95) !important;
+  border: 1px solid oklch(0.3 0.01 240) !important;
+  border-radius: 0.25rem !important;
+  color: oklch(0.93 0 0) !important;
+  padding: 0.5rem 0.75rem !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.4) !important;
+}
+
+.heatmap-route-tooltip::before {
+  border-top-color: oklch(0.3 0.01 240) !important;
+}
+
+.heatmap-route-tooltip .text-muted-foreground {
+  color: oklch(0.6 0 0);
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"golang.org/x/oauth2"
 
@@ -74,13 +75,68 @@ func restoreAuth(
 	return nil
 }
 
+// loadDemoAthlete loads the demo athlete and sets it in the Strava client.
+// This allows the dashboard to work without Strava OAuth.
+func loadDemoAthlete(
+	ctx context.Context,
+	stravaClient *strava.Client,
+	appStateRepo *storage.AppStateRepository,
+	athleteRepo *storage.AthleteRepository,
+) error {
+	// Get the demo athlete ID
+	athleteIDStr, err := appStateRepo.Get(ctx, storage.AppStateDemoAthleteID)
+	if err != nil {
+		return fmt.Errorf("getting demo athlete id: %w", err)
+	}
+	if athleteIDStr == "" {
+		return fmt.Errorf("%s not found in app_state", storage.AppStateDemoAthleteID)
+	}
+
+	athleteID, parseErr := strconv.ParseInt(athleteIDStr, 10, 64)
+	if parseErr != nil {
+		return fmt.Errorf("parsing demo athlete id %q: %w", athleteIDStr, parseErr)
+	}
+
+	// Load the athlete
+	storedAthlete, err := athleteRepo.GetByID(ctx, athleteID)
+	if err != nil {
+		return fmt.Errorf("getting demo athlete: %w", err)
+	}
+	if storedAthlete == nil {
+		return fmt.Errorf("demo athlete not found in database")
+	}
+
+	// Convert to strava.Athlete
+	athlete := &strava.Athlete{
+		ID:            storedAthlete.ID,
+		Username:      storedAthlete.Username,
+		FirstName:     storedAthlete.FirstName,
+		LastName:      storedAthlete.LastName,
+		City:          storedAthlete.City,
+		State:         storedAthlete.State,
+		Country:       storedAthlete.Country,
+		Sex:           storedAthlete.Sex,
+		Premium:       storedAthlete.Premium,
+		Summit:        storedAthlete.Summit,
+		ProfileMedium: storedAthlete.ProfileMedium,
+		Profile:       storedAthlete.Profile,
+		Weight:        storedAthlete.Weight,
+	}
+
+	// Set the athlete with a nil token (no API calls will be made in demo mode)
+	stravaClient.SetToken(nil, athlete)
+	slog.Info("loaded demo athlete", "athlete_id", athlete.ID, "name", athlete.FirstName+" "+athlete.LastName)
+
+	return nil
+}
+
 // restoreRateLimitState restores rate limit state from the database on startup.
 func restoreRateLimitState(
 	ctx context.Context,
 	stravaClient *strava.Client,
 	appStateRepo *storage.AppStateRepository,
 ) error {
-	stateJSON, err := appStateRepo.Get(ctx, "strava_rate_limit")
+	stateJSON, err := appStateRepo.Get(ctx, storage.AppStateStravaRateLimit)
 	if err != nil {
 		return fmt.Errorf("getting rate limit state: %w", err)
 	}

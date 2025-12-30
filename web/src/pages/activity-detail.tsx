@@ -6,7 +6,7 @@ import {
   useAppSettings,
   useAuthStatus,
 } from '@/lib/api'
-import { ActivityHeader, ActivityStats } from '@/components/activities'
+import { ActivityHeader, ActivityStats, WeatherBadge } from '@/components/activities'
 import { ActivityMap } from '@/components/maps'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft } from 'lucide-react'
@@ -98,6 +98,10 @@ export function ActivityDetailPage() {
 
       <ActivityHeader activity={activity} />
       <ActivityStats activity={activity} />
+
+      <div className="mt-6">
+        <WeatherBadge activityId={activityNum} />
+      </div>
 
       {activity.summary_polyline && (
         <div className="mt-6">

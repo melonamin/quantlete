@@ -5,13 +5,15 @@
  * - OAuth flow (redirect to Strava, exchange code via worker)
  * - Token management (storage, refresh)
  * - API calls (via worker proxy)
+ *
+ * Credentials (client_id, client_secret) are stored locally in the database
+ * and sent to the worker proxy for OAuth operations.
  */
 
 import { getDatabase } from '../db'
 import * as rateLimit from './ratelimit'
+import { getCredentials } from './credentials'
 
-// Configuration - these should be set for your deployment
-const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID || ''
 // Remove trailing slash from worker URL to prevent double-slash in paths
 const WORKER_URL = (import.meta.env.VITE_CF_WORKER_URL || import.meta.env.VITE_STRAVA_WORKER_URL || '').replace(/\/$/, '')
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize'
@@ -47,10 +49,16 @@ let currentAthlete: StravaAthlete | null = null
 
 /**
  * Get the OAuth authorization URL to redirect the user to Strava.
+ * Requires credentials to be configured first.
  */
 export function getAuthUrl(redirectUri: string): string {
+  const credentials = getCredentials()
+  if (!credentials) {
+    throw new Error('Strava credentials not configured. Please configure your Strava app first.')
+  }
+
   const params = new URLSearchParams({
-    client_id: STRAVA_CLIENT_ID,
+    client_id: credentials.clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'read,activity:read_all,profile:read_all',
@@ -61,15 +69,26 @@ export function getAuthUrl(redirectUri: string): string {
 
 /**
  * Exchange an authorization code for tokens via the worker.
+ * Sends credentials to the worker for the token exchange.
  */
 export async function exchangeCode(
   code: string,
   redirectUri: string
 ): Promise<StravaAuthResponse> {
+  const credentials = getCredentials()
+  if (!credentials) {
+    throw new Error('Strava credentials not configured. Please configure your Strava app first.')
+  }
+
   const response = await fetch(`${WORKER_URL}/oauth/exchange`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, redirect_uri: redirectUri }),
+    body: JSON.stringify({
+      code,
+      redirect_uri: redirectUri,
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+    }),
   })
 
   if (!response.ok) {
@@ -96,16 +115,26 @@ export async function exchangeCode(
 
 /**
  * Refresh the access token using the refresh token.
+ * Sends credentials to the worker for the token refresh.
  */
 export async function refreshToken(): Promise<StravaToken> {
   if (!currentToken?.refresh_token) {
     throw new Error('No refresh token available')
   }
 
+  const credentials = getCredentials()
+  if (!credentials) {
+    throw new Error('Strava credentials not configured. Please configure your Strava app first.')
+  }
+
   const response = await fetch(`${WORKER_URL}/oauth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: currentToken.refresh_token }),
+    body: JSON.stringify({
+      refresh_token: currentToken.refresh_token,
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+    }),
   })
 
   if (!response.ok) {

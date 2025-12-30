@@ -4,38 +4,54 @@
 -- Get activities with polylines for heatmap visualization.
 SELECT
     id,
+    name,
     sport_type,
+    start_date,
+    COALESCE(distance, 0) AS distance,
     summary_polyline,
-    start_lat,
-    start_lng
-FROM v_heatmap_activities
+    COALESCE(start_lat, 0) AS start_lat,
+    COALESCE(start_lng, 0) AS start_lng
+FROM activities
 WHERE athlete_id = ?1
+    AND summary_polyline IS NOT NULL
+    AND summary_polyline != ''
 ORDER BY start_date DESC;
 
 -- name: GetHeatmapActivitiesBySport :many
 -- Get heatmap activities filtered by sport type.
 SELECT
     id,
+    name,
     sport_type,
+    start_date,
+    COALESCE(distance, 0) AS distance,
     summary_polyline,
-    start_lat,
-    start_lng
-FROM v_heatmap_activities
-WHERE athlete_id = ?1 AND sport_type = ?2
+    COALESCE(start_lat, 0) AS start_lat,
+    COALESCE(start_lng, 0) AS start_lng
+FROM activities
+WHERE athlete_id = ?1
+    AND sport_type = ?2
+    AND summary_polyline IS NOT NULL
+    AND summary_polyline != ''
 ORDER BY start_date DESC;
 
 -- name: GetHeatmapActivitiesByDateRange :many
 -- Get heatmap activities within a date range.
 SELECT
     id,
+    name,
     sport_type,
+    start_date,
+    COALESCE(distance, 0) AS distance,
     summary_polyline,
-    start_lat,
-    start_lng
-FROM v_heatmap_activities
+    COALESCE(start_lat, 0) AS start_lat,
+    COALESCE(start_lng, 0) AS start_lng
+FROM activities
 WHERE athlete_id = ?1
     AND start_date >= ?2
     AND start_date <= ?3
+    AND summary_polyline IS NOT NULL
+    AND summary_polyline != ''
 ORDER BY start_date DESC;
 
 -- name: GetHeatmapCountries :many

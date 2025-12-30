@@ -56,12 +56,40 @@ export interface SegmentsFilters {
   starred?: boolean
   kom_only?: boolean
   search?: string
-  limit?: number
+  // Pagination
+  page?: number
+  per_page?: number
+  // Sorting
+  order_by?: 'name' | 'distance' | 'maximum_grade' | 'times_completed' | 'last_effort_date' | 'best_elapsed_time'
+  order_dir?: 'asc' | 'desc'
+}
+
+export interface SegmentsResponse {
+  data: SegmentListItem[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
 }
 
 export interface SegmentDetailResponse {
   segment: Segment
   efforts: SegmentEffort[]
+}
+
+export interface SegmentEffortsFilters {
+  page?: number
+  per_page?: number
+  order_by?: 'start_date' | 'elapsed_time'
+  order_dir?: 'asc' | 'desc'
+}
+
+export interface SegmentEffortsResponse {
+  data: SegmentEffort[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
 }
 
 export {

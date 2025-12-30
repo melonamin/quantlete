@@ -107,7 +107,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 
 	// Set up rate limit persistence
 	stravaClient.SetRateLimitPersister(func(json string) error {
-		return appStateRepo.Set(context.Background(), "strava_rate_limit", json)
+		return appStateRepo.Set(context.Background(), storage.AppStateStravaRateLimit, json)
 	})
 
 	// Restore authentication from stored tokens if available

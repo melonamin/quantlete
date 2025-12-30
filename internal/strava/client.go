@@ -55,6 +55,30 @@ func NewClient(cfg *config.StravaConfig) *Client {
 	}
 }
 
+// UpdateCredentials updates the OAuth configuration with new credentials at runtime.
+// This is used when credentials are configured via the API instead of environment variables.
+func (c *Client) UpdateCredentials(clientID, clientSecret, redirectURI string) {
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+
+	c.cfg.ClientID = clientID
+	c.cfg.ClientSecret = clientSecret
+	if redirectURI != "" {
+		c.cfg.RedirectURI = redirectURI
+	}
+
+	c.oauth = &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  c.cfg.RedirectURI,
+		Scopes:       []string{"activity:read_all"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authURL,
+			TokenURL: tokenURL,
+		},
+	}
+}
+
 // GetAuthURL returns the URL to redirect users to for OAuth authorization.
 func (c *Client) GetAuthURL(state string) string {
 	if state == "" {

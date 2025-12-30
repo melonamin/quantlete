@@ -31,6 +31,8 @@ import type {
   DashboardConfig,
   // Activity streams
   ActivityStream,
+  // Weather
+  ActivityWeather,
   // Stats
   PowerStatsResponse,
   HrZonesResponse,
@@ -40,14 +42,17 @@ import type {
   DistributionSlice,
   // Gear
   Gear,
+  GearFilters,
+  GearResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
   // Segments
-  SegmentListItem,
   SegmentCountryStat,
   SegmentDetailResponse,
-  SegmentEffort,
+  SegmentEffortsFilters,
+  SegmentEffortsResponse,
   SegmentsFilters,
+  SegmentsResponse,
   // Athlete
   FTPHistoryResponse,
   WeightHistoryResponse,
@@ -61,7 +66,8 @@ import type {
   PhotosFilters,
   ActivityPhoto,
   // Challenges
-  Challenge,
+  ChallengesFilters,
+  ChallengesResponse,
   // Goals
   TrainingGoalsConfig,
   TrainingGoalsResponse,
@@ -69,6 +75,8 @@ import type {
   ExportStats,
   // Maintenance
   ComponentWithRules,
+  ComponentsFilters,
+  ComponentsResponse,
   DueComponent,
   CreateComponentRequest,
   UpdateComponentRequest,
@@ -78,6 +86,9 @@ import type {
   // Import
   ImportProgress,
   StartImportRequest,
+  // Setup
+  CredentialsStatus,
+  UpdateCredentialsRequest,
 } from '../types'
 import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
@@ -118,6 +129,16 @@ export class ServerProvider implements DataProvider {
 
   async getActivityStreams(id: number): Promise<ActivityStream[]> {
     return get<ActivityStream[]>(`/activities/${id}/streams`)
+  }
+
+  async getActivityWeather(id: number): Promise<ActivityWeather | null> {
+    try {
+      return await get<ActivityWeather>(`/activities/${id}/weather`)
+    } catch (error) {
+      // Weather data not available is not a user-facing error, but log for debugging
+      console.debug('Weather data not available for activity', id, error)
+      return null
+    }
   }
 
   // ============================================================================
@@ -282,16 +303,28 @@ export class ServerProvider implements DataProvider {
   // ============================================================================
   // Gear
   // ============================================================================
-  async getGear(includeRetired = true): Promise<Gear[]> {
-    return get<Gear[]>(`/gear?include_retired=${includeRetired}`)
+  async getGear(filters: GearFilters = {}): Promise<GearResponse> {
+    return get<GearResponse>('/gear', {
+      include_retired: filters.include_retired,
+      page: filters.page,
+      per_page: filters.per_page,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
+    })
   }
 
   async getGearDetail(id: string): Promise<Gear> {
     return get<Gear>(`/gear/${id}`)
   }
 
-  async getCustomGear(includeRetired = true): Promise<Gear[]> {
-    return get<Gear[]>(`/gear/custom?include_retired=${includeRetired}`)
+  async getCustomGear(filters: GearFilters = {}): Promise<GearResponse> {
+    return get<GearResponse>('/gear/custom', {
+      include_retired: filters.include_retired,
+      page: filters.page,
+      per_page: filters.per_page,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
+    })
   }
 
   async createCustomGear(req: CustomGearCreateRequest): Promise<Gear> {
@@ -313,14 +346,17 @@ export class ServerProvider implements DataProvider {
   // ============================================================================
   // Segments
   // ============================================================================
-  async getSegments(filters: SegmentsFilters = {}): Promise<SegmentListItem[]> {
-    return get<SegmentListItem[]>('/segments', {
+  async getSegments(filters: SegmentsFilters = {}): Promise<SegmentsResponse> {
+    return get<SegmentsResponse>('/segments', {
       activity_type: filters.activity_type,
       country: filters.country,
       starred: filters.starred,
       kom_only: filters.kom_only,
       search: filters.search,
-      limit: filters.limit,
+      page: filters.page,
+      per_page: filters.per_page,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
     })
   }
 
@@ -332,8 +368,13 @@ export class ServerProvider implements DataProvider {
     return get<SegmentDetailResponse>(`/segments/${id}`)
   }
 
-  async getSegmentEfforts(id: number): Promise<SegmentEffort[]> {
-    return get<SegmentEffort[]>(`/segments/${id}/efforts`)
+  async getSegmentEfforts(id: number, filters: SegmentEffortsFilters = {}): Promise<SegmentEffortsResponse> {
+    return get<SegmentEffortsResponse>(`/segments/${id}/efforts`, {
+      page: filters.page,
+      per_page: filters.per_page,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
+    })
   }
 
   // ============================================================================
@@ -374,8 +415,14 @@ export class ServerProvider implements DataProvider {
   // ============================================================================
   // Challenges
   // ============================================================================
-  async getChallenges(month?: string): Promise<Challenge[]> {
-    return get<Challenge[]>('/challenges', { month: month || undefined })
+  async getChallenges(filters: ChallengesFilters = {}): Promise<ChallengesResponse> {
+    return get<ChallengesResponse>('/challenges', {
+      month: filters.month,
+      page: filters.page,
+      per_page: filters.per_page,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
+    })
   }
 
   async importChallenges(file: File): Promise<{ imported: number }> {
@@ -430,8 +477,13 @@ export class ServerProvider implements DataProvider {
     return get<DueComponent[]>('/maintenance/due')
   }
 
-  async getGearComponents(gearId: string): Promise<ComponentWithRules[]> {
-    return get<ComponentWithRules[]>(`/gear/${gearId}/components`)
+  async getGearComponents(gearId: string, filters: ComponentsFilters = {}): Promise<ComponentsResponse> {
+    return get<ComponentsResponse>(`/gear/${gearId}/components`, {
+      page: filters.page,
+      per_page: filters.per_page,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
+    })
   }
 
   async createComponent(gearId: string, req: CreateComponentRequest): Promise<ComponentWithRules> {
@@ -494,5 +546,16 @@ export class ServerProvider implements DataProvider {
 
   async getExportStats(): Promise<ExportStats> {
     return get<ExportStats>('/export/stats')
+  }
+
+  // ============================================================================
+  // Setup (Strava Credentials)
+  // ============================================================================
+  async getCredentialsStatus(): Promise<CredentialsStatus> {
+    return get<CredentialsStatus>('/setup/credentials')
+  }
+
+  async updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus> {
+    return put<CredentialsStatus>('/setup/credentials', req)
   }
 }

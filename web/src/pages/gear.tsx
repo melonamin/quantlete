@@ -29,7 +29,7 @@ import type { ApiError } from '@/lib/api/client'
 export function GearPage() {
   const [includeRetired, setIncludeRetired] = useState(false)
   const [tab, setTab] = useState<'gear' | 'maintenance'>('gear')
-  const { data: gear, isLoading, error } = useGear(includeRetired)
+  const { data: gear, isLoading, error } = useGear({ include_retired: includeRetired })
   const { data: monthlyUsage } = useGearMonthlyUsage(includeRetired)
 
   const [customModal, setCustomModal] = useState<{ mode: 'create' | 'edit'; gear?: Gear } | null>(

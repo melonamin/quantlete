@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -39,6 +40,8 @@ type Router struct {
 	photosHandler      *handlers.PhotosHandler
 	challengesHandler  *handlers.ChallengesHandler
 	exportHandler      *handlers.ExportHandler
+	weatherHandler     *handlers.WeatherHandler
+	setupHandler       *handlers.SetupHandler
 }
 
 // securityHeaders middleware adds security headers to all responses.
@@ -192,6 +195,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	challengeRepo := storage.NewChallengeRepository(db)
 	appStateRepo := storage.NewAppStateRepository(db)
 	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
+	weatherRepo := storage.NewWeatherRepository(db.Conn())
 
 	// Create handlers
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
@@ -209,6 +213,8 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	photosHandler := handlers.NewPhotosHandler(photoRepo, stravaClient)
 	challengesHandler := handlers.NewChallengesHandler(challengeRepo, stravaClient, cfg.Storage.DataDir)
 	exportHandler := handlers.NewExportHandler(activityRepo, stravaClient)
+	weatherHandler := handlers.NewWeatherHandler(weatherRepo, activityRepo, streamRepo, stravaClient, slog.Default())
+	setupHandler := handlers.NewSetupHandler(cfg, appStateRepo, stravaClient)
 
 	router := &Router{
 		Mux:                r,
@@ -230,6 +236,8 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 		photosHandler:      photosHandler,
 		challengesHandler:  challengesHandler,
 		exportHandler:      exportHandler,
+		weatherHandler:     weatherHandler,
+		setupHandler:       setupHandler,
 	}
 
 	// Mount routes
@@ -252,12 +260,19 @@ func (r *Router) mountRoutes() {
 			router.Post("/refresh", r.authHandler.RefreshToken)
 		})
 
+		// Setup routes (for credential configuration)
+		router.Route("/setup", func(router chi.Router) {
+			router.Get("/credentials", r.setupHandler.GetCredentialsStatus)
+			router.Put("/credentials", r.setupHandler.UpdateCredentials)
+		})
+
 		// Activities routes
 		router.Route("/activities", func(router chi.Router) {
 			router.Get("/", r.activitiesHandler.List)
 			router.Get("/{id}", r.activitiesHandler.GetByID)
 			router.Get("/{id}/streams", r.activitiesHandler.GetStreams)
 			router.Get("/{id}/photos", r.photosHandler.ActivityPhotos)
+			router.Get("/{id}/weather", r.weatherHandler.GetActivityWeather)
 		})
 
 		// Import routes

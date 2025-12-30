@@ -9,7 +9,17 @@ import {
 import { getSportCategory } from '@/lib/sport-types'
 import { useSettingsStore } from '@/stores'
 import { Card, CardContent } from '@/components/ui/card'
-import { Route, Clock, Mountain, Gauge, Heart, Zap, Flame } from 'lucide-react'
+import {
+  Route,
+  Clock,
+  Mountain,
+  Gauge,
+  Heart,
+  Zap,
+  Flame,
+  ThumbsUp,
+  MessageCircle,
+} from 'lucide-react'
 
 interface ActivityStatsProps {
   activity: Activity
@@ -112,6 +122,22 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
           label="Calories"
           value={`${Math.round(activity.calories)}`}
           subValue="kcal"
+        />
+      )}
+
+      {activity.kudos_count > 0 && (
+        <StatCard
+          icon={ThumbsUp}
+          label="Kudos"
+          value={activity.kudos_count.toString()}
+        />
+      )}
+
+      {activity.comment_count > 0 && (
+        <StatCard
+          icon={MessageCircle}
+          label="Comments"
+          value={activity.comment_count.toString()}
         />
       )}
     </div>
