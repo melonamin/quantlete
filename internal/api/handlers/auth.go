@@ -149,7 +149,7 @@ func (h *AuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 // Status handles GET /api/v1/auth/status.
 // Returns the current authentication status.
-func (h *AuthHandler) Status(w http.ResponseWriter, _ *http.Request) {
+func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	token := h.strava.GetToken()
@@ -157,6 +157,16 @@ func (h *AuthHandler) Status(w http.ResponseWriter, _ *http.Request) {
 
 	// Demo mode: athlete exists but no token (set by demo command)
 	isDemoMode := athlete != nil && token == nil
+
+	// If token is present but expired, attempt an automatic refresh so the UI
+	// stays authenticated without manual intervention.
+	if token != nil && athlete != nil && !token.Valid() {
+		if newToken, err := h.strava.RefreshToken(r.Context(), token); err == nil {
+			h.strava.SetToken(newToken, athlete)
+			_ = h.persistToken(context.Background(), newToken, athlete.ID)
+			token = newToken
+		}
+	}
 
 	resp := AuthStatusResponse{
 		Authenticated: (token != nil && token.Valid()) || isDemoMode,

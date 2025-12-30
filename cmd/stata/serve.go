@@ -10,11 +10,13 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/oauth2"
 
 	"github.com/sasha/stata/internal/api"
 	"github.com/sasha/stata/internal/api/handlers"
 	"github.com/sasha/stata/internal/config"
 	"github.com/sasha/stata/internal/importer"
+	"github.com/sasha/stata/internal/scheduler"
 	"github.com/sasha/stata/internal/storage"
 	"github.com/sasha/stata/internal/strava"
 )
@@ -98,6 +100,7 @@ func runServe(port int, dev bool) error {
 	bestEffortsRepo := storage.NewBestEffortsRepository(db)
 	maintenanceRepo := storage.NewMaintenanceRepository(db)
 	photoRepo := storage.NewPhotoRepository(db)
+	settingsRepo := storage.NewSettingsRepository(db)
 
 	// Only do Strava auth setup if not in demo mode
 	if demoMode != "true" {
@@ -116,6 +119,20 @@ func runServe(port int, dev bool) error {
 			return appStateRepo.Set(context.Background(), storage.AppStateStravaRateLimit, json)
 		})
 
+		// Set up token persistence for automatic refresh.
+		stravaClient.SetTokenPersister(func(token *oauth2.Token, athleteID int64) error {
+			if token == nil {
+				return nil
+			}
+			return tokenRepo.Upsert(context.Background(), &storage.AuthToken{
+				AthleteID:    athleteID,
+				AccessToken:  token.AccessToken,
+				RefreshToken: token.RefreshToken,
+				TokenType:    token.TokenType,
+				ExpiresAt:    storage.SQLiteTime{Time: token.Expiry},
+			})
+		})
+
 		// Restore tokens from database
 		if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
 			slog.Warn("failed to restore auth from database", "error", err)
@@ -127,6 +144,14 @@ func runServe(port int, dev bool) error {
 
 	// Create importer
 	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo, syncHistoryRepo)
+
+	// Create scheduler (periodic sync, maintenance checks, etc.)
+	sched := scheduler.New(slog.Default(), stravaClient, settingsRepo, imp)
+	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
+	defer schedulerCancel()
+	if err := sched.Start(schedulerCtx); err != nil {
+		return fmt.Errorf("starting scheduler: %w", err)
+	}
 
 	// Create router
 	router := api.NewRouter(cfg, stravaClient, db, imp)
@@ -151,6 +176,11 @@ func runServe(port int, dev bool) error {
 		slog.Info("shutting down server...")
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.WriteTimeout)
 		defer cancel()
+
+		schedulerCancel()
+		if err := sched.Stop(ctx); err != nil {
+			slog.Warn("scheduler stop error", "error", err)
+		}
 
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("server shutdown error", "error", err)

@@ -17,6 +17,21 @@ export interface AppSettings {
   version: number
   virtual_world_tile_layers: Record<string, VirtualWorldTileLayer>
   eddington_definitions?: EddingtonDefinition[]
+  scheduler: SchedulerSettings
+  enable_public_badges?: boolean
+}
+
+export type PullSchedule = 'midnight' | 'hourly' | 'every_6_hours'
+
+export interface SchedulerSettings {
+  version: number
+  pull: {
+    enabled: boolean
+    schedule: PullSchedule
+  }
+  push: {
+    enabled: boolean
+  }
 }
 
 export { useAppSettings, useUpdateAppSettings } from '@/lib/data'

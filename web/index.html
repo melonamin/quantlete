@@ -1,10 +1,33 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#22c55e" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stata - Strava Analytics</title>
+    <!-- Theme detection runs before React to prevent FOUC (Flash of Unstyled Content).
+         Storage key must match SETTINGS_STORAGE_KEY in web/src/lib/constants.ts -->
+    <script>
+      ;(() => {
+        const storageKey = 'stata-settings'
+        try {
+          const raw = localStorage.getItem(storageKey)
+          const parsed = raw ? JSON.parse(raw) : null
+          const theme = parsed?.state?.theme ?? 'system'
+          const systemDark =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isDark = theme === 'dark' || (theme === 'system' && systemDark)
+          document.documentElement.classList.toggle('dark', isDark)
+        } catch {
+          // ignore
+        }
+      })()
+    </script>
     <!-- Preconnect for faster font loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

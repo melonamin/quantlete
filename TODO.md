@@ -20,7 +20,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 | 9     | Analytics               | Eddington, best efforts, training load   | ✓           |
 | 10    | Feature Parity & Beyond | Gap features + unique enhancements       | ~95%        |
 | 11    | WASM Mode               | Browser-only version with SQLite-WASM    | ~70%        |
-| 12    | Polish                  | PWA, i18n, settings, badges, security    | ~50%        |
+| 12    | Polish                  | PWA, i18n, settings, badges, security    | ~80%        |
 
 ---
 
@@ -165,7 +165,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 - [x] Create `internal/strava/client.go`:
   - [x] HTTP client with auth header injection
   - [x] Rate limit tracking from response headers
-  - [ ] Automatic token refresh on 401
+  - [x] Automatic token refresh on 401
 - [x] Create `internal/strava/types.go`:
   - [x] Activity struct matching Strava API
   - [x] Athlete struct
@@ -1063,7 +1063,7 @@ This document provides a phased implementation plan for the Statistics for Strav
 
 ---
 
-## Phase 10: Feature Parity & Beyond (~90%)
+## Phase 10: Feature Parity & Beyond (~95%)
 
 **Goal:** Match and exceed the reference Statistics for Strava implementation with missing features and unique enhancements.
 
@@ -1074,7 +1074,7 @@ Compared against reference project (statistics-for-strava PHP implementation):
 | Category | Status | Remaining |
 |----------|--------|-----------|
 | Dashboard Widgets | ✓ Complete | 0 |
-| Pages | ~95% | Badge Display Page |
+| Pages | ✓ Complete | 0 |
 | Heatmap Features | ~75% | Route Preview on Hover |
 | UX Enhancements | ~80% | Connected Charts |
 | Beyond Reference | ~70% | Route Similarity, Training Plans, Social |
@@ -1180,27 +1180,38 @@ Dedicated page with accordion-style monthly breakdown tables.
 - [x] Uses existing `GET /api/v1/dashboard/monthly` endpoint
 - [x] Add route and navigation link
 
-#### 10.2.2 Badge Display Page
+#### 10.2.2 Badge Display Page ✓
 SVG badge generation for profile embedding.
 
-- [ ] Create `web/src/pages/badges.tsx`:
-  - [ ] Three tabs: User Badge, PB Badges, Virtual Badges
-  - [ ] User Badge:
-    - [ ] Total stats summary badge
-    - [ ] Customizable colors
-    - [ ] SVG preview
-    - [ ] Embed code generator (Markdown, HTML)
-  - [ ] PB Badges:
-    - [ ] Personal best badges per sport type
-    - [ ] Distance/time achievements
-  - [ ] Virtual Badges:
-    - [ ] Zwift level/achievements
-    - [ ] Virtual world stats
-- [ ] Create `GET /api/v1/badges/user` endpoint
-- [ ] Create `GET /api/v1/badges/pb` endpoint
-- [ ] Create `GET /api/v1/badges/virtual` endpoint
-- [ ] SVG generation in Go (`internal/badges/`)
-- [ ] Add route and navigation link
+- [x] Create `web/src/pages/badges.tsx`:
+  - [x] Three sections: Overall Stats, Achievements, Time Periods
+  - [x] Overall Stats Badge:
+    - [x] Total distance, time, elevation, activities
+    - [x] Customizable themes (terminal, strava, etc.)
+    - [x] SVG preview with copy/download
+    - [x] Embed code generator (Markdown, HTML, URL)
+  - [x] Achievements Badge:
+    - [x] Eddington number display
+    - [x] Personal best achievements
+  - [x] Time Period Badges:
+    - [x] Yearly stats badge
+    - [x] Monthly stats badge
+- [x] Create badge API endpoints (`internal/api/handlers/badges.go`):
+  - [x] `GET /api/v1/badges/:type` - SVG badge generation
+  - [x] `GET /api/v1/badges/config` - badge configuration
+  - [x] `PUT /api/v1/badges/config` - save configuration
+- [x] SVG generation in Go (`internal/badges/`):
+  - [x] `render.go` - SVG rendering
+  - [x] `format.go` - value formatting
+  - [x] `themes.go` - theme definitions
+- [x] Badge customizer UI:
+  - [x] Theme selection
+  - [x] Size options (compact, standard, large)
+  - [x] Background selection (dark, light, transparent)
+  - [x] Metric/imperial unit toggle
+  - [x] Public badge enable/disable
+- [x] Add route and navigation link
+- [x] Test coverage (`badges_test.go`)
 
 ---
 
@@ -1563,17 +1574,17 @@ Comprehensive data export capabilities.
 
 ---
 
-## Phase 12: Polish
+## Phase 12: Polish (~80%)
 
 **Goal:** PWA, internationalization, settings, badges, final polish.
 
-### 12.1 PWA Support
+### 12.1 PWA Support ✓
 
-- [ ] Create `web/public/manifest.json`
-- [ ] Create service worker for offline support
-- [ ] Add app icons (multiple sizes)
-- [ ] Configure installable prompt
-- [ ] Test PWA installation
+- [x] Create `web/public/manifest.json`
+- [x] Create service worker for offline support (`web/public/sw.js`)
+- [x] Add app icons (multiple sizes) (`web/public/icons/`)
+- [x] Configure installable prompt (Settings UI)
+- [x] Test PWA installation (manual)
 
 ### 12.2 Unit System ✓
 
@@ -1593,38 +1604,45 @@ Comprehensive data export capabilities.
   - [x] FTP history management
   - [x] Weight history management
   - [x] Virtual world tile layer settings
-  - [ ] Theme selector (dark/light/system)
+  - [x] Theme selector (dark/light/system)
   - [ ] Notification settings
 - [x] Create `web/src/components/settings/strava-credentials-form.tsx`
 - [x] Create `internal/api/handlers/setup.go` - credentials API
 - [x] Create `web/src/lib/api/setup.ts` - TypeScript types
 
-### 12.4 SVG Badges
+### 12.4 SVG Badges ✓
 
-- [ ] Create badge generation in Go:
-  - [ ] Strava stats badge
-  - [ ] PB badges per sport
-  - [ ] Zwift badge
-- [ ] Create badge API endpoints
-- [ ] Create badge preview in settings
-- [ ] Create embed code generator
+- [x] Create badge generation in Go (`internal/badges/`):
+  - [x] Stats badge (distance, time, elevation, activities)
+  - [x] Achievements badge (Eddington, PBs)
+  - [x] Time period badges (yearly, monthly)
+- [x] Create badge API endpoints (`internal/api/handlers/badges.go`)
+- [x] Create badge preview in badges page
+- [x] Create embed code generator (Markdown, HTML, URL)
+- [x] Multiple themes (terminal, strava, etc.)
+- [x] Size and background customization
 
-### 12.5 Webhooks
+### 12.5 Webhooks ✓
 
-- [ ] Implement Strava webhook subscription:
-  - [ ] `GET /api/v1/webhooks/strava` - validation
-  - [ ] `POST /api/v1/webhooks/strava` - receive events
-- [ ] Handle activity create/update/delete events
-- [ ] Trigger incremental import on webhook
+- [x] Implement Strava webhook subscription endpoints:
+  - [x] `GET /api/v1/webhooks/strava` - validation
+  - [x] `POST /api/v1/webhooks/strava` - receive events
+- [x] Handle activity create/update/delete events
+- [x] Trigger incremental import on webhook (create events)
+- [x] Async processing with bounded concurrency
+- [x] Test coverage (`webhooks_test.go`)
 
-### 12.6 Scheduler
+### 12.6 Scheduler ✓
 
-- [ ] Create `internal/scheduler/scheduler.go`
-- [ ] Configurable scheduled jobs:
-  - [ ] Periodic full sync
-  - [ ] Maintenance check notifications
-  - [ ] App update check
-- [ ] Create scheduler configuration in settings
+- [x] Create `internal/scheduler/scheduler.go`
+- [x] Add Sync settings (pull/push):
+  - [x] Pull toggle (scheduled incremental sync)
+  - [x] Pull schedule presets (midnight / every 6 hours / hourly)
+  - [x] Push toggle (webhook processing)
+- [x] Reconciliation loop for config changes
+- [x] Test coverage (`scheduler_test.go`)
+- [ ] Maintenance check notifications (see 12.7 Notifications)
+- [ ] App update check (see 12.7 Notifications)
 
 ### 12.7 Notifications
 

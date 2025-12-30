@@ -8,10 +8,13 @@ import { WelcomeModal } from '@/components/onboarding/welcome-modal'
 import { SyncProgressModal } from '@/components/sync/sync-progress-modal'
 import { useSyncProtection } from '@/hooks/use-sync-protection'
 import { useSyncInvalidation } from '@/hooks/use-sync-invalidation'
+import { useTheme } from '@/hooks/use-theme'
+import { registerServiceWorker } from '@/lib/pwa'
 import './index.css'
 
 // Global sync-related hooks
 function SyncEffects() {
+  useTheme()
   useSyncProtection() // Prevents accidental page refresh during sync
   useSyncInvalidation() // Auto-refresh UI when sync imports data
   return null
@@ -25,6 +28,8 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

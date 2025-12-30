@@ -61,6 +61,10 @@ export default defineConfig(({ mode }) => {
               target: 'http://localhost:8081',
               changeOrigin: true,
             },
+            '/badges': {
+              target: 'http://localhost:8081',
+              changeOrigin: true,
+            },
           },
     },
     build: {

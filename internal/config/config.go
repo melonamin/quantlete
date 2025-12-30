@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Config holds all application configuration.
 type Config struct {
@@ -22,9 +25,11 @@ type ServerConfig struct {
 
 // StravaConfig holds Strava API configuration.
 type StravaConfig struct {
-	ClientID     string `mapstructure:"client_id"`
-	ClientSecret string `mapstructure:"client_secret"`
-	RedirectURI  string `mapstructure:"redirect_uri"`
+	ClientID              string `mapstructure:"client_id"`
+	ClientSecret          string `mapstructure:"client_secret"`
+	RedirectURI           string `mapstructure:"redirect_uri"`
+	WebhookVerifyToken    string `mapstructure:"webhook_verify_token"`
+	WebhookSubscriptionID int64  `mapstructure:"webhook_subscription_id"`
 }
 
 // StorageConfig holds database configuration.
@@ -73,5 +78,18 @@ func (c *Config) DBPath() string {
 func (c *Config) Validate() error {
 	// Strava credentials are optional for initial setup
 	// They'll be required when attempting OAuth
+	return c.Strava.Validate()
+}
+
+// Validate checks if the Strava configuration is valid.
+// Returns nil if configuration is valid or not yet configured.
+func (s *StravaConfig) Validate() error {
+	// Credentials are optional for initial setup - validated when OAuth is attempted.
+
+	// If webhook verify token is set, ensure it has minimum length for security.
+	if s.WebhookVerifyToken != "" && len(s.WebhookVerifyToken) < 16 {
+		return fmt.Errorf("webhook verify token must be at least 16 characters for security")
+	}
+
 	return nil
 }

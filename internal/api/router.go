@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 
 	"github.com/sasha/stata/internal/api/handlers"
 	"github.com/sasha/stata/internal/config"
@@ -19,12 +20,21 @@ import (
 	"github.com/sasha/stata/internal/strava"
 )
 
+// badgeRateLimitRequests is the maximum number of badge requests per IP per window.
+// Badges are public endpoints that need protection against abuse while remaining
+// usable for embedding in READMEs and profiles.
+const badgeRateLimitRequests = 60
+
+// badgeRateLimitWindow is the time window for badge rate limiting.
+const badgeRateLimitWindow = time.Minute
+
 // Router holds the HTTP router and its dependencies.
 type Router struct {
 	*chi.Mux
 	cfg                *config.Config
 	db                 *storage.DB
 	stravaClient       *strava.Client
+	webhooksHandler    *handlers.StravaWebhookHandler
 	authHandler        *handlers.AuthHandler
 	activitiesHandler  *handlers.ActivitiesHandler
 	importHandler      *handlers.ImportHandler
@@ -42,6 +52,7 @@ type Router struct {
 	exportHandler      *handlers.ExportHandler
 	weatherHandler     *handlers.WeatherHandler
 	setupHandler       *handlers.SetupHandler
+	badgesHandler      *handlers.BadgesHandler
 }
 
 // securityHeaders middleware adds security headers to all responses.
@@ -198,6 +209,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	weatherRepo := storage.NewWeatherRepository(db.Conn())
 
 	// Create handlers
+	webhooksHandler := handlers.NewStravaWebhookHandler(cfg, imp, activityRepo, settingsRepo, stravaClient)
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
 	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, streamRepo, stravaClient)
 	importHandler := handlers.NewImportHandler(imp, syncHistoryRepo, stravaClient)
@@ -215,12 +227,14 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	exportHandler := handlers.NewExportHandler(activityRepo, stravaClient)
 	weatherHandler := handlers.NewWeatherHandler(weatherRepo, activityRepo, streamRepo, stravaClient, slog.Default())
 	setupHandler := handlers.NewSetupHandler(cfg, appStateRepo, stravaClient)
+	badgesHandler := handlers.NewBadgesHandler(statsRepo, settingsRepo, stravaClient)
 
 	router := &Router{
 		Mux:                r,
 		cfg:                cfg,
 		db:                 db,
 		stravaClient:       stravaClient,
+		webhooksHandler:    webhooksHandler,
 		authHandler:        authHandler,
 		activitiesHandler:  activitiesHandler,
 		importHandler:      importHandler,
@@ -238,6 +252,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 		exportHandler:      exportHandler,
 		weatherHandler:     weatherHandler,
 		setupHandler:       setupHandler,
+		badgesHandler:      badgesHandler,
 	}
 
 	// Mount routes
@@ -251,6 +266,12 @@ func (r *Router) mountRoutes() {
 	r.Route("/api/v1", func(router chi.Router) {
 		// Health check
 		router.Get("/health", handlers.HealthCheck)
+
+		// Webhooks
+		router.Route("/webhooks", func(router chi.Router) {
+			router.Get("/strava", r.webhooksHandler.Validate)
+			router.Post("/strava", r.webhooksHandler.Receive)
+		})
 
 		// Auth routes
 		router.Route("/auth", func(router chi.Router) {
@@ -395,6 +416,18 @@ func (r *Router) mountRoutes() {
 			router.Get("/activities/csv", r.exportHandler.ExportActivitiesCSV)
 			router.Get("/activities/json", r.exportHandler.ExportActivitiesJSON)
 		})
+	})
+
+	// Public badge endpoints (no auth required, but checks setting)
+	r.Route("/badges", func(router chi.Router) {
+		router.Use(httprate.LimitByIP(badgeRateLimitRequests, badgeRateLimitWindow))
+		router.Get("/distance.svg", r.badgesHandler.GetDistanceBadge)
+		router.Get("/time.svg", r.badgesHandler.GetTimeBadge)
+		router.Get("/elevation.svg", r.badgesHandler.GetElevationBadge)
+		router.Get("/activities.svg", r.badgesHandler.GetActivitiesBadge)
+		router.Get("/eddington.svg", r.badgesHandler.GetEddingtonBadge)
+		router.Get("/year-{year}.svg", r.badgesHandler.GetYearBadge)
+		router.Get("/month-{month}.svg", r.badgesHandler.GetMonthBadge)
 	})
 
 	// Serve locally stored challenge badge images

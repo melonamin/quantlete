@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -22,6 +23,9 @@ const (
 // RateLimitPersister is called after each API request to persist rate limit state.
 type RateLimitPersister func(json string) error
 
+// TokenPersister is called after an automatic token refresh to persist the new token.
+type TokenPersister func(token *oauth2.Token, athleteID int64) error
+
 // Client is a Strava API client.
 type Client struct {
 	cfg              *config.StravaConfig
@@ -29,9 +33,11 @@ type Client struct {
 	httpClient       *http.Client
 	rateLimit        *RateLimiter
 	rateLimitPersist RateLimitPersister
+	tokenPersist     TokenPersister
 	token            *oauth2.Token
 	athlete          *Athlete
 	tokenMu          sync.RWMutex
+	refreshMu        sync.Mutex // serializes token refresh operations
 }
 
 // NewClient creates a new Strava API client.
@@ -146,6 +152,11 @@ func (c *Client) SetRateLimitPersister(p RateLimitPersister) {
 	c.rateLimitPersist = p
 }
 
+// SetTokenPersister sets the callback for persisting refreshed tokens.
+func (c *Client) SetTokenPersister(p TokenPersister) {
+	c.tokenPersist = p
+}
+
 // IsAuthenticated returns true if the client has a valid token.
 func (c *Client) IsAuthenticated() bool {
 	c.tokenMu.RLock()
@@ -153,14 +164,99 @@ func (c *Client) IsAuthenticated() bool {
 	return c.token != nil && c.token.Valid()
 }
 
+func (c *Client) persistToken(token *oauth2.Token, athleteID int64) {
+	if c.tokenPersist == nil {
+		return
+	}
+	if err := c.tokenPersist(token, athleteID); err != nil {
+		// Best effort: don't fail API calls on persistence errors, but log for debugging.
+		slog.Warn("token persistence failed", "error", err, "athlete_id", athleteID)
+	}
+}
+
+// tokenRefreshTimeout is the maximum time allowed for a token refresh operation.
+const tokenRefreshTimeout = 30 * time.Second
+
+// forceRefreshToken performs a mutex-protected token refresh, used when a 401
+// is received after the initial token validation passed (e.g., token expired
+// server-side between validation and request).
+func (c *Client) forceRefreshToken(ctx context.Context) (*oauth2.Token, error) {
+	c.refreshMu.Lock()
+	defer c.refreshMu.Unlock()
+
+	// Add timeout for the refresh operation to prevent indefinite blocking.
+	ctx, cancel := context.WithTimeout(ctx, tokenRefreshTimeout)
+	defer cancel()
+
+	c.tokenMu.RLock()
+	currentToken := c.token
+	athlete := c.athlete
+	c.tokenMu.RUnlock()
+
+	if athlete == nil {
+		return nil, fmt.Errorf("not authenticated")
+	}
+
+	newToken, err := c.RefreshToken(ctx, currentToken)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetToken(newToken, athlete)
+	c.persistToken(newToken, athlete.ID)
+	return newToken, nil
+}
+
+func (c *Client) ensureValidToken(ctx context.Context, token *oauth2.Token) (*oauth2.Token, error) {
+	if token == nil {
+		return nil, fmt.Errorf("not authenticated")
+	}
+	if token.Valid() {
+		return token, nil
+	}
+
+	// Serialize refresh operations to prevent concurrent refresh attempts
+	c.refreshMu.Lock()
+	defer c.refreshMu.Unlock()
+
+	// Add timeout for the refresh operation to prevent indefinite blocking.
+	ctx, cancel := context.WithTimeout(ctx, tokenRefreshTimeout)
+	defer cancel()
+
+	// Re-check after acquiring lock — another goroutine may have refreshed already
+	c.tokenMu.RLock()
+	currentToken := c.token
+	athlete := c.athlete
+	c.tokenMu.RUnlock()
+
+	if athlete == nil {
+		return nil, fmt.Errorf("not authenticated")
+	}
+	if currentToken != nil && currentToken.Valid() {
+		return currentToken, nil
+	}
+
+	newToken, err := c.RefreshToken(ctx, currentToken)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetToken(newToken, athlete)
+	c.persistToken(newToken, athlete.ID)
+	return newToken, nil
+}
+
 // do performs an authenticated API request.
 func (c *Client) do(ctx context.Context, method, path string, result any) error {
 	c.tokenMu.RLock()
 	token := c.token
+	athlete := c.athlete
 	c.tokenMu.RUnlock()
 
-	if token == nil {
-		return fmt.Errorf("not authenticated")
+	var err error
+	token, err = c.ensureValidToken(ctx, token)
+	if err != nil {
+		return err
 	}
 
 	// Check rate limits
@@ -168,18 +264,34 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 		return fmt.Errorf("rate limit: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, apiBase+path, http.NoBody)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+	doRequest := func(accessToken string) (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, method, apiBase+path, http.NoBody)
+		if err != nil {
+			return nil, fmt.Errorf("creating request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		return c.httpClient.Do(req)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, err := doRequest(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// If we got a 401, try a single refresh+retry using mutex-protected refresh.
+	if resp.StatusCode == http.StatusUnauthorized && athlete != nil {
+		_ = resp.Body.Close()
+		newToken, refreshErr := c.forceRefreshToken(ctx)
+		if refreshErr != nil {
+			return fmt.Errorf("unauthorized: token refresh failed: %w", refreshErr)
+		}
+		resp, err = doRequest(newToken.AccessToken)
+		if err != nil {
+			return fmt.Errorf("executing request: %w", err)
+		}
+		defer resp.Body.Close()
+	}
 
 	// Update rate limits from response headers
 	c.rateLimit.UpdateFromHeaders(resp.Header)
@@ -189,10 +301,6 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 		if jsonStr, err := c.rateLimit.ToJSON(); err == nil {
 			_ = c.rateLimitPersist(jsonStr) // Best effort, don't fail request on persistence error
 		}
-	}
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return fmt.Errorf("unauthorized: token may be expired")
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {

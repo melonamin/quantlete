@@ -2567,15 +2567,28 @@ export class WasmProvider implements DataProvider {
       [athleteId]
     )
 
-    if (!row) {
-      return {
-        version: 1,
-        virtual_world_tile_layers: {},
-        eddington_definitions: [],
-      }
+    const defaults: AppSettings = {
+      version: 3,
+      virtual_world_tile_layers: {},
+      eddington_definitions: [],
+      scheduler: {
+        version: 2,
+        pull: { enabled: false, schedule: 'midnight' },
+        push: { enabled: false },
+      },
     }
 
-    return JSON.parse(row.settings)
+    if (!row) {
+      return defaults
+    }
+
+    const raw = JSON.parse(row.settings) as Partial<AppSettings>
+
+    return {
+      ...defaults,
+      ...raw,
+      scheduler: raw.scheduler ?? defaults.scheduler,
+    }
   }
 
   async updateAppSettings(settings: AppSettings): Promise<AppSettings> {

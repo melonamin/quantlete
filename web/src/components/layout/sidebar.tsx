@@ -24,6 +24,7 @@ import {
   Download,
   Loader2,
   Clock,
+  Tag,
 } from 'lucide-react'
 import { useEffect, useCallback } from 'react'
 
@@ -65,6 +66,7 @@ export function Sidebar() {
     ...(showEddington ? [{ name: 'Eddington', href: '/eddington', icon: TrendingUp }] : []),
     { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
     { name: 'Rewind', href: '/rewind', icon: History },
+    { name: 'Badges', href: '/badges', icon: Tag },
     { name: 'Export', href: '/export', icon: Download },
   ]
 

@@ -7,3 +7,6 @@ export const PAGINATION = {
   // Maximum items for "view all" mode to prevent performance issues
   VIEW_ALL_LIMIT: 2000,
 } as const
+
+// Storage key for settings - keep in sync with web/index.html (inline theme script)
+export const SETTINGS_STORAGE_KEY = 'stata-settings'

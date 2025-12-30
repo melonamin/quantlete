@@ -87,6 +87,12 @@ func convertActivity(a *strava.Activity, athleteID int64) *storage.Activity {
 	return act
 }
 
+// ConvertActivity converts a Strava activity to a storage activity.
+// This is used outside the importer (e.g., webhook updates).
+func ConvertActivity(a *strava.Activity, athleteID int64) *storage.Activity {
+	return convertActivity(a, athleteID)
+}
+
 // convertAthlete converts a Strava athlete to a storage athlete.
 func convertAthlete(a *strava.Athlete) *storage.Athlete {
 	return &storage.Athlete{

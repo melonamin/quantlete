@@ -322,6 +322,31 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 	return activities, total, rows.Err()
 }
 
+// DeleteByID deletes an activity and its dependent computed rows.
+//
+// Most child tables use ON DELETE CASCADE, but a few computed tables do not.
+func (r *ActivityRepository) DeleteByID(ctx context.Context, athleteID, activityID int64) error {
+	tx, err := r.db.Conn().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// These tables reference activities(id) without ON DELETE CASCADE.
+	if _, err := tx.ExecContext(ctx, "DELETE FROM power_best_efforts WHERE activity_id = ? AND athlete_id = ?", activityID, athleteID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM activity_training_load WHERE activity_id = ? AND athlete_id = ?", activityID, athleteID); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM activities WHERE id = ? AND athlete_id = ?", activityID, athleteID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // GetTotals returns aggregate statistics for activities.
 func (r *ActivityRepository) GetTotals(ctx context.Context, filters ActivityFilters) (*ActivityTotals, error) {
 	// Build WHERE clause (same as List)
@@ -489,20 +514,20 @@ func scanActivityRow(rows *sql.Rows) (*Activity, error) {
 }
 
 var allowedActivityOrderColumns = map[string]string{
-	"start_date":            "start_date",
-	"distance":              "distance",
-	"moving_time":           "moving_time",
-	"elapsed_time":          "elapsed_time",
-	"total_elevation_gain":  "total_elevation_gain",
-	"sport_type":            "sport_type",
-	"name":                  "name",
-	"average_speed":         "average_speed",
-	"average_heartrate":     "average_heartrate",
-	"average_watts":         "average_watts",
-	"average_cadence":       "average_cadence",
-	"calories":              "calories",
-	"created_at":            "created_at",
-	"updated_at":            "updated_at",
+	"start_date":           "start_date",
+	"distance":             "distance",
+	"moving_time":          "moving_time",
+	"elapsed_time":         "elapsed_time",
+	"total_elevation_gain": "total_elevation_gain",
+	"sport_type":           "sport_type",
+	"name":                 "name",
+	"average_speed":        "average_speed",
+	"average_heartrate":    "average_heartrate",
+	"average_watts":        "average_watts",
+	"average_cadence":      "average_cadence",
+	"calories":             "calories",
+	"created_at":           "created_at",
+	"updated_at":           "updated_at",
 }
 
 // StreamRepository handles activity stream persistence.

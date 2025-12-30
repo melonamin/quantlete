@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { SETTINGS_STORAGE_KEY } from '@/lib/constants'
+
 export type UnitSystem = 'metric' | 'imperial'
 export type Theme = 'light' | 'dark' | 'system'
 
@@ -20,7 +22,7 @@ export const useSettingsStore = create<SettingsState>()(
       setTheme: (theme) => set({ theme }),
     }),
     {
-      name: 'stata-settings',
+      name: SETTINGS_STORAGE_KEY,
     }
   )
 )

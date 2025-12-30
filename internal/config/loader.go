@@ -20,6 +20,7 @@ func Load() (*Config, error) {
 	v.SetDefault("server.idle_timeout", defaults.Server.IdleTimeout)
 	v.SetDefault("server.dev_mode", defaults.Server.DevMode)
 	v.SetDefault("strava.redirect_uri", defaults.Strava.RedirectURI)
+	v.SetDefault("strava.webhook_verify_token", defaults.Strava.WebhookVerifyToken)
 	v.SetDefault("storage.data_dir", defaults.Storage.DataDir)
 	v.SetDefault("storage.db_file", defaults.Storage.DBFile)
 	v.SetDefault("log.level", defaults.Log.Level)
@@ -37,6 +38,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("strava.client_id", "STATA_STRAVA_CLIENT_ID")
 	_ = v.BindEnv("strava.client_secret", "STATA_STRAVA_CLIENT_SECRET")
 	_ = v.BindEnv("strava.redirect_uri", "STATA_STRAVA_REDIRECT_URI")
+	_ = v.BindEnv("strava.webhook_verify_token", "STATA_STRAVA_WEBHOOK_VERIFY_TOKEN")
 	_ = v.BindEnv("storage.data_dir", "STATA_STORAGE_DATA_DIR")
 	_ = v.BindEnv("log.level", "STATA_LOG_LEVEL")
 
