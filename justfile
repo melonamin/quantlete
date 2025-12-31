@@ -263,7 +263,7 @@ preview-wasm:
 # ============================================================================
 
 # Install all dependencies
-setup: setup-go setup-web setup-worker check-tinygo
+setup: setup-go setup-web setup-worker setup-landing check-tinygo
 
 # Install Go dependencies
 setup-go:
@@ -285,6 +285,26 @@ setup-tools:
     go install github.com/air-verse/air@latest
 
 # ============================================================================
+# Landing Page
+# ============================================================================
+
+# Run landing page dev server
+dev-landing:
+    cd landing && yarn dev
+
+# Build landing page
+build-landing:
+    cd landing && yarn build
+
+# Install landing page dependencies
+setup-landing:
+    cd landing && yarn install
+
+# Preview landing page build
+preview-landing:
+    cd landing && yarn preview
+
+# ============================================================================
 # Utilities
 # ============================================================================
 
@@ -299,3 +319,142 @@ run: build
 # Import activities from Strava
 import:
     go run ./cmd/quantlete import
+
+# ============================================================================
+# macOS App
+# ============================================================================
+
+# Build complete macOS app (Go binary + Swift app)
+build-macos: build-macos-go build-macos-swift
+    #!/usr/bin/env bash
+    set -e
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Debug -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    if [ -z "$APP_PATH" ]; then
+        echo "Error: Quantlete.app not found in DerivedData"
+        exit 1
+    fi
+    mkdir -p "$APP_PATH/Contents/Resources"
+    cp bin/quantlete "$APP_PATH/Contents/Resources/"
+    echo "Built: $APP_PATH"
+
+# Build Go binary for macOS (universal binary)
+build-macos-go: generate build-web
+    #!/usr/bin/env bash
+    set -e
+    mkdir -p bin
+    echo "Building for arm64..."
+    GOOS=darwin GOARCH=arm64 go build -o bin/quantlete-darwin-arm64 ./cmd/quantlete
+    echo "Building for amd64..."
+    GOOS=darwin GOARCH=amd64 go build -o bin/quantlete-darwin-amd64 ./cmd/quantlete
+    echo "Creating universal binary..."
+    lipo -create -output bin/quantlete bin/quantlete-darwin-arm64 bin/quantlete-darwin-amd64
+    rm bin/quantlete-darwin-arm64 bin/quantlete-darwin-amd64
+    echo "Built: bin/quantlete (universal)"
+
+# Build Swift macOS app
+build-macos-swift:
+    xcodebuild -project macos/Quantlete.xcodeproj -scheme Quantlete -configuration Debug build
+
+# Build macOS app for release (signed)
+build-macos-release: build-macos-go
+    xcodebuild -project macos/Quantlete.xcodeproj -scheme Quantlete -configuration Release build
+    #!/usr/bin/env bash
+    set -e
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Release -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    mkdir -p "$APP_PATH/Contents/Resources"
+    cp bin/quantlete "$APP_PATH/Contents/Resources/"
+    echo "Built: $APP_PATH"
+
+# Run macOS app
+run-macos: build-macos
+    #!/usr/bin/env bash
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Debug -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    open "$APP_PATH"
+
+# Clean macOS build artifacts
+clean-macos:
+    rm -rf ~/Library/Developer/Xcode/DerivedData/Quantlete-*
+
+# Code signing identity (Developer ID for distribution outside App Store)
+MACOS_SIGN_IDENTITY := "Developer ID Application: Ameba Labs, LLC (X93LWC49WV)"
+MACOS_KEYCHAIN_PROFILE := "notarytool-kefir"
+
+# Sign macOS binary and app bundle
+sign-macos: build-macos-go
+    #!/usr/bin/env bash
+    set -e
+    echo "Code signing Go binary..."
+    codesign --force --options runtime --sign "{{MACOS_SIGN_IDENTITY}}" --timestamp bin/quantlete
+    echo "Verifying binary signature..."
+    codesign -dv --verbose=2 bin/quantlete
+
+# Build and sign complete macOS app for distribution
+build-macos-signed: sign-macos build-macos-swift
+    #!/usr/bin/env bash
+    set -e
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Debug -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    if [ -z "$APP_PATH" ]; then
+        echo "Error: Quantlete.app not found in DerivedData"
+        exit 1
+    fi
+    mkdir -p "$APP_PATH/Contents/Resources"
+    cp bin/quantlete "$APP_PATH/Contents/Resources/"
+
+    echo "Code signing app bundle..."
+    codesign --force --deep --options runtime --sign "{{MACOS_SIGN_IDENTITY}}" --timestamp "$APP_PATH"
+
+    echo "Verifying app signature..."
+    codesign -dv --verbose=2 "$APP_PATH"
+    echo "Built and signed: $APP_PATH"
+
+# Create zip archive for notarization
+package-macos: build-macos-signed
+    #!/usr/bin/env bash
+    set -e
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Debug -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    echo "Creating zip archive for notarization..."
+    rm -f Quantlete.zip
+    ditto -c -k --keepParent "$APP_PATH" Quantlete.zip
+    echo "Archive created: Quantlete.zip"
+
+# Submit for notarization
+notarize-macos: package-macos
+    #!/usr/bin/env bash
+    set -e
+    echo "Submitting for notarization..."
+    xcrun notarytool submit Quantlete.zip \
+        --keychain-profile "{{MACOS_KEYCHAIN_PROFILE}}" \
+        --wait
+
+    echo "Stapling notarization ticket to app..."
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Debug -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    xcrun stapler staple "$APP_PATH"
+
+    echo "Verifying notarization..."
+    spctl -a -vvv -t exec "$APP_PATH" 2>&1 || true
+    echo "App is notarized and ready for distribution!"
+
+# Create distribution DMG
+dist-macos: notarize-macos
+    #!/usr/bin/env bash
+    set -e
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Quantlete-*/Build/Products/Debug -name "Quantlete.app" -type d 2>/dev/null | head -1)
+    mkdir -p dist
+    rm -f dist/Quantlete.dmg
+
+    echo "Creating DMG..."
+    hdiutil create -volname Quantlete -srcfolder "$APP_PATH" -ov -format UDZO dist/Quantlete.dmg
+
+    echo "Signing DMG..."
+    codesign --force --sign "{{MACOS_SIGN_IDENTITY}}" --timestamp dist/Quantlete.dmg
+
+    echo "Notarizing DMG..."
+    xcrun notarytool submit dist/Quantlete.dmg \
+        --keychain-profile "{{MACOS_KEYCHAIN_PROFILE}}" \
+        --wait
+    xcrun stapler staple dist/Quantlete.dmg
+
+    echo "Creating checksum..."
+    cd dist && shasum -a 256 Quantlete.dmg > Quantlete.dmg.sha256
+
+    echo "Distribution ready: dist/Quantlete.dmg"

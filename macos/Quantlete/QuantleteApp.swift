@@ -16,6 +16,12 @@ struct QuantleteApp: App {
     }
 
     private var iconName: String {
+        // Show sync icon when syncing
+        if let progress = serverManager.importProgress,
+           progress.status == "running" {
+            return "arrow.triangle.2.circlepath"
+        }
+
         switch serverManager.status {
         case .running:
             return "chart.line.uptrend.xyaxis"
@@ -30,32 +36,15 @@ struct QuantleteApp: App {
 
     @ViewBuilder
     private var menuContent: some View {
-        statusSection
-        Divider()
         dashboardSection
         Divider()
-        serverControlSection
+        syncStatusSection
         Divider()
         loginItemSection
         Divider()
+        advancedSection
+        Divider()
         appSection
-    }
-
-    @ViewBuilder
-    private var statusSection: some View {
-        HStack {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(serverManager.status.description)
-        }
-        .padding(.horizontal, 4)
-
-        if let errorMessage = serverManager.errorMessage {
-            Text(errorMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
     }
 
     private var statusColor: Color {
@@ -64,10 +53,128 @@ struct QuantleteApp: App {
             return .green
         case .starting:
             return .yellow
-        case .stopped:
-            return .gray
-        case .error:
+        case .stopped, .error:
             return .red
+        }
+    }
+
+    @ViewBuilder
+    private var syncStatusSection: some View {
+        if let progress = serverManager.importProgress, progress.status == "running" {
+            // Sync in progress
+            Text(phaseDescription(progress.phase))
+
+            // Progress info
+            let (current, total) = currentProgress(progress)
+            if total > 0 {
+                ProgressView(value: Double(current), total: Double(total))
+                    .progressViewStyle(.linear)
+                    .frame(width: 150)
+                Text("\(current) / \(total)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Rate limit
+            if progress.rateLimitLimit15Min > 0 {
+                Text("API: \(progress.rateLimitUsed15Min)/\(progress.rateLimitLimit15Min)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // ETA
+            if let eta = progress.estimatedETA, !eta.isEmpty {
+                Text("ETA: \(eta)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Rate limit warning
+            if progress.waitingForRateLimit {
+                Text("Waiting for rate limit...")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+
+            Divider()
+
+            Button("Cancel Sync") {
+                serverManager.cancelSync()
+            }
+        } else if let progress = serverManager.importProgress, progress.status == "failed" {
+            // Sync failed
+            Text(progress.error ?? "Sync failed")
+                .font(.caption)
+                .foregroundColor(.red)
+
+            Button {
+                serverManager.startSync()
+            } label: {
+                HStack {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                    Text("Retry Sync")
+                }
+            }
+            .disabled(serverManager.status != .running)
+        } else {
+            // Idle or completed - show Sync Now with status dot
+            if let errorMessage = serverManager.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+
+            Button {
+                serverManager.startSync()
+            } label: {
+                HStack {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                    Text("Sync Now")
+                }
+            }
+            .disabled(serverManager.status != .running)
+        }
+    }
+
+    private func phaseDescription(_ phase: String) -> String {
+        switch phase {
+        case "activities":
+            return "Syncing activities..."
+        case "gear":
+            return "Syncing gear..."
+        case "streams":
+            return "Fetching GPS/HR data..."
+        case "activity_details":
+            return "Fetching activity details..."
+        case "segment_details":
+            return "Fetching segments..."
+        case "photos":
+            return "Fetching photos..."
+        case "completed":
+            return "Completed"
+        default:
+            return "Syncing..."
+        }
+    }
+
+    private func currentProgress(_ progress: ImportProgress) -> (current: Int, total: Int) {
+        switch progress.phase {
+        case "activities":
+            return (progress.activitiesDone, progress.activitiesTotal)
+        case "streams":
+            return (progress.streamsDone, progress.streamsTotal)
+        case "activity_details":
+            return (progress.detailsDone, progress.detailsTotal)
+        case "segment_details":
+            return (progress.segmentsDone, progress.segmentsTotal)
+        case "photos":
+            return (progress.photosDone, progress.photosTotal)
+        default:
+            return (0, 0)
         }
     }
 
@@ -80,23 +187,36 @@ struct QuantleteApp: App {
     }
 
     @ViewBuilder
-    private var serverControlSection: some View {
-        switch serverManager.status {
-        case .stopped, .error:
-            Button("Start Server") {
-                serverManager.start()
+    private var advancedSection: some View {
+        Menu("Advanced") {
+            Button("Open in Browser") {
+                openInBrowser()
             }
-        case .running:
-            Button("Stop Server") {
-                serverManager.stop()
+
+            Divider()
+
+            switch serverManager.status {
+            case .stopped, .error:
+                Button("Start Server") {
+                    serverManager.start()
+                }
+            case .running:
+                Button("Stop Server") {
+                    serverManager.stop()
+                }
+                Button("Restart Server") {
+                    serverManager.restart()
+                }
+            case .starting:
+                Button("Starting...") {}
+                    .disabled(true)
             }
-            Button("Restart Server") {
-                serverManager.restart()
-            }
-        case .starting:
-            Button("Starting...") {}
-                .disabled(true)
         }
+    }
+
+    private func openInBrowser() {
+        let url = URL(string: "http://localhost:\(serverManager.port)")!
+        NSWorkspace.shared.open(url)
     }
 
     @ViewBuilder
@@ -120,8 +240,7 @@ struct QuantleteApp: App {
     }
 
     private func openDashboard() {
-        let url = URL(string: "http://localhost:\(serverManager.port)")!
-        NSWorkspace.shared.open(url)
+        DashboardWindowController.shared.showWindow(port: serverManager.port)
     }
 
     private func setLoginItem(enabled: Bool) {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import os.log
 
@@ -21,12 +22,64 @@ enum ServerStatus: Equatable {
     }
 }
 
+/// Import progress from the server API
+struct ImportProgress: Codable {
+    let status: String
+    let phase: String
+    let activitiesTotal: Int
+    let activitiesDone: Int
+    let gearTotal: Int
+    let gearDone: Int
+    let streamsTotal: Int
+    let streamsDone: Int
+    let detailsTotal: Int
+    let detailsDone: Int
+    let segmentsTotal: Int
+    let segmentsDone: Int
+    let photosTotal: Int
+    let photosDone: Int
+    let rateLimitUsed15Min: Int
+    let rateLimitLimit15Min: Int
+    let rateLimitUsedDaily: Int
+    let rateLimitLimitDaily: Int
+    let waitingForRateLimit: Bool
+    let estimatedETA: String?
+    let error: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case phase
+        case activitiesTotal = "activities_total"
+        case activitiesDone = "activities_done"
+        case gearTotal = "gear_total"
+        case gearDone = "gear_done"
+        case streamsTotal = "streams_total"
+        case streamsDone = "streams_done"
+        case detailsTotal = "details_total"
+        case detailsDone = "details_done"
+        case segmentsTotal = "segments_total"
+        case segmentsDone = "segments_done"
+        case photosTotal = "photos_total"
+        case photosDone = "photos_done"
+        case rateLimitUsed15Min = "rate_limit_used_15min"
+        case rateLimitLimit15Min = "rate_limit_limit_15min"
+        case rateLimitUsedDaily = "rate_limit_used_daily"
+        case rateLimitLimitDaily = "rate_limit_limit_daily"
+        case waitingForRateLimit = "waiting_for_rate_limit"
+        case estimatedETA = "estimated_eta"
+        case error
+    }
+}
+
 @MainActor
 class ServerManager: ObservableObject {
     @Published private(set) var status: ServerStatus = .stopped
     @Published private(set) var errorMessage: String?
+    @Published private(set) var importProgress: ImportProgress?
+    @Published private(set) var port: Int = 8081
 
-    let port: Int = 8081
+    private let preferredPort: Int = 8081
+    private let portRange: ClosedRange<Int> = 8081...8099
 
     private var process: Process?
     private var healthCheckTimer: Timer?
@@ -51,7 +104,9 @@ class ServerManager: ObservableObject {
     }
 
     deinit {
-        stop()
+        // Cleanup is handled by the willTerminateNotification observer
+        // We can't call @MainActor stop() from nonisolated deinit
+        process?.terminate()
     }
 
     func start() {
@@ -63,12 +118,15 @@ class ServerManager: ObservableObject {
         status = .starting
         errorMessage = nil
 
-        if isPortInUse(port: port) {
+        // Find an available port
+        guard let availablePort = findAvailablePort() else {
             status = .error
-            errorMessage = "Port \(port) is already in use"
-            logger.error("Port \(self.port) is already in use")
+            errorMessage = "No available ports in range \(portRange.lowerBound)-\(portRange.upperBound)"
+            logger.error("No available ports found")
             return
         }
+        port = availablePort
+        logger.info("Using port \(self.port)")
 
         guard let binaryPath = locateBinary() else {
             status = .error
@@ -264,6 +322,9 @@ class ServerManager: ObservableObject {
                         openDashboard()
                     }
                 }
+
+                // Fetch import progress when server is running
+                await fetchImportProgress()
             }
         } catch {
             if self.status == .running {
@@ -272,10 +333,91 @@ class ServerManager: ObservableObject {
         }
     }
 
+    private func fetchImportProgress() async {
+        let url = URL(string: "http://localhost:\(port)/api/v1/import/progress")!
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2.0
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return
+            }
+
+            let decoder = JSONDecoder()
+            let progress = try decoder.decode(ImportProgress.self, from: data)
+            self.importProgress = progress
+        } catch {
+            // Don't log errors for import progress - it's optional
+        }
+    }
+
+    /// Start a sync operation
+    func startSync() {
+        Task {
+            let url = URL(string: "http://localhost:\(port)/api/v1/import/start")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 5.0
+
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse,
+                   httpResponse.statusCode == 200 || httpResponse.statusCode == 202 {
+                    logger.info("Sync started")
+                    // Immediately fetch progress
+                    await fetchImportProgress()
+                } else {
+                    logger.warning("Failed to start sync")
+                }
+            } catch {
+                logger.error("Failed to start sync: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Cancel an ongoing sync operation
+    func cancelSync() {
+        Task {
+            let url = URL(string: "http://localhost:\(port)/api/v1/import/cancel")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 5.0
+
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse,
+                   httpResponse.statusCode == 200 {
+                    logger.info("Sync cancelled")
+                    // Immediately fetch progress to update UI
+                    await fetchImportProgress()
+                }
+            } catch {
+                logger.error("Failed to cancel sync: \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func openDashboard() {
-        let url = URL(string: "http://localhost:\(port)")!
-        NSWorkspace.shared.open(url)
-        logger.info("Opened dashboard in browser")
+        DashboardWindowController.shared.showWindow(port: port)
+        logger.info("Opened dashboard window on port \(self.port)")
+    }
+
+    private func findAvailablePort() -> Int? {
+        // Try preferred port first, then scan the range
+        if !isPortInUse(port: preferredPort) {
+            return preferredPort
+        }
+        logger.info("Preferred port \(self.preferredPort) is in use, searching for available port")
+
+        for port in portRange where port != preferredPort {
+            if !isPortInUse(port: port) {
+                return port
+            }
+        }
+        return nil
     }
 
     private func isPortInUse(port: Int) -> Bool {
