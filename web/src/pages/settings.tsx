@@ -22,6 +22,7 @@ import {
 } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ImportStatus } from '@/components/sync/import-status'
 import { SyncHistoryModal } from '@/components/sync/sync-history-modal'
@@ -206,25 +207,24 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* DATA SYNC SECTION - Server mode only, disabled in demo mode */}
-        {isServerMode() && (
-          <section>
-            <SectionHeader icon={RefreshCw} title="Data Sync" />
-            <div className="space-y-4">
-              {/* Demo mode notice */}
-              {isDemoMode && (
-                <Card className="border-dashed opacity-75">
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground">
-                      Data sync is disabled in demo mode. Demo data is pre-generated and cannot be modified.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+        {/* DATA SYNC SECTION - disabled in demo mode */}
+        <section>
+          <SectionHeader icon={RefreshCw} title="Data Sync" />
+          <div className="space-y-4">
+            {/* Demo mode notice */}
+            {isDemoMode && (
+              <Card className="border-dashed opacity-75">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Data sync is disabled in demo mode. Demo data is pre-generated and cannot be modified.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Data Import */}
-              {!isDemoMode && (
-              <Card>
+            {/* Data Import */}
+            {!isDemoMode && (
+            <Card>
                 <CardHeader>
                   <CardTitle>Import</CardTitle>
                   <CardDescription>
@@ -260,9 +260,9 @@ export function SettingsPage() {
                       </div>
 
                       <div className="rounded-md border border-border bg-muted/30">
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 p-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        <Button
+                          variant="ghost"
+                          className="flex w-full items-center justify-start gap-2 p-3 text-sm text-muted-foreground hover:text-foreground"
                           onClick={() => setShowAdvanced(!showAdvanced)}
                           disabled={isImporting}
                           aria-expanded={showAdvanced}
@@ -274,51 +274,47 @@ export function SettingsPage() {
                             <ChevronRight className="h-4 w-4" />
                           )}
                           Advanced options
-                        </button>
+                        </Button>
                         {showAdvanced && (
                           <div id="import-advanced-options" className="space-y-2 px-3 pb-3 border-t border-border pt-3">
                             <p className="text-xs text-muted-foreground mb-2">
                               All data is imported by default. Uncheck to skip specific data types.
                             </p>
                             <label htmlFor="include-streams" className="flex items-center gap-2 text-sm">
-                              <input
+                              <Checkbox
                                 id="include-streams"
-                                type="checkbox"
                                 checked={includeStreams}
-                                onChange={(e) => setIncludeStreams(e.target.checked)}
+                                onCheckedChange={(checked) => setIncludeStreams(!!checked)}
                                 disabled={isImporting}
                                 aria-describedby="include-streams-desc"
                               />
                               <span id="include-streams-desc">Streams (GPS, heartrate, power - for maps & charts)</span>
                             </label>
                             <label htmlFor="include-segments" className="flex items-center gap-2 text-sm">
-                              <input
+                              <Checkbox
                                 id="include-segments"
-                                type="checkbox"
                                 checked={includeSegments}
-                                onChange={(e) => setIncludeSegments(e.target.checked)}
+                                onCheckedChange={(checked) => setIncludeSegments(!!checked)}
                                 disabled={isImporting}
                                 aria-describedby="include-segments-desc"
                               />
                               <span id="include-segments-desc">Segments (segment efforts & leaderboards)</span>
                             </label>
                             <label htmlFor="include-best-efforts" className="flex items-center gap-2 text-sm">
-                              <input
+                              <Checkbox
                                 id="include-best-efforts"
-                                type="checkbox"
                                 checked={includeBestEfforts}
-                                onChange={(e) => setIncludeBestEfforts(e.target.checked)}
+                                onCheckedChange={(checked) => setIncludeBestEfforts(!!checked)}
                                 disabled={isImporting}
                                 aria-describedby="include-best-efforts-desc"
                               />
                               <span id="include-best-efforts-desc">Best efforts (PRs for standard distances)</span>
                             </label>
                             <label htmlFor="include-photos" className="flex items-center gap-2 text-sm">
-                              <input
+                              <Checkbox
                                 id="include-photos"
-                                type="checkbox"
                                 checked={includePhotos}
-                                onChange={(e) => setIncludePhotos(e.target.checked)}
+                                onCheckedChange={(checked) => setIncludePhotos(!!checked)}
                                 disabled={isImporting}
                                 aria-describedby="include-photos-desc"
                               />
@@ -333,23 +329,23 @@ export function SettingsPage() {
               </Card>
               )}
 
-              {/* Scheduler */}
-              {!isDemoMode && isAuthenticated && appSettings && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Schedule</CardTitle>
-                    <CardDescription>Automate pull and/or push updates</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <SchedulerEditor
-                      key={`${appSettings.scheduler.pull.enabled}-${appSettings.scheduler.pull.schedule}-${appSettings.scheduler.push.enabled}`}
-                      settings={appSettings}
-                      onSave={(s) => updateAppSettings.mutate(s)}
-                      saving={updateAppSettings.isPending}
-                    />
-                  </CardContent>
-                </Card>
-              )}
+            {/* Scheduler - Server mode only */}
+            {isServerMode() && !isDemoMode && isAuthenticated && appSettings && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Schedule</CardTitle>
+                  <CardDescription>Automate pull and/or push updates</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SchedulerEditor
+                    key={`${appSettings.scheduler.pull.enabled}-${appSettings.scheduler.pull.schedule}-${appSettings.scheduler.push.enabled}`}
+                    settings={appSettings}
+                    onSave={(s) => updateAppSettings.mutate(s)}
+                    saving={updateAppSettings.isPending}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
               {/* Last Sync Status */}
               {!isDemoMode && isAuthenticated && latestSync && (
@@ -432,7 +428,6 @@ export function SettingsPage() {
               )}
             </div>
           </section>
-        )}
 
         <SyncHistoryModal open={showHistoryModal} onOpenChange={setShowHistoryModal} />
 

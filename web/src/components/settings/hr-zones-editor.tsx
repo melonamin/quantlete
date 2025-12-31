@@ -1,5 +1,13 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface HrZoneDefinition {
   sport_type: string
@@ -38,42 +46,42 @@ export function HrZonesEditor({ defs, onSave, onDelete, saving }: HrZonesEditorP
       <div className="grid gap-2 md:grid-cols-3">
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">Sport group</label>
-          <select
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-            value={sportType}
-            onChange={(e) => setSportType(e.target.value)}
-          >
-            <option value="All">All</option>
-            <option value="Ride">Ride</option>
-            <option value="Run">Run</option>
-          </select>
+          <Select value={sportType} onValueChange={setSportType}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="Ride">Ride</SelectItem>
+              <SelectItem value="Run">Run</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">Effective from</label>
-          <input
+          <Input
             type="date"
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
             value={effectiveFrom}
             onChange={(e) => setEffectiveFrom(e.target.value)}
           />
         </div>
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">Method</label>
-          <select
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-          >
-            <option value="percent_hrmax">% of HR max</option>
-            <option value="absolute_bpm">Absolute BPM</option>
-          </select>
+          <Select value={method} onValueChange={setMethod}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="percent_hrmax">% of HR max</SelectItem>
+              <SelectItem value="absolute_bpm">Absolute BPM</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {method === 'percent_hrmax' && (
           <div className="space-y-1">
             <label className="text-sm text-muted-foreground">HR max (bpm)</label>
-            <input
+            <Input
               inputMode="numeric"
-              className="h-9 w-full rounded-md border border-border bg-background px-2"
               value={hrMax}
               onChange={(e) => setHrMax(e.target.value)}
             />
@@ -84,9 +92,8 @@ export function HrZonesEditor({ defs, onSave, onDelete, saving }: HrZonesEditorP
         {bounds.slice(0, 5).map((v, idx) => (
           <div key={idx} className="space-y-1">
             <label className="text-sm text-muted-foreground">Z{idx + 1} max</label>
-            <input
+            <Input
               inputMode="decimal"
-              className="h-9 w-full rounded-md border border-border bg-background px-2"
               value={v}
               onChange={(e) => {
                 const next = bounds.slice()

@@ -2,6 +2,14 @@ import { useMemo, useState } from 'react'
 import { useTrainingGoals, useUpdateTrainingGoals, type GoalPeriod } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { formatDistance, formatDuration } from '@/lib/format'
 
 const PERIODS: { key: GoalPeriod; label: string }[] = [
@@ -54,17 +62,18 @@ export function TrainingGoals() {
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-              value={activeSport.name}
-              onChange={(e) => setSportName(e.target.value)}
-            >
-              {sports.map((s) => (
-                <option key={s.name} value={s.name}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <Select value={activeSport.name} onValueChange={(value) => setSportName(value)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sports.map((s) => (
+                  <SelectItem key={s.name} value={s.name}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex flex-wrap gap-1">
               {PERIODS.map((p) => (
                 <Button
@@ -213,8 +222,7 @@ function EditGoalsDialog({
         </div>
         <div className="space-y-3">
           <Field label="Distance (km)">
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2"
+            <Input
               inputMode="decimal"
               value={distanceKm}
               onChange={(e) => setDistanceKm(e.target.value)}
@@ -222,8 +230,7 @@ function EditGoalsDialog({
             />
           </Field>
           <Field label="Elevation (m)">
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2"
+            <Input
               inputMode="numeric"
               value={elevationM}
               onChange={(e) => setElevationM(e.target.value)}
@@ -231,8 +238,7 @@ function EditGoalsDialog({
             />
           </Field>
           <Field label="Moving time (hours)">
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2"
+            <Input
               inputMode="decimal"
               value={timeH}
               onChange={(e) => setTimeH(e.target.value)}

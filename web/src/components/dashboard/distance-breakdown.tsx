@@ -4,6 +4,7 @@ import { WidgetWrapper } from './widget-wrapper'
 import { BarChart } from '@/components/charts'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface DistanceZone {
   label: string
@@ -95,30 +96,28 @@ export function DistanceBreakdown() {
           <BarChart data={chartData} height="100%" showValues />
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2 text-left font-medium">Distance</th>
-                <th className="py-2 text-right font-medium">Count</th>
-                <th className="py-2 text-right font-medium">Total</th>
-                <th className="py-2 text-right font-medium">Time</th>
-                <th className="py-2 text-right font-medium">Elev</th>
-              </tr>
-            </thead>
-            <tbody>
-              {zones.map((zone) => (
-                <tr key={zone.label} className="border-b border-border/50 last:border-0">
-                  <td className="py-1.5 font-medium">{zone.label}</td>
-                  <td className="py-1.5 text-right">{zone.count}</td>
-                  <td className="py-1.5 text-right">{formatDistance(zone.totalDistance)}</td>
-                  <td className="py-1.5 text-right">{formatDuration(zone.totalTime)}</td>
-                  <td className="py-1.5 text-right">{zone.totalElevation.toLocaleString()}m</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Distance</TableHead>
+              <TableHead className="text-right">Count</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Time</TableHead>
+              <TableHead className="text-right">Elev</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {zones.map((zone) => (
+              <TableRow key={zone.label}>
+                <TableCell className="font-medium">{zone.label}</TableCell>
+                <TableCell className="text-right">{zone.count}</TableCell>
+                <TableCell className="text-right">{formatDistance(zone.totalDistance)}</TableCell>
+                <TableCell className="text-right">{formatDuration(zone.totalTime)}</TableCell>
+                <TableCell className="text-right">{zone.totalElevation.toLocaleString()}m</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </WidgetWrapper>
   )

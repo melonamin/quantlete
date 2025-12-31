@@ -20,6 +20,16 @@ import {
 import { formatDistance } from '@/lib/format'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { DonutChart, LineChart, StackedBarChart } from '@/components/charts'
@@ -434,18 +444,18 @@ function CustomGearModal({
             </div>
           )}
           <div>
-            <div className="mb-1 text-sm text-muted-foreground">Name</div>
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+            <Label className="text-sm text-muted-foreground mb-1">Name</Label>
+            <Input
+              className="h-9"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={isPending}
             />
           </div>
           <div>
-            <div className="mb-1 text-sm text-muted-foreground">Hashtag</div>
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+            <Label className="text-sm text-muted-foreground mb-1">Hashtag</Label>
+            <Input
+              className="h-9"
               value={hashtag}
               onChange={(e) => setHashtag(e.target.value)}
               placeholder="#skateboard"
@@ -458,9 +468,9 @@ function CustomGearModal({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="mb-1 text-sm text-muted-foreground">Purchase price</div>
-              <input
-                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+              <Label className="text-sm text-muted-foreground mb-1">Purchase price</Label>
+              <Input
+                className="h-9"
                 value={purchasePrice}
                 onChange={(e) => setPurchasePrice(e.target.value)}
                 placeholder="e.g. 499.99"
@@ -468,9 +478,9 @@ function CustomGearModal({
               />
             </div>
             <div>
-              <div className="mb-1 text-sm text-muted-foreground">Currency</div>
-              <input
-                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+              <Label className="text-sm text-muted-foreground mb-1">Currency</Label>
+              <Input
+                className="h-9"
                 value={purchaseCurrency}
                 onChange={(e) => setPurchaseCurrency(e.target.value)}
                 placeholder="USD"
@@ -479,15 +489,14 @@ function CustomGearModal({
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <Label className="flex items-center gap-2 text-sm">
+            <Checkbox
               checked={retired}
-              onChange={(e) => setRetired(e.target.checked)}
+              onCheckedChange={(checked) => setRetired(!!checked)}
               disabled={isPending}
             />
             Retired
-          </label>
+          </Label>
 
           <div className="flex items-center justify-between gap-2 pt-2">
             {editing ? (
@@ -516,14 +525,13 @@ function CustomGearModal({
                     Delete
                   </Button>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
+                <Label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Checkbox
                     checked={forceDelete}
-                    onChange={(e) => setForceDelete(e.target.checked)}
+                    onCheckedChange={(checked) => setForceDelete(!!checked)}
                   />
                   Force delete (unlink activities)
-                </label>
+                </Label>
               </>
             ) : (
               <Button
@@ -643,19 +651,19 @@ function MaintenancePanel({ gear }: { gear: Gear[] }) {
         <CardContent className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <div className="text-sm text-muted-foreground">Gear</div>
-              <select
-                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-                value={selectedGearId}
-                onChange={(e) => setSelectedGearId(e.target.value)}
-              >
-                <option value="">Select gear</option>
-                {gear.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
+              <Label className="text-sm text-muted-foreground">Gear</Label>
+              <Select value={selectedGearId} onValueChange={setSelectedGearId}>
+                <SelectTrigger size="sm" className="w-48">
+                  <SelectValue placeholder="Select gear" />
+                </SelectTrigger>
+                <SelectContent>
+                  {gear.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button
               size="sm"
@@ -794,17 +802,17 @@ function ComponentModal({
         <div className="space-y-3 p-4">
           <div className="text-xs text-muted-foreground">Gear: {gearId}</div>
           <div>
-            <div className="mb-1 text-sm text-muted-foreground">Name</div>
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+            <Label className="text-sm text-muted-foreground mb-1">Name</Label>
+            <Input
+              className="h-9"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div>
-            <div className="mb-1 text-sm text-muted-foreground">Maintenance hashtag</div>
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+            <Label className="text-sm text-muted-foreground mb-1">Maintenance hashtag</Label>
+            <Input
+              className="h-9"
               value={maintenanceHashtag}
               onChange={(e) => setMaintenanceHashtag(e.target.value)}
               placeholder="#chain"
@@ -824,20 +832,24 @@ function ComponentModal({
               <div className="space-y-2">
                 {rules.map((r, idx) => (
                   <div key={idx} className="grid grid-cols-3 gap-2 items-center">
-                    <select
-                      className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                    <Select
                       value={r.type}
-                      onChange={(e) => {
-                        const v = e.target.value as 'distance_m' | 'time_s' | 'days'
-                        setRules((prev) => prev.map((x, i) => (i === idx ? { ...x, type: v } : x)))
+                      onValueChange={(v) => {
+                        const value = v as 'distance_m' | 'time_s' | 'days'
+                        setRules((prev) => prev.map((x, i) => (i === idx ? { ...x, type: value } : x)))
                       }}
                     >
-                      <option value="distance_m">distance_m</option>
-                      <option value="time_s">time_s</option>
-                      <option value="days">days</option>
-                    </select>
-                    <input
-                      className="col-span-2 h-9 rounded-md border border-border bg-background px-2 text-sm"
+                      <SelectTrigger size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="distance_m">distance_m</SelectItem>
+                        <SelectItem value="time_s">time_s</SelectItem>
+                        <SelectItem value="days">days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      className="col-span-2 h-9"
                       value={r.threshold_value}
                       onChange={(e) =>
                         setRules((prev) =>

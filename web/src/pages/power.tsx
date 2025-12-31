@@ -4,6 +4,13 @@ import { usePowerStats, usePowerStatsFiltered, usePowerZones } from '@/lib/api'
 import { BarChart, LineChart, PowerZonesChart } from '@/components/charts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 function formatDurationLabel(seconds: number) {
   if (seconds < 60) return `${seconds}s`
@@ -72,17 +79,21 @@ export function PowerPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Progression</CardTitle>
-            <select
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-              value={selectedDuration}
-              onChange={(e) => setSelectedDuration(Number(e.target.value))}
+            <Select
+              value={String(selectedDuration)}
+              onValueChange={(value) => setSelectedDuration(Number(value))}
             >
-              {(data?.durations_s ?? []).map((d) => (
-                <option key={d} value={d}>
-                  {formatDurationLabel(d)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(data?.durations_s ?? []).map((d) => (
+                  <SelectItem key={d} value={String(d)}>
+                    {formatDurationLabel(d)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <LineChart

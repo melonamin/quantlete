@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import type { AppSettings } from '@/lib/api/settings'
 
 const DEFAULT_EDDINGTON_DEFS = [
@@ -119,39 +122,41 @@ export function EddingtonDefinitionsEditor({
 
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1">
-          <label className="text-sm text-muted-foreground">Name</label>
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-2"
+          <Label className="text-sm text-muted-foreground">Name</Label>
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Commutes"
           />
         </div>
         <div className="space-y-1">
-          <label className="text-sm text-muted-foreground">Sport types (optional)</label>
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-2"
+          <Label className="text-sm text-muted-foreground">Sport types (optional)</Label>
+          <Input
             value={sportTypes}
             onChange={(e) => setSportTypes(e.target.value)}
             placeholder="Ride,VirtualRide"
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+        <div className="flex items-center gap-2 pt-2">
+          <Checkbox
+            id="new-show-in-nav"
             checked={showInNav}
-            onChange={(e) => setShowInNav(e.target.checked)}
+            onCheckedChange={(c) => setShowInNav(c === true)}
           />
-          Show in navigation
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+          <Label htmlFor="new-show-in-nav" className="text-sm font-normal">
+            Show in navigation
+          </Label>
+        </div>
+        <div className="flex items-center gap-2 pt-2">
+          <Checkbox
+            id="new-show-in-widget"
             checked={showInWidget}
-            onChange={(e) => setShowInWidget(e.target.checked)}
+            onCheckedChange={(c) => setShowInWidget(c === true)}
           />
-          Show in dashboard widget
-        </label>
+          <Label htmlFor="new-show-in-widget" className="text-sm font-normal">
+            Show in dashboard widget
+          </Label>
+        </div>
       </div>
 
       <div className="flex justify-end">
@@ -201,17 +206,15 @@ export function EddingtonDefinitionsEditor({
 
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="text-sm text-muted-foreground">Rename</label>
-                  <input
-                    className="h-9 w-full rounded-md border border-border bg-background px-2"
+                  <Label className="text-sm text-muted-foreground">Rename</Label>
+                  <Input
                     value={d.name}
                     onChange={(e) => update(d.id, { name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm text-muted-foreground">Sport types</label>
-                  <input
-                    className="h-9 w-full rounded-md border border-border bg-background px-2"
+                  <Label className="text-sm text-muted-foreground">Sport types</Label>
+                  <Input
                     value={(d.sport_types ?? []).join(',')}
                     onChange={(e) => {
                       const v = e.target.value

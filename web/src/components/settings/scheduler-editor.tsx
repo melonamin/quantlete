@@ -1,5 +1,14 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import type { AppSettings } from '@/lib/api/settings'
 
 interface SchedulerEditorProps {
@@ -35,15 +44,14 @@ export function SchedulerEditor({ settings, onSave, saving }: SchedulerEditorPro
               Run an automatic incremental sync on a schedule
             </p>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <Label className="flex items-center gap-2 text-sm">
+            <Checkbox
               checked={pullEnabled}
-              onChange={(e) => setPullEnabled(e.target.checked)}
+              onCheckedChange={(checked) => setPullEnabled(!!checked)}
               disabled={saving}
             />
             Enabled
-          </label>
+          </Label>
         </div>
 
         <div className="flex items-center justify-between gap-4">
@@ -51,18 +59,22 @@ export function SchedulerEditor({ settings, onSave, saving }: SchedulerEditorPro
             <p className="text-sm font-medium">Interval</p>
             <p className="text-xs text-muted-foreground">Uses the server's local time</p>
           </div>
-          <select
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+          <Select
             value={pullSchedule}
-            onChange={(e) => setPullSchedule(e.target.value as typeof pullSchedule)}
+            onValueChange={(value) => setPullSchedule(value as typeof pullSchedule)}
             disabled={saving || !pullEnabled}
           >
-            {scheduleOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {scheduleOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -75,15 +87,14 @@ export function SchedulerEditor({ settings, onSave, saving }: SchedulerEditorPro
             </p>
             <p className="text-xs text-muted-foreground">Endpoint: /api/v1/webhooks/strava</p>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <Label className="flex items-center gap-2 text-sm">
+            <Checkbox
               checked={pushEnabled}
-              onChange={(e) => setPushEnabled(e.target.checked)}
+              onCheckedChange={(checked) => setPushEnabled(!!checked)}
               disabled={saving}
             />
             Enabled
-          </label>
+          </Label>
         </div>
       </div>
 

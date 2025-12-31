@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useExportStats, getExportCSVUrl, getExportJSONUrl } from '@/lib/api/export'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Download, FileJson, FileSpreadsheet, Calendar, Activity } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 
@@ -125,18 +126,16 @@ export function ExportPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">From</label>
-                  <input
+                  <Input
                     type="date"
-                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
                     value={after}
                     onChange={(e) => setAfter(e.target.value)}
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">To</label>
-                  <input
+                  <Input
                     type="date"
-                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
                     value={before}
                     onChange={(e) => setBefore(e.target.value)}
                   />
@@ -147,10 +146,9 @@ export function ExportPage() {
             {/* Sport Type */}
             <div>
               <label className="mb-2 block text-sm font-medium">Sport Type (Optional)</label>
-              <input
+              <Input
                 type="text"
                 placeholder="e.g., Ride, Run, Swim"
-                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
                 value={sportType}
                 onChange={(e) => setSportType(e.target.value)}
               />

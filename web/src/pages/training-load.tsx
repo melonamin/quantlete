@@ -4,6 +4,7 @@ import { useTrainingLoad } from '@/lib/api'
 import { TrainingLoadChart } from '@/components/charts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 export function TrainingLoadPage() {
   const [after, setAfter] = useState('')
@@ -39,16 +40,16 @@ export function TrainingLoadPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Range</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <input
+            <Input
               type="date"
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              className="w-auto"
               value={after}
               onChange={(e) => setAfter(e.target.value)}
             />
             <span className="text-sm text-muted-foreground">to</span>
-            <input
+            <Input
               type="date"
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              className="w-auto"
               value={before}
               onChange={(e) => setBefore(e.target.value)}
             />

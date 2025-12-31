@@ -11,6 +11,8 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Check, ExternalLink, Eye, EyeOff, Loader2, Settings } from 'lucide-react'
 import { useCredentialsStatus, useUpdateCredentials } from '@/lib/data/hooks'
 
@@ -200,39 +202,40 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
 
         <div className="space-y-3">
           <div>
-            <label htmlFor="client-id" className="block text-sm font-medium mb-1">
+            <Label htmlFor="client-id" className="mb-1">
               Client ID
-            </label>
-            <input
+            </Label>
+            <Input
               id="client-id"
               type="text"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
               placeholder="e.g., 123456"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
 
           <div>
-            <label htmlFor="client-secret" className="block text-sm font-medium mb-1">
+            <Label htmlFor="client-secret" className="mb-1">
               Client Secret
-            </label>
+            </Label>
             <div className="relative">
-              <input
+              <Input
                 id="client-secret"
                 type={showSecret ? 'text' : 'password'}
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}
                 placeholder="e.g., abc123..."
-                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="pr-10"
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => setShowSecret(!showSecret)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
               >
                 {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

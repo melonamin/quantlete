@@ -666,7 +666,8 @@ SELECT
     DATE(start_date) AS date,
     COUNT(*) AS activity_count,
     COALESCE(SUM(distance), 0) AS total_distance,
-    COALESCE(SUM(moving_time), 0) AS total_time
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(calories), 0) AS total_calories
 FROM activities
 GROUP BY athlete_id, DATE(start_date);
 

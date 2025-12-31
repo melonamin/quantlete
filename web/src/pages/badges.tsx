@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   BadgePreview,
@@ -88,13 +90,11 @@ export function BadgesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
+            <Label className="flex items-center gap-3 cursor-pointer">
+              <Checkbox
                 checked={publicBadgesEnabled}
-                onChange={handleTogglePublicBadges}
+                onCheckedChange={handleTogglePublicBadges}
                 disabled={!settings || updateSettings.isPending}
-                className="h-4 w-4 rounded border-border"
               />
               <div>
                 <p className="font-medium">Enable public badge URLs</p>
@@ -102,7 +102,7 @@ export function BadgesPage() {
                   When enabled, badge images can be embedded in external sites like GitHub READMEs
                 </p>
               </div>
-            </label>
+            </Label>
           </CardContent>
         </Card>
       )}

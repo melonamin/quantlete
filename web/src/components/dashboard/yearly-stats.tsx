@@ -1,5 +1,13 @@
 import { useYearlyStats } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -84,48 +92,48 @@ export function YearlyStats() {
         <div className="text-sm text-muted-foreground">No yearly data available.</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2 text-left font-medium">Year</th>
-                <th className="py-2 text-right font-medium">Activities</th>
-                <th className="py-2 text-right font-medium">Distance</th>
-                <th className="py-2 text-right font-medium">Time</th>
-                <th className="py-2 text-right font-medium">Elevation</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="text-sm">
+            <TableHeader>
+              <TableRow className="border-b">
+                <TableHead className="py-2 text-left font-medium">Year</TableHead>
+                <TableHead className="py-2 text-right font-medium">Activities</TableHead>
+                <TableHead className="py-2 text-right font-medium">Distance</TableHead>
+                <TableHead className="py-2 text-right font-medium">Time</TableHead>
+                <TableHead className="py-2 text-right font-medium">Elevation</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {displayStats.map((stat) => (
-                <tr key={stat.year} className="border-b border-border/50 last:border-0">
-                  <td className="py-2 font-medium">{stat.year}</td>
-                  <td className="py-2 text-right">
+                <TableRow key={stat.year} className="border-b border-border/50 last:border-0">
+                  <TableCell className="py-2 font-medium">{stat.year}</TableCell>
+                  <TableCell className="py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <span>{stat.activity_count}</span>
                       <DeltaIndicator value={stat.deltas.activity_count} />
                     </div>
-                  </td>
-                  <td className="py-2 text-right">
+                  </TableCell>
+                  <TableCell className="py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <span>{formatDistance(stat.total_distance)}</span>
                       <DeltaIndicator value={stat.deltas.distance} />
                     </div>
-                  </td>
-                  <td className="py-2 text-right">
+                  </TableCell>
+                  <TableCell className="py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <span>{formatDuration(stat.total_time)}</span>
                       <DeltaIndicator value={stat.deltas.time} />
                     </div>
-                  </td>
-                  <td className="py-2 text-right">
+                  </TableCell>
+                  <TableCell className="py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <span>{stat.total_elevation.toLocaleString()}m</span>
                       <DeltaIndicator value={stat.deltas.elevation} />
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </WidgetWrapper>

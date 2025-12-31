@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { AppSettings } from '@/lib/api/settings'
 
 const VIRTUAL_WORLDS = [
@@ -115,30 +123,29 @@ export function VirtualWorldTilesEditor({
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">World</label>
-          <select
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-            value={world}
-            onChange={(e) => setWorld(e.target.value)}
-          >
-            {VIRTUAL_WORLDS.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
+          <Select value={world} onValueChange={setWorld}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VIRTUAL_WORLDS.map((w) => (
+                <SelectItem key={w} value={w}>
+                  {w}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">Max zoom</label>
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-2"
+          <Input
             value={maxZoom}
             onChange={(e) => setMaxZoom(e.target.value)}
           />
         </div>
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm text-muted-foreground">Tile URL template</label>
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-2"
+          <Input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/tiles/{z}/{x}/{y}.png"
@@ -146,8 +153,7 @@ export function VirtualWorldTilesEditor({
         </div>
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm text-muted-foreground">Attribution (optional)</label>
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-2"
+          <Input
             value={attribution}
             onChange={(e) => setAttribution(e.target.value)}
           />

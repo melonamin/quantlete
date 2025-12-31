@@ -36,10 +36,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getAuthUrl as getStravaOAuthUrl } from '@/lib/wasm/strava/client'
 
-function getStravaAuthUrl(): string {
+function getStravaAuthUrl(): string | null {
   if (isWasmMode()) {
-    const redirectUri = `${window.location.origin}/oauth/callback`
-    return getStravaOAuthUrl(redirectUri)
+    try {
+      const redirectUri = `${window.location.origin}/oauth/callback`
+      return getStravaOAuthUrl(redirectUri)
+    } catch {
+      // Credentials not configured yet
+      return null
+    }
   }
   // Server mode - use server-side OAuth
   return '/api/v1/auth/strava'
@@ -91,6 +96,36 @@ export function DashboardPage() {
   if (!authLoading && !isAuthenticated && !onboardingShowing && !syncInProgress) {
     const stravaAuthUrl = getStravaAuthUrl()
 
+    // In WASM mode, if credentials aren't configured, show setup message
+    if (isWasmMode() && !stravaAuthUrl) {
+      return (
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Your activity statistics at a glance</p>
+          </div>
+
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle>Setup Required</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                To get started, you need to configure your Strava API credentials. Go to Settings
+                to enter your Client ID and Client Secret from your Strava API Application.
+              </p>
+              <Button asChild>
+                <Link to="/settings">Go to Settings</Link>
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Running in browser-only mode. Your data will be stored locally.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -106,9 +141,11 @@ export function DashboardPage() {
             <p className="text-sm text-muted-foreground">
               Connect your Strava account to import your activities and view your statistics.
             </p>
-            <Button asChild className="bg-strava hover:bg-strava/90">
-              <a href={stravaAuthUrl}>Connect Strava</a>
-            </Button>
+            {stravaAuthUrl && (
+              <Button asChild className="bg-strava hover:bg-strava/90">
+                <a href={stravaAuthUrl}>Connect Strava</a>
+              </Button>
+            )}
             {isWasmMode() && (
               <p className="text-xs text-muted-foreground">
                 Running in browser-only mode. Your data will be stored locally.

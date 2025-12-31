@@ -216,9 +216,31 @@ release-snapshot:
 # Cloudflare Deployment (WASM mode)
 # ============================================================================
 
+# Show deployment checklist
+deploy-checklist:
+    @echo "Cloudflare Deployment Checklist"
+    @echo "================================"
+    @echo ""
+    @echo "Prerequisites:"
+    @echo "  1. Add quantlete.fit zone to Cloudflare"
+    @echo "  2. Set CLOUDFLARE_ACCOUNT_ID in .env"
+    @echo "  3. Login: wrangler login (use correct account)"
+    @echo "  4. Verify: wrangler whoami"
+    @echo ""
+    @echo "Deploy Worker (proxy.quantlete.fit):"
+    @echo "  just deploy-worker"
+    @echo ""
+    @echo "Deploy Pages (app.quantlete.fit):"
+    @echo "  just deploy-wasm"
+    @echo "  Then add custom domain in CF dashboard:"
+    @echo "    Pages > quantlete > Custom domains > Add > app.quantlete.fit"
+    @echo ""
+    @echo "Deploy both:"
+    @echo "  just deploy-cf"
+
 # Deploy WASM mode to Cloudflare Pages
 deploy-wasm: build-web-wasm
-    cd web && npx wrangler pages deploy dist-wasm --project-name=quantlete
+    npx wrangler pages deploy web/dist-wasm --project-name=quantlete --branch=main --commit-dirty=true
 
 # Deploy worker to Cloudflare Workers
 deploy-worker:
@@ -226,6 +248,11 @@ deploy-worker:
 
 # Deploy both worker and pages
 deploy-cf: deploy-worker deploy-wasm
+    @echo ""
+    @echo "Deployed! Next steps:"
+    @echo "  - Worker: Verify proxy.quantlete.fit is working"
+    @echo "  - Pages: Add custom domain app.quantlete.fit in CF dashboard"
+    @echo "    Pages > quantlete > Custom domains > Add domain"
 
 # Preview WASM mode locally
 preview-wasm:

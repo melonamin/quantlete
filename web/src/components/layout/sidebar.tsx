@@ -1,4 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useSidebarStore, useSyncModalStore } from '@/stores'
 import { useAppSettings, useAuthStatus, useImportProgress } from '@/lib/api'
@@ -303,9 +304,10 @@ export function Sidebar() {
           </Link>
 
           {/* Collapse toggle - desktop only */}
-          <button
+          <Button
+            variant="ghost"
             onClick={toggleCollapsed}
-            className="hidden md:flex mt-1 w-full items-center gap-3 rounded-sm px-2 py-2 text-sm text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            className="hidden md:flex mt-1 w-full justify-start items-center gap-3 rounded-sm px-2 py-2 text-sm text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
             title={collapsed ? 'Expand sidebar ([ or ])' : 'Collapse sidebar ([ or ])'}
           >
             {collapsed ? (
@@ -317,18 +319,20 @@ export function Sidebar() {
                 <span className="ml-auto text-[10px]">[ ]</span>
               </>
             )}
-          </button>
+          </Button>
         </div>
       </aside>
 
       {/* Mobile menu button */}
-      <button
+      <Button
+        variant="outline"
+        size="icon"
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed left-3 top-3 z-50 flex h-10 w-10 items-center justify-center rounded-sm border border-border bg-card md:hidden"
+        className="fixed left-3 top-3 z-50 h-10 w-10 rounded-sm md:hidden"
         aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
+      </Button>
     </>
   )
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { LineChart } from '@/components/charts'
 
 interface WeightHistoryPoint {
@@ -56,16 +57,14 @@ export function WeightEditor({ value, onSave, saving }: WeightEditorProps) {
         {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
       </div>
       <div className="grid gap-2 md:grid-cols-3">
-        <input
+        <Input
           type="date"
-          className="h-9 rounded-md border border-border bg-background px-2"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
-        <input
+        <Input
           inputMode="decimal"
           placeholder="Weight (kg)"
-          className="h-9 rounded-md border border-border bg-background px-2"
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
         />

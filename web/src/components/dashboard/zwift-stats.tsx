@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Bike, Route, Clock, Mountain } from 'lucide-react'
 
@@ -130,26 +131,26 @@ export function ZwiftStats() {
 
           {/* World breakdown */}
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="pb-2 font-medium">World</th>
-                  <th className="pb-2 font-medium text-right">Rides</th>
-                  <th className="pb-2 font-medium text-right">Distance</th>
-                  <th className="pb-2 font-medium text-right">Elev</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>World</TableHead>
+                  <TableHead className="text-right">Rides</TableHead>
+                  <TableHead className="text-right">Distance</TableHead>
+                  <TableHead className="text-right">Elev</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {worldStats.map((w) => (
-                  <tr key={w.world} className="border-b border-border/50">
-                    <td className="py-2">{w.world}</td>
-                    <td className="py-2 text-right">{w.count}</td>
-                    <td className="py-2 text-right">{formatDistance(w.distance / 1000)}</td>
-                    <td className="py-2 text-right">{Math.round(w.elevation).toLocaleString()}m</td>
-                  </tr>
+                  <TableRow key={w.world}>
+                    <TableCell>{w.world}</TableCell>
+                    <TableCell className="text-right">{w.count}</TableCell>
+                    <TableCell className="text-right">{formatDistance(w.distance / 1000)}</TableCell>
+                    <TableCell className="text-right">{Math.round(w.elevation).toLocaleString()}m</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}

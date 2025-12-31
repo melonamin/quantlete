@@ -3,6 +3,13 @@ import { Link } from '@tanstack/react-router'
 import { useRewind, useRewindYears } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BarChart, DonutChart, LineChart, WorldLocationsChart } from '@/components/charts'
 import { formatDistance, formatDurationLong, formatElevation } from '@/lib/format'
@@ -94,33 +101,41 @@ export function RewindPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+          <Select
             value={String(year)}
-            onChange={(e) => setYear(Number(e.target.value))}
+            onValueChange={(value) => setYear(Number(value))}
             disabled={yearsLoading}
           >
-            <option value="0">All time</option>
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">All time</SelectItem>
+              {availableYears.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+          <Select
             value={compareYear === null ? '' : String(compareYear)}
-            onChange={(e) => setCompareYear(e.target.value ? Number(e.target.value) : null)}
+            onValueChange={(value) => setCompareYear(value ? Number(value) : null)}
           >
-            <option value="">No comparison</option>
-            <option value="0">Compare to all time</option>
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                Compare to {y}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="No comparison" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No comparison</SelectItem>
+              <SelectItem value="0">Compare to all time</SelectItem>
+              {availableYears.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  Compare to {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

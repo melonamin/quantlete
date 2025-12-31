@@ -557,6 +557,7 @@ export class WasmProvider implements DataProvider {
       activity_count: number
       total_distance: number
       total_time: number
+      total_calories: number
     } & Record<string, unknown>
 
     const rows = queries.getCalendarData<CalendarRow>(db, athleteId, year)
@@ -566,6 +567,7 @@ export class WasmProvider implements DataProvider {
       activity_count: row.activity_count,
       total_distance: row.total_distance,
       total_time: row.total_time,
+      total_calories: row.total_calories,
     }))
   }
 

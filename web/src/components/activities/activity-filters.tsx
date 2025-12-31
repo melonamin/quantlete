@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Search, X, Filter, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { ActivityFilters as Filters } from '@/lib/api'
 
 interface ActivityFiltersProps {
@@ -51,20 +60,22 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
       {/* Search input */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
+        <Input
           type="text"
           placeholder="Search activities by name, description, location, hashtags..."
-          className="h-10 w-full rounded-md border border-border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="pl-10 pr-10"
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
         />
         {localSearch && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setLocalSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-1 top-1/2 -translate-y-1/2"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -75,49 +86,30 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
       </div>
 
       {/* Quick sport filters */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onFiltersChange({ sport_type: undefined, page: 1 })}
-          className={cn(
-            'px-3 py-1.5 rounded-md text-sm transition-colors',
-            !filters.sport_type
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          )}
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          type="single"
+          value={filters.sport_type ?? ''}
+          onValueChange={(value) => onFiltersChange({ sport_type: value || undefined, page: 1 })}
+          variant="outline"
+          size="sm"
         >
-          All
-        </button>
-        {SPORT_TYPES.slice(0, 5).map((type) => (
-          <button
-            key={type}
-            onClick={() =>
-              onFiltersChange({
-                sport_type: filters.sport_type === type ? undefined : type,
-                page: 1,
-              })
-            }
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors',
-              filters.sport_type === type
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
-          >
-            {type}
-          </button>
-        ))}
-        <button
+          <ToggleGroupItem value="">All</ToggleGroupItem>
+          {SPORT_TYPES.slice(0, 5).map((type) => (
+            <ToggleGroupItem key={type} value={type}>
+              {type}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <Button
+          variant={showAdvanced ? 'default' : 'outline'}
+          size="sm"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className={cn(
-            'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
-            showAdvanced
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          )}
+          className="gap-1"
         >
           <Filter className="h-3 w-3" />
           More
-        </button>
+        </Button>
       </div>
 
       {/* Advanced filters */}
@@ -126,28 +118,31 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
           {/* Sport type dropdown */}
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Sport Type</label>
-            <select
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+            <Select
               value={filters.sport_type ?? ''}
-              onChange={(e) =>
-                onFiltersChange({ sport_type: e.target.value || undefined, page: 1 })
+              onValueChange={(value) =>
+                onFiltersChange({ sport_type: value || undefined, page: 1 })
               }
             >
-              <option value="">All types</option>
-              {SPORT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All types</SelectItem>
+                {SPORT_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Date from */}
           <div>
             <label className="text-xs text-muted-foreground block mb-1">From</label>
-            <input
+            <Input
               type="date"
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
               value={filters.after ?? ''}
               onChange={(e) => onFiltersChange({ after: e.target.value || undefined, page: 1 })}
             />
@@ -156,9 +151,8 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
           {/* Date to */}
           <div>
             <label className="text-xs text-muted-foreground block mb-1">To</label>
-            <input
+            <Input
               type="date"
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
               value={filters.before ?? ''}
               onChange={(e) => onFiltersChange({ before: e.target.value || undefined, page: 1 })}
             />
@@ -169,12 +163,11 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
             <label className="text-xs text-muted-foreground block">Options</label>
             <div className="flex flex-wrap gap-3">
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={filters.commute === true}
-                  onChange={(e) =>
+                  onCheckedChange={(checked) =>
                     onFiltersChange({
-                      commute: e.target.checked ? true : undefined,
+                      commute: checked === true ? true : undefined,
                       page: 1,
                     })
                   }
@@ -182,12 +175,11 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
                 Commute
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={filters.trainer === true}
-                  onChange={(e) =>
+                  onCheckedChange={(checked) =>
                     onFiltersChange({
-                      trainer: e.target.checked ? true : undefined,
+                      trainer: checked === true ? true : undefined,
                       page: 1,
                     })
                   }

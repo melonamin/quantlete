@@ -6,7 +6,8 @@ SELECT
     date,
     activity_count,
     total_distance,
-    total_time
+    total_time,
+    total_calories
 FROM v_calendar_days
 WHERE athlete_id = ?1
     AND date >= ?2 || '-01-01'

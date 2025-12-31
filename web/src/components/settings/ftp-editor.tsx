@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { LineChart } from '@/components/charts'
 
 interface FtpHistoryPoint {
@@ -88,16 +89,14 @@ export function FtpEditor({ value, onSave, saving }: FtpEditorProps) {
 
       <div className="space-y-3">
         <div className="grid gap-2 md:grid-cols-3">
-          <input
+          <Input
             type="date"
-            className="h-9 rounded-md border border-border bg-background px-2"
             value={cyclingDate}
             onChange={(e) => setCyclingDate(e.target.value)}
           />
-          <input
+          <Input
             inputMode="numeric"
             placeholder="Cycling FTP (W)"
-            className="h-9 rounded-md border border-border bg-background px-2"
             value={cyclingValue}
             onChange={(e) => setCyclingValue(e.target.value)}
           />
@@ -108,16 +107,14 @@ export function FtpEditor({ value, onSave, saving }: FtpEditorProps) {
 
       <div className="space-y-3">
         <div className="grid gap-2 md:grid-cols-3">
-          <input
+          <Input
             type="date"
-            className="h-9 rounded-md border border-border bg-background px-2"
             value={runningDate}
             onChange={(e) => setRunningDate(e.target.value)}
           />
-          <input
+          <Input
             inputMode="decimal"
             placeholder="Running FTP (m/s)"
-            className="h-9 rounded-md border border-border bg-background px-2"
             value={runningValue}
             onChange={(e) => setRunningValue(e.target.value)}
           />

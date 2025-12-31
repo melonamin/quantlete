@@ -5,13 +5,23 @@ import type { SegmentsFilters } from '@/lib/api/segments'
 import { formatDate, formatDistance, formatDuration } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SegmentMap } from '@/components/maps'
 import { SegmentPRChart } from '@/components/charts/segment-pr-chart'
 import { Pagination } from '@/components/activities'
 import { Search, X, Filter, Star, Crown } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { PAGINATION } from '@/lib/constants'
 
 type SortKey = NonNullable<SegmentsFilters['order_by']>
@@ -123,102 +133,73 @@ export function SegmentsPage() {
         {/* Search input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
+          <Input
             type="text"
             placeholder="Search segments by name..."
-            className="h-10 w-full rounded-md border border-border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-10 pl-10 pr-10"
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
           />
           {localSearch && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={() => setLocalSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Quick filters */}
         <div className="flex flex-wrap gap-2">
           {/* Sport type buttons */}
-          <button
-            onClick={() => setActivityType('')}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors',
-              !activityType
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
+          <ToggleGroup
+            type="single"
+            value={activityType}
+            onValueChange={(value) => setActivityType(value)}
+            variant="outline"
+            size="sm"
           >
-            All
-          </button>
-          <button
-            onClick={() => setActivityType(activityType === 'Ride' ? '' : 'Ride')}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors',
-              activityType === 'Ride'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
-          >
-            Ride
-          </button>
-          <button
-            onClick={() => setActivityType(activityType === 'Run' ? '' : 'Run')}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors',
-              activityType === 'Run'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
-          >
-            Run
-          </button>
+            <ToggleGroupItem value="">All</ToggleGroupItem>
+            <ToggleGroupItem value="Ride">Ride</ToggleGroupItem>
+            <ToggleGroupItem value="Run">Run</ToggleGroupItem>
+          </ToggleGroup>
 
           {/* Divider */}
           <div className="w-px bg-border mx-1" />
 
           {/* Toggle buttons */}
-          <button
+          <Button
+            variant={starredOnly ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setStarredOnly(!starredOnly)}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
-              starredOnly
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
+            className="gap-1"
           >
             <Star className="h-3 w-3" />
             Starred
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={komOnly ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setKomOnly(!komOnly)}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
-              komOnly
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
+            className="gap-1"
           >
             <Crown className="h-3 w-3" />
             KOM
-          </button>
+          </Button>
 
           {/* More filters button */}
-          <button
+          <Button
+            variant={showAdvanced ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1',
-              showAdvanced
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
+            className="gap-1"
           >
             <Filter className="h-3 w-3" />
             More
-          </button>
+          </Button>
         </div>
 
         {/* Advanced filters */}
@@ -226,58 +207,58 @@ export function SegmentsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border">
             {/* Sport type dropdown */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Sport Type</label>
-              <select
-                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-                value={activityType}
-                onChange={(e) => setActivityType(e.target.value)}
-              >
-                <option value="">All types</option>
-                {sportOptions.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+              <Label className="text-xs text-muted-foreground mb-1">Sport Type</Label>
+              <Select value={activityType} onValueChange={setActivityType}>
+                <SelectTrigger size="sm">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All types</SelectItem>
+                  {sportOptions.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Country dropdown */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Country</label>
-              <select
-                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-              >
-                <option value="">All countries</option>
-                {(countries ?? []).map((c) => (
-                  <option key={c.country} value={c.country}>
-                    {flagEmoji(c.iso2)} {c.country} ({c.count})
-                  </option>
-                ))}
-              </select>
+              <Label className="text-xs text-muted-foreground mb-1">Country</Label>
+              <Select value={country} onValueChange={setCountry}>
+                <SelectTrigger size="sm">
+                  <SelectValue placeholder="All countries" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All countries</SelectItem>
+                  {(countries ?? []).map((c) => (
+                    <SelectItem key={c.country} value={c.country}>
+                      {flagEmoji(c.iso2)} {c.country} ({c.count})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Toggles */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Options</label>
+              <Label className="text-xs text-muted-foreground mb-1">Options</Label>
               <div className="flex flex-wrap gap-3 h-9 items-center">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+                <Label className="flex items-center gap-2 text-sm">
+                  <Checkbox
                     checked={starredOnly}
-                    onChange={(e) => setStarredOnly(e.target.checked)}
+                    onCheckedChange={(checked) => setStarredOnly(!!checked)}
                   />
                   Starred only
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+                </Label>
+                <Label className="flex items-center gap-2 text-sm">
+                  <Checkbox
                     checked={komOnly}
-                    onChange={(e) => setKomOnly(e.target.checked)}
+                    onCheckedChange={(checked) => setKomOnly(!!checked)}
                   />
                   KOM only
-                </label>
+                </Label>
               </div>
             </div>
           </div>
@@ -567,12 +548,17 @@ function SortableHead({
 }) {
   return (
     <TableHead className={align === 'right' ? 'text-right' : ''}>
-      <button className="inline-flex items-center gap-1 hover:underline" onClick={onClick}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-auto p-0 font-medium uppercase tracking-wider text-[10px] hover:bg-transparent hover:underline"
+        onClick={onClick}
+      >
         {label}
         {active ? (
-          <span className="text-xs text-muted-foreground">{dir === 'asc' ? '↑' : '↓'}</span>
+          <span className="ml-1 text-muted-foreground">{dir === 'asc' ? '↑' : '↓'}</span>
         ) : null}
-      </button>
+      </Button>
     </TableHead>
   )
 }

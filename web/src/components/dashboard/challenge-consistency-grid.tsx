@@ -1,6 +1,14 @@
 import { useMemo } from 'react'
 import { useTrainingGoals } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Check, X } from 'lucide-react'
 import { uiColors } from '@/components/charts'
 
@@ -89,31 +97,31 @@ export function ChallengeConsistencyGrid() {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr>
-                <th className="py-1 text-left font-medium text-muted-foreground">Goal</th>
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="py-1 text-left font-medium">Goal</TableHead>
                 {months.map((m) => (
-                  <th
+                  <TableHead
                     key={m.key}
-                    className="py-1 text-center font-medium text-muted-foreground"
+                    className="py-1 text-center font-medium"
                     style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
                   >
                     {m.label}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {goalStatuses.map((goal, idx) => (
-                <tr key={idx} className="border-t border-border/50">
-                  <td className="py-1.5 pr-2 font-medium truncate max-w-[120px]" title={goal.name}>
+                <TableRow key={idx} className="border-t border-border/50">
+                  <TableCell className="py-1.5 pr-2 font-medium truncate max-w-[120px]" title={goal.name}>
                     {goal.name}
-                  </td>
+                  </TableCell>
                   {months.map((m) => {
                     const status = goal.months.get(m.key)
                     return (
-                      <td key={m.key} className="py-1.5 text-center">
+                      <TableCell key={m.key} className="py-1.5 text-center">
                         {status === undefined ? (
                           <span className="text-muted-foreground/30">—</span>
                         ) : status ? (
@@ -137,13 +145,13 @@ export function ChallengeConsistencyGrid() {
                             <X className="h-3.5 w-3.5" />
                           </span>
                         )}
-                      </td>
+                      </TableCell>
                     )
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </WidgetWrapper>

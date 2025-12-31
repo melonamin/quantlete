@@ -6,6 +6,8 @@
 name = "quantlete-strava-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
+account_id = "9790c6f97c4032b6a3933442ba9817ec"
+workers_dev = true
 
 # Optional environment variables (for backwards compatibility only)
 # STRAVA_CLIENT_ID - Falls back if not provided in request body
@@ -16,3 +18,9 @@ compatibility_date = "2024-12-01"
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
+ALLOWED_ORIGIN = "https://app.quantlete.fit"
+
+# Custom domain routing
+[[routes]]
+pattern = "proxy.quantlete.fit/*"
+zone_name = "quantlete.fit"

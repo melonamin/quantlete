@@ -8,6 +8,7 @@ import {
 } from '@/lib/api'
 import { ActivityHeader, ActivityStats, WeatherBadge } from '@/components/activities'
 import { ActivityMap } from '@/components/maps'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft } from 'lucide-react'
 import { ActivityStreamProfileChart, ElevationProfileChart } from '@/components/charts'
@@ -128,37 +129,33 @@ export function ActivityDetailPage() {
               <h2 className="text-sm font-medium">Activity Streams</h2>
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                 <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showHr}
-                    onChange={(e) => setShowHr(e.target.checked)}
+                    onCheckedChange={(checked) => setShowHr(!!checked)}
                     disabled={!hasHr}
                   />
                   HR
                 </label>
                 <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showWatts}
-                    onChange={(e) => setShowWatts(e.target.checked)}
+                    onCheckedChange={(checked) => setShowWatts(!!checked)}
                     disabled={!hasWatts}
                   />
                   Power
                 </label>
                 <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showCadence}
-                    onChange={(e) => setShowCadence(e.target.checked)}
+                    onCheckedChange={(checked) => setShowCadence(!!checked)}
                     disabled={!hasCadence}
                   />
                   Cadence
                 </label>
                 <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showAltitude}
-                    onChange={(e) => setShowAltitude(e.target.checked)}
+                    onCheckedChange={(checked) => setShowAltitude(!!checked)}
                     disabled={!hasAltitude}
                   />
                   Elev
@@ -180,10 +177,9 @@ export function ActivityDetailPage() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-medium">Elevation Profile</h2>
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={elevGradient}
-                  onChange={(e) => setElevGradient(e.target.checked)}
+                  onCheckedChange={(checked) => setElevGradient(!!checked)}
                   disabled={!hasAltitude}
                 />
                 Gradient

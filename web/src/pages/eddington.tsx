@@ -7,6 +7,13 @@ import {
   type EddingtonResult,
 } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -76,17 +83,18 @@ export function EddingtonPage() {
           <p className="text-muted-foreground">Track your Eddington number progress</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-            value={defId}
-            onChange={(e) => setDefId(e.target.value)}
-          >
-            {defs.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          <Select value={defId} onValueChange={setDefId}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {defs.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

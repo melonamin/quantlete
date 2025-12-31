@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from './button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table'
 
 export interface AccordionTableColumn<T> {
   key: string
@@ -71,86 +73,80 @@ export function AccordionTable<T, C>({
     <div className={cn('space-y-2', className)}>
       {hasChildren && (
         <div className="flex justify-end">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={allExpanded ? collapseAll : expandAll}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-xs text-muted-foreground h-auto py-1 px-2"
           >
             {allExpanded ? collapseAllLabel : expandAllLabel}
-          </button>
+          </Button>
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-muted-foreground">
-              {hasChildren && <th className="w-8 py-2" />}
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={cn('py-2 text-left font-medium', col.headerClassName)}
-                >
-                  {col.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((group) => {
-              const isExpanded = expanded.has(group.id)
-              const hasChildRows = group.children.length > 0
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {hasChildren && <TableHead className="w-8" />}
+            {columns.map((col) => (
+              <TableHead key={col.key} className={col.headerClassName}>
+                {col.header}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groups.map((group) => {
+            const isExpanded = expanded.has(group.id)
+            const hasChildRows = group.children.length > 0
 
-              return (
-                <>
-                  <tr
-                    key={group.id}
-                    className={cn(
-                      'border-b border-border/50 transition-colors',
-                      hasChildRows && 'cursor-pointer hover:bg-muted/50'
-                    )}
-                    onClick={hasChildRows ? () => toggleGroup(group.id) : undefined}
-                  >
-                    {hasChildren && (
-                      <td className="py-2 pr-1">
-                        {hasChildRows && (
-                          <span className="inline-flex items-center justify-center w-5 h-5">
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </span>
-                        )}
-                      </td>
-                    )}
-                    {columns.map((col) => (
-                      <td key={col.key} className={cn('py-2', col.className)}>
-                        {col.render(group.summary)}
-                      </td>
-                    ))}
-                  </tr>
-                  {isExpanded &&
-                    hasChildRows &&
-                    childColumns &&
-                    group.children.map((child, idx) => (
-                      <tr
-                        key={`${group.id}-child-${idx}`}
-                        className="border-b border-border/30 bg-muted/20"
-                      >
-                        {hasChildren && <td className="py-1.5" />}
-                        {childColumns.map((col) => (
-                          <td key={col.key} className={cn('py-1.5 pl-4', col.className)}>
-                            {col.render(child)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                </>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+            return (
+              <>
+                <TableRow
+                  key={group.id}
+                  className={cn(hasChildRows && 'cursor-pointer')}
+                  onClick={hasChildRows ? () => toggleGroup(group.id) : undefined}
+                >
+                  {hasChildren && (
+                    <TableCell className="pr-1">
+                      {hasChildRows && (
+                        <span className="inline-flex items-center justify-center w-5 h-5">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </span>
+                      )}
+                    </TableCell>
+                  )}
+                  {columns.map((col) => (
+                    <TableCell key={col.key} className={col.className}>
+                      {col.render(group.summary)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                {isExpanded &&
+                  hasChildRows &&
+                  childColumns &&
+                  group.children.map((child, idx) => (
+                    <TableRow
+                      key={`${group.id}-child-${idx}`}
+                      className="bg-muted/20"
+                    >
+                      {hasChildren && <TableCell />}
+                      {childColumns.map((col) => (
+                        <TableCell key={col.key} className={cn('pl-4', col.className)}>
+                          {col.render(child)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+              </>
+            )
+          })}
+        </TableBody>
+      </Table>
     </div>
   )
 }

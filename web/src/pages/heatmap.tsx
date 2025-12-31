@@ -1,6 +1,17 @@
 import { useHeatmap } from '@/lib/api'
 import { Heatmap, getActivitiesBounds } from '@/components/maps'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Link } from '@tanstack/react-router'
 import { useMemo, useState, useCallback, useRef } from 'react'
 import type { Map as LeafletMap } from 'leaflet'
@@ -95,31 +106,20 @@ export function HeatmapPage() {
         {/* Quick filters row */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Sport type buttons */}
-          <button
-            onClick={() => setSportType('')}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors',
-              !sportType
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
+          <ToggleGroup
+            type="single"
+            value={sportType}
+            onValueChange={(value) => setSportType(value)}
+            variant="outline"
+            size="sm"
           >
-            All
-          </button>
-          {['Ride', 'Run', 'Walk', 'Swim'].map((type) => (
-            <button
-              key={type}
-              onClick={() => setSportType(sportType === type ? '' : type)}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-sm transition-colors',
-                sportType === type
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              )}
-            >
-              {type}
-            </button>
-          ))}
+            <ToggleGroupItem value="">All</ToggleGroupItem>
+            {['Ride', 'Run', 'Walk', 'Swim'].map((type) => (
+              <ToggleGroupItem key={type} value={type}>
+                {type}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
 
           {/* Divider */}
           <div className="w-px h-6 bg-border mx-1" />
@@ -127,21 +127,18 @@ export function HeatmapPage() {
           {/* Countries dropdown */}
           {countryStats.length > 0 && (
             <div className="relative">
-              <button
+              <Button
+                variant={selectedCountry ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setShowCountries(!showCountries)}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
-                  selectedCountry
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                )}
+                className="gap-1.5"
               >
                 <Globe className="h-3.5 w-3.5" />
                 {selectedCountry || `${uniqueCountries} countries`}
                 <ChevronDown
                   className={cn('h-3.5 w-3.5 transition-transform', showCountries && 'rotate-180')}
                 />
-              </button>
+              </Button>
 
               {/* Countries dropdown panel */}
               {showCountries && (
@@ -188,31 +185,34 @@ export function HeatmapPage() {
           )}
 
           {/* More filters button */}
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
+          <Button
+            variant={
               showAdvanced || (hasActiveFilters && (after || before || commute !== 'all' || workoutType))
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
+                ? 'default'
+                : 'outline'
+            }
+            size="sm"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="gap-1.5"
           >
             <Filter className="h-3.5 w-3.5" />
             More
             <ChevronDown
               className={cn('h-3.5 w-3.5 transition-transform', showAdvanced && 'rotate-180')}
             />
-          </button>
+          </Button>
 
           {/* Clear filters */}
           {hasActiveFilters && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clearFilters}
-              className="px-3 py-1.5 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
             >
               <X className="h-3.5 w-3.5" />
               Clear
-            </button>
+            </Button>
           )}
         </div>
 
@@ -221,10 +221,10 @@ export function HeatmapPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-border">
             {/* Custom sport type */}
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Custom sport</label>
-              <input
+              <Label className="text-xs text-muted-foreground mb-1">Custom sport</Label>
+              <Input
                 type="text"
-                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                className="h-8"
                 value={sportType}
                 onChange={(e) => setSportType(e.target.value)}
                 placeholder="e.g. Ride,VirtualRide"
@@ -233,10 +233,10 @@ export function HeatmapPage() {
 
             {/* Date from */}
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">From</label>
-              <input
+              <Label className="text-xs text-muted-foreground mb-1">From</Label>
+              <Input
                 type="date"
-                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                className="h-8"
                 value={after}
                 onChange={(e) => setAfter(e.target.value)}
               />
@@ -244,10 +244,10 @@ export function HeatmapPage() {
 
             {/* Date to */}
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">To</label>
-              <input
+              <Label className="text-xs text-muted-foreground mb-1">To</Label>
+              <Input
                 type="date"
-                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+                className="h-8"
                 value={before}
                 onChange={(e) => setBefore(e.target.value)}
               />
@@ -255,16 +255,20 @@ export function HeatmapPage() {
 
             {/* Commute */}
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Commute</label>
-              <select
-                className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+              <Label className="text-xs text-muted-foreground mb-1">Commute</Label>
+              <Select
                 value={commute}
-                onChange={(e) => setCommute(e.target.value as 'all' | 'yes' | 'no')}
+                onValueChange={(value) => setCommute(value as 'all' | 'yes' | 'no')}
               >
-                <option value="all">All</option>
-                <option value="yes">Commute only</option>
-                <option value="no">Non-commute</option>
-              </select>
+                <SelectTrigger size="sm" className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Commute only</SelectItem>
+                  <SelectItem value="no">Non-commute</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
