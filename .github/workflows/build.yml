@@ -25,12 +25,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: web/yarn.lock
+
+      - name: Generate TypeScript from SQL
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-schema
 
       - name: Install dependencies
         working-directory: web
