@@ -148,9 +148,9 @@ export function Sidebar() {
       <aside
         className={cn(
           'fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200 ease-in-out',
-          collapsed ? 'w-[--sidebar-width-collapsed]' : 'w-[--sidebar-width-expanded]',
+          collapsed ? 'w-(--sidebar-width-collapsed)' : 'w-(--sidebar-width-expanded)',
           'max-md:-translate-x-full max-md:data-[mobile-open=true]:translate-x-0',
-          'max-md:w-[--sidebar-width-expanded]'
+          'max-md:w-(--sidebar-width-expanded)'
         )}
         data-mobile-open={mobileOpen}
         role="navigation"
@@ -174,16 +174,16 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav className="flex-1 overflow-y-auto py-1">
           {navigationGroups.map((group, groupIndex) => (
             <div
               key={group.label}
-              className={cn(groupIndex > 0 && (collapsed ? 'mt-3 pt-3 border-t border-sidebar-border/50 mx-2' : 'mt-3'))}
+              className={cn(groupIndex > 0 && (collapsed ? 'mt-2 pt-2 border-t border-sidebar-border/50 mx-2' : 'mt-2'))}
             >
               {/* Group label - hidden when collapsed */}
               <div
                 className={cn(
-                  'px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-sidebar-foreground/40 transition-opacity duration-200',
+                  'px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-sidebar-foreground/40 transition-opacity duration-200',
                   collapsed ? 'opacity-0 h-0 py-0 overflow-hidden' : 'opacity-100'
                 )}
               >
@@ -195,7 +195,7 @@ export function Sidebar() {
                     <Link
                       to={item.href}
                       className={cn(
-                        'group flex items-center gap-3 rounded-sm px-2 py-1.5 text-sm transition-colors',
+                        'group flex items-center gap-3 rounded-sm px-2 py-1 text-sm transition-colors',
                         isActive(item.href)
                           ? 'bg-sidebar-accent text-terminal-green'
                           : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -225,7 +225,7 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom section */}
-        <div className="border-t border-sidebar-border px-2 py-2">
+        <div className="border-t border-sidebar-border px-2 py-1">
           {/* Sync indicator */}
           {isSyncing && (
             <Link
@@ -238,7 +238,7 @@ export function Sidebar() {
                 }
               }}
               className={cn(
-                'flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition-colors',
+                'flex items-center gap-3 rounded-sm px-2 py-1 text-sm transition-colors',
                 isWaitingForRateLimit
                   ? 'text-amber-600 dark:text-amber-500 hover:bg-amber-100/50 dark:hover:bg-amber-950/30'
                   : 'text-primary hover:bg-sidebar-accent/50'
@@ -264,7 +264,7 @@ export function Sidebar() {
           <Link
             to="/athlete"
             className={cn(
-              'group flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition-colors',
+              'group flex items-center gap-3 rounded-sm px-2 py-1 text-sm transition-colors',
               currentPath === '/athlete'
                 ? 'bg-sidebar-accent text-terminal-green'
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -285,7 +285,7 @@ export function Sidebar() {
           <Link
             to="/settings"
             className={cn(
-              'group flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition-colors',
+              'group flex items-center gap-3 rounded-sm px-2 py-1 text-sm transition-colors',
               currentPath === '/settings'
                 ? 'bg-sidebar-accent text-terminal-green'
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -307,18 +307,30 @@ export function Sidebar() {
           <Button
             variant="ghost"
             onClick={toggleCollapsed}
-            className="hidden md:flex mt-1 w-full justify-start items-center gap-3 rounded-sm px-2 py-2 text-sm text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            className="hidden md:flex mt-1 w-full justify-start items-center gap-3 rounded-sm px-2 py-1 text-sm text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
             title={collapsed ? 'Expand sidebar ([ or ])' : 'Collapse sidebar ([ or ])'}
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4 shrink-0" />
             ) : (
-              <>
-                <ChevronLeft className="h-4 w-4 shrink-0" />
-                <span className="text-xs">Collapse</span>
-                <span className="ml-auto text-[10px]">[ ]</span>
-              </>
+              <ChevronLeft className="h-4 w-4 shrink-0" />
             )}
+            <span
+              className={cn(
+                'truncate transition-opacity duration-200 text-xs',
+                collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+              )}
+            >
+              Collapse
+            </span>
+            <span
+              className={cn(
+                'ml-auto text-[10px] transition-opacity duration-200',
+                collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+              )}
+            >
+              [ ]
+            </span>
           </Button>
         </div>
       </aside>

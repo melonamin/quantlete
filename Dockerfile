@@ -1,36 +1,42 @@
-# Build stage
-FROM golang:1.23-bookworm AS builder
+# Build stage - Web assets
+FROM node:22-alpine AS web-builder
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/web
+COPY web/package.json web/yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY web/ ./
+RUN yarn build:server
+
+# Build stage - Go binary
+FROM golang:1.24.5-alpine AS go-builder
+
+RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copy go mod files first for caching
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
 COPY . .
+COPY --from=web-builder /app/web/dist ./web/dist
 
-# Build binary
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o quantlete ./cmd/quantlete
+ARG VERSION=dev
+ARG BUILD_DATE
+RUN CGO_ENABLED=0 go build \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.buildDate=${BUILD_DATE}" \
+    -o quantlete ./cmd/quantlete
 
 # Runtime stage
-FROM debian:bookworm-slim
+FROM alpine:3.21
 
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates tzdata
 
 # Create non-root user
-RUN useradd -r -u 1000 quantlete
+RUN adduser -D -u 1000 quantlete
 
 WORKDIR /app
 
-# Copy binary from builder
-COPY --from=builder /app/quantlete /app/quantlete
+COPY --from=go-builder /app/quantlete /app/quantlete
 
 # Create data directory
 RUN mkdir -p /data && chown quantlete:quantlete /data

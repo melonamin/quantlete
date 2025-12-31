@@ -1,0 +1,6 @@
+export { Hero } from './Hero'
+export { Features } from './Features'
+export { Screenshots } from './Screenshots'
+export { Installation } from './Installation'
+export { OpenSource } from './OpenSource'
+export { Footer } from './Footer'
