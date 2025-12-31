@@ -1,0 +1,236 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  color-scheme: dark;
+
+  /* Terminal-inspired dark theme */
+  --background: oklch(0.11 0.005 240);
+  --foreground: oklch(0.93 0 0);
+  --card: oklch(0.14 0.005 240);
+  --card-foreground: oklch(0.93 0 0);
+  --muted: oklch(0.2 0.005 240);
+  --muted-foreground: oklch(0.6 0 0);
+
+  /* Terminal green accent */
+  --primary: oklch(0.72 0.19 145);
+  --primary-foreground: oklch(0.08 0 0);
+
+  /* Strava orange accent */
+  --strava: oklch(0.72 0.18 45);
+
+  /* Borders */
+  --border: oklch(0.3 0.01 240);
+  --border-dim: oklch(0.22 0.01 240);
+
+  /* Terminal colors */
+  --terminal-green: oklch(0.72 0.19 145);
+  --terminal-amber: oklch(0.75 0.17 80);
+  --terminal-cyan: oklch(0.7 0.14 195);
+  --terminal-dim: oklch(0.45 0 0);
+
+  /* Sharp terminal radius */
+  --radius: 0.25rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-strava: var(--strava);
+  --color-border: var(--border);
+  --color-border-dim: var(--border-dim);
+  --color-terminal-green: var(--terminal-green);
+  --color-terminal-amber: var(--terminal-amber);
+  --color-terminal-cyan: var(--terminal-cyan);
+  --color-terminal-dim: var(--terminal-dim);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    font-feature-settings: 'liga' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+/* Blinking cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Scanline effect */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.scanline::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    oklch(0.72 0.19 145 / 0.03),
+    transparent
+  );
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Subtle CRT glow effect */
+.glow-green {
+  text-shadow:
+    0 0 5px oklch(0.72 0.19 145 / 0.5),
+    0 0 10px oklch(0.72 0.19 145 / 0.3),
+    0 0 20px oklch(0.72 0.19 145 / 0.1);
+}
+
+/* Fade in animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-delay-1 { animation-delay: 0.1s; }
+.animate-delay-2 { animation-delay: 0.2s; }
+.animate-delay-3 { animation-delay: 0.3s; }
+.animate-delay-4 { animation-delay: 0.4s; }
+.animate-delay-5 { animation-delay: 0.5s; }
+.animate-delay-6 { animation-delay: 0.6s; }
+
+/* Terminal window styling */
+.terminal-window {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: oklch(0.12 0.005 240);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.terminal-dot-red { background: oklch(0.6 0.22 25); }
+.terminal-dot-yellow { background: oklch(0.75 0.17 80); }
+.terminal-dot-green { background: oklch(0.72 0.19 145); }
+
+/* Noise texture overlay */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+  z-index: 99;
+}
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid var(--primary);
+}
+
+.btn-primary:hover {
+  background: oklch(0.78 0.19 145);
+  border-color: oklch(0.78 0.19 145);
+  box-shadow: 0 0 20px oklch(0.72 0.19 145 / 0.3);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.btn-outline:hover {
+  background: var(--muted);
+  border-color: var(--foreground);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}

@@ -87,3 +87,6 @@ algorithms/.yarn/*
 !algorithms/.yarn/releases
 !algorithms/.yarn/sdks
 !algorithms/.yarn/versions
+
+# ===== Landing =====
+landing/node_modules/
