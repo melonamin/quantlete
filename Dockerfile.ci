@@ -1,0 +1,30 @@
+# Dockerfile.ci - For CI pipeline with pre-built binaries
+# Uses ARG to select the correct binary for each platform
+
+FROM alpine:3.21
+
+ARG TARGETARCH
+
+RUN apk add --no-cache ca-certificates tzdata
+
+# Create non-root user
+RUN adduser -D -u 1000 quantlete
+
+WORKDIR /app
+
+# Copy the pre-built binary for the target architecture
+COPY dist/quantlete-linux-${TARGETARCH} /app/quantlete
+RUN chmod +x /app/quantlete
+
+# Create data directory
+RUN mkdir -p /data && chown quantlete:quantlete /data
+
+USER quantlete
+
+VOLUME /data
+ENV QUANTLETE_DATA_DIR=/data
+
+EXPOSE 8081
+
+ENTRYPOINT ["/app/quantlete"]
+CMD ["serve", "--port", "8081"]
