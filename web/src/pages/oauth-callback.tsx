@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { useStartImport } from '@/lib/api'
 import { useDataProviderStatus } from '@/lib/data'
 import { isWasmMode } from '@/lib/mode'
@@ -23,6 +24,7 @@ interface OAuthSearchParams {
 export function OAuthCallbackPage() {
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as OAuthSearchParams
+  const queryClient = useQueryClient()
   const { provider, initialized, error: providerError } = useDataProviderStatus()
   const startImport = useStartImport()
   const openSyncModal = useSyncModalStore((s) => s.openModal)
@@ -104,6 +106,12 @@ export function OAuthCallbackPage() {
         await exchangeCode(search.code, redirectUri)
 
         console.log('[OAuth] Token exchange successful')
+
+        // Invalidate auth-related caches immediately to ensure all components
+        // see the updated auth state (fixes race condition with Settings page)
+        queryClient.invalidateQueries({ queryKey: ['data', 'auth', 'status'] })
+        queryClient.invalidateQueries({ queryKey: ['data', 'setup', 'credentials'] })
+
         setStatus('success')
 
         // Mark onboarding as complete after successful auth
@@ -134,8 +142,8 @@ export function OAuthCallbackPage() {
 
     handleCallback()
     // Callbacks are stored in refs to avoid stale closures and prevent effect re-runs
-     
-  }, [initialized, provider, providerError, search.code, search.error])
+    // queryClient is stable but included for exhaustive deps
+  }, [initialized, provider, providerError, search.code, search.error, queryClient])
 
   return (
     <div className="flex min-h-screen items-center justify-center">

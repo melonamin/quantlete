@@ -90,7 +90,7 @@ export function useAuthStatus() {
       return provider.getAuthStatus()
     },
     enabled: initialized && !error && !!provider,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 30, // 30 seconds - shorter than default to ensure auth state updates quickly
     retry: false,
   })
 }
@@ -553,6 +553,8 @@ export function useStartImport() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'import', 'progress'] })
+      // Also refresh auth status since successful import start confirms valid auth
+      queryClient.invalidateQueries({ queryKey: ['data', 'auth', 'status'] })
     },
   })
 }
