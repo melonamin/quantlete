@@ -20,6 +20,32 @@ const (
 	apiBase  = "https://www.strava.com/api/v3"
 )
 
+// APIError represents an error response from the Strava API with status code details.
+type APIError struct {
+	StatusCode int
+	Status     string
+	Path       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("Strava API error %d (%s) for %s", e.StatusCode, e.Status, e.Path)
+}
+
+// IsNotFound returns true if this is a 404 error.
+func (e *APIError) IsNotFound() bool {
+	return e.StatusCode == http.StatusNotFound
+}
+
+// IsForbidden returns true if this is a 403 error.
+func (e *APIError) IsForbidden() bool {
+	return e.StatusCode == http.StatusForbidden
+}
+
+// IsServerError returns true if this is a 5xx error.
+func (e *APIError) IsServerError() bool {
+	return e.StatusCode >= 500 && e.StatusCode < 600
+}
+
 // RateLimitPersister is called after each API request to persist rate limit state.
 type RateLimitPersister func(json string) error
 
@@ -164,14 +190,17 @@ func (c *Client) IsAuthenticated() bool {
 	return c.token != nil && c.token.Valid()
 }
 
-func (c *Client) persistToken(token *oauth2.Token, athleteID int64) {
+// persistToken persists the token using the configured persister.
+// Returns an error if persistence fails, allowing the caller to decide how to handle it.
+// Token persistence is critical: if it fails, the next restart will lose the token.
+func (c *Client) persistToken(token *oauth2.Token, athleteID int64) error {
 	if c.tokenPersist == nil {
-		return
+		return nil
 	}
 	if err := c.tokenPersist(token, athleteID); err != nil {
-		// Best effort: don't fail API calls on persistence errors, but log for debugging.
-		slog.Warn("token persistence failed", "error", err, "athlete_id", athleteID)
+		return fmt.Errorf("token persistence failed for athlete %d: %w", athleteID, err)
 	}
+	return nil
 }
 
 // tokenRefreshTimeout is the maximum time allowed for a token refresh operation.
@@ -203,7 +232,16 @@ func (c *Client) forceRefreshToken(ctx context.Context) (*oauth2.Token, error) {
 	}
 
 	c.SetToken(newToken, athlete)
-	c.persistToken(newToken, athlete.ID)
+	if err := c.persistToken(newToken, athlete.ID); err != nil {
+		// Log error prominently - token refresh succeeded but if app restarts,
+		// the old token on disk will be loaded, requiring re-authentication.
+		// We intentionally don't return an error here because:
+		// 1. The token refresh succeeded - the current session works fine
+		// 2. Returning an error would fail the API request even though it can proceed
+		// 3. This is a "best-effort" persistence; the error is logged for operators
+		slog.Error("CRITICAL: token persistence failed after refresh - re-authentication may be required after restart",
+			"athlete_id", athlete.ID, "error", err)
+	}
 	return newToken, nil
 }
 
@@ -242,7 +280,16 @@ func (c *Client) ensureValidToken(ctx context.Context, token *oauth2.Token) (*oa
 	}
 
 	c.SetToken(newToken, athlete)
-	c.persistToken(newToken, athlete.ID)
+	if err := c.persistToken(newToken, athlete.ID); err != nil {
+		// Log error prominently - token refresh succeeded but if app restarts,
+		// the old token on disk will be loaded, requiring re-authentication.
+		// We intentionally don't return an error here because:
+		// 1. The token refresh succeeded - the current session works fine
+		// 2. Returning an error would fail the API request even though it can proceed
+		// 3. This is a "best-effort" persistence; the error is logged for operators
+		slog.Error("CRITICAL: token persistence failed after refresh - re-authentication may be required after restart",
+			"athlete_id", athlete.ID, "error", err)
+	}
 	return newToken, nil
 }
 
@@ -308,7 +355,11 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("API error: %s", resp.Status)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Path:       path,
+		}
 	}
 
 	if result != nil {
@@ -358,7 +409,11 @@ func (c *Client) getAthleteWithToken(ctx context.Context, token *oauth2.Token) (
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error: %s", resp.Status)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Path:       "/athlete",
+		}
 	}
 
 	var athlete Athlete

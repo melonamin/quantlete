@@ -305,6 +305,18 @@ preview-landing:
     cd landing && yarn preview
 
 # ============================================================================
+# Documentation Site
+# ============================================================================
+
+# Serve docs locally with hot reload
+dev-docs:
+    npx docsify-cli serve docs
+
+# Deploy docs to Cloudflare Pages
+deploy-docs:
+    npx wrangler pages deploy docs --project-name=quantlete-docs --branch=main --commit-dirty=true
+
+# ============================================================================
 # Utilities
 # ============================================================================
 

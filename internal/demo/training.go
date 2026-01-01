@@ -94,7 +94,7 @@ type ActivityTrainingLoad struct {
 	ActivityID      int64
 	AthleteID       int64
 	SportType       string
-	Method          string  // cycling_power, running_pace, running_hr
+	Method          string // cycling_power, running_pace, running_hr
 	FTPUsed         float64
 	NormalizedPower float64
 	IntensityFactor float64

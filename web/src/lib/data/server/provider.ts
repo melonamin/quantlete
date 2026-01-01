@@ -531,6 +531,19 @@ export class ServerProvider implements DataProvider {
     return post<{ message: string }>('/import/cancel')
   }
 
+  async pauseImport(): Promise<{ message: string }> {
+    return post<{ message: string }>('/import/pause')
+  }
+
+  async resumeImport(): Promise<{ message: string }> {
+    return post<{ message: string }>('/import/resume')
+  }
+
+  hasResumableImport(): boolean {
+    // Server mode doesn't track resumable state client-side
+    return false
+  }
+
   async getSyncHistory(limit = 10): Promise<SyncRun[]> {
     return get<SyncRun[]>('/import/history', { limit })
   }

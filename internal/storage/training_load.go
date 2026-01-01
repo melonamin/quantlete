@@ -37,7 +37,7 @@ func NewTrainingLoadRepository(db *DB, streams *StreamRepository, metrics *Athle
 type ActivityForLoad struct {
 	ID          int64
 	SportType   string
-	StartDate            SQLiteTime
+	StartDate   SQLiteTime
 	MovingTimeS int
 }
 

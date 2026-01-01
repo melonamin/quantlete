@@ -132,6 +132,11 @@ func (s *Scheduler) reconcileLoop(ctx context.Context) {
 }
 
 func (s *Scheduler) reconcileOnce(ctx context.Context) {
+	if s.strava == nil {
+		s.clearJobs()
+		return
+	}
+
 	athlete := s.strava.GetAthlete()
 	if athlete == nil || s.strava.GetToken() == nil {
 		s.clearJobs()

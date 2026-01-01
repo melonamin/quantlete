@@ -4,20 +4,20 @@ import "time"
 
 // ActivityWeather represents cached weather data for an activity.
 type ActivityWeather struct {
-	ActivityID    int64   `json:"activity_id"`
-	Source        string  `json:"source"` // "strava" or "open-meteo"
-	TemperatureC  *float64 `json:"temperature_c,omitempty"`
-	FeelsLikeC    *float64 `json:"feels_like_c,omitempty"`
-	HumidityPct   *float64 `json:"humidity_percent,omitempty"`
-	WindSpeedMps  *float64 `json:"wind_speed_mps,omitempty"`
-	WindDirDeg    *float64 `json:"wind_direction_deg,omitempty"`
-	PrecipMM      *float64 `json:"precipitation_mm,omitempty"`
-	WeatherCode   *int     `json:"weather_code,omitempty"`
-	TempMinC      *float64 `json:"temp_min_c,omitempty"`
-	TempMaxC      *float64 `json:"temp_max_c,omitempty"`
-	TempAvgC      *float64 `json:"temp_avg_c,omitempty"`
-	TempStream    []float64 `json:"temp_stream,omitempty"`
-	FetchedAt     time.Time `json:"fetched_at"`
+	ActivityID   int64     `json:"activity_id"`
+	Source       string    `json:"source"` // "strava" or "open-meteo"
+	TemperatureC *float64  `json:"temperature_c,omitempty"`
+	FeelsLikeC   *float64  `json:"feels_like_c,omitempty"`
+	HumidityPct  *float64  `json:"humidity_percent,omitempty"`
+	WindSpeedMps *float64  `json:"wind_speed_mps,omitempty"`
+	WindDirDeg   *float64  `json:"wind_direction_deg,omitempty"`
+	PrecipMM     *float64  `json:"precipitation_mm,omitempty"`
+	WeatherCode  *int      `json:"weather_code,omitempty"`
+	TempMinC     *float64  `json:"temp_min_c,omitempty"`
+	TempMaxC     *float64  `json:"temp_max_c,omitempty"`
+	TempAvgC     *float64  `json:"temp_avg_c,omitempty"`
+	TempStream   []float64 `json:"temp_stream,omitempty"`
+	FetchedAt    time.Time `json:"fetched_at"`
 }
 
 // OpenMeteoRequest represents parameters for an Open-Meteo API request.

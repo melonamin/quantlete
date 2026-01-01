@@ -109,12 +109,19 @@ func (h *StravaWebhookHandler) processEvent(e StravaWebhookEvent) {
 		return
 	}
 
+	if h.strava == nil {
+		slog.Debug("webhook: strava client not configured; ignoring event")
+		return
+	}
+
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
 		slog.Info("webhook event received but not authenticated; ignoring", "object_id", e.ObjectID, "aspect_type", e.AspectType)
 		return
 	}
-	if e.OwnerID != 0 && e.OwnerID != athlete.ID {
+	// Reject events where OwnerID doesn't match our athlete.
+	// OwnerID=0 indicates a malformed or potentially forged webhook - reject for safety.
+	if e.OwnerID != athlete.ID {
 		slog.Info("webhook event owner mismatch; ignoring", "event_owner_id", e.OwnerID, "athlete_id", athlete.ID)
 		return
 	}
@@ -137,15 +144,9 @@ func (h *StravaWebhookHandler) processEvent(e StravaWebhookEvent) {
 			slog.Info("webhook create: sync not started", "activity_id", e.ObjectID, "error", err)
 		}
 	case "update":
-		act, err := h.strava.GetActivity(ctx, e.ObjectID)
-		if err != nil {
-			slog.Warn("webhook update: failed to fetch activity", "activity_id", e.ObjectID, "error", err)
-			return
-		}
-
-		stored := importer.ConvertActivity(act, athlete.ID)
-		if err := h.activities.Upsert(ctx, stored); err != nil {
-			slog.Warn("webhook update: failed to upsert activity", "activity_id", e.ObjectID, "error", err)
+		// Use the importer to fully sync the activity (including streams, segments, best efforts, photos)
+		if err := h.importer.ImportActivityByID(ctx, e.ObjectID, importer.ImportOptions{}); err != nil {
+			slog.Warn("webhook update: failed to import activity", "activity_id", e.ObjectID, "error", err)
 		}
 	case "delete":
 		if err := h.activities.DeleteByID(ctx, athlete.ID, e.ObjectID); err != nil {

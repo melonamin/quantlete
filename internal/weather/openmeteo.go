@@ -21,9 +21,9 @@ const (
 
 // OpenMeteoClient fetches historical weather data from Open-Meteo.
 type OpenMeteoClient struct {
-	httpClient   *http.Client
-	rateLimitMu  sync.Mutex
-	lastRequest  time.Time
+	httpClient  *http.Client
+	rateLimitMu sync.Mutex
+	lastRequest time.Time
 }
 
 // NewOpenMeteoClient creates a new Open-Meteo API client.

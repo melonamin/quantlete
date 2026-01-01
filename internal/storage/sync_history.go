@@ -9,11 +9,11 @@ import (
 
 // SyncRun represents a single import/sync run.
 type SyncRun struct {
-	ID        int64      `json:"id"`
-	AthleteID int64      `json:"athlete_id"`
-	StartedAt time.Time  `json:"started_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	DurationSeconds *int  `json:"duration_seconds,omitempty"`
+	ID              int64      `json:"id"`
+	AthleteID       int64      `json:"athlete_id"`
+	StartedAt       time.Time  `json:"started_at"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	DurationSeconds *int       `json:"duration_seconds,omitempty"`
 
 	Status string `json:"status"` // running, completed, failed, canceled
 	Error  string `json:"error,omitempty"`
@@ -101,35 +101,6 @@ type SyncRunOptions struct {
 	SkipPhotos      bool
 }
 
-// CompleteRun marks a sync run as completed with final counts.
-func (r *SyncHistoryRepository) CompleteRun(ctx context.Context, runID int64, counts SyncRunCounts) error {
-	now := time.Now()
-	_, err := r.db.ExecContext(ctx, `
-		UPDATE sync_history SET
-			completed_at = ?,
-			duration_seconds = (
-				SELECT CAST(strftime('%s', ?) - strftime('%s', started_at) AS INTEGER)
-				FROM sync_history WHERE id = ?
-			),
-			status = 'completed',
-			activities_total = ?,
-			activities_imported = ?,
-			activities_skipped = ?,
-			gear_imported = ?,
-			streams_imported = ?,
-			segments_imported = ?,
-			photos_imported = ?,
-			failed_count = ?,
-			newest_activity_date = ?
-		WHERE id = ?
-	`, SQLiteTime{Time: now}, SQLiteTime{Time: now}, runID,
-		counts.ActivitiesTotal, counts.ActivitiesImported, counts.ActivitiesSkipped,
-		counts.GearImported, counts.StreamsImported, counts.SegmentsImported,
-		counts.PhotosImported, counts.FailedCount,
-		nullableSQLiteTime(counts.NewestActivityDate), runID)
-	return err
-}
-
 // SyncRunCounts contains the final counts for a sync run.
 type SyncRunCounts struct {
 	ActivitiesTotal    int
@@ -143,18 +114,41 @@ type SyncRunCounts struct {
 	NewestActivityDate *time.Time
 }
 
-// FailRun marks a sync run as failed with an error message.
-func (r *SyncHistoryRepository) FailRun(ctx context.Context, runID int64, errMsg string, counts SyncRunCounts) error {
+// updateRunStatus is a helper that updates a sync run's final state.
+func (r *SyncHistoryRepository) updateRunStatus(
+	ctx context.Context,
+	runID int64,
+	status string,
+	counts SyncRunCounts,
+	errMsg *string,
+) error {
 	now := time.Now()
-	_, err := r.db.ExecContext(ctx, `
+
+	// Build query dynamically based on status
+	query := `
 		UPDATE sync_history SET
 			completed_at = ?,
 			duration_seconds = (
 				SELECT CAST(strftime('%s', ?) - strftime('%s', started_at) AS INTEGER)
 				FROM sync_history WHERE id = ?
 			),
-			status = 'failed',
-			error = ?,
+			status = ?,`
+
+	args := []interface{}{
+		SQLiteTime{Time: now},
+		SQLiteTime{Time: now},
+		runID,
+		status,
+	}
+
+	// Add error field for failed status
+	if errMsg != nil {
+		query += `
+			error = ?,`
+		args = append(args, *errMsg)
+	}
+
+	query += `
 			activities_total = ?,
 			activities_imported = ?,
 			activities_skipped = ?,
@@ -162,40 +156,47 @@ func (r *SyncHistoryRepository) FailRun(ctx context.Context, runID int64, errMsg
 			streams_imported = ?,
 			segments_imported = ?,
 			photos_imported = ?,
-			failed_count = ?
-		WHERE id = ?
-	`, SQLiteTime{Time: now}, SQLiteTime{Time: now}, runID, errMsg,
-		counts.ActivitiesTotal, counts.ActivitiesImported, counts.ActivitiesSkipped,
-		counts.GearImported, counts.StreamsImported, counts.SegmentsImported,
-		counts.PhotosImported, counts.FailedCount, runID)
+			failed_count = ?`
+
+	args = append(args,
+		counts.ActivitiesTotal,
+		counts.ActivitiesImported,
+		counts.ActivitiesSkipped,
+		counts.GearImported,
+		counts.StreamsImported,
+		counts.SegmentsImported,
+		counts.PhotosImported,
+		counts.FailedCount,
+	)
+
+	// Add newest_activity_date for completed status
+	if status == "completed" {
+		query += `,
+			newest_activity_date = ?`
+		args = append(args, nullableSQLiteTime(counts.NewestActivityDate))
+	}
+
+	query += `
+		WHERE id = ?`
+	args = append(args, runID)
+
+	_, err := r.db.ExecContext(ctx, query, args...)
 	return err
+}
+
+// CompleteRun marks a sync run as completed with final counts.
+func (r *SyncHistoryRepository) CompleteRun(ctx context.Context, runID int64, counts SyncRunCounts) error {
+	return r.updateRunStatus(ctx, runID, "completed", counts, nil)
+}
+
+// FailRun marks a sync run as failed with an error message.
+func (r *SyncHistoryRepository) FailRun(ctx context.Context, runID int64, errMsg string, counts SyncRunCounts) error {
+	return r.updateRunStatus(ctx, runID, "failed", counts, &errMsg)
 }
 
 // CancelRun marks a sync run as canceled.
 func (r *SyncHistoryRepository) CancelRun(ctx context.Context, runID int64, counts SyncRunCounts) error {
-	now := time.Now()
-	_, err := r.db.ExecContext(ctx, `
-		UPDATE sync_history SET
-			completed_at = ?,
-			duration_seconds = (
-				SELECT CAST(strftime('%s', ?) - strftime('%s', started_at) AS INTEGER)
-				FROM sync_history WHERE id = ?
-			),
-			status = 'canceled',
-			activities_total = ?,
-			activities_imported = ?,
-			activities_skipped = ?,
-			gear_imported = ?,
-			streams_imported = ?,
-			segments_imported = ?,
-			photos_imported = ?,
-			failed_count = ?
-		WHERE id = ?
-	`, SQLiteTime{Time: now}, SQLiteTime{Time: now}, runID,
-		counts.ActivitiesTotal, counts.ActivitiesImported, counts.ActivitiesSkipped,
-		counts.GearImported, counts.StreamsImported, counts.SegmentsImported,
-		counts.PhotosImported, counts.FailedCount, runID)
-	return err
+	return r.updateRunStatus(ctx, runID, "canceled", counts, nil)
 }
 
 // GetLatest returns the most recent sync runs for an athlete.

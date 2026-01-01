@@ -31,7 +31,7 @@ type BestEffortPR struct {
 	ActivityID     int64
 	ActivityName   string
 	SportType      string
-	StartDateLocal       SQLiteTime
+	StartDateLocal SQLiteTime
 }
 
 type BestEffortListItem struct {
@@ -46,7 +46,7 @@ type BestEffortListItem struct {
 	ActivityID     int64
 	ActivityName   string
 	SportType      string
-	StartDateLocal       SQLiteTime
+	StartDateLocal SQLiteTime
 }
 
 type BestEffortsRepository struct {

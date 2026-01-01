@@ -92,13 +92,13 @@ func generateChallenges(rng *rand.Rand, athleteID int64, months int) []storage.C
 			monthStr := monthDate.Format("2006-01")
 
 			challenges = append(challenges, storage.Challenge{
-				ID:        fmt.Sprintf("%s-%d", tmpl.slug, monthDate.Year()),
-				AthleteID: athleteID,
-				Name:      fmt.Sprintf("%s %d", tmpl.name, monthDate.Year()),
-				Slug:      tmpl.slug,
-				BadgeURL:  tmpl.badgeURL,
+				ID:             fmt.Sprintf("%s-%d", tmpl.slug, monthDate.Year()),
+				AthleteID:      athleteID,
+				Name:           fmt.Sprintf("%s %d", tmpl.name, monthDate.Year()),
+				Slug:           tmpl.slug,
+				BadgeURL:       tmpl.badgeURL,
 				CompletionDate: &storage.SQLiteTime{Time: completionDate},
-				Month:     monthStr,
+				Month:          monthStr,
 			})
 			break
 		}
@@ -133,13 +133,13 @@ func generateChallenges(rng *rand.Rand, athleteID int64, months int) []storage.C
 		year := completionDate.Year()
 
 		challenges = append(challenges, storage.Challenge{
-			ID:        fmt.Sprintf("%s-%d-%d", tmpl.slug, year, i),
-			AthleteID: athleteID,
-			Name:      tmpl.name,
-			Slug:      tmpl.slug,
-			BadgeURL:  tmpl.badgeURL,
+			ID:             fmt.Sprintf("%s-%d-%d", tmpl.slug, year, i),
+			AthleteID:      athleteID,
+			Name:           tmpl.name,
+			Slug:           tmpl.slug,
+			BadgeURL:       tmpl.badgeURL,
 			CompletionDate: &storage.SQLiteTime{Time: completionDate},
-			Month:     monthStr,
+			Month:          monthStr,
 		})
 
 		// Remove used template to avoid duplicates

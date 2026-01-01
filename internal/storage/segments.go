@@ -100,6 +100,90 @@ func (r *SegmentRepository) UpsertSegment(ctx context.Context, s *Segment) error
 	return err
 }
 
+// UpsertSegmentWithEffort atomically upserts a segment and its effort in a transaction.
+// This ensures data consistency - either both are stored or neither is.
+func (r *SegmentRepository) UpsertSegmentWithEffort(ctx context.Context, s *Segment, e *SegmentEffort) error {
+	tx, err := r.db.Conn().BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Insert segment first (required for FK constraint)
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO segments (
+			id, name, activity_type, distance, average_grade, maximum_grade,
+			elevation_high, elevation_low, climb_category,
+			start_lat, start_lng, end_lat, end_lng,
+			starred, polyline,
+			athlete_kom_rank, athlete_effort_count, athlete_pr_elapsed_time, athlete_pr_date,
+			updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			activity_type = EXCLUDED.activity_type,
+			distance = EXCLUDED.distance,
+			average_grade = EXCLUDED.average_grade,
+			maximum_grade = EXCLUDED.maximum_grade,
+			elevation_high = EXCLUDED.elevation_high,
+			elevation_low = EXCLUDED.elevation_low,
+			climb_category = EXCLUDED.climb_category,
+			start_lat = EXCLUDED.start_lat,
+			start_lng = EXCLUDED.start_lng,
+			end_lat = EXCLUDED.end_lat,
+			end_lng = EXCLUDED.end_lng,
+			starred = EXCLUDED.starred,
+			polyline = EXCLUDED.polyline,
+			athlete_kom_rank = EXCLUDED.athlete_kom_rank,
+			athlete_effort_count = EXCLUDED.athlete_effort_count,
+			athlete_pr_elapsed_time = EXCLUDED.athlete_pr_elapsed_time,
+			athlete_pr_date = EXCLUDED.athlete_pr_date,
+			updated_at = EXCLUDED.updated_at
+	`, s.ID, s.Name, s.ActivityType, s.Distance, s.AverageGrade, s.MaximumGrade,
+		s.ElevationHigh, s.ElevationLow, s.ClimbCategory,
+		s.StartLat, s.StartLng, s.EndLat, s.EndLng,
+		s.Starred, s.Polyline,
+		s.AthleteKOMRank, s.AthleteEffortCount, s.AthletePRElapsedTime, s.AthletePRDate,
+		SQLiteTime{Time: time.Now()},
+	)
+	if err != nil {
+		return fmt.Errorf("upserting segment: %w", err)
+	}
+
+	// Insert effort
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO segment_efforts (
+			id, segment_id, activity_id, athlete_id,
+			name, elapsed_time, moving_time,
+			start_date, start_date_local,
+			distance, average_watts, average_heartrate, max_heartrate,
+			pr_rank, country
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			elapsed_time = EXCLUDED.elapsed_time,
+			moving_time = EXCLUDED.moving_time,
+			start_date = EXCLUDED.start_date,
+			start_date_local = EXCLUDED.start_date_local,
+			distance = EXCLUDED.distance,
+			average_watts = EXCLUDED.average_watts,
+			average_heartrate = EXCLUDED.average_heartrate,
+			max_heartrate = EXCLUDED.max_heartrate,
+			pr_rank = EXCLUDED.pr_rank,
+			country = EXCLUDED.country
+	`, e.ID, e.SegmentID, e.ActivityID, e.AthleteID,
+		e.Name, e.ElapsedTime, e.MovingTime,
+		e.StartDate, e.StartDateLocal,
+		e.Distance, e.AverageWatts, e.AverageHeartrate, e.MaxHeartrate,
+		e.PRRank, e.Country,
+	)
+	if err != nil {
+		return fmt.Errorf("upserting segment effort: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 func (r *SegmentRepository) UpsertEffort(ctx context.Context, e *SegmentEffort) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO segment_efforts (

@@ -50,7 +50,7 @@ export type ImportPhase =
   | 'completed'
 
 export interface ImportProgress {
-  status: 'idle' | 'running' | 'completed' | 'failed' | 'canceled'
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'canceled' | 'paused'
   started_at?: string
   completed_at?: string
   error?: string
@@ -78,6 +78,10 @@ export interface ImportProgress {
   skipped_count: number
   failed_count: number
   current_page: number
+
+  // Aggregated non-fatal errors for user visibility
+  errors?: string[]
+  dropped_error_count?: number
 
   // ETA estimation
   remaining_api_calls: number
@@ -109,6 +113,9 @@ export {
   useImportProgress,
   useStartImport,
   useCancelImport,
+  usePauseImport,
+  useResumeImport,
+  useHasResumableImport,
   useSyncHistory,
   useLatestSync,
   useSyncWatermark,

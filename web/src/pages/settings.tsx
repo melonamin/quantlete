@@ -3,6 +3,7 @@ import {
   useAuthStatus,
   useCancelImport,
   useCredentialsStatus,
+  useHasResumableImport,
   useImportProgress,
   useLatestSync,
   useStartImport,
@@ -57,6 +58,7 @@ export function SettingsPage() {
   const { data: credentials } = useCredentialsStatus()
   const { data: progress } = useImportProgress()
   const { data: latestSync } = useLatestSync()
+  const { data: hasResumable } = useHasResumableImport()
   const startImport = useStartImport()
   const cancelImport = useCancelImport()
 
@@ -64,6 +66,8 @@ export function SettingsPage() {
   const isDemoMode = authStatus?.demo_mode ?? false
   const credentialsConfigured = credentials?.configured ?? false
   const isImporting = progress?.status === 'running'
+  const isPaused = progress?.status === 'paused'
+  const isIdle = progress?.status === 'idle' || !progress
 
   const [includeStreams, setIncludeStreams] = useState(true)
   const [includeSegments, setIncludeSegments] = useState(true)
@@ -89,6 +93,10 @@ export function SettingsPage() {
       skip_best_efforts: !includeBestEfforts,
       skip_photos: !includePhotos,
     })
+  }
+
+  const handleResumeImport = () => {
+    startImport.mutate({ resume: true })
   }
 
   const handleCancelImport = () => {
@@ -242,17 +250,35 @@ export function SettingsPage() {
                       {progress && progress.status !== 'idle' && <ImportStatus progress={progress} />}
 
                       <div className="flex gap-2">
-                        <Button onClick={handleStartImport} disabled={isImporting || !isAuthenticated}>
+                        {hasResumable && isIdle && (
+                          <Button onClick={handleResumeImport} disabled={startImport.isPending}>
+                            {startImport.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Resuming...
+                              </>
+                            ) : (
+                              'Resume Previous Sync'
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          onClick={handleStartImport}
+                          disabled={isImporting || isPaused || !isAuthenticated}
+                          variant={hasResumable && isIdle ? 'outline' : 'default'}
+                        >
                           {isImporting ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                               Importing...
                             </>
+                          ) : hasResumable && isIdle ? (
+                            'Start New Import'
                           ) : (
                             'Start Import'
                           )}
                         </Button>
-                        {isImporting && (
+                        {(isImporting || isPaused) && (
                           <Button variant="outline" onClick={handleCancelImport}>
                             Cancel
                           </Button>

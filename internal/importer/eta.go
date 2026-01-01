@@ -9,12 +9,12 @@ import (
 // ETAEstimator estimates completion time based on rate limits.
 type ETAEstimator struct {
 	// Rate limits (from Strava)
-	FifteenMinLimit  int
-	FifteenMinUsed   int
-	FifteenMinReset  time.Time
-	DailyLimit       int
-	DailyUsed        int
-	DailyReset       time.Time
+	FifteenMinLimit int
+	FifteenMinUsed  int
+	FifteenMinReset time.Time
+	DailyLimit      int
+	DailyUsed       int
+	DailyReset      time.Time
 
 	// Average API call duration
 	AvgCallDuration time.Duration

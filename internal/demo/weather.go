@@ -25,18 +25,18 @@ var seasonalTemps = []struct {
 	low  float64
 	high float64
 }{
-	{-5, 8},   // January
-	{-3, 10},  // February
-	{2, 14},   // March
-	{6, 18},   // April
-	{10, 22},  // May
-	{14, 26},  // June
-	{16, 30},  // July
-	{15, 29},  // August
-	{11, 24},  // September
-	{6, 18},   // October
-	{1, 12},   // November
-	{-3, 8},   // December
+	{-5, 8},  // January
+	{-3, 10}, // February
+	{2, 14},  // March
+	{6, 18},  // April
+	{10, 22}, // May
+	{14, 26}, // June
+	{16, 30}, // July
+	{15, 29}, // August
+	{11, 24}, // September
+	{6, 18},  // October
+	{1, 12},  // November
+	{-3, 8},  // December
 }
 
 // generateWeather creates realistic weather data for activities.

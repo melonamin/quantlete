@@ -186,9 +186,9 @@ func TestFormatMonthName(t *testing.T) {
 		// Edge cases
 		{"invalid", "invalid"},
 		{"2024", "2024"},
-		{"2024-13", "2024-13"},   // Invalid month
-		{"2024-00", "2024-00"},   // Invalid month
-		{"2024-XX", "2024-XX"},   // Non-numeric month
+		{"2024-13", "2024-13"}, // Invalid month
+		{"2024-00", "2024-00"}, // Invalid month
+		{"2024-XX", "2024-XX"}, // Non-numeric month
 	}
 
 	for _, tt := range tests {

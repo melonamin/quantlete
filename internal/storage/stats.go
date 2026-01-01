@@ -298,19 +298,19 @@ type CalendarDay struct {
 	Date          string  `json:"date"` // YYYY-MM-DD format
 	ActivityCount int     `json:"activity_count"`
 	TotalDistance float64 `json:"total_distance"`
-	TotalTime     int     `json:"total_time"`     // moving_time in seconds
+	TotalTime     int     `json:"total_time"` // moving_time in seconds
 	TotalCalories float64 `json:"total_calories"`
 }
 
 // CalendarActivity represents an activity summary for the calendar view.
 type CalendarActivity struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	SportType          string    `json:"sport_type"`
-	StartDate            SQLiteTime `json:"start_date"`
-	Distance           float64   `json:"distance"`
-	MovingTime         int       `json:"moving_time"`
-	TotalElevationGain float64   `json:"total_elevation_gain"`
+	ID                 int64      `json:"id"`
+	Name               string     `json:"name"`
+	SportType          string     `json:"sport_type"`
+	StartDate          SQLiteTime `json:"start_date"`
+	Distance           float64    `json:"distance"`
+	MovingTime         int        `json:"moving_time"`
+	TotalElevationGain float64    `json:"total_elevation_gain"`
 }
 
 // GetCalendarData returns daily activity counts for a given year.
@@ -435,14 +435,14 @@ type YearStat struct {
 // IMPORTANT: Field order must match the SELECT column order in GetHeatmapData.
 // When modifying fields, update both the struct and the SQL query together.
 type HeatmapActivity struct {
-	ID              int64   `json:"id"`              // Column 1
-	Name            string  `json:"name"`            // Column 2
-	SportType       string  `json:"sport_type"`      // Column 3
-	StartDate       string  `json:"start_date"`      // Column 4
-	Distance        float64 `json:"distance"`        // Column 5
+	ID              int64   `json:"id"`               // Column 1
+	Name            string  `json:"name"`             // Column 2
+	SportType       string  `json:"sport_type"`       // Column 3
+	StartDate       string  `json:"start_date"`       // Column 4
+	Distance        float64 `json:"distance"`         // Column 5
 	SummaryPolyline string  `json:"summary_polyline"` // Column 6
-	StartLat        float64 `json:"start_lat"`       // Column 7
-	StartLng        float64 `json:"start_lng"`       // Column 8
+	StartLat        float64 `json:"start_lat"`        // Column 7
+	StartLng        float64 `json:"start_lng"`        // Column 8
 }
 
 // HeatmapFilters contains filters for heatmap queries.

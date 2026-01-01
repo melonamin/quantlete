@@ -8,8 +8,8 @@ import (
 )
 
 type AthleteMetricPoint struct {
-	RecordedAt           SQLiteTime `json:"recorded_at"`
-	Value      float64   `json:"value"`
+	RecordedAt SQLiteTime `json:"recorded_at"`
+	Value      float64    `json:"value"`
 }
 
 type AthleteMetricsRepository struct {

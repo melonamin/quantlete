@@ -233,6 +233,9 @@ export interface DataProvider {
   getImportProgress(): Promise<ImportProgress>
   startImport(req?: StartImportRequest): Promise<{ message: string }>
   cancelImport(): Promise<{ message: string }>
+  pauseImport(): Promise<{ message: string }>
+  resumeImport(): Promise<{ message: string }>
+  hasResumableImport(): boolean
   getSyncHistory(limit?: number): Promise<SyncRun[]>
   getLatestSync(): Promise<SyncRun | null>
   getSyncWatermark(): Promise<SyncWatermark | null>

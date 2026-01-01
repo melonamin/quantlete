@@ -90,10 +90,13 @@ import {
   exchangeCode,
   startImport as stravaStartImport,
   cancelImport as stravaCancelImport,
+  pauseImport as stravaPauseImport,
+  hasResumableImport as stravaHasResumableImport,
   getImportProgress as stravaGetImportProgress,
   getSyncHistory as stravaGetSyncHistory,
   getLatestSync as stravaGetLatestSync,
   getRateLimitInfo,
+  backfillPowerBests,
 } from '@/lib/wasm/strava'
 import type { SyncRun as ApiSyncRun, SyncWatermark } from '@/lib/api/import'
 import { fetchOpenMeteoWeather, computeFromTempStream } from '@/lib/wasm/weather'
@@ -116,6 +119,11 @@ export class WasmProvider implements DataProvider {
       const athlete = getAthlete()
       this.athleteId = athlete?.id ?? null
       console.log('[WasmProvider] Loaded auth', { athleteId: this.athleteId })
+
+      // Backfill power bests for existing activities (runs in background)
+      backfillPowerBests().catch((err) => {
+        console.warn('[WasmProvider] Power backfill failed:', err)
+      })
     } else {
       // Fall back to checking if athlete exists
       const athleteRow = this.db.queryOne<{ id: number }>('SELECT id FROM athletes LIMIT 1')
@@ -767,10 +775,82 @@ export class WasmProvider implements DataProvider {
   // Stats & Training
   // ============================================================================
   async getPowerStats(
-    _filters?: { after?: string; before?: string; sport_type?: string }
+    filters?: { after?: string; before?: string; sport_type?: string }
   ): Promise<PowerStatsResponse> {
-    // Power stats require power best efforts table - return stub for now
-    return { durations_s: [], best: [], history: {} }
+    const db = this.assertInitialized()
+    const athleteId = this.getAthleteId()
+
+    const durations = [5, 10, 30, 60, 300, 480, 1200, 3600]
+
+    // Build WHERE clause with filters
+    const conditions: string[] = ['p.athlete_id = ?']
+    const args: unknown[] = [athleteId]
+
+    if (filters?.after) {
+      conditions.push('a.start_date >= ?')
+      args.push(filters.after)
+    }
+    if (filters?.before) {
+      conditions.push('a.start_date <= ?')
+      args.push(filters.before)
+    }
+    if (filters?.sport_type) {
+      conditions.push('a.sport_type = ?')
+      args.push(filters.sport_type)
+    }
+
+    const whereClause = conditions.join(' AND ')
+
+    // Query best power for each duration using window function
+    const best = db.query<{
+      duration_s: number
+      watts: number
+      activity_id: number
+      start_date: string
+    }>(
+      `WITH ranked AS (
+        SELECT
+          p.duration_s,
+          p.best_avg_watts AS watts,
+          p.activity_id,
+          a.start_date,
+          ROW_NUMBER() OVER (PARTITION BY p.duration_s ORDER BY p.best_avg_watts DESC) AS rn
+        FROM power_best_efforts p
+        JOIN activities a ON a.id = p.activity_id
+        WHERE ${whereClause}
+      )
+      SELECT duration_s, watts, activity_id, start_date
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY duration_s ASC`,
+      args
+    )
+
+    // Query history for each duration (cumulative best over time)
+    const history: Record<string, { date: string; watts: number }[]> = {}
+    for (const duration of durations) {
+      const points = db.query<{ date: string; watts: number }>(
+        `SELECT DATE(a.start_date) as date, p.best_avg_watts as watts
+         FROM power_best_efforts p
+         JOIN activities a ON a.id = p.activity_id
+         WHERE ${whereClause} AND p.duration_s = ?
+         ORDER BY a.start_date ASC`,
+        [...args, duration]
+      )
+
+      // Build cumulative best history (matching Go behavior)
+      let maxSeen = 0
+      history[String(duration)] = points.map((p) => {
+        if (p.watts > maxSeen) maxSeen = p.watts
+        return { date: p.date, watts: maxSeen }
+      })
+    }
+
+    return {
+      durations_s: durations,
+      best,
+      history,
+    }
   }
 
   async getPowerZones(): Promise<PowerZonesResponse> {
@@ -2623,6 +2703,7 @@ export class WasmProvider implements DataProvider {
       complete: 'completed',
       error: 'failed',
       cancelled: 'canceled',
+      paused: 'paused',
     }
 
     // Map phase names (WASM uses 'details'/'segments', API uses 'activity_details'/'segment_details')
@@ -2667,9 +2748,9 @@ export class WasmProvider implements DataProvider {
       current_page: 0,
       error: progress.error,
 
-      // Rate limit info from WASM rate limiter
-      remaining_api_calls: 0,
-      estimated_eta: undefined,
+      // ETA estimation from WASM importer
+      remaining_api_calls: progress.remaining_api_calls ?? 0,
+      estimated_eta: progress.estimated_eta,
       rate_limit_used_15min: rateLimitInfo.usage15Min,
       rate_limit_limit_15min: rateLimitInfo.limit15Min,
       rate_limit_used_daily: rateLimitInfo.usageDaily,
@@ -2699,6 +2780,23 @@ export class WasmProvider implements DataProvider {
   async cancelImport(): Promise<{ message: string }> {
     stravaCancelImport()
     return { message: 'Import cancelled' }
+  }
+
+  async pauseImport(): Promise<{ message: string }> {
+    stravaPauseImport()
+    return { message: 'Import paused' }
+  }
+
+  async resumeImport(): Promise<{ message: string }> {
+    // Resume by starting import with resume: true
+    stravaStartImport({ resume: true }).catch((err) => {
+      console.error('[WasmProvider] Resume error:', err)
+    })
+    return { message: 'Import resumed' }
+  }
+
+  hasResumableImport(): boolean {
+    return stravaHasResumableImport()
   }
 
   async getSyncHistory(limit = 10): Promise<ApiSyncRun[]> {

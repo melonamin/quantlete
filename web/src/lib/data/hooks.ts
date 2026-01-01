@@ -534,8 +534,8 @@ export function useImportProgress(enabled = true) {
     enabled: enabled && initialized && !error && !!provider,
     refetchInterval: (query) => {
       const data = query.state.data
-      if (data?.status === 'running') {
-        return 1000 // Poll every second while running
+      if (data?.status === 'running' || data?.status === 'paused') {
+        return 1000 // Poll every second while running or paused
       }
       return false
     },
@@ -569,6 +569,50 @@ export function useCancelImport() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'import', 'progress'] })
     },
+  })
+}
+
+export function usePauseImport() {
+  const { provider, initialized } = useDataProviderStatus()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.pauseImport()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['data', 'import', 'progress'] })
+    },
+  })
+}
+
+export function useResumeImport() {
+  const { provider, initialized } = useDataProviderStatus()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.resumeImport()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['data', 'import', 'progress'] })
+    },
+  })
+}
+
+export function useHasResumableImport() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'import', 'resumable'],
+    queryFn: async (): Promise<boolean> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.hasResumableImport()
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: 1000 * 5, // 5 seconds
   })
 }
 

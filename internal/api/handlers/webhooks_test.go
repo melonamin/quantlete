@@ -110,11 +110,11 @@ func TestStravaWebhookHandler_Validate(t *testing.T) {
 
 func TestStravaWebhookHandler_Receive(t *testing.T) {
 	tests := []struct {
-		name             string
-		event            StravaWebhookEvent
-		configSubID      int64
-		wantStatusCode   int
-		wantReceived     bool
+		name           string
+		event          StravaWebhookEvent
+		configSubID    int64
+		wantStatusCode int
+		wantReceived   bool
 	}{
 		{
 			name: "valid activity create event",

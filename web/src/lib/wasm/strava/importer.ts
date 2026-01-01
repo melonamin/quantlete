@@ -12,6 +12,23 @@
 
 import { stravaFetch, getAthlete } from './client'
 import { getDatabase } from '../db'
+import { getRateLimitInfo } from './ratelimit'
+import { createETAEstimator, updateFromRateLimits, estimateCompletion, formatETA, type ETAState } from './eta'
+import { rollingMaxAverage, isInitialized as algorithmsInitialized } from '../algorithms'
+import {
+  saveImportState,
+  loadImportState,
+  clearImportState,
+  hasResumableState,
+  type ImportState,
+} from './import-state'
+
+// Standard durations for power curve (matching Go backend)
+const POWER_DURATIONS = [5, 10, 30, 60, 300, 480, 1200, 3600]
+
+// Rate limiting delays between API calls (milliseconds)
+const RATE_LIMIT_DELAY_SHORT_MS = 100 // Used between fast operations (activity list pages, gear)
+const RATE_LIMIT_DELAY_LONG_MS = 200 // Used between heavier operations (streams, details, segments, photos)
 
 // ============================================================================
 // Types
@@ -32,10 +49,11 @@ export interface ImportOptions {
   skipStreams?: boolean
   skipSegments?: boolean
   skipPhotos?: boolean
+  resume?: boolean
 }
 
 export interface ImportProgress {
-  status: 'idle' | 'running' | 'complete' | 'error' | 'cancelled'
+  status: 'idle' | 'running' | 'complete' | 'error' | 'cancelled' | 'paused'
   phase: ImportPhase
   error?: string
   sync_run_id?: number
@@ -56,6 +74,10 @@ export interface ImportProgress {
 
   // Legacy/aggregate fields
   failed_count: number
+
+  // ETA estimation
+  remaining_api_calls: number
+  estimated_eta?: string
 }
 
 export interface SyncRun {
@@ -231,9 +253,13 @@ let importProgress: ImportProgress = {
   photos_total: 0,
   photos_done: 0,
   failed_count: 0,
+  remaining_api_calls: 0,
+  estimated_eta: undefined,
 }
 
 let cancelRequested = false
+let pauseRequested = false
+let etaState: ETAState = createETAEstimator()
 
 // ============================================================================
 // Public API
@@ -244,9 +270,61 @@ export function getImportProgress(): ImportProgress {
 }
 
 export function cancelImport(): void {
-  if (importProgress.status === 'running') {
+  if (importProgress.status === 'running' || importProgress.status === 'paused') {
+    const wasPaused = importProgress.status === 'paused'
     cancelRequested = true
+    pauseRequested = false
+    clearImportState()
+
+    // If cancelling from paused state, update sync_history immediately
+    // (running state will be updated when the import loop catches the cancel)
+    if (wasPaused && importProgress.sync_run_id) {
+      const db = getDatabase()
+      try {
+        const completedAt = new Date().toISOString()
+        db.exec(
+          `UPDATE sync_history SET
+            completed_at = ?, status = 'canceled',
+            activities_total = ?, activities_imported = ?,
+            streams_imported = ?, failed_count = ?
+          WHERE id = ?`,
+          [
+            completedAt,
+            importProgress.activities_total,
+            importProgress.activities_done,
+            importProgress.streams_done,
+            importProgress.failed_count,
+            importProgress.sync_run_id,
+          ]
+        )
+      } catch (err) {
+        console.error('[Import] Failed to update sync_history on cancel:', err)
+      }
+      importProgress.status = 'cancelled'
+    }
   }
+}
+
+export function pauseImport(): void {
+  if (importProgress.status === 'running') {
+    pauseRequested = true
+  }
+}
+
+export function resumeImport(): void {
+  if (importProgress.status === 'paused') {
+    // Resume by calling startImport with resume: true
+    // The actual resume is handled by startImport
+    pauseRequested = false
+  }
+}
+
+export function isPausedImport(): boolean {
+  return importProgress.status === 'paused'
+}
+
+export function hasResumableImport(): boolean {
+  return hasResumableState() || importProgress.status === 'paused'
 }
 
 export function getSyncHistory(limit = 10): SyncRun[] {
@@ -306,6 +384,197 @@ export function getLatestSync(): SyncRun | null {
   return history.length > 0 ? history[0] : null
 }
 
+// ============================================================================
+// ETA Helpers
+// ============================================================================
+
+/**
+ * Calculate remaining API calls based on current phase and state.
+ */
+function calculateRemainingAPICalls(
+  phase: ImportPhase,
+  state: SyncState,
+  options: ImportOptions
+): number {
+  let calls = 0
+
+  // Add calls for remaining phases based on current phase
+  switch (phase) {
+    case 'activities':
+      // Estimate remaining activity pages (we don't know total yet)
+      calls += 5 // Conservative estimate for remaining pages
+      // Fall through to count remaining phases
+      calls += state.gearIds.size
+      if (!options.skipStreams) calls += state.activityIds.length - importProgress.streams_done
+      if (!options.skipSegments) {
+        calls += state.activityIds.length - importProgress.details_done
+        calls += state.segmentIdsToFetch.size - importProgress.segments_done
+      }
+      if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
+      break
+
+    case 'gear':
+      calls += state.gearIds.size - importProgress.gear_done
+      if (!options.skipStreams) calls += state.activityIds.length - importProgress.streams_done
+      if (!options.skipSegments) {
+        calls += state.activityIds.length - importProgress.details_done
+        calls += state.segmentIdsToFetch.size
+      }
+      if (!options.skipPhotos) calls += state.activitiesWithPhotos.length
+      break
+
+    case 'streams':
+      calls += importProgress.streams_total - importProgress.streams_done
+      if (!options.skipSegments) {
+        calls += state.activityIds.length - importProgress.details_done
+        calls += state.segmentIdsToFetch.size
+      }
+      if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
+      break
+
+    case 'details':
+      calls += importProgress.details_total - importProgress.details_done
+      if (!options.skipSegments) calls += state.segmentIdsToFetch.size - importProgress.segments_done
+      if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
+      break
+
+    case 'segments':
+      calls += importProgress.segments_total - importProgress.segments_done
+      if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
+      break
+
+    case 'photos':
+      calls += importProgress.photos_total - importProgress.photos_done
+      break
+  }
+
+  return Math.max(0, calls)
+}
+
+/**
+ * Build import state for persistence.
+ */
+function buildImportState(
+  phase: ImportPhase,
+  state: SyncState,
+  options: ImportOptions,
+  indices: {
+    activitiesLastPage?: number
+    gearLastIndex?: number
+    streamsLastIndex?: number
+    detailsLastIndex?: number
+    segmentsLastIndex?: number
+    photosLastIndex?: number
+  } = {}
+): ImportState {
+  return {
+    phase,
+    activityIds: state.activityIds,
+    gearIds: Array.from(state.gearIds),
+    segmentIdsToFetch: Array.from(state.segmentIdsToFetch),
+    activitiesWithPhotos: state.activitiesWithPhotos,
+    newestActivityDate: state.newestActivityDate,
+    activitiesLastPage: indices.activitiesLastPage ?? 0,
+    gearLastIndex: indices.gearLastIndex ?? 0,
+    streamsLastIndex: indices.streamsLastIndex ?? 0,
+    detailsLastIndex: indices.detailsLastIndex ?? 0,
+    segmentsLastIndex: indices.segmentsLastIndex ?? 0,
+    photosLastIndex: indices.photosLastIndex ?? 0,
+    activitiesTotal: importProgress.activities_total,
+    activitiesDone: importProgress.activities_done,
+    gearTotal: importProgress.gear_total,
+    gearDone: importProgress.gear_done,
+    streamsTotal: importProgress.streams_total,
+    streamsDone: importProgress.streams_done,
+    detailsTotal: importProgress.details_total,
+    detailsDone: importProgress.details_done,
+    segmentsTotal: importProgress.segments_total,
+    segmentsDone: importProgress.segments_done,
+    photosTotal: importProgress.photos_total,
+    photosDone: importProgress.photos_done,
+    failedCount: importProgress.failed_count,
+    options,
+    startedAt: new Date().toISOString(),
+    syncRunId: importProgress.sync_run_id,
+  }
+}
+
+/**
+ * Check if pause was requested and handle it.
+ * Returns true if paused (caller should exit loop).
+ * Note: Does NOT clear pauseRequested - the outer startImport() checks this flag
+ * to throw 'Paused' and exit cleanly after the phase loop breaks.
+ */
+function checkPauseRequested(
+  phase: ImportPhase,
+  state: SyncState,
+  options: ImportOptions,
+  currentIndex: number,
+  indexKey: 'activitiesLastPage' | 'gearLastIndex' | 'streamsLastIndex' | 'detailsLastIndex' | 'segmentsLastIndex' | 'photosLastIndex'
+): boolean {
+  if (!pauseRequested) return false
+
+  // Build and save state for resume
+  const importState = buildImportState(phase, state, options, { [indexKey]: currentIndex })
+  importState.pausedAt = new Date().toISOString()
+  saveImportState(importState)
+
+  // Update progress status - pauseRequested stays true so startImport() can detect it
+  importProgress.status = 'paused'
+
+  // Update sync_history to reflect paused status
+  if (importProgress.sync_run_id) {
+    const db = getDatabase()
+    try {
+      db.exec(
+        `UPDATE sync_history SET status = 'paused',
+          activities_total = ?, activities_imported = ?,
+          streams_imported = ?, failed_count = ?
+        WHERE id = ?`,
+        [
+          importProgress.activities_total,
+          importProgress.activities_done,
+          importProgress.streams_done,
+          importProgress.failed_count,
+          importProgress.sync_run_id,
+        ]
+      )
+    } catch (err) {
+      console.error('[Import] Failed to update sync_history on pause:', err)
+    }
+  }
+
+  console.log(`[Import] Paused at phase ${phase}, index ${currentIndex}`)
+  return true
+}
+
+/**
+ * Update ETA estimation based on current progress.
+ */
+function updateETA(phase: ImportPhase, state: SyncState, options: ImportOptions): void {
+  // Update rate limit info
+  const rateLimits = getRateLimitInfo()
+  updateFromRateLimits(
+    etaState,
+    rateLimits.usage15Min,
+    rateLimits.limit15Min,
+    rateLimits.usageDaily,
+    rateLimits.limitDaily
+  )
+
+  // Calculate remaining calls
+  const remaining = calculateRemainingAPICalls(phase, state, options)
+  importProgress.remaining_api_calls = remaining
+
+  // Estimate ETA
+  if (remaining > 0) {
+    const durationMs = estimateCompletion(etaState, remaining)
+    importProgress.estimated_eta = formatETA(durationMs)
+  } else {
+    importProgress.estimated_eta = undefined
+  }
+}
+
 /**
  * Start importing activities from Strava using phased approach.
  */
@@ -322,103 +591,184 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   }
 
   cancelRequested = false
+  pauseRequested = false
+  etaState = createETAEstimator()
   const db = getDatabase()
   const athleteId = athlete.id
   const startedAt = new Date().toISOString()
 
-  // Create sync history record
+  // Check for resumable state
+  const savedState = options.resume ? loadImportState() : null
+  const isResuming = savedState !== null
+
+  // Merge options with saved options if resuming
+  const effectiveOptions: ImportOptions = isResuming
+    ? { ...savedState.options, ...options }
+    : options
+
+  // Always create a new sync history record (even when resuming to preserve audit trail)
+  // When resuming, the previous sync run retains its terminal state (paused/failed)
   let syncRunId: number | null = null
   try {
     db.exec(
       `INSERT INTO sync_history (
         athlete_id, started_at, status, full_sync, skip_streams
       ) VALUES (?, ?, 'running', ?, ?)`,
-      [athleteId, startedAt, options.fullSync ? 1 : 0, options.skipStreams ? 1 : 0]
+      [athleteId, startedAt, effectiveOptions.fullSync ? 1 : 0, effectiveOptions.skipStreams ? 1 : 0]
     )
     const result = db.queryOne<{ id: number }>('SELECT last_insert_rowid() as id')
     syncRunId = result?.id ?? null
+
+    // If resuming, update the old sync run to mark it was resumed
+    if (isResuming && savedState.syncRunId) {
+      db.exec(
+        `UPDATE sync_history SET status = 'resumed', error = ? WHERE id = ? AND status IN ('paused', 'running')`,
+        [`Resumed in sync run ${syncRunId}`, savedState.syncRunId]
+      )
+    }
   } catch (err) {
     console.error('[Import] Failed to create sync history record:', err)
   }
 
-  // Initialize progress
-  importProgress = {
-    status: 'running',
-    phase: 'activities',
-    sync_run_id: syncRunId ?? undefined,
-    activities_total: 0,
-    activities_done: 0,
-    gear_total: 0,
-    gear_done: 0,
-    streams_total: 0,
-    streams_done: 0,
-    details_total: 0,
-    details_done: 0,
-    segments_total: 0,
-    segments_done: 0,
-    photos_total: 0,
-    photos_done: 0,
-    failed_count: 0,
+  // Initialize or restore progress
+  if (isResuming) {
+    console.log('[Import] Resuming from phase:', savedState.phase)
+    importProgress = {
+      status: 'running',
+      phase: savedState.phase,
+      sync_run_id: syncRunId ?? undefined,
+      activities_total: savedState.activitiesTotal,
+      activities_done: savedState.activitiesDone,
+      gear_total: savedState.gearTotal,
+      gear_done: savedState.gearDone,
+      streams_total: savedState.streamsTotal,
+      streams_done: savedState.streamsDone,
+      details_total: savedState.detailsTotal,
+      details_done: savedState.detailsDone,
+      segments_total: savedState.segmentsTotal,
+      segments_done: savedState.segmentsDone,
+      photos_total: savedState.photosTotal,
+      photos_done: savedState.photosDone,
+      failed_count: savedState.failedCount,
+      remaining_api_calls: 0,
+      estimated_eta: undefined,
+    }
+  } else {
+    importProgress = {
+      status: 'running',
+      phase: 'activities',
+      sync_run_id: syncRunId ?? undefined,
+      activities_total: 0,
+      activities_done: 0,
+      gear_total: 0,
+      gear_done: 0,
+      streams_total: 0,
+      streams_done: 0,
+      details_total: 0,
+      details_done: 0,
+      segments_total: 0,
+      segments_done: 0,
+      photos_total: 0,
+      photos_done: 0,
+      failed_count: 0,
+      remaining_api_calls: 0,
+      estimated_eta: undefined,
+    }
   }
 
-  // Initialize state
-  const state: SyncState = {
-    activityIds: [],
-    gearIds: new Set(),
-    activitiesWithPhotos: [],
-    segmentIdsToFetch: new Set(),
-    newestActivityDate: null,
-  }
+  // Initialize or restore state
+  const state: SyncState = isResuming
+    ? {
+        activityIds: savedState.activityIds,
+        gearIds: new Set(savedState.gearIds),
+        activitiesWithPhotos: savedState.activitiesWithPhotos,
+        segmentIdsToFetch: new Set(savedState.segmentIdsToFetch),
+        newestActivityDate: savedState.newestActivityDate,
+      }
+    : {
+        activityIds: [],
+        gearIds: new Set(),
+        activitiesWithPhotos: [],
+        segmentIdsToFetch: new Set(),
+        newestActivityDate: null,
+      }
+
+  // Resume indices
+  const resumeIndices = isResuming
+    ? {
+        activitiesLastPage: savedState.activitiesLastPage,
+        gearLastIndex: savedState.gearLastIndex,
+        streamsLastIndex: savedState.streamsLastIndex,
+        detailsLastIndex: savedState.detailsLastIndex,
+        segmentsLastIndex: savedState.segmentsLastIndex,
+        photosLastIndex: savedState.photosLastIndex,
+      }
+    : { activitiesLastPage: 0, gearLastIndex: 0, streamsLastIndex: 0, detailsLastIndex: 0, segmentsLastIndex: 0, photosLastIndex: 0 }
 
   // Get existing activity IDs if not full sync
   const existingIds = new Set<number>()
-  if (!options.fullSync) {
+  if (!effectiveOptions.fullSync && !isResuming) {
     const rows = db.query<{ id: number }>('SELECT id FROM activities WHERE athlete_id = ?', [athleteId])
     for (const row of rows) {
       existingIds.add(row.id)
     }
   }
 
-  try {
-    // Phase 1: Activities
-    await runActivitiesPhase(db, athleteId, existingIds, state)
-    if (cancelRequested) throw new Error('Cancelled')
-    await db.persist()
+  // Determine starting phase
+  const phaseOrder: ImportPhase[] = ['activities', 'gear', 'streams', 'details', 'segments', 'photos']
+  const startPhaseIndex = isResuming ? phaseOrder.indexOf(savedState.phase) : 0
 
-    // Phase 2: Gear
-    await runGearPhase(db, athleteId, state)
-    if (cancelRequested) throw new Error('Cancelled')
-    await db.persist()
+  try {
+    // Phase 1: Activities (skip if resuming past this phase)
+    if (startPhaseIndex <= 0) {
+      await runActivitiesPhase(db, athleteId, existingIds, state, effectiveOptions, startPhaseIndex === 0 ? resumeIndices.activitiesLastPage : 0)
+      if (cancelRequested) throw new Error('Cancelled')
+      if (pauseRequested) throw new Error('Paused')
+      await db.persist()
+    }
+
+    // Phase 2: Gear (skip if resuming past this phase)
+    if (startPhaseIndex <= 1) {
+      await runGearPhase(db, athleteId, state, effectiveOptions, startPhaseIndex === 1 ? resumeIndices.gearLastIndex : 0)
+      if (cancelRequested) throw new Error('Cancelled')
+      if (pauseRequested) throw new Error('Paused')
+      await db.persist()
+    }
 
     // Phase 3: Streams
-    if (!options.skipStreams) {
-      await runStreamsPhase(db, state)
+    if (!effectiveOptions.skipStreams && startPhaseIndex <= 2) {
+      await runStreamsPhase(db, state, effectiveOptions, startPhaseIndex === 2 ? resumeIndices.streamsLastIndex : 0)
       if (cancelRequested) throw new Error('Cancelled')
+      if (pauseRequested) throw new Error('Paused')
       await db.persist()
     }
 
     // Phase 4: Activity Details (segment efforts + best efforts)
-    if (!options.skipSegments) {
-      await runActivityDetailsPhase(db, athleteId, state)
+    if (!effectiveOptions.skipSegments && startPhaseIndex <= 3) {
+      await runActivityDetailsPhase(db, athleteId, state, effectiveOptions, startPhaseIndex === 3 ? resumeIndices.detailsLastIndex : 0)
       if (cancelRequested) throw new Error('Cancelled')
+      if (pauseRequested) throw new Error('Paused')
       await db.persist()
     }
 
     // Phase 5: Segment Details (for incomplete segments)
-    if (!options.skipSegments && state.segmentIdsToFetch.size > 0) {
-      await runSegmentDetailsPhase(db, state)
+    if (!effectiveOptions.skipSegments && state.segmentIdsToFetch.size > 0 && startPhaseIndex <= 4) {
+      await runSegmentDetailsPhase(db, state, effectiveOptions, startPhaseIndex === 4 ? resumeIndices.segmentsLastIndex : 0)
       if (cancelRequested) throw new Error('Cancelled')
+      if (pauseRequested) throw new Error('Paused')
       await db.persist()
     }
 
     // Phase 6: Photos
-    if (!options.skipPhotos) {
-      await runPhotosPhase(db, athleteId, state)
+    if (!effectiveOptions.skipPhotos && startPhaseIndex <= 5) {
+      await runPhotosPhase(db, athleteId, state, effectiveOptions, startPhaseIndex === 5 ? resumeIndices.photosLastIndex : 0)
       if (cancelRequested) throw new Error('Cancelled')
+      if (pauseRequested) throw new Error('Paused')
       await db.persist()
     }
 
-    // Complete
+    // Complete - clear saved state
+    clearImportState()
     importProgress.status = 'complete'
     importProgress.phase = 'complete'
 
@@ -449,11 +799,18 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
 
-    if (errorMsg === 'Cancelled') {
+    if (errorMsg === 'Paused') {
+      // Pause was requested - state already saved, clear flag and return
+      pauseRequested = false
+      console.log('[Import] Paused')
+      return
+    } else if (errorMsg === 'Cancelled') {
       importProgress.status = 'cancelled'
+      clearImportState()
     } else {
       importProgress.status = 'error'
       importProgress.error = errorMsg
+      clearImportState()
     }
 
     // Update sync history with failure/cancellation
@@ -500,12 +857,14 @@ async function runActivitiesPhase(
   db: ReturnType<typeof getDatabase>,
   athleteId: number,
   existingIds: Set<number>,
-  state: SyncState
+  state: SyncState,
+  options: ImportOptions,
+  startPage = 1
 ): Promise<void> {
   importProgress.phase = 'activities'
-  console.log('[Import] Phase 1: Fetching activities')
+  console.log(`[Import] Phase 1: Fetching activities (starting at page ${startPage || 1})`)
 
-  let page = 1
+  let page = startPage || 1
   const perPage = 100
   let hasMore = true
 
@@ -519,6 +878,7 @@ async function runActivitiesPhase(
 
     importProgress.activities_total += activities.length
 
+    let batchCount = 0
     for (const activity of activities) {
       if (cancelRequested) break
 
@@ -527,8 +887,15 @@ async function runActivitiesPhase(
         state.newestActivityDate = activity.start_date
       }
 
-      // Collect activity ID for later phases
-      state.activityIds.push(activity.id)
+      // Collect activity ID for later phases (with memory limit)
+      if (state.activityIds.length < MAX_ACTIVITY_IDS_IN_MEMORY) {
+        state.activityIds.push(activity.id)
+      } else if (state.activityIds.length === MAX_ACTIVITY_IDS_IN_MEMORY) {
+        // Log warning once when limit is reached (don't push beyond limit)
+        console.warn(`[Import] Activity ID memory limit reached (${MAX_ACTIVITY_IDS_IN_MEMORY}). ` +
+          'Older activities will not have streams/details fetched in this sync. Run another sync for remaining activities.')
+      }
+      // Beyond limit, we still store the activity but don't track its ID for later phases
 
       // Collect gear ID
       if (activity.gear_id) {
@@ -552,10 +919,23 @@ async function runActivitiesPhase(
         console.error(`Failed to store activity ${activity.id}:`, error)
         importProgress.failed_count++
       }
+
+      // Yield to main thread periodically to prevent UI blocking
+      batchCount++
+      if (batchCount >= DB_BATCH_SIZE) {
+        await yieldToMain()
+        batchCount = 0
+      }
     }
 
+    // Update ETA after each page
+    updateETA('activities', state, options)
+
+    // Check for pause after each page (next page will be fetched on resume)
+    if (checkPauseRequested('activities', state, options, page + 1, 'activitiesLastPage')) break
+
     page++
-    await sleep(100) // Rate limiting
+    await sleep(RATE_LIMIT_DELAY_SHORT_MS)
   }
 
   console.log(`[Import] Phase 1 complete: ${state.activityIds.length} activities, ${state.gearIds.size} unique gear`)
@@ -568,7 +948,9 @@ async function runActivitiesPhase(
 async function runGearPhase(
   db: ReturnType<typeof getDatabase>,
   athleteId: number,
-  state: SyncState
+  state: SyncState,
+  options: ImportOptions,
+  startIndex = 0
 ): Promise<void> {
   if (state.gearIds.size === 0) {
     console.log('[Import] Phase 2: No gear to fetch')
@@ -577,16 +959,20 @@ async function runGearPhase(
 
   importProgress.phase = 'gear'
   importProgress.gear_total = state.gearIds.size
-  console.log(`[Import] Phase 2: Fetching ${state.gearIds.size} gear items`)
+  console.log(`[Import] Phase 2: Fetching ${state.gearIds.size} gear items (starting at ${startIndex})`)
 
-  for (const gearId of state.gearIds) {
+  const gearArray = Array.from(state.gearIds)
+  for (let i = startIndex; i < gearArray.length; i++) {
     if (cancelRequested) break
+    if (checkPauseRequested('gear', state, options, i, 'gearLastIndex')) break
 
+    const gearId = gearArray[i]
     try {
       const gear = await stravaFetch<StravaGear>(`/gear/${gearId}`)
       storeGear(db, athleteId, gear)
       importProgress.gear_done++
-      await sleep(100)
+      updateETA('gear', state, options)
+      await sleep(RATE_LIMIT_DELAY_SHORT_MS)
     } catch (error) {
       console.error(`Failed to fetch gear ${gearId}:`, error)
       importProgress.failed_count++
@@ -600,13 +986,21 @@ async function runGearPhase(
 // Phase 3: Streams
 // ============================================================================
 
-async function runStreamsPhase(db: ReturnType<typeof getDatabase>, state: SyncState): Promise<void> {
+async function runStreamsPhase(
+  db: ReturnType<typeof getDatabase>,
+  state: SyncState,
+  options: ImportOptions,
+  startIndex = 0
+): Promise<void> {
   importProgress.phase = 'streams'
   importProgress.streams_total = state.activityIds.length
-  console.log(`[Import] Phase 3: Fetching streams for ${state.activityIds.length} activities`)
+  console.log(`[Import] Phase 3: Fetching streams for ${state.activityIds.length} activities (starting at ${startIndex})`)
 
-  for (const activityId of state.activityIds) {
+  for (let i = startIndex; i < state.activityIds.length; i++) {
     if (cancelRequested) break
+    if (checkPauseRequested('streams', state, options, i, 'streamsLastIndex')) break
+
+    const activityId = state.activityIds[i]
 
     // Check if we already have streams
     const hasStreams = db.queryOne<{ count: number }>(
@@ -616,16 +1010,19 @@ async function runStreamsPhase(db: ReturnType<typeof getDatabase>, state: SyncSt
 
     if (hasStreams && hasStreams.count > 0) {
       importProgress.streams_done++
+      updateETA('streams', state, options)
       continue
     }
 
     try {
       await fetchAndStoreStreams(db, activityId)
       importProgress.streams_done++
-      await sleep(200)
+      updateETA('streams', state, options)
+      await sleep(RATE_LIMIT_DELAY_LONG_MS)
     } catch (error) {
       console.error(`Failed to fetch streams for activity ${activityId}:`, error)
       importProgress.streams_done++ // Still count as done (skipped)
+      updateETA('streams', state, options)
     }
   }
 
@@ -639,14 +1036,19 @@ async function runStreamsPhase(db: ReturnType<typeof getDatabase>, state: SyncSt
 async function runActivityDetailsPhase(
   db: ReturnType<typeof getDatabase>,
   athleteId: number,
-  state: SyncState
+  state: SyncState,
+  options: ImportOptions,
+  startIndex = 0
 ): Promise<void> {
   importProgress.phase = 'details'
   importProgress.details_total = state.activityIds.length
-  console.log(`[Import] Phase 4: Fetching activity details for ${state.activityIds.length} activities`)
+  console.log(`[Import] Phase 4: Fetching activity details for ${state.activityIds.length} activities (starting at ${startIndex})`)
 
-  for (const activityId of state.activityIds) {
+  for (let i = startIndex; i < state.activityIds.length; i++) {
     if (cancelRequested) break
+    if (checkPauseRequested('details', state, options, i, 'detailsLastIndex')) break
+
+    const activityId = state.activityIds[i]
 
     // Check if we already have segment efforts for this activity
     const hasEfforts = db.queryOne<{ count: number }>(
@@ -656,6 +1058,7 @@ async function runActivityDetailsPhase(
 
     if (hasEfforts && hasEfforts.count > 0) {
       importProgress.details_done++
+      updateETA('details', state, options)
       continue
     }
 
@@ -688,10 +1091,12 @@ async function runActivityDetailsPhase(
       }
 
       importProgress.details_done++
-      await sleep(200)
+      updateETA('details', state, options)
+      await sleep(RATE_LIMIT_DELAY_LONG_MS)
     } catch (error) {
       console.error(`Failed to fetch details for activity ${activityId}:`, error)
       importProgress.details_done++ // Still count as processed
+      updateETA('details', state, options)
     }
   }
 
@@ -702,22 +1107,32 @@ async function runActivityDetailsPhase(
 // Phase 5: Segment Details
 // ============================================================================
 
-async function runSegmentDetailsPhase(db: ReturnType<typeof getDatabase>, state: SyncState): Promise<void> {
+async function runSegmentDetailsPhase(
+  db: ReturnType<typeof getDatabase>,
+  state: SyncState,
+  options: ImportOptions,
+  startIndex = 0
+): Promise<void> {
   importProgress.phase = 'segments'
   importProgress.segments_total = state.segmentIdsToFetch.size
-  console.log(`[Import] Phase 5: Fetching details for ${state.segmentIdsToFetch.size} segments`)
+  console.log(`[Import] Phase 5: Fetching details for ${state.segmentIdsToFetch.size} segments (starting at ${startIndex})`)
 
-  for (const segmentId of state.segmentIdsToFetch) {
+  const segmentArray = Array.from(state.segmentIdsToFetch)
+  for (let i = startIndex; i < segmentArray.length; i++) {
     if (cancelRequested) break
+    if (checkPauseRequested('segments', state, options, i, 'segmentsLastIndex')) break
 
+    const segmentId = segmentArray[i]
     try {
       const segment = await stravaFetch<StravaSegment>(`/segments/${segmentId}`)
       storeSegmentDetail(db, segment)
       importProgress.segments_done++
-      await sleep(200)
+      updateETA('segments', state, options)
+      await sleep(RATE_LIMIT_DELAY_LONG_MS)
     } catch (error) {
       console.error(`Failed to fetch segment ${segmentId}:`, error)
       importProgress.segments_done++ // Still count as processed
+      updateETA('segments', state, options)
     }
   }
 
@@ -731,7 +1146,9 @@ async function runSegmentDetailsPhase(db: ReturnType<typeof getDatabase>, state:
 async function runPhotosPhase(
   db: ReturnType<typeof getDatabase>,
   athleteId: number,
-  state: SyncState
+  state: SyncState,
+  options: ImportOptions,
+  startIndex = 0
 ): Promise<void> {
   if (state.activitiesWithPhotos.length === 0) {
     console.log('[Import] Phase 6: No activities with photos')
@@ -740,10 +1157,13 @@ async function runPhotosPhase(
 
   importProgress.phase = 'photos'
   importProgress.photos_total = state.activitiesWithPhotos.length
-  console.log(`[Import] Phase 6: Fetching photos for ${state.activitiesWithPhotos.length} activities`)
+  console.log(`[Import] Phase 6: Fetching photos for ${state.activitiesWithPhotos.length} activities (starting at ${startIndex})`)
 
-  for (const activityId of state.activitiesWithPhotos) {
+  for (let i = startIndex; i < state.activitiesWithPhotos.length; i++) {
     if (cancelRequested) break
+    if (checkPauseRequested('photos', state, options, i, 'photosLastIndex')) break
+
+    const activityId = state.activitiesWithPhotos[i]
 
     // Check if we already have photos
     const hasPhotos = db.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM photos WHERE activity_id = ?', [
@@ -752,16 +1172,19 @@ async function runPhotosPhase(
 
     if (hasPhotos && hasPhotos.count > 0) {
       importProgress.photos_done++
+      updateETA('photos', state, options)
       continue
     }
 
     try {
       await fetchAndStorePhotos(db, athleteId, activityId)
       importProgress.photos_done++
-      await sleep(200)
+      updateETA('photos', state, options)
+      await sleep(RATE_LIMIT_DELAY_LONG_MS)
     } catch (error) {
       console.error(`Failed to fetch photos for activity ${activityId}:`, error)
       importProgress.photos_done++ // Still count as processed
+      updateETA('photos', state, options)
     }
   }
 
@@ -880,9 +1303,55 @@ async function fetchAndStoreStreams(db: ReturnType<typeof getDatabase>, activity
         [activityId, stream.type, JSON.stringify(stream.data), stream.series_type, stream.original_size, stream.resolution]
       )
     }
+
+    // Compute power best efforts if watts stream exists
+    const wattsStream = streams.find((s) => s.type === 'watts')
+    if (wattsStream && Array.isArray(wattsStream.data) && wattsStream.data.length > 0) {
+      computeAndStorePowerBests(db, activityId, wattsStream.data as number[])
+    }
+
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * Compute power best efforts for an activity and store in database.
+ */
+function computeAndStorePowerBests(
+  db: ReturnType<typeof getDatabase>,
+  activityId: number,
+  watts: number[]
+): void {
+  // Skip if algorithms not initialized
+  if (!algorithmsInitialized()) {
+    console.warn('[Import] Algorithms not initialized, skipping power computation')
+    return
+  }
+
+  const athlete = getAthlete()
+  if (!athlete) return
+
+  for (const duration of POWER_DURATIONS) {
+    // Skip if activity is shorter than duration
+    if (watts.length < duration) continue
+
+    try {
+      const best = rollingMaxAverage(watts, duration)
+      if (best <= 0) continue
+
+      db.exec(
+        `INSERT INTO power_best_efforts (activity_id, athlete_id, duration_s, best_avg_watts, computed_at)
+         VALUES (?, ?, ?, ?, datetime('now'))
+         ON CONFLICT (activity_id, duration_s) DO UPDATE SET
+           best_avg_watts = EXCLUDED.best_avg_watts,
+           computed_at = EXCLUDED.computed_at`,
+        [activityId, athlete.id, duration, Math.round(best)]
+      )
+    } catch (err) {
+      console.error(`[Import] Failed to compute power for duration ${duration}s:`, err)
+    }
   }
 }
 
@@ -1044,4 +1513,92 @@ async function fetchAndStorePhotos(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Yield to the main thread to prevent UI blocking.
+ * Uses setTimeout(0) to allow event loop to process other tasks.
+ */
+function yieldToMain(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+// Batch size for database operations before yielding
+const DB_BATCH_SIZE = 25
+
+// Maximum number of activity IDs to track in memory (safety limit for very large accounts)
+// Beyond this, older activity IDs are dropped from memory (they're already stored in DB)
+const MAX_ACTIVITY_IDS_IN_MEMORY = 50000
+
+/**
+ * Backfill power best efforts for activities that have watts streams but no power data.
+ * Call this after importing activities to compute power for existing data.
+ * Yields to main thread periodically to keep UI responsive on large datasets.
+ */
+export async function backfillPowerBests(): Promise<number> {
+  if (!algorithmsInitialized()) {
+    console.warn('[Import] Algorithms not initialized, cannot backfill power')
+    return 0
+  }
+
+  const athlete = getAthlete()
+  if (!athlete) {
+    console.warn('[Import] Not authenticated, cannot backfill power')
+    return 0
+  }
+
+  const db = getDatabase()
+  if (!db.isInitialized()) {
+    console.warn('[Import] Database not initialized, cannot backfill power')
+    return 0
+  }
+
+  // Find activities with watts stream but no power_best_efforts
+  const activities = db.query<{ id: number }>(
+    `SELECT DISTINCT s.activity_id as id
+     FROM activity_streams s
+     LEFT JOIN power_best_efforts p ON p.activity_id = s.activity_id
+     WHERE s.stream_type = 'watts' AND p.activity_id IS NULL`
+  )
+
+  if (activities.length === 0) {
+    console.log('[Import] No activities need power backfill')
+    return 0
+  }
+
+  console.log(`[Import] Backfilling power for ${activities.length} activities`)
+
+  let computed = 0
+  let batchCount = 0
+  for (const { id } of activities) {
+    const stream = db.queryOne<{ data: string }>(
+      `SELECT data FROM activity_streams WHERE activity_id = ? AND stream_type = 'watts'`,
+      [id]
+    )
+    if (!stream?.data) continue
+
+    try {
+      const watts = JSON.parse(stream.data) as number[]
+      if (Array.isArray(watts) && watts.length > 0) {
+        computeAndStorePowerBests(db, id, watts)
+        computed++
+      }
+    } catch (err) {
+      console.error(`[Import] Failed to backfill power for activity ${id}:`, err)
+    }
+
+    // Yield to main thread periodically to prevent UI blocking
+    batchCount++
+    if (batchCount >= DB_BATCH_SIZE) {
+      await yieldToMain()
+      batchCount = 0
+    }
+  }
+
+  if (computed > 0) {
+    await db.persist()
+  }
+
+  console.log(`[Import] Backfilled power for ${computed} activities`)
+  return computed
 }

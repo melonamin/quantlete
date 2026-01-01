@@ -106,17 +106,20 @@ func (r *RateLimiter) Wait(ctx context.Context) error {
 	thresholdDaily := int(float64(limitDaily) * 0.9)
 
 	if usage15 >= threshold15 || usageDaily >= thresholdDaily {
-		// Calculate wait time based on how close we are to the limit
+		// Calculate wait time based on how close we are to the limit.
+		// Check 15-min limit first: if at 15-min limit, waiting 15 min will reset it.
+		// Check daily limit second: only matters if 15-min has room but daily is exhausted.
+		// Note: if both limits are hit, 15-min takes precedence because it resets sooner.
 		var waitTime time.Duration
 
 		if usage15 >= limit15 {
 			// At 15-min limit, wait until the 15-min window resets
 			waitTime = 15 * time.Minute
 		} else if usageDaily >= limitDaily {
-			// At daily limit, we need to wait until tomorrow
+			// At daily limit (but 15-min has room), need to wait until tomorrow
 			waitTime = 24 * time.Hour
 		} else {
-			// Close to limit, add a small delay
+			// Close to limit (90-99%), add a small delay to slow down
 			waitTime = 1 * time.Second
 		}
 

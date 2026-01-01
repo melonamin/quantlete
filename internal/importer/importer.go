@@ -58,6 +58,10 @@ type Progress struct {
 	FailedCount     int `json:"failed_count"`
 	CurrentPage     int `json:"current_page"`
 
+	// Aggregated non-fatal errors for user visibility
+	Errors            []string `json:"errors,omitempty"`
+	DroppedErrorCount int      `json:"dropped_error_count,omitempty"`
+
 	// ETA estimation
 	RemainingAPICalls int    `json:"remaining_api_calls"`
 	EstimatedETA      string `json:"estimated_eta,omitempty"`
@@ -88,7 +92,11 @@ type Importer struct {
 	photos       *storage.PhotoRepository
 	syncHistory  *storage.SyncHistoryRepository
 
-	// State management for resume capability
+	// State management for resume capability.
+	// IMPORTANT: state is only accessed from the import goroutine after Start() launches it.
+	// Start() ensures single-caller by checking progress.Status == StatusRunning under mu lock.
+	// The progress field (protected by mu) is the public-facing snapshot updated via updateProgress().
+	// Do NOT access state from other goroutines - use Progress() to read the snapshot instead.
 	stateManager *StateManager
 	state        *ImportState
 	eta          *ETAEstimator
@@ -96,10 +104,11 @@ type Importer struct {
 	// Current sync run (for history tracking)
 	currentRunID int64
 
-	segmentCacheMu sync.Mutex
-	segmentCache   map[int64]*strava.Segment
+	segmentCacheMu   sync.Mutex
+	segmentCache     map[int64]*strava.Segment
+	segmentFailCache map[int64]bool // Tracks segments that failed to fetch
 
-	mu       sync.RWMutex
+	mu       sync.RWMutex // Protects progress
 	progress Progress
 	cancel   context.CancelFunc
 }
@@ -120,21 +129,22 @@ func New(
 	syncHistory *storage.SyncHistoryRepository,
 ) *Importer {
 	return &Importer{
-		stravaClient: stravaClient,
-		activities:   activities,
-		athletes:     athletes,
-		tokens:       tokens,
-		gear:         gear,
-		streams:      streams,
-		segments:     segments,
-		bestEfforts:  bestEfforts,
-		maintenance:  maintenance,
-		photos:       photos,
-		syncHistory:  syncHistory,
-		stateManager: NewStateManager(appState),
-		eta:          NewETAEstimator(),
-		segmentCache: make(map[int64]*strava.Segment),
-		progress:     Progress{Status: StatusIdle, Phase: PhaseIdle},
+		stravaClient:     stravaClient,
+		activities:       activities,
+		athletes:         athletes,
+		tokens:           tokens,
+		gear:             gear,
+		streams:          streams,
+		segments:         segments,
+		bestEfforts:      bestEfforts,
+		maintenance:      maintenance,
+		photos:           photos,
+		syncHistory:      syncHistory,
+		stateManager:     NewStateManager(appState),
+		eta:              NewETAEstimator(),
+		segmentCache:     make(map[int64]*strava.Segment),
+		segmentFailCache: make(map[int64]bool),
+		progress:         Progress{Status: StatusIdle, Phase: PhaseIdle},
 	}
 }
 
@@ -158,9 +168,9 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 
 	// Get athlete ID for sync history
 	athlete := i.stravaClient.GetAthlete()
-	if athlete == nil {
+	if athlete == nil || athlete.ID == 0 {
 		i.mu.Unlock()
-		return fmt.Errorf("not authenticated")
+		return fmt.Errorf("not authenticated or invalid athlete")
 	}
 	athleteID := athlete.ID
 
@@ -329,6 +339,33 @@ func (i *Importer) Cancel() {
 	}
 }
 
+// Pause pauses a running import. The import can be resumed later with Start(opts{Resume: true}).
+// This is currently implemented as a cancel that preserves state, allowing resume.
+func (i *Importer) Pause() bool {
+	i.mu.RLock()
+	status := i.progress.Status
+	cancel := i.cancel
+	i.mu.RUnlock()
+
+	if status != StatusRunning || cancel == nil {
+		return false
+	}
+
+	// Save current state before cancelling so it can be resumed
+	// The saveState is called periodically during import, so state is already preserved
+	cancel()
+	return true
+}
+
+// CanResume returns true if there is a resumable import state.
+func (i *Importer) CanResume(ctx context.Context) bool {
+	state, err := i.stateManager.Load(ctx)
+	if err != nil {
+		return false
+	}
+	return state != nil && state.Phase != PhaseCompleted && state.Phase != PhaseIdle
+}
+
 // Progress returns the current import progress.
 func (i *Importer) Progress() Progress {
 	i.mu.RLock()
@@ -452,14 +489,31 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 }
 
 // saveState persists the current import state.
+// Failures are logged and tracked in aggregated errors so users know resume may not work.
 func (i *Importer) saveState(ctx context.Context) {
 	if err := i.stateManager.Save(ctx, i.state); err != nil {
 		slog.Warn("failed to save import state", "error", err)
+		i.addError("state persistence failed (resume may not work): %v", err)
 	}
 }
 
 // updateProgress updates the progress from current state.
+// Called from the import goroutine to snapshot state into the progress field
+// which can be safely read by other goroutines via Progress().
+//
+// Thread safety: i.state is only accessed from this goroutine (see struct comment),
+// so reading i.state.Errors here is safe. The copy is made before taking the lock,
+// then assigned to i.progress.Errors under lock. Progress() reads under the same lock.
 func (i *Importer) updateProgress() {
+	// Copy errors slice to avoid sharing the backing array
+	var errors []string
+	if len(i.state.Errors) > 0 {
+		errors = make([]string, len(i.state.Errors))
+		copy(errors, i.state.Errors)
+	}
+
+	remaining := i.state.RemainingAPICalls()
+
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -483,13 +537,34 @@ func (i *Importer) updateProgress() {
 	i.progress.ImportedCount = i.state.ActivitiesDone
 
 	// ETA estimation
-	remaining := i.state.RemainingAPICalls()
 	i.progress.RemainingAPICalls = remaining
 	i.progress.EstimatedETA = FormatETA(i.eta.EstimateCompletion(remaining))
+
+	// Copy aggregated errors
+	i.progress.Errors = errors
+	i.progress.DroppedErrorCount = i.state.DroppedErrorCount
+}
+
+// maxAggregatedErrors limits the number of errors stored to prevent unbounded memory growth.
+const maxAggregatedErrors = 100
+
+// addError records a non-fatal error for user visibility.
+// These errors are aggregated and displayed to the user at the end of the sync.
+// Called only from the import goroutine, so no locking is needed.
+func (i *Importer) addError(format string, args ...any) {
+	i.state.FailedCount++
+	// Cap error list to prevent unbounded memory growth
+	if len(i.state.Errors) >= maxAggregatedErrors {
+		i.state.DroppedErrorCount++
+		return
+	}
+	msg := fmt.Sprintf(format, args...)
+	i.state.Errors = append(i.state.Errors, msg)
 }
 
 // waitForRateLimit handles rate limit errors by waiting and retrying.
 // It updates progress to show the waiting state so the UI can display a countdown.
+// Uses a ticker to allow for periodic cancellation checks instead of blocking.
 func (i *Importer) waitForRateLimit(ctx context.Context, err error) error {
 	rle, ok := strava.IsRateLimitError(err)
 	if !ok {
@@ -507,14 +582,27 @@ func (i *Importer) waitForRateLimit(ctx context.Context, err error) error {
 	i.progress.WaitingReason = fmt.Sprintf("Rate limit exceeded. Waiting %v for reset.", rle.RetryAfter.Round(time.Second))
 	i.mu.Unlock()
 
-	// Wait for the rate limit to reset
-	select {
-	case <-ctx.Done():
-		i.clearWaitingState()
-		return ctx.Err()
-	case <-time.After(rle.RetryAfter):
-		i.clearWaitingState()
-		return nil
+	// Use ticker for periodic cancellation checks instead of blocking time.After
+	deadline := time.Now().Add(rle.RetryAfter)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			i.clearWaitingState()
+			return ctx.Err()
+		case <-ticker.C:
+			if time.Now().After(deadline) {
+				i.clearWaitingState()
+				return nil
+			}
+			// Update waiting progress periodically
+			remaining := time.Until(deadline).Round(time.Second)
+			i.mu.Lock()
+			i.progress.WaitingReason = fmt.Sprintf("Rate limit exceeded. Waiting %v for reset.", remaining)
+			i.mu.Unlock()
+		}
 	}
 }
 
@@ -623,15 +711,16 @@ func (i *Importer) runActivitiesPhase(ctx context.Context, athleteID int64) erro
 
 			if err := i.activities.Upsert(ctx, act); err != nil {
 				slog.Warn("failed to store activity", "id", a.ID, "error", err)
-				i.state.FailedCount++
+				i.addError("failed to store activity %d: %v", a.ID, err)
 				continue
 			}
 
 			i.state.ActivitiesDone++
 
 			// Track newest activity date for watermark
+			// Truncate to second precision to match Strava API (Unix timestamp)
 			if i.state.NewestActivityDate == nil || a.StartDate.After(*i.state.NewestActivityDate) {
-				t := a.StartDate
+				t := a.StartDate.Truncate(time.Second)
 				i.state.NewestActivityDate = &t
 			}
 
@@ -678,6 +767,7 @@ func (i *Importer) runGearPhase(ctx context.Context, athleteID int64) error {
 		gearID := i.state.GearIDs[idx]
 		if err := i.importGearItem(ctx, gearID); err != nil {
 			slog.Warn("failed to import gear", "id", gearID, "error", err)
+			i.addError("failed to import gear %s: %v", gearID, err)
 		} else {
 			i.state.GearDone++
 		}
@@ -708,6 +798,7 @@ func (i *Importer) runStreamsPhase(ctx context.Context) error {
 		activityID := i.state.ActivityIDs[idx]
 		if err := i.importStreamsForActivity(ctx, activityID); err != nil {
 			slog.Debug("failed to import streams", "activity_id", activityID, "error", err)
+			i.addError("failed to import streams for activity %d: %v", activityID, err)
 		} else {
 			i.state.StreamsDone++
 		}
@@ -745,7 +836,14 @@ func (i *Importer) runActivityDetailsPhase(ctx context.Context, athleteID int64)
 			return fetchErr
 		})
 		if err != nil {
-			slog.Debug("failed to fetch activity detail", "activity_id", activityID, "error", err)
+			// 404/403 are "soft" errors - activity may have been deleted or made private
+			if isResourceGoneError(err) {
+				slog.Debug("activity no longer accessible (deleted or private)", "activity_id", activityID)
+				i.state.DetailsDone++ // Count as processed (skipped)
+			} else {
+				slog.Debug("failed to fetch activity detail", "activity_id", activityID, "error", err)
+				i.addError("failed to fetch activity detail %d: %v", activityID, err)
+			}
 			i.state.DetailsLastIndex = idx + 1
 			continue
 		}
@@ -754,6 +852,7 @@ func (i *Importer) runActivityDetailsPhase(ctx context.Context, athleteID int64)
 		if !i.state.SkipBestEfforts {
 			if err := i.importBestEfforts(ctx, detail, athleteID); err != nil {
 				slog.Debug("failed to import best efforts", "activity_id", activityID, "error", err)
+				i.addError("failed to import best efforts for activity %d: %v", activityID, err)
 			}
 		}
 
@@ -762,14 +861,16 @@ func (i *Importer) runActivityDetailsPhase(ctx context.Context, athleteID int64)
 			for _, effort := range detail.SegmentEfforts {
 				seg := effort.Segment
 
-				// Store segment first (basic info from effort) - required for FK constraint
-				if err := i.storeSegmentFromEffort(ctx, &seg); err != nil {
-					slog.Debug("failed to store segment", "segment_id", seg.ID, "error", err)
+				// Skip segments with invalid zero ID
+				if seg.ID == 0 {
+					slog.Debug("skipping segment with zero ID", "activity_id", activityID)
+					continue
 				}
 
-				// Store segment effort (references segment_id)
-				if err := i.storeSegmentEffort(ctx, detail, &effort, athleteID); err != nil {
-					slog.Debug("failed to store segment effort", "effort_id", effort.ID, "error", err)
+				// Store segment and effort atomically in a transaction
+				if err := i.storeSegmentWithEffort(ctx, detail, &seg, &effort, athleteID); err != nil {
+					slog.Debug("failed to store segment with effort", "segment_id", seg.ID, "effort_id", effort.ID, "error", err)
+					i.addError("failed to store segment %d with effort %d: %v", seg.ID, effort.ID, err)
 				}
 
 				// Check if we need to fetch full segment detail later
@@ -819,9 +920,17 @@ func (i *Importer) runSegmentDetailsPhase(ctx context.Context) error {
 			return err
 		})
 		if fetchErr != nil {
-			slog.Debug("failed to fetch segment detail", "segment_id", segmentID, "error", fetchErr)
+			// 404/403 are "soft" errors - segment may have been deleted or made private
+			if isResourceGoneError(fetchErr) {
+				slog.Debug("segment no longer accessible (deleted or private)", "segment_id", segmentID)
+				i.state.SegmentsDone++ // Count as processed (skipped)
+			} else {
+				slog.Debug("failed to fetch segment detail", "segment_id", segmentID, "error", fetchErr)
+				i.addError("failed to fetch segment detail %d: %v", segmentID, fetchErr)
+			}
 		} else if err := i.storeSegment(ctx, seg); err != nil {
 			slog.Debug("failed to store segment", "segment_id", segmentID, "error", err)
+			i.addError("failed to store segment %d: %v", segmentID, err)
 		} else {
 			i.state.SegmentsDone++
 		}
@@ -852,6 +961,7 @@ func (i *Importer) runPhotosPhase(ctx context.Context, athleteID int64) error {
 		activityID := i.state.ActivityIDs[idx]
 		if err := i.importPhotosForActivity(ctx, activityID, athleteID); err != nil {
 			slog.Debug("failed to import photos", "activity_id", activityID, "error", err)
+			i.addError("failed to import photos for activity %d: %v", activityID, err)
 		} else {
 			i.state.PhotosDone++
 		}
@@ -900,6 +1010,23 @@ func uniqueInt64(slice []int64) []int64 {
 		}
 	}
 	return result
+}
+
+// ImportActivityByID fetches and imports a single activity by ID.
+// Used for webhook-triggered updates to ensure streams, segments, best efforts, and photos are synced.
+func (i *Importer) ImportActivityByID(ctx context.Context, activityID int64, opts ImportOptions) error {
+	athlete := i.stravaClient.GetAthlete()
+	if athlete == nil || athlete.ID == 0 {
+		return fmt.Errorf("not authenticated")
+	}
+
+	// Fetch the activity from Strava
+	activity, err := i.stravaClient.GetActivity(ctx, activityID)
+	if err != nil {
+		return fmt.Errorf("fetching activity %d: %w", activityID, err)
+	}
+
+	return i.importActivity(ctx, activity, athlete.ID, opts)
 }
 
 // importActivity imports a single activity (used for webhook/incremental sync).
@@ -1060,16 +1187,44 @@ func (i *Importer) importBestEfforts(ctx context.Context, a *strava.Activity, at
 	return i.bestEfforts.ReplaceForActivity(ctx, athleteID, a.ID, a.SportType, out)
 }
 
+// errSegmentFetchFailed is returned when a segment was previously tried and failed.
+var errSegmentFetchFailed = fmt.Errorf("segment fetch previously failed")
+
+// maxSegmentFailCacheSize limits the size of the segment fail cache to prevent unbounded memory growth.
+const maxSegmentFailCacheSize = 10000
+
+// isResourceGoneError returns true if the error indicates the resource no longer exists
+// or is inaccessible (404 Not Found or 403 Forbidden). These are "soft" errors that
+// shouldn't fail the entire import - the resource may have been deleted or made private.
+func isResourceGoneError(err error) bool {
+	if apiErr, ok := err.(*strava.APIError); ok {
+		return apiErr.IsNotFound() || apiErr.IsForbidden()
+	}
+	return false
+}
+
 func (i *Importer) getSegment(ctx context.Context, segmentID int64) (*strava.Segment, error) {
 	i.segmentCacheMu.Lock()
+	// Check if we already have this segment cached
 	if cached, ok := i.segmentCache[segmentID]; ok && cached != nil {
 		i.segmentCacheMu.Unlock()
 		return cached, nil
+	}
+	// Check if this segment previously failed (avoid hammering API with unreachable segments)
+	if i.segmentFailCache[segmentID] {
+		i.segmentCacheMu.Unlock()
+		return nil, errSegmentFetchFailed
 	}
 	i.segmentCacheMu.Unlock()
 
 	seg, err := i.stravaClient.GetSegment(ctx, segmentID)
 	if err != nil {
+		// Cache the failure to avoid repeated API calls (with size cap)
+		i.segmentCacheMu.Lock()
+		if len(i.segmentFailCache) < maxSegmentFailCacheSize {
+			i.segmentFailCache[segmentID] = true
+		}
+		i.segmentCacheMu.Unlock()
 		return nil, err
 	}
 
@@ -1102,13 +1257,6 @@ func ptrInt(v int) *int {
 		return nil
 	}
 	return &v
-}
-
-func ptrSQLiteTime(t *time.Time) *storage.SQLiteTime {
-	if t == nil {
-		return nil
-	}
-	return &storage.SQLiteTime{Time: *t}
 }
 
 func ptrSQLiteTimeFromFlex(t *strava.FlexTime) *storage.SQLiteTime {
@@ -1289,6 +1437,7 @@ func bestPhotoURLs(urls map[string]string) (best string, thumb string) {
 }
 
 // importStreams imports stream data for an activity.
+// Continues on individual stream storage errors to save as much data as possible.
 func (i *Importer) importStreams(ctx context.Context, activityID int64) error {
 	var streams *strava.StreamSet
 	err := i.withRetry(ctx, func() error {
@@ -1300,48 +1449,56 @@ func (i *Importer) importStreams(ctx context.Context, activityID int64) error {
 		return err
 	}
 
-	// Store each stream type
+	// Store each stream type, aggregating errors instead of failing fast
+	var errs []error
 	if streams.Time != nil {
 		if err := i.storeStream(ctx, activityID, "time", streams.Time); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("time: %w", err))
 		}
 	}
 	if streams.Distance != nil {
 		if err := i.storeStream(ctx, activityID, "distance", streams.Distance); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("distance: %w", err))
 		}
 	}
 	if streams.Altitude != nil {
 		if err := i.storeStream(ctx, activityID, "altitude", streams.Altitude); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("altitude: %w", err))
 		}
 	}
 	if streams.Heartrate != nil {
 		if err := i.storeStream(ctx, activityID, "heartrate", streams.Heartrate); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("heartrate: %w", err))
 		}
 	}
 	if streams.Watts != nil {
 		if err := i.storeStream(ctx, activityID, "watts", streams.Watts); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("watts: %w", err))
 		}
 	}
 	if streams.Cadence != nil {
 		if err := i.storeStream(ctx, activityID, "cadence", streams.Cadence); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("cadence: %w", err))
 		}
 	}
 	if streams.VelocitySmooth != nil {
 		if err := i.storeStream(ctx, activityID, "velocity_smooth", streams.VelocitySmooth); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("velocity_smooth: %w", err))
 		}
 	}
 	if streams.Latlng != nil {
 		if err := i.storeStream(ctx, activityID, "latlng", streams.Latlng); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("latlng: %w", err))
 		}
 	}
 
+	if len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		return fmt.Errorf("stream storage errors: %s", strings.Join(msgs, "; "))
+	}
 	return nil
 }
 
@@ -1385,34 +1542,6 @@ func (i *Importer) importStreamsForActivity(ctx context.Context, activityID int6
 // importPhotosForActivity imports photos for a single activity.
 func (i *Importer) importPhotosForActivity(ctx context.Context, activityID int64, athleteID int64) error {
 	return i.importPhotos(ctx, activityID, athleteID)
-}
-
-// storeSegmentEffort stores a segment effort from an activity detail.
-func (i *Importer) storeSegmentEffort(ctx context.Context, a *strava.Activity, effort *strava.SegmentEffort, athleteID int64) error {
-	if i.segments == nil {
-		return nil
-	}
-
-	startDate := storage.SQLiteTime{Time: effort.StartDate}
-	startDateLocal := storage.SQLiteTime{Time: effort.StartDateLocal}
-	e := &storage.SegmentEffort{
-		ID:               effort.ID,
-		SegmentID:        effort.Segment.ID,
-		ActivityID:       a.ID,
-		AthleteID:        athleteID,
-		Name:             effort.Name,
-		ElapsedTime:      effort.ElapsedTime,
-		MovingTime:       effort.MovingTime,
-		StartDate:        &startDate,
-		StartDateLocal:   &startDateLocal,
-		Distance:         effort.Distance,
-		AverageWatts:     ptrFloat64(effort.AverageWatts),
-		AverageHeartrate: ptrFloat64(effort.AverageHeartrate),
-		MaxHeartrate:     ptrInt(int(effort.MaxHeartrate)),
-		PRRank:           effort.PRRank,
-		Country:          a.LocationCountry,
-	}
-	return i.segments.UpsertEffort(ctx, e)
 }
 
 // storeSegmentFromEffort stores a segment from the effort's embedded segment data.
@@ -1462,6 +1591,74 @@ func (i *Importer) storeSegmentFromEffort(ctx context.Context, seg *strava.Segme
 // storeSegment stores a segment from full segment detail.
 func (i *Importer) storeSegment(ctx context.Context, seg *strava.Segment) error {
 	return i.storeSegmentFromEffort(ctx, seg)
+}
+
+// storeSegmentWithEffort stores a segment and its effort atomically in a transaction.
+// This ensures data consistency - either both are stored or neither is.
+func (i *Importer) storeSegmentWithEffort(ctx context.Context, a *strava.Activity, seg *strava.Segment, effort *strava.SegmentEffort, athleteID int64) error {
+	if i.segments == nil {
+		return nil
+	}
+
+	// Build segment
+	startLat, startLng := floatSliceLatLng(seg.StartLatlng)
+	endLat, endLng := floatSliceLatLng(seg.EndLatlng)
+
+	var effortCount *int
+	if seg.AthleteSegmentStats.EffortCount >= 0 {
+		v := seg.AthleteSegmentStats.EffortCount
+		effortCount = &v
+	}
+	var prElapsed *int
+	if seg.AthleteSegmentStats.PRElapsedTime > 0 {
+		v := seg.AthleteSegmentStats.PRElapsedTime
+		prElapsed = &v
+	}
+
+	s := &storage.Segment{
+		ID:                   seg.ID,
+		Name:                 seg.Name,
+		ActivityType:         seg.ActivityType,
+		Distance:             seg.Distance,
+		AverageGrade:         seg.AverageGrade,
+		MaximumGrade:         seg.MaximumGrade,
+		ElevationHigh:        seg.ElevationHigh,
+		ElevationLow:         seg.ElevationLow,
+		ClimbCategory:        seg.ClimbCategory,
+		StartLat:             startLat,
+		StartLng:             startLng,
+		EndLat:               endLat,
+		EndLng:               endLng,
+		Starred:              seg.Starred,
+		Polyline:             seg.Map.Polyline,
+		AthleteKOMRank:       seg.AthleteSegmentStats.KOMRank,
+		AthleteEffortCount:   effortCount,
+		AthletePRElapsedTime: prElapsed,
+		AthletePRDate:        ptrSQLiteTimeFromFlex(seg.AthleteSegmentStats.PRDate),
+	}
+
+	// Build effort
+	startDate := storage.SQLiteTime{Time: effort.StartDate}
+	startDateLocal := storage.SQLiteTime{Time: effort.StartDateLocal}
+	e := &storage.SegmentEffort{
+		ID:               effort.ID,
+		SegmentID:        seg.ID,
+		ActivityID:       a.ID,
+		AthleteID:        athleteID,
+		Name:             effort.Name,
+		ElapsedTime:      effort.ElapsedTime,
+		MovingTime:       effort.MovingTime,
+		StartDate:        &startDate,
+		StartDateLocal:   &startDateLocal,
+		Distance:         effort.Distance,
+		AverageWatts:     ptrFloat64(effort.AverageWatts),
+		AverageHeartrate: ptrFloat64(effort.AverageHeartrate),
+		MaxHeartrate:     ptrInt(int(effort.MaxHeartrate)),
+		PRRank:           effort.PRRank,
+		Country:          a.LocationCountry,
+	}
+
+	return i.segments.UpsertSegmentWithEffort(ctx, s, e)
 }
 
 // importGear imports gear details.

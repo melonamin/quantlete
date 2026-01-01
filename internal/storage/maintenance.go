@@ -12,28 +12,28 @@ import (
 )
 
 type Component struct {
-	ID                 int64     `json:"id"`
-	GearID             string    `json:"gear_id"`
-	Name               string    `json:"name"`
-	ImageURL           string    `json:"image_url,omitempty"`
-	MaintenanceHashtag string    `json:"maintenance_hashtag,omitempty"`
-	CreatedAt            SQLiteTime `json:"created_at"`
-	UpdatedAt            SQLiteTime `json:"updated_at"`
+	ID                 int64      `json:"id"`
+	GearID             string     `json:"gear_id"`
+	Name               string     `json:"name"`
+	ImageURL           string     `json:"image_url,omitempty"`
+	MaintenanceHashtag string     `json:"maintenance_hashtag,omitempty"`
+	CreatedAt          SQLiteTime `json:"created_at"`
+	UpdatedAt          SQLiteTime `json:"updated_at"`
 }
 
 type MaintenanceRule struct {
-	ID             int64     `json:"id"`
-	ComponentID    int64     `json:"component_id"`
-	Type           string    `json:"type"` // distance_m | time_s | days
-	ThresholdValue float64   `json:"threshold_value"`
-	CreatedAt            SQLiteTime `json:"created_at"`
-	UpdatedAt            SQLiteTime `json:"updated_at"`
+	ID             int64      `json:"id"`
+	ComponentID    int64      `json:"component_id"`
+	Type           string     `json:"type"` // distance_m | time_s | days
+	ThresholdValue float64    `json:"threshold_value"`
+	CreatedAt      SQLiteTime `json:"created_at"`
+	UpdatedAt      SQLiteTime `json:"updated_at"`
 }
 
 type MaintenanceLogEntry struct {
-	ComponentID int64     `json:"component_id"`
-	ActivityID  *int64    `json:"activity_id,omitempty"`
-	CompletedAt          SQLiteTime `json:"completed_at"`
+	ComponentID int64      `json:"component_id"`
+	ActivityID  *int64     `json:"activity_id,omitempty"`
+	CompletedAt SQLiteTime `json:"completed_at"`
 }
 
 type ComponentWithRules struct {

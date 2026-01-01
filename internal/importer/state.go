@@ -40,12 +40,12 @@ type ImportState struct {
 	SegmentIDsToFetch []int64 `json:"segment_ids_to_fetch,omitempty"`
 
 	// Progress tracking per phase
-	ActivitiesLastPage   int `json:"activities_last_page"`
-	GearLastIndex        int `json:"gear_last_index"`
-	StreamsLastIndex     int `json:"streams_last_index"`
-	DetailsLastIndex     int `json:"details_last_index"`
-	SegmentsLastIndex    int `json:"segments_last_index"`
-	PhotosLastIndex      int `json:"photos_last_index"`
+	ActivitiesLastPage int `json:"activities_last_page"`
+	GearLastIndex      int `json:"gear_last_index"`
+	StreamsLastIndex   int `json:"streams_last_index"`
+	DetailsLastIndex   int `json:"details_last_index"`
+	SegmentsLastIndex  int `json:"segments_last_index"`
+	PhotosLastIndex    int `json:"photos_last_index"`
 
 	// Counters for display
 	ActivitiesTotal int `json:"activities_total"`
@@ -71,7 +71,9 @@ type ImportState struct {
 	StartedAt time.Time `json:"started_at"`
 
 	// Error tracking
-	FailedCount int `json:"failed_count"`
+	FailedCount       int      `json:"failed_count"`
+	Errors            []string `json:"errors,omitempty"`
+	DroppedErrorCount int      `json:"dropped_error_count,omitempty"`
 
 	// Watermark: only fetch activities after this date (for incremental sync)
 	AfterDate *time.Time `json:"after_date,omitempty"`
@@ -158,7 +160,10 @@ func (s *ImportState) RemainingAPICalls() int {
 			calls += n
 		}
 	case PhaseStreams:
-		calls += n - s.StreamsLastIndex
+		// Only count remaining streams if not skipped
+		if !s.SkipStreams {
+			calls += n - s.StreamsLastIndex
+		}
 		if !s.SkipBestEfforts || !s.SkipSegments {
 			calls += n
 		}

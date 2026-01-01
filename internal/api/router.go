@@ -301,6 +301,8 @@ func (r *Router) mountRoutes() {
 			router.Post("/start", r.importHandler.Start)
 			router.Get("/progress", r.importHandler.Progress)
 			router.Post("/cancel", r.importHandler.Cancel)
+			router.Post("/pause", r.importHandler.Pause)
+			router.Post("/resume", r.importHandler.Resume)
 			router.Get("/history", r.importHandler.History)
 			router.Get("/watermark", r.importHandler.Watermark)
 		})

@@ -9,10 +9,10 @@ import (
 )
 
 type PeakPowerBest struct {
-	DurationS  int       `json:"duration_s"`
-	Watts      float64   `json:"watts"`
-	ActivityID int64     `json:"activity_id"`
-	StartDate            SQLiteTime `json:"start_date"`
+	DurationS  int        `json:"duration_s"`
+	Watts      float64    `json:"watts"`
+	ActivityID int64      `json:"activity_id"`
+	StartDate  SQLiteTime `json:"start_date"`
 }
 
 type PeakPowerHistoryPoint struct {

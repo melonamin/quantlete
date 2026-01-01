@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/melonamin/quantlete/internal/importer"
@@ -100,6 +101,56 @@ func (h *ImportHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	h.importer.Cancel()
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "import cancellation requested",
+	})
+}
+
+// Pause handles POST /api/v1/import/pause
+func (h *ImportHandler) Pause(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	if h.importer.Pause() {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"message": "import pause requested",
+		})
+	} else {
+		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "no import running to pause"})
+	}
+}
+
+// Resume handles POST /api/v1/import/resume
+func (h *ImportHandler) Resume(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		return
+	}
+
+	// Check if there's a resumable state
+	if !h.importer.CanResume(r.Context()) {
+		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "no resumable import state found"})
+		return
+	}
+
+	// Start import with resume option
+	opts := importer.ImportOptions{
+		Resume: true,
+	}
+
+	// Use background context since import runs asynchronously after HTTP request completes
+	if err := h.importer.Start(context.Background(), opts); err != nil {
+		slog.Warn("failed to resume import", "error", err)
+		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "failed to resume import"})
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]string{
+		"message": "import resumed",
 	})
 }
 
