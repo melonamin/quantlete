@@ -67,7 +67,7 @@ func (c *OpenMeteoClient) FetchHistorical(ctx context.Context, req OpenMeteoRequ
 	q.Set("timezone", "auto")
 	u.RawQuery = q.Encode()
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

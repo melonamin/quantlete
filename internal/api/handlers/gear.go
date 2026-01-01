@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -74,8 +75,11 @@ func gearToResponse(g storage.Gear, activityCount int) GearResponse {
 	}
 }
 
-// List handles GET /api/v1/gear
-func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
+// gearListFetcher is a function type for fetching paginated gear lists.
+type gearListFetcher func(ctx context.Context, athleteID int64, f storage.GearFilters) (storage.GearListResult, error)
+
+// listGearCommon handles the common logic for listing gear (both regular and custom).
+func (h *GearHandler) listGearCommon(w http.ResponseWriter, r *http.Request, fetcher gearListFetcher, label string) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
 		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
@@ -88,10 +92,10 @@ func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
 		QueryParams:    pagination.ParseQueryParams(q),
 	}
 
-	result, err := h.repo.ListPaginated(r.Context(), athlete.ID, f)
+	result, err := fetcher(r.Context(), athlete.ID, f)
 	if err != nil {
-		slog.Error("failed to list gear", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch gear"})
+		slog.Error("failed to list "+label, "error", err, "athlete_id", athlete.ID)
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch " + label})
 		return
 	}
 
@@ -118,6 +122,11 @@ func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
 		PerPage:    result.PerPage,
 		TotalPages: result.TotalPages,
 	})
+}
+
+// List handles GET /api/v1/gear
+func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
+	h.listGearCommon(w, r, h.repo.ListPaginated, "gear")
 }
 
 // GetByID handles GET /api/v1/gear/{id}
@@ -169,48 +178,7 @@ type CustomGearCreateRequest struct {
 
 // ListCustom handles GET /api/v1/gear/custom
 func (h *GearHandler) ListCustom(w http.ResponseWriter, r *http.Request) {
-	athlete := h.strava.GetAthlete()
-	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
-		return
-	}
-
-	q := r.URL.Query()
-	f := storage.GearFilters{
-		IncludeRetired: q.Get("include_retired") == "true",
-		QueryParams:    pagination.ParseQueryParams(q),
-	}
-
-	result, err := h.repo.ListCustomPaginated(r.Context(), athlete.ID, f)
-	if err != nil {
-		slog.Error("failed to list custom gear", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch custom gear"})
-		return
-	}
-
-	// Batch fetch activity counts to avoid N+1 queries
-	gearIDs := make([]string, len(result.Items))
-	for i, g := range result.Items {
-		gearIDs[i] = g.ID
-	}
-	activityCounts, err := h.repo.GetActivityCountsBatch(r.Context(), gearIDs)
-	if err != nil {
-		slog.Error("failed to get activity counts", "error", err, "athlete_id", athlete.ID)
-		activityCounts = make(map[string]int)
-	}
-
-	responses := make([]GearResponse, 0, len(result.Items))
-	for _, g := range result.Items {
-		responses = append(responses, gearToResponse(g, activityCounts[g.ID]))
-	}
-
-	writeJSON(w, http.StatusOK, gearListResponse{
-		Data:       responses,
-		Total:      result.Total,
-		Page:       result.Page,
-		PerPage:    result.PerPage,
-		TotalPages: result.TotalPages,
-	})
+	h.listGearCommon(w, r, h.repo.ListCustomPaginated, "custom gear")
 }
 
 // CreateCustom handles POST /api/v1/gear/custom

@@ -319,7 +319,7 @@ func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f Segment
 		LIMIT ? OFFSET ?
 	`, whereClause, orderBy)
 
-	queryArgs := append(args, p.PerPage, p.Offset())
+	queryArgs := append(args, p.PerPage, p.Offset()) //nolint:gocritic // appendAssign: intentional new slice for query args
 
 	rows, err := r.db.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
@@ -388,7 +388,7 @@ func (r *SegmentRepository) GetByID(ctx context.Context, id int64) (*Segment, er
 	return &s, nil
 }
 
-func (r *SegmentRepository) ListEfforts(ctx context.Context, athleteID int64, segmentID int64, limit int) ([]SegmentEffort, error) {
+func (r *SegmentRepository) ListEfforts(ctx context.Context, athleteID, segmentID int64, limit int) ([]SegmentEffort, error) {
 	if limit <= 0 || limit > 5000 {
 		limit = 200
 	}
@@ -440,7 +440,7 @@ type SegmentEffortListResult struct {
 }
 
 // ListEffortsPaginated returns a paginated list of segment efforts.
-func (r *SegmentRepository) ListEffortsPaginated(ctx context.Context, athleteID int64, segmentID int64, f SegmentEffortFilters) (SegmentEffortListResult, error) {
+func (r *SegmentRepository) ListEffortsPaginated(ctx context.Context, athleteID, segmentID int64, f SegmentEffortFilters) (SegmentEffortListResult, error) {
 	// Count total
 	var total int
 	if err := r.db.QueryRowContext(ctx,

@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { useActivities } from '@/lib/data/hooks'
 import { formatRelativeDate } from '@/lib/format'
-import { getSportIcon, getSportHexColor } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -58,9 +59,7 @@ export function KudosLeaders() {
         <p className="text-sm text-muted-foreground">No activities with kudos yet</p>
       ) : (
         <div className="space-y-4">
-          {activitiesWithKudos.map((activity) => {
-            const Icon = getSportIcon(activity.sport_type)
-            return (
+          {activitiesWithKudos.map((activity) => (
               <Link
                 key={activity.id}
                 to="/activities/$activityId"
@@ -71,7 +70,8 @@ export function KudosLeaders() {
                   className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
                   style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
                 >
-                  <Icon
+                  <SportIcon
+                    sportType={activity.sport_type}
                     className="h-5 w-5"
                     style={{ color: getSportHexColor(activity.sport_type) }}
                   />
@@ -87,8 +87,7 @@ export function KudosLeaders() {
                   <span className="font-medium">{activity.kudos_count}</span>
                 </div>
               </Link>
-            )
-          })}
+            ))}
         </div>
       )}
     </WidgetWrapper>

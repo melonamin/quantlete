@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuthStatus, useCredentialsStatus, useUpdateCredentials } from '@/lib/data/hooks'
 import { isWasmMode } from '@/lib/mode'
 import { getAuthUrl as getWasmAuthUrl } from '@/lib/wasm/strava/client'
@@ -64,12 +64,9 @@ export function WelcomeModal() {
   const [showSecret, setShowSecret] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Reset step when credentials status changes
-  useEffect(() => {
-    if (credentialsConfigured && step === 'credentials') {
-      setStep('connect')
-    }
-  }, [credentialsConfigured, step])
+  // Derive effective step - auto-advance from credentials if they're configured
+  const effectiveStep =
+    credentialsConfigured && step === 'credentials' ? 'connect' : step
 
   const handleContinue = () => {
     if (credentialsConfigured) {
@@ -110,7 +107,7 @@ export function WelcomeModal() {
   return (
     <Dialog open={show} onOpenChange={() => {}}>
       <DialogContent showCloseButton={false} className="sm:max-w-md">
-        {step === 'welcome' && (
+        {effectiveStep === 'welcome' && (
           <>
             <DialogHeader>
               <DialogTitle className="text-2xl">Welcome to Quantlete</DialogTitle>
@@ -209,7 +206,7 @@ export function WelcomeModal() {
           </>
         )}
 
-        {step === 'credentials' && (
+        {effectiveStep === 'credentials' && (
           <>
             <DialogHeader>
               <DialogTitle className="text-2xl">Configure Strava App</DialogTitle>
@@ -315,7 +312,7 @@ export function WelcomeModal() {
           </>
         )}
 
-        {step === 'connect' && (
+        {effectiveStep === 'connect' && (
           <>
             <DialogHeader>
               <DialogTitle className="text-2xl">Connect to Strava</DialogTitle>

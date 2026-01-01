@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import type { EChartsOption } from 'echarts'
-import { EChartsWrapper, defaultTooltipConfig, chartColors } from './echarts-wrapper'
+import { EChartsWrapper } from './echarts-wrapper'
+import { defaultTooltipConfig, chartColors } from './chart-constants'
 
 export interface DonutSlice {
   name: string

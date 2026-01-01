@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   useAppSettings,
   useAuthStatus,
@@ -51,13 +51,15 @@ export function EddingtonPage() {
   }[]
 
   const [defId, setDefId] = useState(defs[0]?.id ?? 'all')
-  useEffect(() => {
-    if (!defs.length) return
-    if (defs.some((d) => d.id === defId)) return
-    setDefId(defs[0].id)
+
+  // Derive effective defId - falls back to first definition if current selection is invalid
+  const effectiveDefId = useMemo(() => {
+    if (!defs.length) return 'all'
+    if (defs.some((d) => d.id === defId)) return defId
+    return defs[0].id
   }, [defs, defId])
 
-  const def = defs.find((d) => d.id === defId) ?? defs[0]
+  const def = defs.find((d) => d.id === effectiveDefId) ?? defs[0]
   const sportType = def?.sport_types?.length ? def.sport_types.join(',') : undefined
 
   const { data, isLoading, error } = useEddington(sportType)
@@ -83,7 +85,7 @@ export function EddingtonPage() {
           <p className="text-muted-foreground">Track your Eddington number progress</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={defId} onValueChange={setDefId}>
+          <Select value={effectiveDefId} onValueChange={setDefId}>
             <SelectTrigger className="w-[180px]">
               <SelectValue />
             </SelectTrigger>

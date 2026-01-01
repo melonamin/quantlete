@@ -3,7 +3,8 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Link } from '@tanstack/react-router'
 import type { Activity } from '@/lib/api'
 import { formatDistance, formatDuration, formatDate, formatElevation } from '@/lib/format'
-import { getSportIcon, getSportTextColor, formatSportType } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { getSportTextColor, formatSportType } from '@/lib/sport-types'
 import { useSettingsStore } from '@/stores'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,7 +38,6 @@ export function VirtualizedActivitiesTable({
 
   const renderRow = useCallback(
     (activity: Activity) => {
-      const SportIcon = getSportIcon(activity.sport_type)
       const sportColor = getSportTextColor(activity.sport_type)
 
       return (
@@ -56,7 +56,7 @@ export function VirtualizedActivitiesTable({
           {/* Sport Type */}
           <div className="flex-[1.5] min-w-[120px] px-4 py-3">
             <div className="flex items-center gap-2">
-              <SportIcon className={cn('h-4 w-4 shrink-0', sportColor)} />
+              <SportIcon sportType={activity.sport_type} className={cn('h-4 w-4 shrink-0', sportColor)} />
               <span className="text-sm truncate">{formatSportType(activity.sport_type)}</span>
             </div>
           </div>

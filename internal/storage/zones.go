@@ -52,7 +52,7 @@ func (r *ZonesRepository) ListHR(ctx context.Context, athleteID int64) ([]HRZone
 	`, athleteID)
 	if err != nil {
 		if isMissingTable(err, hrZoneDefinitionsTable) {
-			if err := r.ensureHRZoneDefinitionsTable(ctx); err != nil {
+			if err = r.ensureHRZoneDefinitionsTable(ctx); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 				return nil, err
 			}
 			rows, err = r.db.QueryContext(ctx, `
@@ -121,7 +121,7 @@ func (r *ZonesRepository) UpsertHR(ctx context.Context, athleteID int64, def HRZ
 	return err
 }
 
-func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportType string, effectiveFrom string) error {
+func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportType, effectiveFrom string) error {
 	if sportType == "" || effectiveFrom == "" {
 		return fmt.Errorf("sport_type and effective_from are required")
 	}

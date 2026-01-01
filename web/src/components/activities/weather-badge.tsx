@@ -19,27 +19,48 @@ import {
   Thermometer,
   Droplets,
   Wind,
+  type LucideProps,
 } from 'lucide-react'
 
 interface WeatherBadgeProps {
   activityId: number
 }
 
-function getWeatherIconComponent(code: number | undefined): React.ElementType {
-  if (code === undefined) return Thermometer
+const weatherIcons = {
+  sun: Sun,
+  cloudSun: CloudSun,
+  cloud: Cloud,
+  cloudFog: CloudFog,
+  cloudDrizzle: CloudDrizzle,
+  cloudRain: CloudRain,
+  snowflake: Snowflake,
+  cloudLightning: CloudLightning,
+  thermometer: Thermometer,
+} as const
+
+type WeatherIconType = keyof typeof weatherIcons
+
+function getWeatherIconType(code: number | undefined): WeatherIconType {
+  if (code === undefined) return 'thermometer'
 
   // WMO code to icon mapping
-  if (code <= 1) return Sun
-  if (code <= 3) return code === 2 ? CloudSun : Cloud
-  if (code <= 48) return CloudFog
-  if (code <= 57) return CloudDrizzle
-  if (code <= 67) return CloudRain
-  if (code <= 77) return Snowflake
-  if (code <= 82) return CloudRain
-  if (code <= 86) return Snowflake
-  if (code >= 95) return CloudLightning
+  if (code <= 1) return 'sun'
+  if (code <= 3) return code === 2 ? 'cloudSun' : 'cloud'
+  if (code <= 48) return 'cloudFog'
+  if (code <= 57) return 'cloudDrizzle'
+  if (code <= 67) return 'cloudRain'
+  if (code <= 77) return 'snowflake'
+  if (code <= 82) return 'cloudRain'
+  if (code <= 86) return 'snowflake'
+  if (code >= 95) return 'cloudLightning'
 
-  return Cloud
+  return 'cloud'
+}
+
+function WeatherIcon({ code, ...props }: { code: number | undefined } & LucideProps) {
+  const iconType = getWeatherIconType(code)
+  const Icon = weatherIcons[iconType]
+  return <Icon {...props} />
 }
 
 export function WeatherBadge({ activityId }: WeatherBadgeProps) {
@@ -68,7 +89,6 @@ export function WeatherBadge({ activityId }: WeatherBadgeProps) {
     return null
   }
 
-  const WeatherIcon = getWeatherIconComponent(weather.weather_code)
   const temp = weather.temperature_c ?? weather.temp_avg_c
   const description = weather.weather_code !== undefined
     ? getWeatherDescription(weather.weather_code)
@@ -82,7 +102,7 @@ export function WeatherBadge({ activityId }: WeatherBadgeProps) {
       <CardContent>
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <WeatherIcon className="h-6 w-6 text-muted-foreground" />
+            <WeatherIcon code={weather.weather_code} className="h-6 w-6 text-muted-foreground" />
           </div>
           <div>
             <div className="flex items-baseline gap-2">

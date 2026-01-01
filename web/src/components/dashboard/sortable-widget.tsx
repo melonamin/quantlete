@@ -49,44 +49,22 @@ const HEIGHT_CLASSES: Record<WidgetHeight, string> = {
   3: 'row-span-3',
 }
 
-export function SortableWidget({
-  id,
-  title,
+interface CompactControlsProps {
+  width: WidgetWidth
+  height: WidgetHeight
+  onWidthChange: (width: WidgetWidth) => void
+  onHeightChange: (height: WidgetHeight) => void
+  onHide: () => void
+}
+
+function CompactControls({
   width,
   height,
-  editMode,
   onWidthChange,
   onHeightChange,
   onHide,
-  children,
-  showDropIndicator,
-  onRefChange,
-}: SortableWidgetProps) {
-  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({
-    id,
-    disabled: !editMode,
-  })
-
-  // Combined ref for both sortable and position tracking
-  const combinedRef = useCallback(
-    (el: HTMLElement | null) => {
-      setNodeRef(el)
-      onRefChange?.(el)
-    },
-    [setNodeRef, onRefChange]
-  )
-
-  // For variable-width grid items, we don't apply transform animations
-  // The grid handles positioning - we only use DragOverlay for drag visual
-  const style: CSSProperties = {
-    opacity: isDragging ? 0.3 : 1,
-  }
-
-  // Use compact mode for narrowest widgets (col-span-4 = ~300px)
-  const isCompact = width === 4
-
-  // Compact controls popover content
-  const CompactControls = () => (
+}: CompactControlsProps) {
+  return (
     <div className="flex flex-col gap-3 p-3">
       {/* Width controls */}
       <div className="flex flex-col gap-1.5">
@@ -147,6 +125,43 @@ export function SortableWidget({
       </button>
     </div>
   )
+}
+
+export function SortableWidget({
+  id,
+  title,
+  width,
+  height,
+  editMode,
+  onWidthChange,
+  onHeightChange,
+  onHide,
+  children,
+  showDropIndicator,
+  onRefChange,
+}: SortableWidgetProps) {
+  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({
+    id,
+    disabled: !editMode,
+  })
+
+  // Combined ref for both sortable and position tracking
+  const combinedRef = useCallback(
+    (el: HTMLElement | null) => {
+      setNodeRef(el)
+      onRefChange?.(el)
+    },
+    [setNodeRef, onRefChange]
+  )
+
+  // For variable-width grid items, we don't apply transform animations
+  // The grid handles positioning - we only use DragOverlay for drag visual
+  const style: CSSProperties = {
+    opacity: isDragging ? 0.3 : 1,
+  }
+
+  // Use compact mode for narrowest widgets (col-span-4 = ~300px)
+  const isCompact = width === 4
 
   return (
     <>
@@ -226,7 +241,13 @@ export function SortableWidget({
                       </button>
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-auto p-0">
-                      <CompactControls />
+                      <CompactControls
+                        width={width}
+                        height={height}
+                        onWidthChange={onWidthChange}
+                        onHeightChange={onHeightChange}
+                        onHide={onHide}
+                      />
                     </PopoverContent>
                   </Popover>
                 ) : (

@@ -50,7 +50,7 @@ func (r *AthleteMetricsRepository) Replace(ctx context.Context, athleteID int64,
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, "DELETE FROM athlete_metrics WHERE athlete_id = ? AND metric = ?", athleteID, metric); err != nil {
+	if _, err = tx.ExecContext(ctx, "DELETE FROM athlete_metrics WHERE athlete_id = ? AND metric = ?", athleteID, metric); err != nil {
 		return err
 	}
 

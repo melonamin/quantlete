@@ -1,5 +1,6 @@
 import type { SportTypeStat } from '@/lib/api'
-import { getSportIcon, formatSportType, getSportHexColor } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { formatSportType, getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -38,7 +39,6 @@ export function SportBreakdown({ stats, isLoading }: SportBreakdownProps) {
           {stats.slice(0, 6).map((stat) => {
             const percentage =
               totalActivities > 0 ? Math.round((stat.activity_count / totalActivities) * 100) : 0
-            const Icon = getSportIcon(stat.sport_type)
 
             return (
               <div key={stat.sport_type} className="flex items-center gap-3">
@@ -46,7 +46,7 @@ export function SportBreakdown({ stats, isLoading }: SportBreakdownProps) {
                   className="h-8 w-8 rounded flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: getSportHexColor(stat.sport_type) + '20' }}
                 >
-                  <Icon className="h-4 w-4" style={{ color: getSportHexColor(stat.sport_type) }} />
+                  <SportIcon sportType={stat.sport_type} className="h-4 w-4" style={{ color: getSportHexColor(stat.sport_type) }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">

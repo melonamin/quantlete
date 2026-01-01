@@ -16,11 +16,11 @@ func NormalizedPower(watts []float64) float64 {
 }
 
 // IntensityFactor calculates the intensity factor: IF = NP / FTP
-func IntensityFactor(normalizedPower float64, ftp float64) float64 {
+func IntensityFactor(normalizedPower, ftp float64) float64 {
 	return algorithms.IntensityFactor(normalizedPower, ftp)
 }
 
 // TrainingStressScore calculates TSS.
-func TrainingStressScore(durationSeconds int, normalizedPower float64, ftp float64) float64 {
+func TrainingStressScore(durationSeconds int, normalizedPower, ftp float64) float64 {
 	return algorithms.TrainingStressScore(durationSeconds, normalizedPower, ftp)
 }

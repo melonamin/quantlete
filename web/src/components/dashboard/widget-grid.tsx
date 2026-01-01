@@ -190,8 +190,8 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
       }))
   }, [config, widgets])
 
-  const visible = ordered.filter((w) => !w.hidden)
-  const visibleIds = visible.map((w) => w.id)
+  const visible = useMemo(() => ordered.filter((w) => !w.hidden), [ordered])
+  const visibleIds = useMemo(() => visible.map((w) => w.id), [visible])
 
   // Calculate drop position based on pointer coordinates
   const calculateDropIndex = useCallback(

@@ -213,7 +213,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	if year > 0 {
 		months := make([]RewindMonth, 12)
 		for m := 1; m <= 12; m++ {
-			months[m-1] = RewindMonth{
+			months[m-1] = RewindMonth{ //nolint:gosec // G602: loop bounds ensure valid index 0-11
 				Month: time.Date(year, time.Month(m), 1, 0, 0, 0, 0, time.UTC).Format("2006-01"),
 			}
 		}
@@ -236,12 +236,12 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 			var m int
 			var a int
 			var d, e sql.NullFloat64
-			if err := rows.Scan(&m, &a, &d, &e); err != nil {
+			if err = rows.Scan(&m, &a, &d, &e); err != nil {
 				_ = rows.Close()
 				return nil, err
 			}
 			if m >= 1 && m <= 12 {
-				months[m-1].Activities = a
+				months[m-1].Activities = a //nolint:gosec // G602: bounds check above ensures valid index
 				if d.Valid {
 					months[m-1].DistanceM = d.Float64
 				}
@@ -292,7 +292,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 					continue
 				}
 				if mon >= 1 && mon <= 12 {
-					months[mon-1].PRs = prs
+					months[mon-1].PRs = prs //nolint:gosec // G602: bounds check above ensures valid index
 				}
 			}
 			_ = prRows.Close()
@@ -315,7 +315,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	for mtRows.Next() {
 		var st string
 		var secs sql.NullInt64
-		if err := mtRows.Scan(&st, &secs); err != nil {
+		if err = mtRows.Scan(&st, &secs); err != nil {
 			_ = mtRows.Close()
 			return nil, err
 		}
@@ -341,7 +341,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	}
 	for hrRows.Next() {
 		var h, c int
-		if err := hrRows.Scan(&h, &c); err != nil {
+		if err = hrRows.Scan(&h, &c); err != nil {
 			_ = hrRows.Close()
 			return nil, err
 		}
@@ -373,7 +373,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	for locRows.Next() {
 		var lat, lng float64
 		var c int
-		if err := locRows.Scan(&lat, &lng, &c); err != nil {
+		if err = locRows.Scan(&lat, &lng, &c); err != nil {
 			_ = locRows.Close()
 			return nil, err
 		}

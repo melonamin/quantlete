@@ -15,7 +15,7 @@ import (
 
 const (
 	appStateKeyClientID     = "strava_client_id"
-	appStateKeyClientSecret = "strava_client_secret"
+	appStateKeyClientSecret = "strava_client_secret" //nolint:gosec // G101: This is a key name, not a credential
 
 	// Strava client ID is a numeric string, typically 5-6 digits.
 	clientIDMinLen = 4

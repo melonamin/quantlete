@@ -1,10 +1,10 @@
 import type { EChartsOption } from 'echarts'
+import { EChartsWrapper } from './echarts-wrapper'
 import {
-  EChartsWrapper,
   chartColors,
   defaultGridConfig,
   defaultTooltipConfig,
-} from './echarts-wrapper'
+} from './chart-constants'
 
 interface DataPoint {
   x: number | string

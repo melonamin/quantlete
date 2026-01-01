@@ -127,11 +127,11 @@ var (
 )
 
 func parseQueryFile(path string) ([]Query, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: input path is from controlled source
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var queries []Query
 	var current *Query
@@ -261,18 +261,18 @@ func generateGoCode(files []QueryFile, output string) error {
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
 		// Write unformatted for debugging
-		if err := os.WriteFile(output+".unformatted", buf.Bytes(), 0644); err != nil {
-			return fmt.Errorf("writing unformatted: %w", err)
+		if writeErr := os.WriteFile(output+".unformatted", buf.Bytes(), 0o644); writeErr != nil { //nolint:gosec // G306: debug file, permissions are fine
+			return fmt.Errorf("writing unformatted: %w", writeErr)
 		}
 		return fmt.Errorf("formatting Go code: %w", err)
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec // G301: directory for generated code
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	return os.WriteFile(output, formatted, 0644)
+	return os.WriteFile(output, formatted, 0o644) //nolint:gosec // G306: generated code file
 }
 
 // TypeScript code generation
@@ -294,18 +294,18 @@ export const queries = {
 		if i > 0 {
 			buf.WriteString("\n")
 		}
-		buf.WriteString(fmt.Sprintf("  // ============================================================================\n"))
+		buf.WriteString("  // ============================================================================\n")
 		buf.WriteString(fmt.Sprintf("  // %s queries\n", file.Name))
-		buf.WriteString(fmt.Sprintf("  // ============================================================================\n"))
+		buf.WriteString("  // ============================================================================\n")
 
 		for _, q := range file.Queries {
 			// Write function
-			buf.WriteString(fmt.Sprintf("\n  /**\n"))
+			buf.WriteString("\n  /**\n")
 			if q.Comment != "" {
 				buf.WriteString(fmt.Sprintf("   * %s\n", q.Comment))
 			}
 			buf.WriteString(fmt.Sprintf("   * @generated from %s\n", q.File))
-			buf.WriteString(fmt.Sprintf("   */\n"))
+			buf.WriteString("   */\n")
 
 			// Function signature
 			funcName := toLowerCamelCase(q.Name)
@@ -374,11 +374,11 @@ export const queries = {
 	buf.WriteString("}\n")
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec // G301: directory for generated code
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	return os.WriteFile(output, buf.Bytes(), 0644)
+	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec // G306: generated code file
 }
 
 func toLowerCamelCase(s string) string {

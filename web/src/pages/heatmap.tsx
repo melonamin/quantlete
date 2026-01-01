@@ -72,7 +72,7 @@ export function HeatmapPage() {
         mapRef.current.flyToBounds(bounds, { padding: [20, 20], duration: 1 })
       }
     },
-    [data?.activities]
+    [data]
   )
 
   const hasActiveFilters = sportType || after || before || commute !== 'all' || workoutType

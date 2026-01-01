@@ -57,14 +57,14 @@ func NewBestEffortsRepository(db *DB) *BestEffortsRepository {
 	return &BestEffortsRepository{db: db}
 }
 
-func (r *BestEffortsRepository) ReplaceForActivity(ctx context.Context, athleteID int64, activityID int64, sportType string, efforts []BestEffort) error {
+func (r *BestEffortsRepository) ReplaceForActivity(ctx context.Context, athleteID, activityID int64, sportType string, efforts []BestEffort) error {
 	tx, err := r.db.Conn().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM best_efforts WHERE athlete_id = ? AND activity_id = ?`, athleteID, activityID); err != nil {
+	if _, err = tx.ExecContext(ctx, `DELETE FROM best_efforts WHERE athlete_id = ? AND activity_id = ?`, athleteID, activityID); err != nil {
 		return err
 	}
 

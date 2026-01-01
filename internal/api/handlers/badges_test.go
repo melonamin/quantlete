@@ -66,7 +66,7 @@ func TestParseParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/badges/distance.svg", nil)
+			req := httptest.NewRequest(http.MethodGet, "/badges/distance.svg", http.NoBody)
 			q := req.URL.Query()
 			if tt.queryTheme != "" {
 				q.Set("theme", tt.queryTheme)
@@ -206,7 +206,7 @@ func TestBadgesHandler_GetDistanceBadge_NoAthlete(t *testing.T) {
 	// and public badges are not enabled
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/distance.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/distance.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.GetDistanceBadge(rr, req)
@@ -228,7 +228,7 @@ func TestBadgesHandler_GetDistanceBadge_NoAthlete(t *testing.T) {
 func TestBadgesHandler_GetTimeBadge_NoAthlete(t *testing.T) {
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/time.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/time.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.GetTimeBadge(rr, req)
@@ -246,7 +246,7 @@ func TestBadgesHandler_GetTimeBadge_NoAthlete(t *testing.T) {
 func TestBadgesHandler_GetElevationBadge_NoAthlete(t *testing.T) {
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/elevation.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/elevation.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.GetElevationBadge(rr, req)
@@ -264,7 +264,7 @@ func TestBadgesHandler_GetElevationBadge_NoAthlete(t *testing.T) {
 func TestBadgesHandler_GetActivitiesBadge_NoAthlete(t *testing.T) {
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/activities.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/activities.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.GetActivitiesBadge(rr, req)
@@ -282,7 +282,7 @@ func TestBadgesHandler_GetActivitiesBadge_NoAthlete(t *testing.T) {
 func TestBadgesHandler_GetEddingtonBadge_NoAthlete(t *testing.T) {
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/eddington.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/eddington.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.GetEddingtonBadge(rr, req)
@@ -300,7 +300,7 @@ func TestBadgesHandler_GetEddingtonBadge_NoAthlete(t *testing.T) {
 func TestBadgesHandler_GetYearBadge_NoAthlete(t *testing.T) {
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/year-2024.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/year-2024.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	// Note: chi.URLParam won't work in this test without a router
@@ -320,7 +320,7 @@ func TestBadgesHandler_GetYearBadge_NoAthlete(t *testing.T) {
 func TestBadgesHandler_GetMonthBadge_NoAthlete(t *testing.T) {
 	handler := NewBadgesHandler(nil, nil, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/badges/month-2024-12.svg", nil)
+	req := httptest.NewRequest(http.MethodGet, "/badges/month-2024-12.svg", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.GetMonthBadge(rr, req)

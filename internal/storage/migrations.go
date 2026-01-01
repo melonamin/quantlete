@@ -28,7 +28,7 @@ func (db *DB) Migrate() error {
 	}
 
 	// Load all migrations
-	migrations, err := loadMigrations()
+	migs, err := loadMigrations()
 	if err != nil {
 		return fmt.Errorf("loading migrations: %w", err)
 	}
@@ -40,7 +40,7 @@ func (db *DB) Migrate() error {
 	}
 
 	// Run pending migrations
-	for _, m := range migrations {
+	for _, m := range migs {
 		if applied[m.Version] {
 			continue
 		}
@@ -106,7 +106,7 @@ func (db *DB) runMigration(m Migration) error {
 
 // loadMigrations loads all migration files from the embedded filesystem.
 func loadMigrations() ([]Migration, error) {
-	var migrations []Migration
+	var migs []Migration
 
 	err := fs.WalkDir(migrationsFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -128,7 +128,7 @@ func loadMigrations() ([]Migration, error) {
 			return fmt.Errorf("parsing filename %s: %w", filename, err)
 		}
 
-		migrations = append(migrations, Migration{
+		migs = append(migs, Migration{
 			Version: version,
 			Name:    name,
 			SQL:     string(content),
@@ -142,11 +142,11 @@ func loadMigrations() ([]Migration, error) {
 	}
 
 	// Sort by version
-	sort.Slice(migrations, func(i, j int) bool {
-		return migrations[i].Version < migrations[j].Version
+	sort.Slice(migs, func(i, j int) bool {
+		return migs[i].Version < migs[j].Version
 	})
 
-	return migrations, nil
+	return migs, nil
 }
 
 // parseMigrationFilename extracts version and name from a migration filename.
@@ -176,7 +176,7 @@ type MigrationStatus struct {
 
 // Status returns the current migration status.
 func (db *DB) MigrationStatus() (MigrationStatus, error) {
-	migrations, err := loadMigrations()
+	migs, err := loadMigrations()
 	if err != nil {
 		return MigrationStatus{}, err
 	}
@@ -194,12 +194,12 @@ func (db *DB) MigrationStatus() (MigrationStatus, error) {
 	}
 
 	var latest int
-	if len(migrations) > 0 {
-		latest = migrations[len(migrations)-1].Version
+	if len(migs) > 0 {
+		latest = migs[len(migs)-1].Version
 	}
 
 	pending := 0
-	for _, m := range migrations {
+	for _, m := range migs {
 		if !applied[m.Version] {
 			pending++
 		}

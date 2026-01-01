@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useMemo, useState, useCallback, memo } from 'react'
 import { Polyline, Popup, useMapEvents, CircleMarker, Tooltip } from 'react-leaflet'
 import type { LeafletMouseEvent, Map as LeafletMap } from 'leaflet'

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useDashboard } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { formatDistance, formatDuration } from '@/lib/format'
@@ -53,7 +53,7 @@ export function IntroText() {
     }
 
     return items
-  }, [data?.stats])
+  }, [data])
 
   const welcomeMessage = useMemo(() => {
     if (!data?.stats) return 'Welcome to Quantlete!'
@@ -76,9 +76,10 @@ export function IntroText() {
     }
 
     return 'Legendary athlete!'
-  }, [data?.stats])
+  }, [data])
 
-  const motivationalQuote = useMemo(() => {
+  // Use lazy state initializer since Date.now() is impure
+  const [motivationalQuote] = useState(() => {
     const quotes = [
       'Every journey begins with a single step.',
       "The only bad workout is the one you didn't do.",
@@ -93,7 +94,7 @@ export function IntroText() {
       (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
     )
     return quotes[dayOfYear % quotes.length]
-  }, [])
+  })
 
   return (
     <WidgetWrapper title="Welcome" isLoading={isLoading}>

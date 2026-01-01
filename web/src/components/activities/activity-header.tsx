@@ -1,6 +1,7 @@
 import type { Activity } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
-import { getSportIcon, getSportTextColor, formatSportType } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { getSportTextColor, formatSportType } from '@/lib/sport-types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ExternalLink } from 'lucide-react'
@@ -10,7 +11,6 @@ interface ActivityHeaderProps {
 }
 
 export function ActivityHeader({ activity }: ActivityHeaderProps) {
-  const SportIcon = getSportIcon(activity.sport_type)
   const sportColor = getSportTextColor(activity.sport_type)
   const stravaUrl = `https://www.strava.com/activities/${activity.id}`
 
@@ -19,7 +19,7 @@ export function ActivityHeader({ activity }: ActivityHeaderProps) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className={`rounded-lg bg-muted p-3 ${sportColor}`}>
-            <SportIcon className="h-6 w-6" />
+            <SportIcon sportType={activity.sport_type} className="h-6 w-6" />
           </div>
           <div>
             <h1 className="text-2xl font-bold">{activity.name}</h1>

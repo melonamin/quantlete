@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useRewind, useRewindYears } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -30,14 +30,15 @@ export function RewindPage() {
   const [year, setYear] = useState(nowYear)
   const [compareYear, setCompareYear] = useState<number | null>(null)
 
-  useEffect(() => {
-    if (!availableYears.length) return
-    if (year === 0) return
-    if (availableYears.includes(year)) return
-    setYear(availableYears[0])
-  }, [availableYears, year])
+  // Derive the effective year for API calls - handles invalid year values
+  const effectiveYear = useMemo(() => {
+    if (year === 0) return 0 // "all time" is always valid
+    if (!availableYears.length) return nowYear
+    if (availableYears.includes(year)) return year
+    return availableYears[0]
+  }, [year, availableYears, nowYear])
 
-  const { data: report, isLoading, isFetching, error } = useRewind(year)
+  const { data: report, isLoading, isFetching, error } = useRewind(effectiveYear)
   const { data: compare, isLoading: compareLoading } = useRewind(
     compareYear ?? 0,
     compareYear !== null
@@ -90,7 +91,7 @@ export function RewindPage() {
     ]
   }, [report])
 
-  const showMonths = year > 0
+  const showMonths = effectiveYear > 0
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -147,7 +148,7 @@ export function RewindPage() {
       ) : error || !report ? (
         <div className="rounded-lg border border-border bg-card p-8 text-center">
           <p className="text-muted-foreground">
-            No activity data available for {year === 0 ? 'this period' : year}.
+            No activity data available for {effectiveYear === 0 ? 'this period' : effectiveYear}.
           </p>
           <p className="text-sm text-muted-foreground mt-1">
             Import activities to see your year in review.

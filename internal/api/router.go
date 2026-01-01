@@ -109,16 +109,14 @@ func csrfProtection(allowedOrigins []string) func(http.Handler) http.Handler {
 				origin = r.Header.Get("Referer")
 				if origin != "" {
 					// Extract just the origin from referer URL
-					if len(origin) > 0 {
-						// Simple extraction: take everything up to the third slash
-						slashCount := 0
-						for i, c := range origin {
-							if c == '/' {
-								slashCount++
-								if slashCount == 3 {
-									origin = origin[:i]
-									break
-								}
+					// Simple extraction: take everything up to the third slash
+					slashCount := 0
+					for i, c := range origin {
+						if c == '/' {
+							slashCount++
+							if slashCount == 3 {
+								origin = origin[:i]
+								break
 							}
 						}
 					}

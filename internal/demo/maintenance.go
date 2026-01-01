@@ -230,7 +230,7 @@ func generateMaintenanceLogs(rng *rand.Rand, components []GeneratedComponent, ge
 					firstActivity = comp.CreatedAt
 				}
 
-				timeRange := time.Now().Sub(firstActivity)
+				timeRange := time.Since(firstActivity)
 				interval := timeRange / time.Duration(numReplacements+1)
 
 				for i := 1; i <= numReplacements; i++ {
@@ -257,7 +257,7 @@ func generateMaintenanceLogs(rng *rand.Rand, components []GeneratedComponent, ge
 				continue
 			}
 
-			daysSinceCreation := int(time.Now().Sub(comp.CreatedAt).Hours() / 24)
+			daysSinceCreation := int(time.Since(comp.CreatedAt).Hours() / 24)
 			numMaintenance := daysSinceCreation / int(rule.ThresholdValue)
 
 			if numMaintenance > 5 {
@@ -286,10 +286,10 @@ func generateMaintenanceLogs(rng *rand.Rand, components []GeneratedComponent, ge
 
 func isBikeGear(gearID string) bool {
 	// Gear IDs starting with 'b' are bikes
-	return len(gearID) > 0 && gearID[0] == 'b'
+	return gearID != "" && gearID[0] == 'b'
 }
 
 func isShoeGear(gearID string) bool {
 	// Gear IDs starting with 'g' are shoes (from Strava convention)
-	return len(gearID) > 0 && gearID[0] == 'g'
+	return gearID != "" && gearID[0] == 'g'
 }

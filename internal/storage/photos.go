@@ -49,7 +49,7 @@ func (r *PhotoRepository) Upsert(ctx context.Context, p *Photo) error {
 	return err
 }
 
-func (r *PhotoRepository) ListByActivity(ctx context.Context, athleteID int64, activityID int64) ([]Photo, error) {
+func (r *PhotoRepository) ListByActivity(ctx context.Context, athleteID, activityID int64) ([]Photo, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, athlete_id, activity_id, url, COALESCE(thumbnail_url, ''), COALESCE(caption, ''), COALESCE(location, ''), created_at
 		FROM photos
@@ -152,7 +152,8 @@ func (r *PhotoRepository) List(ctx context.Context, athleteID int64, f PhotoList
 	for rows.Next() {
 		var it PhotoListItem
 		var loc string
-		if err := rows.Scan(
+		//nolint:gocritic // sloppyReassign: using = to avoid shadow
+		if err = rows.Scan(
 			&it.ID, &it.AthleteID, &it.ActivityID, &it.URL, &it.ThumbnailURL, &it.Caption, &loc, &it.CreatedAt,
 			&it.ActivityName, &it.SportType, &it.StartDateLocal, &it.LocationCountry,
 		); err != nil {
@@ -163,7 +164,7 @@ func (r *PhotoRepository) List(ctx context.Context, athleteID int64, f PhotoList
 		}
 		items = append(items, it)
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 		return nil, err
 	}
 

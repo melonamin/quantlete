@@ -473,7 +473,7 @@ func (r *ActivityRepository) GetLatestActivityDate(ctx context.Context, athleteI
 	if err != nil {
 		return nil, err
 	}
-	if startDate.Time.IsZero() {
+	if startDate.IsZero() {
 		return nil, nil
 	}
 	t := startDate.Time

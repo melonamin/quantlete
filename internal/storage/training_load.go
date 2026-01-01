@@ -140,6 +140,11 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 	isRun := strings.Contains(a.SportType, "Run")
 
 	// 2) Running: pace/speed-based TSS (threshold speed).
+	// NOTE: This applies the cycling Normalized Power algorithm (30s rolling avg, 4th power)
+	// to running speed data. While not physiologically identical to running-specific metrics
+	// like NGP (Normalized Graded Pace), it provides a reasonable TSS approximation for
+	// comparing training load across activities. Values are not directly comparable to
+	// cycling TSS or TrainingPeaks rTSS.
 	if isRun && len(speedRaw) > 0 {
 		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_running_mps", a.StartDate.Time)
 		if err != nil {
@@ -159,6 +164,9 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 	}
 
 	// 3) Running: HR-based TSS (approximate LTHR from HR zone definition).
+	// NOTE: Similar to pace-based TSS, this applies the cycling NP algorithm to heart rate
+	// data with threshold HR as the "FTP" equivalent. This is an approximation that enables
+	// training load tracking when pace/power data isn't available.
 	if isRun && len(hrRaw) > 0 && r.zones != nil {
 		def, cfg, err := r.zones.GetApplicableHR(ctx, athleteID, a.SportType, a.StartDate.Time)
 		if err != nil {
@@ -170,7 +178,7 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 				if cfg.HRMax <= 0 {
 					return nil
 				}
-				threshold = threshold * cfg.HRMax
+				threshold *= cfg.HRMax
 			}
 			if threshold > 0 {
 				hrs, err := decodeFloat64Array(hrRaw)
@@ -204,6 +212,7 @@ func (r *TrainingLoadRepository) upsertActivity(ctx context.Context, athleteID i
 }
 
 func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID int64, after, before *time.Time) ([]DailyTrainingLoadPoint, error) {
+	// Query active days with TSS values.
 	query := `
 		SELECT
 			date(a.start_date_local) AS day,
@@ -232,40 +241,67 @@ func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID i
 	}
 	defer func() { _ = rows.Close() }()
 
-	type dayRow struct {
-		Day SQLiteTime
-		TSS float64
-	}
-	var days []dayRow
+	// Build a map of day -> TSS for quick lookup.
+	tssByDay := make(map[string]float64)
+	var firstDay, lastDay time.Time
 	for rows.Next() {
-		var d dayRow
-		if err := rows.Scan(&d.Day, &d.TSS); err != nil {
+		var day SQLiteTime
+		var tss float64
+		if err := rows.Scan(&day, &tss); err != nil {
 			return nil, err
 		}
-		days = append(days, d)
+		dayStr := day.Format("2006-01-02")
+		tssByDay[dayStr] = tss
+		dayTime := day.Time
+		if firstDay.IsZero() || dayTime.Before(firstDay) {
+			firstDay = dayTime
+		}
+		if lastDay.IsZero() || dayTime.After(lastDay) {
+			lastDay = dayTime
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
+	if len(tssByDay) == 0 {
+		return nil, nil
+	}
+
+	// Apply date range filters if provided.
+	if after != nil && after.After(firstDay) {
+		firstDay = *after
+	}
+	if before != nil && before.Before(lastDay) {
+		lastDay = *before
+	}
+
+	// Normalize to start of day.
+	firstDay = time.Date(firstDay.Year(), firstDay.Month(), firstDay.Day(), 0, 0, 0, 0, time.UTC)
+	lastDay = time.Date(lastDay.Year(), lastDay.Month(), lastDay.Day(), 0, 0, 0, 0, time.UTC)
+
 	// EWMA constants.
 	const ctlTau = 42.0
 	const atlTau = 7.0
 
+	// Initialize CTL/ATL to 0, letting the EWMA build naturally.
 	var ctl, atl float64
-	out := make([]DailyTrainingLoadPoint, 0, len(days))
-	for i, d := range days {
-		if i == 0 {
-			ctl = d.TSS
-			atl = d.TSS
-		} else {
-			ctl += (d.TSS - ctl) * (1.0 / ctlTau)
-			atl += (d.TSS - atl) * (1.0 / atlTau)
-		}
+	totalDays := int(lastDay.Sub(firstDay).Hours()/24) + 1
+	out := make([]DailyTrainingLoadPoint, 0, totalDays)
+
+	// Iterate through every day in the range, including rest days (TSS=0).
+	for d := firstDay; !d.After(lastDay); d = d.AddDate(0, 0, 1) {
+		dayStr := d.Format("2006-01-02")
+		tss := tssByDay[dayStr] // 0 if not present (rest day)
+
+		// Apply EWMA formula for each day.
+		ctl += (tss - ctl) * (1.0 / ctlTau)
+		atl += (tss - atl) * (1.0 / atlTau)
 		tsb := ctl - atl
+
 		out = append(out, DailyTrainingLoadPoint{
-			Day: d.Day.Format("2006-01-02"),
-			TSS: round2(d.TSS),
+			Day: dayStr,
+			TSS: round2(tss),
 			CTL: round2(ctl),
 			ATL: round2(atl),
 			TSB: round2(tsb),
@@ -329,7 +365,7 @@ func (r *TrainingLoadRepository) GetSummary(ctx context.Context, athleteID int64
 	}, nil
 }
 
-func (r *TrainingLoadRepository) GetActivityTSS(ctx context.Context, athleteID int64, activityID int64) (float64, error) {
+func (r *TrainingLoadRepository) GetActivityTSS(ctx context.Context, athleteID, activityID int64) (float64, error) {
 	var tss sql.NullFloat64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT tss

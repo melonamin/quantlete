@@ -1,5 +1,3 @@
-import { Bike, Footprints, Waves, Snowflake, Activity } from 'lucide-react'
-
 export type SportCategory = 'ride' | 'run' | 'walk' | 'swim' | 'winter' | 'other'
 
 const sportCategoryMap: Record<string, SportCategory> = {
@@ -62,19 +60,6 @@ export function getSportTextColor(sportType: string): string {
     other: 'text-sport-other',
   }
   return colors[category]
-}
-
-export function getSportIcon(sportType: string) {
-  const category = getSportCategory(sportType)
-  const icons: Record<SportCategory, typeof Activity> = {
-    ride: Bike,
-    run: Footprints,
-    walk: Footprints,
-    swim: Waves,
-    winter: Snowflake,
-    other: Activity,
-  }
-  return icons[category]
 }
 
 export function formatSportType(sportType: string): string {

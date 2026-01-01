@@ -7,7 +7,7 @@
  * Works in both WASM mode (browser storage) and server mode (API storage).
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -24,20 +24,28 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
   const { data: credentials, isLoading } = useCredentialsStatus()
   const updateCredentials = useUpdateCredentials()
 
-  const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   const [showSecret, setShowSecret] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [clientIdInput, setClientIdInput] = useState('')
 
-  // Initialize form with existing client ID when credentials load
-  useEffect(() => {
+  // Derive clientId: use user input if editing, otherwise from credentials
+  const credentialsClientId = useMemo(() => {
     if (credentials?.configured && credentials.client_id) {
-      // Remove masking to get just the visible part
-      const visiblePart = credentials.client_id.replace(/\*+$/, '')
-      setClientId(visiblePart)
+      return credentials.client_id.replace(/\*+$/, '')
     }
+    return ''
   }, [credentials])
+
+  const clientId = isEditing ? clientIdInput : credentialsClientId
+  const setClientId = (value: string) => setClientIdInput(value)
+
+  // Start editing mode and initialize form with current credentials
+  const startEditing = () => {
+    setClientIdInput(credentialsClientId)
+    setIsEditing(true)
+  }
 
   const handleSave = async () => {
     if (!clientId.trim()) {
@@ -153,7 +161,7 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => setIsEditing(true)}>
+            <Button variant="outline" onClick={startEditing}>
               Edit
             </Button>
           </div>

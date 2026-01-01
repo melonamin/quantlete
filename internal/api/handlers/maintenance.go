@@ -151,7 +151,7 @@ func (h *MaintenanceHandler) UpdateComponent(w http.ResponseWriter, r *http.Requ
 	}
 
 	var req updateComponentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
 		return
 	}

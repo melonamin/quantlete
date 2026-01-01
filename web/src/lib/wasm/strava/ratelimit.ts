@@ -31,7 +31,7 @@ const DEFAULT_LIMIT_DAILY = 1000
 const THRESHOLD_PERCENT = 0.9
 
 // Global state
-let state: RateLimitState = {
+const state: RateLimitState = {
   limit15Min: DEFAULT_LIMIT_15MIN,
   limitDaily: DEFAULT_LIMIT_DAILY,
   usage15Min: 0,

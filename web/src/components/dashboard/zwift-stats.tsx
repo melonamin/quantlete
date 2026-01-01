@@ -75,7 +75,7 @@ export function ZwiftStats() {
     }
 
     return Object.values(stats).sort((a, b) => b.distance - a.distance)
-  }, [data?.data])
+  }, [data])
 
   const totals = useMemo(() => {
     return worldStats.reduce(

@@ -242,10 +242,10 @@ func (r *SyncHistoryRepository) GetLatest(ctx context.Context, athleteID int64, 
 		}
 
 		run.StartedAt = startedAt.Time
-		if !completedAt.Time.IsZero() {
+		if !completedAt.IsZero() {
 			run.CompletedAt = &completedAt.Time
 		}
-		if !newestActivityDate.Time.IsZero() {
+		if !newestActivityDate.IsZero() {
 			run.NewestActivityDate = &newestActivityDate.Time
 		}
 		run.CreatedAt = createdAt.Time

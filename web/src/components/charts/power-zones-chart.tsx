@@ -1,5 +1,5 @@
 import { StackedBarChart } from './bar-chart'
-import { zoneColorsArray } from './echarts-wrapper'
+import { zoneColorsArray } from './chart-constants'
 
 export function PowerZonesChart({
   secondsByZone,

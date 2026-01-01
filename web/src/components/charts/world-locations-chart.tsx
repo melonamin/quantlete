@@ -1,5 +1,6 @@
 import type { EChartsOption, TooltipComponentFormatterCallbackParams } from 'echarts'
-import { EChartsWrapper, defaultGridConfig, defaultTooltipConfig } from './echarts-wrapper'
+import { EChartsWrapper } from './echarts-wrapper'
+import { defaultGridConfig, defaultTooltipConfig } from './chart-constants'
 
 type LocationValue = [number, number, number] // [lng, lat, count]
 

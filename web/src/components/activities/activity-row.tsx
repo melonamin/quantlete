@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import type { Activity } from '@/lib/api'
 import { formatDistance, formatDuration, formatDate, formatElevation } from '@/lib/format'
-import { getSportIcon, getSportTextColor, formatSportType } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { getSportTextColor, formatSportType } from '@/lib/sport-types'
 import { useSettingsStore } from '@/stores'
 import { Badge } from '@/components/ui/badge'
 import { TableCell, TableRow } from '@/components/ui/table'
@@ -12,7 +13,6 @@ interface ActivityRowProps {
 
 export function ActivityRow({ activity }: ActivityRowProps) {
   const { unitSystem } = useSettingsStore()
-  const SportIcon = getSportIcon(activity.sport_type)
   const sportColor = getSportTextColor(activity.sport_type)
 
   return (
@@ -28,7 +28,7 @@ export function ActivityRow({ activity }: ActivityRowProps) {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
-          <SportIcon className={`h-4 w-4 ${sportColor}`} />
+          <SportIcon sportType={activity.sport_type} className={`h-4 w-4 ${sportColor}`} />
           <span className="text-sm">{formatSportType(activity.sport_type)}</span>
         </div>
       </TableCell>

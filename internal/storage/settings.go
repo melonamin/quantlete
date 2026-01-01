@@ -212,7 +212,7 @@ func migrateSchedulerSettings(s *SchedulerSettings) {
 	s.Pull.Schedule = normalizePullSchedule(s.Pull.Schedule, PullScheduleMidnight)
 }
 
-func normalizePullSchedule(v PullSchedule, def PullSchedule) PullSchedule {
+func normalizePullSchedule(v, def PullSchedule) PullSchedule {
 	switch v {
 	case PullScheduleMidnight, PullScheduleHourly, PullScheduleEvery6Hours:
 		return v
@@ -229,7 +229,7 @@ func (r *SettingsRepository) GetPublicBadgesAthleteID(ctx context.Context) (int6
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var athleteID int64

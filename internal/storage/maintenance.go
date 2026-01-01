@@ -151,7 +151,8 @@ func (r *MaintenanceRepository) ListComponents(ctx context.Context, athleteID in
 	componentIDs := make([]int64, 0, 16)
 	for rows.Next() {
 		var it ComponentWithRules
-		if err := rows.Scan(
+		//nolint:gocritic // sloppyReassign: using = to avoid shadow
+		if err = rows.Scan(
 			&it.ID,
 			&it.GearID,
 			&it.Name,
@@ -169,7 +170,7 @@ func (r *MaintenanceRepository) ListComponents(ctx context.Context, athleteID in
 		componentIDs = append(componentIDs, it.ID)
 		items = append(items, it)
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 		return nil, err
 	}
 
@@ -239,7 +240,7 @@ func (r *MaintenanceRepository) ListComponentsPaginated(ctx context.Context, ath
 
 	// Count total
 	var total int
-	if err := r.db.QueryRowContext(ctx,
+	if err = r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM components WHERE gear_id = ?`, gearID,
 	).Scan(&total); err != nil {
 		return ComponentListResult{}, fmt.Errorf("counting components: %w", err)
@@ -391,11 +392,10 @@ func (r *MaintenanceRepository) CreateComponent(ctx context.Context, athleteID i
 		if rule.ThresholdValue <= 0 {
 			return nil, fmt.Errorf("threshold_value must be > 0")
 		}
-		_, err := r.db.ExecContext(ctx, `
+		if _, err = r.db.ExecContext(ctx, `
 			INSERT INTO maintenance_rules (component_id, type, threshold_value, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)
-		`, id, rule.Type, rule.ThresholdValue, now, now)
-		if err != nil {
+		`, id, rule.Type, rule.ThresholdValue, now, now); err != nil {
 			return nil, err
 		}
 	}
@@ -419,7 +419,7 @@ type UpdateComponentInput struct {
 	Rules              *[]CreateRuleInput
 }
 
-func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID int64, componentID int64, in UpdateComponentInput) (*ComponentWithRules, error) {
+func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID, componentID int64, in UpdateComponentInput) (*ComponentWithRules, error) {
 	var gearID string
 	err := r.db.QueryRowContext(ctx, `
 		SELECT c.gear_id
@@ -449,7 +449,7 @@ func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID i
 		if in.MaintenanceHashtag != nil {
 			tag = normalizeTag(*in.MaintenanceHashtag)
 		}
-		_, err := r.db.ExecContext(ctx, `
+		if _, err = r.db.ExecContext(ctx, `
 			UPDATE components
 			SET
 				name = COALESCE(NULLIF(?, ''), name),
@@ -463,15 +463,13 @@ func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID i
 			in.MaintenanceHashtag != nil, tag,
 			now,
 			componentID,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, err
 		}
 	}
 
 	if in.Rules != nil {
-		_, err := r.db.ExecContext(ctx, `DELETE FROM maintenance_rules WHERE component_id = ?`, componentID)
-		if err != nil {
+		if _, err = r.db.ExecContext(ctx, `DELETE FROM maintenance_rules WHERE component_id = ?`, componentID); err != nil {
 			return nil, err
 		}
 		for _, rule := range *in.Rules {
@@ -481,11 +479,10 @@ func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID i
 			if rule.ThresholdValue <= 0 {
 				return nil, fmt.Errorf("threshold_value must be > 0")
 			}
-			_, err := r.db.ExecContext(ctx, `
+			if _, err = r.db.ExecContext(ctx, `
 				INSERT INTO maintenance_rules (component_id, type, threshold_value, created_at, updated_at)
 				VALUES (?, ?, ?, ?, ?)
-			`, componentID, rule.Type, rule.ThresholdValue, now, now)
-			if err != nil {
+			`, componentID, rule.Type, rule.ThresholdValue, now, now); err != nil {
 				return nil, err
 			}
 		}
@@ -503,7 +500,7 @@ func (r *MaintenanceRepository) UpdateComponent(ctx context.Context, athleteID i
 	return nil, nil
 }
 
-func (r *MaintenanceRepository) DeleteComponent(ctx context.Context, athleteID int64, componentID int64) error {
+func (r *MaintenanceRepository) DeleteComponent(ctx context.Context, athleteID, componentID int64) error {
 	var gearID string
 	err := r.db.QueryRowContext(ctx, `
 		SELECT c.gear_id
@@ -539,7 +536,7 @@ func (r *MaintenanceRepository) DeleteComponent(ctx context.Context, athleteID i
 	return tx.Commit()
 }
 
-func (r *MaintenanceRepository) LogMaintenance(ctx context.Context, athleteID int64, componentID int64, activityID *int64, completedAt time.Time) error {
+func (r *MaintenanceRepository) LogMaintenance(ctx context.Context, athleteID, componentID int64, activityID *int64, completedAt time.Time) error {
 	var exists bool
 	err := r.db.QueryRowContext(ctx, `
 		SELECT TRUE
@@ -562,7 +559,7 @@ func (r *MaintenanceRepository) LogMaintenance(ctx context.Context, athleteID in
 	return err
 }
 
-func (r *MaintenanceRepository) LogFromActivityHashtags(ctx context.Context, athleteID int64, activityID int64, completedAt time.Time, activityName string) (int, error) {
+func (r *MaintenanceRepository) LogFromActivityHashtags(ctx context.Context, athleteID, activityID int64, completedAt time.Time, activityName string) (int, error) {
 	tags := extractMaintenanceTags(activityName)
 	if len(tags) == 0 {
 		return 0, nil
@@ -623,7 +620,8 @@ func (r *MaintenanceRepository) Due(ctx context.Context, athleteID int64) ([]Due
 	componentIDs := make([]int64, 0, 64)
 	for rows.Next() {
 		var it ComponentWithRules
-		if err := rows.Scan(
+		//nolint:gocritic // sloppyReassign: using = to avoid shadow
+		if err = rows.Scan(
 			&it.ID,
 			&it.GearID,
 			&it.Name,
@@ -641,7 +639,7 @@ func (r *MaintenanceRepository) Due(ctx context.Context, athleteID int64) ([]Due
 		components = append(components, it)
 		componentIDs = append(componentIDs, it.ID)
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 		return nil, err
 	}
 	if len(components) == 0 {
@@ -680,42 +678,90 @@ func (r *MaintenanceRepository) Due(ctx context.Context, athleteID int64) ([]Due
 
 	now := time.Now()
 
-	// Build a map of gear_id -> since date for batched activity stats query
+	// Build a map of component_id -> (gear_id, since) for batched activity stats query.
 	type gearSince struct {
 		gearID string
 		since  time.Time
 	}
 	componentGearSince := make(map[int64]gearSince, len(components))
-	gearIDs := make(map[string]bool)
+	gearIDs := make([]string, 0, len(components))
+	gearIDSet := make(map[string]bool)
+	var minSince time.Time
 	for _, c := range components {
 		since := c.CreatedAt.Time
 		if c.LastCompletedAt != nil && !c.LastCompletedAt.IsZero() {
 			since = c.LastCompletedAt.Time
 		}
 		componentGearSince[c.ID] = gearSince{gearID: c.GearID, since: since}
-		gearIDs[c.GearID] = true
+		if !gearIDSet[c.GearID] {
+			gearIDSet[c.GearID] = true
+			gearIDs = append(gearIDs, c.GearID)
+		}
+		if minSince.IsZero() || since.Before(minSince) {
+			minSince = since
+		}
 	}
 
-	// Batch query: get activity stats per gear since the earliest date we care about
-	// We need per-component since dates, but we can optimize by fetching all activities
-	// for the athlete's gear and computing per-component in memory
+	// Batch query: fetch all activities for relevant gear since the earliest "since" date.
+	// Then compute per-component stats in memory based on each component's specific "since".
+	type activityRow struct {
+		gearID     string
+		startDate  time.Time
+		distance   float64
+		movingTime int
+	}
+	var activities []activityRow
+
+	if len(gearIDs) > 0 {
+		gearPlaceholders := make([]string, len(gearIDs))
+		gearArgs := make([]any, 0, len(gearIDs)+2)
+		gearArgs = append(gearArgs, athleteID)
+		for i, gid := range gearIDs {
+			gearPlaceholders[i] = "?"
+			gearArgs = append(gearArgs, gid)
+		}
+		gearArgs = append(gearArgs, minSince)
+
+		actRows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
+			SELECT gear_id, start_date_local, COALESCE(distance, 0), COALESCE(moving_time, 0)
+			FROM activities
+			WHERE athlete_id = ? AND gear_id IN (%s) AND start_date_local >= ?
+		`, strings.Join(gearPlaceholders, ",")), gearArgs...)
+		if err != nil {
+			return nil, err
+		}
+		for actRows.Next() {
+			var a activityRow
+			var startDate SQLiteTime
+			if err := actRows.Scan(&a.gearID, &startDate, &a.distance, &a.movingTime); err != nil {
+				_ = actRows.Close()
+				return nil, err
+			}
+			a.startDate = startDate.Time
+			activities = append(activities, a)
+		}
+		if err := actRows.Err(); err != nil {
+			_ = actRows.Close()
+			return nil, err
+		}
+		_ = actRows.Close()
+	}
+
+	// Compute per-component stats by filtering activities based on each component's "since" date.
 	type activityStats struct {
 		distance   float64
 		movingTime int
 	}
 	gearStats := make(map[int64]activityStats, len(components))
-
 	for compID, gs := range componentGearSince {
-		var dist float64
-		var moving int
-		if err := r.db.QueryRowContext(ctx, `
-			SELECT COALESCE(SUM(distance), 0), COALESCE(SUM(moving_time), 0)
-			FROM activities
-			WHERE athlete_id = ? AND gear_id = ? AND start_date_local >= ?
-		`, athleteID, gs.gearID, gs.since).Scan(&dist, &moving); err != nil {
-			return nil, err
+		var stats activityStats
+		for _, a := range activities {
+			if a.gearID == gs.gearID && !a.startDate.Before(gs.since) {
+				stats.distance += a.distance
+				stats.movingTime += a.movingTime
+			}
 		}
-		gearStats[compID] = activityStats{distance: dist, movingTime: moving}
+		gearStats[compID] = stats
 	}
 
 	out := make([]DueComponent, 0, len(components))

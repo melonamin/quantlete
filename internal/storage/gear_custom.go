@@ -249,7 +249,7 @@ func (r *GearRepository) UpdateCustom(ctx context.Context, athleteID int64, id s
 	if err != nil {
 		return nil, err
 	}
-	if g == nil || g.AthleteID != athleteID || strings.ToLower(g.Source) != "custom" {
+	if g == nil || g.AthleteID != athleteID || !strings.EqualFold(g.Source, "custom") {
 		return nil, nil
 	}
 
@@ -285,12 +285,12 @@ func (r *GearRepository) DeleteCustom(ctx context.Context, athleteID int64, id s
 	if err != nil {
 		return false, err
 	}
-	if strings.ToLower(source) != "custom" {
+	if !strings.EqualFold(source, "custom") {
 		return false, fmt.Errorf("not custom gear")
 	}
 
 	var cnt int
-	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM activities WHERE athlete_id = ? AND gear_id = ?`, athleteID, id).Scan(&cnt); err != nil {
+	if err = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM activities WHERE athlete_id = ? AND gear_id = ?`, athleteID, id).Scan(&cnt); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 		return false, err
 	}
 	if cnt > 0 {
@@ -298,7 +298,7 @@ func (r *GearRepository) DeleteCustom(ctx context.Context, athleteID int64, id s
 		if !force {
 			return hadActivities, nil
 		}
-		if _, err := r.db.ExecContext(ctx, `UPDATE activities SET gear_id = '' WHERE athlete_id = ? AND gear_id = ?`, athleteID, id); err != nil {
+		if _, err = r.db.ExecContext(ctx, `UPDATE activities SET gear_id = '' WHERE athlete_id = ? AND gear_id = ?`, athleteID, id); err != nil {
 			return hadActivities, err
 		}
 	}

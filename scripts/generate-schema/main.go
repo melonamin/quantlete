@@ -88,7 +88,7 @@ func readMigrations(dir string) ([]Migration, error) {
 		}
 		name = strings.TrimSuffix(name, ".sql")
 
-		content, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		content, err := os.ReadFile(filepath.Join(dir, entry.Name())) //nolint:gosec // G304: path from controlled directory listing
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", entry.Name(), err)
 		}
@@ -131,21 +131,21 @@ export const migrations: Migration[] = [
 		if i > 0 {
 			sb.WriteString(",\n")
 		}
-		sb.WriteString(fmt.Sprintf("  {\n"))
+		sb.WriteString("  {\n")
 		sb.WriteString(fmt.Sprintf("    version: %d,\n", m.Version))
 		sb.WriteString(fmt.Sprintf("    name: %q,\n", m.Name))
 		sb.WriteString(fmt.Sprintf("    sql: `%s`,\n", escapeForTS(m.SQL)))
-		sb.WriteString(fmt.Sprintf("  }"))
+		sb.WriteString("  }")
 	}
 
 	sb.WriteString("\n]\n")
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec // G301: directory for generated code
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	return os.WriteFile(output, []byte(sb.String()), 0644)
+	return os.WriteFile(output, []byte(sb.String()), 0o644) //nolint:gosec // G306: generated code file
 }
 
 func escapeForTS(s string) string {

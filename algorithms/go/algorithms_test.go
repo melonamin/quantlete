@@ -138,10 +138,10 @@ func TestEddingtonNumber(t *testing.T) {
 	}{
 		{"empty", []float64{}, 0},
 		{"single ride", []float64{100}, 1},
-		{"E=3", []float64{50, 50, 50}, 3},          // 3 days of 50+ km
-		{"E=2", []float64{50, 50, 1}, 2},           // only 2 days of 2+ km
+		{"E=3", []float64{50, 50, 50}, 3},           // 3 days of 50+ km
+		{"E=2", []float64{50, 50, 1}, 2},            // only 2 days of 2+ km
 		{"mixed", []float64{10, 20, 30, 40, 50}, 5}, // 5 days of 5+ km each
-		{"high E", generateEddingtonData(50), 50},  // exactly E=50
+		{"high E", generateEddingtonData(50), 50},   // exactly E=50
 	}
 
 	for _, tt := range tests {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { usePhotos, type PhotoListItem } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -22,15 +22,8 @@ export function PhotosPage() {
   const [page, setPage] = useState(1)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showCountries, setShowCountries] = useState(false)
+  const [photos, setPhotos] = useState<PhotoListItem[]>([])
   const perPage = 60
-
-  const filtersKey = useMemo(
-    () => JSON.stringify({ sportTypes: [...sportTypes].sort(), country }),
-    [sportTypes, country]
-  )
-  useEffect(() => {
-    setPage(1)
-  }, [filtersKey])
 
   const sportParam = sportTypes.length > 0 ? sportTypes.join(',') : undefined
   const { data, isLoading, error } = usePhotos({
@@ -40,35 +33,50 @@ export function PhotosPage() {
     per_page: perPage,
   })
 
-  const [photos, setPhotos] = useState<PhotoListItem[]>([])
-  useEffect(() => {
-    if (!data) return
-    if (page === 1) {
-      setPhotos(data.data)
-      return
-    }
-    setPhotos((prev) => {
-      const seen = new Set(prev.map((p) => p.id))
-      const next = [...prev]
-      for (const p of data.data) {
-        if (!seen.has(p.id)) next.push(p)
-      }
-      return next
-    })
-  }, [data, page])
+  // Accumulate photos from data for infinite scroll
+  const displayPhotos = useMemo(() => {
+    if (!data) return photos
+    if (page === 1) return data.data
+    // For subsequent pages, we need to merge with existing photos
+    const seen = new Set(photos.map((p) => p.id))
+    const newPhotos = data.data.filter((p) => !seen.has(p.id))
+    return [...photos, ...newPhotos]
+  }, [data, page, photos])
 
-  useEffect(() => {
-    setPhotos([])
-  }, [filtersKey])
+  // Update photos state when we get new data (for persistence across pages)
+  // This is done as a side effect but in the event handler when loading more
+  const handleLoadMore = () => {
+    if (data) {
+      const seen = new Set(photos.map((p) => p.id))
+      const newPhotos = data.data.filter((p) => !seen.has(p.id))
+      setPhotos([...photos, ...newPhotos])
+    }
+    setPage((p) => p + 1)
+  }
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
-  const activePhoto = lightboxIndex != null ? photos[lightboxIndex] : null
+  const activePhoto = lightboxIndex != null ? displayPhotos[lightboxIndex] : null
 
   const sportFacet = data?.sport_types ?? []
   const countryFacet = data?.countries ?? []
 
+  // Filter change handlers that also reset pagination and photos
   const toggleSport = (t: string) => {
     setSportTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
+    setPage(1)
+    setPhotos([])
+  }
+
+  const handleSetSportTypes = (types: string[]) => {
+    setSportTypes(types)
+    setPage(1)
+    setPhotos([])
+  }
+
+  const handleSetCountry = (c: string) => {
+    setCountry(c)
+    setPage(1)
+    setPhotos([])
   }
 
   const hasActiveFilters = sportTypes.length > 0 || country
@@ -76,6 +84,8 @@ export function PhotosPage() {
   const clearFilters = () => {
     setSportTypes([])
     setCountry('')
+    setPage(1)
+    setPhotos([])
   }
 
   // Common sport types for quick filters
@@ -94,7 +104,7 @@ export function PhotosPage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* All button */}
           <button
-            onClick={() => setSportTypes([])}
+            onClick={() => handleSetSportTypes([])}
             className={cn(
               'px-3 py-1.5 rounded-md text-sm transition-colors',
               sportTypes.length === 0
@@ -149,7 +159,7 @@ export function PhotosPage() {
                   <div className="p-1">
                     <button
                       onClick={() => {
-                        setCountry('')
+                        handleSetCountry('')
                         setShowCountries(false)
                       }}
                       className={cn(
@@ -163,7 +173,7 @@ export function PhotosPage() {
                       <button
                         key={c.value}
                         onClick={() => {
-                          setCountry(c.value)
+                          handleSetCountry(c.value)
                           setShowCountries(false)
                         }}
                         className={cn(
@@ -264,7 +274,7 @@ export function PhotosPage() {
         </div>
       )}
 
-      {isLoading && photos.length === 0 ? (
+      {isLoading && displayPhotos.length === 0 ? (
         <div className="columns-2 gap-3 md:columns-3 lg:columns-4 xl:columns-5">
           {Array.from({ length: 20 }).map((_, i) => (
             <div key={i} className="mb-3 break-inside-avoid">
@@ -272,7 +282,7 @@ export function PhotosPage() {
             </div>
           ))}
         </div>
-      ) : photos.length === 0 ? (
+      ) : displayPhotos.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-8 text-center">
           <p className="text-muted-foreground">No photos found.</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -282,7 +292,7 @@ export function PhotosPage() {
       ) : (
         <>
           <div className="columns-2 gap-3 md:columns-3 lg:columns-4 xl:columns-5">
-            {photos.map((p, idx) => (
+            {displayPhotos.map((p, idx) => (
               <button
                 key={p.id}
                 className="mb-3 w-full break-inside-avoid overflow-hidden rounded-lg border border-border bg-card text-left"
@@ -311,7 +321,7 @@ export function PhotosPage() {
 
           {data && page < data.total_pages && (
             <div className="mt-6 flex justify-center">
-              <Button variant="outline" onClick={() => setPage((p) => p + 1)} disabled={isLoading}>
+              <Button variant="outline" onClick={handleLoadMore} disabled={isLoading}>
                 Load more
               </Button>
             </div>
@@ -363,11 +373,11 @@ export function PhotosPage() {
               <button
                 className={cn(
                   'absolute left-2 top-1/2 -translate-y-1/2 rounded-md bg-black/50 px-3 py-2 text-white hover:bg-black/70',
-                  photos.length <= 1 && 'hidden'
+                  displayPhotos.length <= 1 && 'hidden'
                 )}
                 onClick={() =>
                   setLightboxIndex((i) =>
-                    i == null ? null : (i - 1 + photos.length) % photos.length
+                    i == null ? null : (i - 1 + displayPhotos.length) % displayPhotos.length
                   )
                 }
               >
@@ -376,10 +386,10 @@ export function PhotosPage() {
               <button
                 className={cn(
                   'absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-black/50 px-3 py-2 text-white hover:bg-black/70',
-                  photos.length <= 1 && 'hidden'
+                  displayPhotos.length <= 1 && 'hidden'
                 )}
                 onClick={() =>
-                  setLightboxIndex((i) => (i == null ? null : (i + 1) % photos.length))
+                  setLightboxIndex((i) => (i == null ? null : (i + 1) % displayPhotos.length))
                 }
               >
                 Next

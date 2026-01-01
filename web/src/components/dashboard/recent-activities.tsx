@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import type { RecentActivity } from '@/lib/api'
 import { formatDistance, formatDuration, formatRelativeDate } from '@/lib/format'
-import { getSportIcon, getSportHexColor } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -51,9 +52,7 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
         <p className="text-sm text-muted-foreground">No activities yet</p>
       ) : (
         <div className="space-y-4">
-          {activities.map((activity) => {
-            const Icon = getSportIcon(activity.sport_type)
-            return (
+          {activities.map((activity) => (
               <Link
                 key={activity.id}
                 to="/activities/$activityId"
@@ -64,7 +63,8 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
                   className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
                   style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
                 >
-                  <Icon
+                  <SportIcon
+                    sportType={activity.sport_type}
                     className="h-5 w-5"
                     style={{ color: getSportHexColor(activity.sport_type) }}
                   />
@@ -82,8 +82,7 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
                   </p>
                 </div>
               </Link>
-            )
-          })}
+            ))}
         </div>
       )}
     </WidgetWrapper>

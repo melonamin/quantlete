@@ -70,7 +70,7 @@ func runServe(port int, dev bool) error {
 	slog.Info("database opened", "path", db.Path())
 
 	// Run migrations
-	if err := db.Migrate(); err != nil {
+	if err = db.Migrate(); err != nil {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 

@@ -62,14 +62,14 @@ func generateWeather(rng *rand.Rand, activities []storage.Activity) []weather.Ac
 }
 
 func generateActivityWeather(rng *rand.Rand, a storage.Activity) weather.ActivityWeather {
-	month := int(a.StartDateLocal.Time.Month()) - 1 // 0-indexed
+	month := int(a.StartDateLocal.Month()) - 1 // 0-indexed
 	temps := seasonalTemps[month]
 
 	// Base temperature for the day
 	baseTemp := temps.low + rng.Float64()*(temps.high-temps.low)
 
 	// Morning activities are cooler, afternoon warmer
-	hour := a.StartDateLocal.Time.Hour()
+	hour := a.StartDateLocal.Hour()
 	timeAdjust := 0.0
 	if hour < 10 {
 		timeAdjust = -3.0

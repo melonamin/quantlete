@@ -472,7 +472,6 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 			Method:        "percent_hrmax",
 			Zones:         b,
 		})
-		defs, _ = h.zones.ListHR(r.Context(), athlete.ID)
 	}
 
 	// Fetch activities with HR streams in range.

@@ -120,7 +120,7 @@ func FormatETA(d time.Duration) string {
 
 	if hours > 24 {
 		days := hours / 24
-		hours = hours % 24
+		hours %= 24
 		if hours > 0 {
 			return formatPlural(days, "day") + " " + formatPlural(hours, "hour")
 		}

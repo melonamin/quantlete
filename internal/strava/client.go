@@ -307,14 +307,14 @@ func (c *Client) do(ctx context.Context, method, path string, result any) error 
 	}
 
 	// Check rate limits
-	if err := c.rateLimit.Wait(ctx); err != nil {
+	if err = c.rateLimit.Wait(ctx); err != nil {
 		return fmt.Errorf("rate limit: %w", err)
 	}
 
 	doRequest := func(accessToken string) (*http.Response, error) {
-		req, err := http.NewRequestWithContext(ctx, method, apiBase+path, http.NoBody)
-		if err != nil {
-			return nil, fmt.Errorf("creating request: %w", err)
+		req, reqErr := http.NewRequestWithContext(ctx, method, apiBase+path, http.NoBody)
+		if reqErr != nil {
+			return nil, fmt.Errorf("creating request: %w", reqErr)
 		}
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 		return c.httpClient.Do(req)

@@ -1,6 +1,7 @@
 import type { WeeklyStat } from '@/lib/api'
 import { formatDistance, formatDuration } from '@/lib/format'
-import { getSportIcon, formatSportType, getSportHexColor } from '@/lib/sport-types'
+import { SportIcon } from '@/lib/sport-icon'
+import { formatSportType, getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -56,15 +57,14 @@ export function WeeklyStats({ stats, isLoading }: WeeklyStatsProps) {
 
           {/* By sport type */}
           <div className="space-y-3">
-            {stats.map((stat) => {
-              const Icon = getSportIcon(stat.sport_type)
-              return (
+            {stats.map((stat) => (
                 <div key={stat.sport_type} className="flex items-center gap-3">
                   <div
                     className="h-8 w-8 rounded flex items-center justify-center"
                     style={{ backgroundColor: getSportHexColor(stat.sport_type) + '20' }}
                   >
-                    <Icon
+                    <SportIcon
+                      sportType={stat.sport_type}
                       className="h-4 w-4"
                       style={{ color: getSportHexColor(stat.sport_type) }}
                     />
@@ -80,8 +80,7 @@ export function WeeklyStats({ stats, isLoading }: WeeklyStatsProps) {
                     </p>
                   </div>
                 </div>
-              )
-            })}
+              ))}
           </div>
         </div>
       )}

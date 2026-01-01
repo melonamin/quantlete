@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // G501: MD5 is used for ETag generation, not security
 	"fmt"
 	"net/http"
 	"strconv"
@@ -70,13 +70,13 @@ func parseParams(r *http.Request) (badges.Theme, badges.Size, badges.Background,
 // writeSVG writes an SVG response with appropriate headers.
 func writeSVG(w http.ResponseWriter, svg string) {
 	// Generate ETag from content
-	etag := fmt.Sprintf(`"%x"`, md5.Sum([]byte(svg)))
+	etag := fmt.Sprintf(`"%x"`, md5.Sum([]byte(svg))) //nolint:gosec // G401: MD5 is used for ETag, not security
 
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=3600") // 1 hour
 	w.Header().Set("ETag", etag)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(svg))
+	_, _ = w.Write([]byte(svg))
 }
 
 // writeBadgeError writes an error badge SVG.
@@ -93,7 +93,7 @@ func writeBadgeError(w http.ResponseWriter, message string) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK) // Return 200 so the image displays
-	w.Write([]byte(svg))
+	_, _ = w.Write([]byte(svg))
 }
 
 // GetDistanceBadge handles GET /badges/distance.svg
@@ -376,5 +376,5 @@ func formatMonthName(monthStr string) string {
 		return monthStr
 	}
 
-	return fmt.Sprintf("%s %s", months[monthNum-1], parts[0])
+	return fmt.Sprintf("%s %s", months[monthNum-1], parts[0]) //nolint:gosec // G602: bounds check above ensures valid index
 }

@@ -351,7 +351,7 @@ func (i *Importer) Pause() bool {
 		return false
 	}
 
-	// Save current state before cancelling so it can be resumed
+	// Save current state before canceling so it can be resumed
 	// The saveState is called periodically during import, so state is already preserved
 	cancel()
 	return true
@@ -1266,7 +1266,7 @@ func ptrSQLiteTimeFromFlex(t *strava.FlexTime) *storage.SQLiteTime {
 	return &storage.SQLiteTime{Time: t.Time}
 }
 
-func floatSliceLatLng(latlng []float64) (lat *float64, lng *float64) {
+func floatSliceLatLng(latlng []float64) (lat, lng *float64) {
 	if len(latlng) < 2 {
 		return nil, nil
 	}
@@ -1358,7 +1358,7 @@ func (i *Importer) importSegments(ctx context.Context, a *strava.Activity, athle
 	return nil
 }
 
-func (i *Importer) importPhotos(ctx context.Context, activityID int64, athleteID int64) error {
+func (i *Importer) importPhotos(ctx context.Context, activityID, athleteID int64) error {
 	var photos []strava.ActivityPhoto
 	err := i.withRetry(ctx, func() error {
 		var fetchErr error
@@ -1404,7 +1404,7 @@ func (i *Importer) importPhotos(ctx context.Context, activityID int64, athleteID
 	return nil
 }
 
-func bestPhotoURLs(urls map[string]string) (best string, thumb string) {
+func bestPhotoURLs(urls map[string]string) (best, thumb string) {
 	if len(urls) == 0 {
 		return "", ""
 	}
@@ -1540,7 +1540,7 @@ func (i *Importer) importStreamsForActivity(ctx context.Context, activityID int6
 }
 
 // importPhotosForActivity imports photos for a single activity.
-func (i *Importer) importPhotosForActivity(ctx context.Context, activityID int64, athleteID int64) error {
+func (i *Importer) importPhotosForActivity(ctx context.Context, activityID, athleteID int64) error {
 	return i.importPhotos(ctx, activityID, athleteID)
 }
 

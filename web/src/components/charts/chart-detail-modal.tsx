@@ -50,28 +50,3 @@ export function ChartDetailModal({ open, onOpenChange, data }: ChartDetailModalP
     </Dialog>
   )
 }
-
-// Hook for managing chart detail modal state
-import { useState, useCallback } from 'react'
-
-export function useChartDetailModal() {
-  const [open, setOpen] = useState(false)
-  const [data, setData] = useState<ChartDetailData | null>(null)
-
-  const showDetail = useCallback((detail: ChartDetailData) => {
-    setData(detail)
-    setOpen(true)
-  }, [])
-
-  const hideDetail = useCallback(() => {
-    setOpen(false)
-  }, [])
-
-  return {
-    open,
-    data,
-    showDetail,
-    hideDetail,
-    setOpen,
-  }
-}

@@ -1,10 +1,10 @@
 import type { EChartsOption } from 'echarts'
+import { EChartsWrapper } from './echarts-wrapper'
 import {
-  EChartsWrapper,
   chartColors,
   defaultGridConfig,
   defaultTooltipConfig,
-} from './echarts-wrapper'
+} from './chart-constants'
 import type { SegmentEffort } from '@/lib/api'
 
 function formatElapsed(seconds: number) {

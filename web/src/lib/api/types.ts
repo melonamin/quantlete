@@ -50,7 +50,7 @@ export interface PaginatedResponse<T> {
   total_pages: number
 }
 
-export interface ActivitiesResponse extends PaginatedResponse<Activity> {}
+export type ActivitiesResponse = PaginatedResponse<Activity>
 
 export interface ActivityFilters {
   sport_type?: string

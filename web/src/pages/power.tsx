@@ -20,7 +20,10 @@ function formatDurationLabel(seconds: number) {
 
 export function PowerPage() {
   const { data, isLoading, error } = usePowerStats()
-  const after90 = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+  // Use lazy state initializer to avoid impure Date.now() call during render
+  const [after90] = useState(() =>
+    new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+  )
   const { data: last90 } = usePowerStatsFiltered({ after: after90 })
   const { data: powerZones } = usePowerZones()
   const [selectedDuration, setSelectedDuration] = useState<number>(300)

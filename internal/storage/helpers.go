@@ -76,8 +76,8 @@ func (t *SQLiteTime) parseString(s string) error {
 
 // Value implements driver.Valuer for SQLiteTime.
 func (t SQLiteTime) Value() (driver.Value, error) {
-	if t.Time.IsZero() {
+	if t.IsZero() {
 		return nil, nil
 	}
-	return t.Time.Format("2006-01-02 15:04:05-07:00"), nil
+	return t.Format("2006-01-02 15:04:05-07:00"), nil
 }

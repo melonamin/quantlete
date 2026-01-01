@@ -130,7 +130,7 @@ func TestScheduler_ClearJobs(t *testing.T) {
 	// Cleanup
 	stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	sched.Stop(stopCtx)
+	_ = sched.Stop(stopCtx)
 }
 
 func TestScheduler_SetJobLocked(t *testing.T) {
@@ -147,7 +147,7 @@ func TestScheduler_SetJobLocked(t *testing.T) {
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		sched.Stop(stopCtx)
+		_ = sched.Stop(stopCtx)
 	}()
 
 	tests := []struct {
@@ -216,7 +216,7 @@ func TestScheduler_ConfigurePullSyncLocked(t *testing.T) {
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		sched.Stop(stopCtx)
+		_ = sched.Stop(stopCtx)
 	}()
 
 	tests := []struct {
@@ -279,7 +279,7 @@ func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		sched.Stop(stopCtx)
+		_ = sched.Stop(stopCtx)
 	}()
 
 	cfg := &storage.SchedulerSettings{

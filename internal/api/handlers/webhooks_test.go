@@ -81,7 +81,7 @@ func TestStravaWebhookHandler_Validate(t *testing.T) {
 
 			handler := NewStravaWebhookHandler(cfg, nil, nil, nil, nil)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/webhooks/strava", nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/webhooks/strava", http.NoBody)
 			q := req.URL.Query()
 			q.Set("hub.mode", tt.mode)
 			q.Set("hub.verify_token", tt.verifyToken)

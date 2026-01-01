@@ -29,7 +29,7 @@ func NewPowerRepository(db *DB, streams *StreamRepository) *PowerRepository {
 	return &PowerRepository{db: db, streams: streams}
 }
 
-func (r *PowerRepository) EnsureActivityComputed(ctx context.Context, athleteID int64, activityID int64, durations []int) error {
+func (r *PowerRepository) EnsureActivityComputed(ctx context.Context, athleteID, activityID int64, durations []int) error {
 	if len(durations) == 0 {
 		return nil
 	}
@@ -47,12 +47,12 @@ func (r *PowerRepository) EnsureActivityComputed(ctx context.Context, athleteID 
 	existing := map[int]bool{}
 	for rows.Next() {
 		var d int
-		if err := rows.Scan(&d); err != nil {
+		if err = rows.Scan(&d); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 			return err
 		}
 		existing[d] = true
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil { //nolint:gocritic // sloppyReassign: using = to avoid shadow
 		return err
 	}
 

@@ -38,10 +38,12 @@ export function OAuthCallbackPage() {
   const openSyncModalRef = useRef(openSyncModal)
   const navigateRef = useRef(navigate)
 
-  // Keep refs up to date
-  startImportRef.current = startImport
-  openSyncModalRef.current = openSyncModal
-  navigateRef.current = navigate
+  // Keep refs up to date (must be in effect, not during render)
+  useEffect(() => {
+    startImportRef.current = startImport
+    openSyncModalRef.current = openSyncModal
+    navigateRef.current = navigate
+  })
 
   useEffect(() => {
     async function handleCallback() {
@@ -132,7 +134,7 @@ export function OAuthCallbackPage() {
 
     handleCallback()
     // Callbacks are stored in refs to avoid stale closures and prevent effect re-runs
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [initialized, provider, providerError, search.code, search.error])
 
   return (

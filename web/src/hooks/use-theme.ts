@@ -31,10 +31,8 @@ export function useTheme() {
       return () => mql.removeEventListener('change', onChange)
     }
 
-    // Safari < 14
-    // eslint-disable-next-line deprecation/deprecation
+    // Safari < 14 - uses deprecated addListener/removeListener API
     mql.addListener(onChange)
-    // eslint-disable-next-line deprecation/deprecation
     return () => mql.removeListener(onChange)
   }, [theme])
 }

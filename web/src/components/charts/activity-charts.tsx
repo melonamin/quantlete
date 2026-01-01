@@ -1,12 +1,12 @@
 import { useRef, useEffect, useState } from 'react'
 import type { EChartsOption } from 'echarts'
+import { EChartsWrapper } from './echarts-wrapper'
 import {
-  EChartsWrapper,
   chartColors,
   calendarPalettes,
   defaultGridConfig,
   defaultTooltipConfig,
-} from './echarts-wrapper'
+} from './chart-constants'
 import { formatDistance } from '@/lib/format'
 
 // Monthly activity summary chart

@@ -52,18 +52,16 @@ export function SegmentsPage() {
   // Pagination state
   const [page, setPage] = useState(1)
 
-  // Debounce search
+  // Debounce search and reset page when search changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSearch(localSearch)
+      if (search !== localSearch) {
+        setSearch(localSearch)
+        setPage(1)
+      }
     }, 300)
     return () => clearTimeout(timer)
-  }, [localSearch])
-
-  // Reset page when filters change (but not when page itself or viewAll changes)
-  useEffect(() => {
-    setPage(1)
-  }, [activityType, country, starredOnly, komOnly, search, sortKey, sortDir])
+  }, [localSearch, search])
 
   // Build API filters with pagination and sorting
   const apiFilters = useMemo((): SegmentsFilters => {
@@ -101,13 +99,35 @@ export function SegmentsPage() {
 
   const detailQuery = useSegmentDetail(selectedSegmentId, selectedSegmentId != null)
 
+  // Filter change handlers that also reset pagination
+  const handleActivityTypeChange = (value: string) => {
+    setActivityType(value)
+    setPage(1)
+  }
+
+  const handleCountryChange = (value: string) => {
+    setCountry(value)
+    setPage(1)
+  }
+
+  const handleStarredOnlyChange = (checked: boolean) => {
+    setStarredOnly(checked)
+    setPage(1)
+  }
+
+  const handleKomOnlyChange = (checked: boolean) => {
+    setKomOnly(checked)
+    setPage(1)
+  }
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
-      return
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'name' ? 'asc' : 'desc')
     }
-    setSortKey(key)
-    setSortDir(key === 'name' ? 'asc' : 'desc')
+    setPage(1)
   }
 
   const hasActiveFilters = activityType || country || starredOnly || komOnly || search
@@ -158,7 +178,7 @@ export function SegmentsPage() {
           <ToggleGroup
             type="single"
             value={activityType}
-            onValueChange={(value) => setActivityType(value)}
+            onValueChange={handleActivityTypeChange}
             variant="outline"
             size="sm"
           >
@@ -174,7 +194,7 @@ export function SegmentsPage() {
           <Button
             variant={starredOnly ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStarredOnly(!starredOnly)}
+            onClick={() => handleStarredOnlyChange(!starredOnly)}
             className="gap-1"
           >
             <Star className="h-3 w-3" />
@@ -183,7 +203,7 @@ export function SegmentsPage() {
           <Button
             variant={komOnly ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setKomOnly(!komOnly)}
+            onClick={() => handleKomOnlyChange(!komOnly)}
             className="gap-1"
           >
             <Crown className="h-3 w-3" />
@@ -208,7 +228,7 @@ export function SegmentsPage() {
             {/* Sport type dropdown */}
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Sport Type</Label>
-              <Select value={activityType} onValueChange={setActivityType}>
+              <Select value={activityType} onValueChange={handleActivityTypeChange}>
                 <SelectTrigger size="sm">
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
@@ -226,7 +246,7 @@ export function SegmentsPage() {
             {/* Country dropdown */}
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Country</Label>
-              <Select value={country} onValueChange={setCountry}>
+              <Select value={country} onValueChange={handleCountryChange}>
                 <SelectTrigger size="sm">
                   <SelectValue placeholder="All countries" />
                 </SelectTrigger>
@@ -248,14 +268,14 @@ export function SegmentsPage() {
                 <Label className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={starredOnly}
-                    onCheckedChange={(checked) => setStarredOnly(!!checked)}
+                    onCheckedChange={(checked) => handleStarredOnlyChange(!!checked)}
                   />
                   Starred only
                 </Label>
                 <Label className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={komOnly}
-                    onCheckedChange={(checked) => setKomOnly(!!checked)}
+                    onCheckedChange={(checked) => handleKomOnlyChange(!!checked)}
                   />
                   KOM only
                 </Label>

@@ -192,11 +192,14 @@ func EddingtonNextSteps(distances []float64, currentE, stepsToCalculate int) []N
 
 // EddingtonHistory calculates progressive Eddington numbers over time.
 // Given distances in chronological order, returns E for each day.
+// Supports distances up to 1000km to accommodate ultra-distance events.
 func EddingtonHistory(distances []float64) []int {
 	n := len(distances)
 	history := make([]int, n)
 
-	const maxDistance = 500
+	// 1000km covers ultra-distance events (brevets, RAAM stages).
+	// Using fixed array for TinyGo/WASM compatibility.
+	const maxDistance = 1000
 	counts := make([]int, maxDistance+1)
 	currentE := 0
 
@@ -251,8 +254,8 @@ func CalculateTrainingLoad(dailyTss []float64, ctlTau, atlTau float64) []Trainin
 
 	for i := 0; i < n; i++ {
 		tss := dailyTss[i]
-		ctl = ctl + (tss-ctl)*ctlDecay
-		atl = atl + (tss-atl)*atlDecay
+		ctl += (tss - ctl) * ctlDecay
+		atl += (tss - atl) * atlDecay
 		result[i] = TrainingLoadPoint{
 			CTL: ctl,
 			ATL: atl,
@@ -280,8 +283,8 @@ func CalculateTrainingLoadWithInitial(dailyTss []float64, initialCtl, initialAtl
 
 	for i := 0; i < n; i++ {
 		tss := dailyTss[i]
-		ctl = ctl + (tss-ctl)*ctlDecay
-		atl = atl + (tss-atl)*atlDecay
+		ctl += (tss - ctl) * ctlDecay
+		atl += (tss - atl) * atlDecay
 		result[i] = TrainingLoadPoint{
 			CTL: ctl,
 			ATL: atl,

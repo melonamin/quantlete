@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { ImportProgress, ImportPhase } from '@/lib/api/import'
 import { Loader2, Check, X, AlertCircle, Timer } from 'lucide-react'
 
@@ -118,17 +118,12 @@ function PhaseProgressBar({
 }
 
 function RateLimitCountdown({ waitingUntil }: { waitingUntil: string }) {
+  const targetTime = useMemo(() => new Date(waitingUntil).getTime(), [waitingUntil])
+  const isValidDate = !Number.isNaN(targetTime)
   const [timeRemaining, setTimeRemaining] = useState('')
 
   useEffect(() => {
-    const targetDate = new Date(waitingUntil)
-    const targetTime = targetDate.getTime()
-
-    // Validate that the date is valid
-    if (Number.isNaN(targetTime)) {
-      setTimeRemaining('Unknown')
-      return
-    }
+    if (!isValidDate) return
 
     const updateCountdown = () => {
       const now = Date.now()
@@ -152,7 +147,11 @@ function RateLimitCountdown({ waitingUntil }: { waitingUntil: string }) {
     updateCountdown()
     const interval = setInterval(updateCountdown, 1000)
     return () => clearInterval(interval)
-  }, [waitingUntil])
+  }, [isValidDate, targetTime])
+
+  if (!isValidDate) {
+    return <span className="tabular-nums font-medium text-amber-600">Unknown</span>
+  }
 
   return (
     <span className="tabular-nums font-medium text-amber-600">{timeRemaining}</span>
