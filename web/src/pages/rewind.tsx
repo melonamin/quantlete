@@ -120,14 +120,14 @@ export function RewindPage() {
           </Select>
 
           <Select
-            value={compareYear === null ? '' : String(compareYear)}
-            onValueChange={(value) => setCompareYear(value ? Number(value) : null)}
+            value={compareYear === null ? '__none__' : String(compareYear)}
+            onValueChange={(value) => setCompareYear(value === '__none__' ? null : Number(value))}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="No comparison" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No comparison</SelectItem>
+              <SelectItem value="__none__">No comparison</SelectItem>
               <SelectItem value="0">Compare to all time</SelectItem>
               {availableYears.map((y) => (
                 <SelectItem key={y} value={String(y)}>
