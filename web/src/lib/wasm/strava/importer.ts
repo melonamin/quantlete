@@ -14,7 +14,6 @@ import { stravaFetch, getAthlete } from './client'
 import { getDatabase } from '../db'
 import { getRateLimitInfo } from './ratelimit'
 import { createETAEstimator, updateFromRateLimits, estimateCompletion, formatETA, type ETAState } from './eta'
-import { rollingMaxAverage, isInitialized as algorithmsInitialized } from '../algorithms'
 import {
   saveImportState,
   loadImportState,
@@ -29,9 +28,16 @@ import {
   createDataChangedEvent,
   type DataEventListener,
 } from '@/lib/data/events'
-
-// Standard durations for power curve (matching Go backend)
-const POWER_DURATIONS = [5, 10, 30, 60, 300, 480, 1200, 3600]
+import {
+  saveActivity as goSaveActivity,
+  saveStream as goSaveStream,
+  saveGear as goSaveGear,
+  saveSegment as goSaveSegment,
+  saveSegmentEffort as goSaveSegmentEffort,
+  saveBestEfforts as goSaveBestEfforts,
+  savePhoto as goSavePhoto,
+  computePowerBestEfforts as goComputePowerBestEfforts,
+} from '../go-storage'
 
 // Rate limiting delays between API calls (milliseconds)
 const RATE_LIMIT_DELAY_SHORT_MS = 100 // Used between fast operations (activity list pages, gear)
@@ -46,10 +52,10 @@ export type ImportPhase =
   | 'activities'
   | 'gear'
   | 'streams'
-  | 'details'
-  | 'segments'
+  | 'activity_details'
+  | 'segment_details'
   | 'photos'
-  | 'complete'
+  | 'completed'
 
 export interface ImportOptions {
   fullSync?: boolean
@@ -505,13 +511,13 @@ function calculateRemainingAPICalls(
       if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
       break
 
-    case 'details':
+    case 'activity_details':
       calls += importProgress.details_total - importProgress.details_done
       if (!options.skipSegments) calls += state.segmentIdsToFetch.size - importProgress.segments_done
       if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
       break
 
-    case 'segments':
+    case 'segment_details':
       calls += importProgress.segments_total - importProgress.segments_done
       if (!options.skipPhotos) calls += state.activitiesWithPhotos.length - importProgress.photos_done
       break
@@ -789,7 +795,7 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   }
 
   // Determine starting phase
-  const phaseOrder: ImportPhase[] = ['activities', 'gear', 'streams', 'details', 'segments', 'photos']
+  const phaseOrder: ImportPhase[] = ['activities', 'gear', 'streams', 'activity_details', 'segment_details', 'photos']
   const startPhaseIndex = isResuming ? phaseOrder.indexOf(savedState.phase) : 0
 
   try {
@@ -861,7 +867,7 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
     // Complete - clear saved state
     clearImportState()
     importProgress.status = 'completed'
-    importProgress.phase = 'complete'
+    importProgress.phase = 'completed'
 
     // Emit sync complete event
     importEventEmitter.emit(createSyncCompleteEvent('completed'))
@@ -955,7 +961,7 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
 // ============================================================================
 
 async function runActivitiesPhase(
-  db: ReturnType<typeof getDatabase>,
+  _db: ReturnType<typeof getDatabase>,
   athleteId: number,
   existingIds: Set<number>,
   state: SyncState,
@@ -1012,7 +1018,7 @@ async function runActivitiesPhase(
 
       try {
         if (!activityExists) {
-          storeActivity(db, athleteId, activity)
+          storeActivity(athleteId, activity)
         }
         // Count as done regardless of new or skipped
         importProgress.activities_done++
@@ -1052,7 +1058,7 @@ async function runActivitiesPhase(
 // ============================================================================
 
 async function runGearPhase(
-  db: ReturnType<typeof getDatabase>,
+  _db: ReturnType<typeof getDatabase>,
   athleteId: number,
   state: SyncState,
   options: ImportOptions,
@@ -1075,7 +1081,7 @@ async function runGearPhase(
     const gearId = gearArray[i]
     try {
       const gear = await stravaFetch<StravaGear>(`/gear/${gearId}`)
-      storeGear(db, athleteId, gear)
+      storeGear(athleteId, gear)
       importProgress.gear_done++
       updateETA('gear', state, options)
       await sleep(RATE_LIMIT_DELAY_SHORT_MS)
@@ -1121,7 +1127,7 @@ async function runStreamsPhase(
     }
 
     try {
-      await fetchAndStoreStreams(db, activityId)
+      await fetchAndStoreStreams(activityId)
       importProgress.streams_done++
       updateETA('streams', state, options)
       await sleep(RATE_LIMIT_DELAY_LONG_MS)
@@ -1153,13 +1159,13 @@ async function runActivityDetailsPhase(
   options: ImportOptions,
   startIndex = 0
 ): Promise<void> {
-  importProgress.phase = 'details'
+  importProgress.phase = 'activity_details'
   importProgress.details_total = state.activityIds.length
   console.log(`[Import] Phase 4: Fetching activity details for ${state.activityIds.length} activities (starting at ${startIndex})`)
 
   for (let i = startIndex; i < state.activityIds.length; i++) {
     if (cancelRequested) break
-    if (checkPauseRequested('details', state, options, i, 'detailsLastIndex')) break
+    if (checkPauseRequested('activity_details', state, options, i, 'detailsLastIndex')) break
 
     const activityId = state.activityIds[i]
 
@@ -1171,7 +1177,7 @@ async function runActivityDetailsPhase(
 
     if (hasEfforts && hasEfforts.count > 0) {
       importProgress.details_done++
-      updateETA('details', state, options)
+      updateETA('activity_details', state, options)
       continue
     }
 
@@ -1184,7 +1190,7 @@ async function runActivityDetailsPhase(
           const seg = effort.segment
 
           // Store segment (basic info from effort)
-          storeSegmentFromEffort(db, seg)
+          storeSegmentFromEffort(seg)
 
           // Check if segment needs full detail fetch
           if (shouldFetchSegmentDetail(seg)) {
@@ -1192,24 +1198,24 @@ async function runActivityDetailsPhase(
           }
 
           // Store segment effort
-          storeSegmentEffort(db, athleteId, activityId, effort)
+          storeSegmentEffort(athleteId, activityId, effort)
         }
       }
 
       // Store best efforts
       if (detailed.best_efforts && detailed.best_efforts.length > 0) {
         for (const effort of detailed.best_efforts) {
-          storeBestEffort(db, athleteId, activityId, effort)
+          storeBestEffort(athleteId, activityId, effort)
         }
       }
 
       importProgress.details_done++
-      updateETA('details', state, options)
+      updateETA('activity_details', state, options)
       await sleep(RATE_LIMIT_DELAY_LONG_MS)
     } catch (error) {
       console.error(`Failed to fetch details for activity ${activityId}:`, error)
       importProgress.details_done++ // Still count as processed
-      updateETA('details', state, options)
+      updateETA('activity_details', state, options)
     }
 
     // Emit progress event periodically (batch or time-based)
@@ -1226,31 +1232,31 @@ async function runActivityDetailsPhase(
 // ============================================================================
 
 async function runSegmentDetailsPhase(
-  db: ReturnType<typeof getDatabase>,
+  _db: ReturnType<typeof getDatabase>,
   state: SyncState,
   options: ImportOptions,
   startIndex = 0
 ): Promise<void> {
-  importProgress.phase = 'segments'
+  importProgress.phase = 'segment_details'
   importProgress.segments_total = state.segmentIdsToFetch.size
   console.log(`[Import] Phase 5: Fetching details for ${state.segmentIdsToFetch.size} segments (starting at ${startIndex})`)
 
   const segmentArray = Array.from(state.segmentIdsToFetch)
   for (let i = startIndex; i < segmentArray.length; i++) {
     if (cancelRequested) break
-    if (checkPauseRequested('segments', state, options, i, 'segmentsLastIndex')) break
+    if (checkPauseRequested('segment_details', state, options, i, 'segmentsLastIndex')) break
 
     const segmentId = segmentArray[i]
     try {
       const segment = await stravaFetch<StravaSegment>(`/segments/${segmentId}`)
-      storeSegmentDetail(db, segment)
+      storeSegmentDetail(segment)
       importProgress.segments_done++
-      updateETA('segments', state, options)
+      updateETA('segment_details', state, options)
       await sleep(RATE_LIMIT_DELAY_LONG_MS)
     } catch (error) {
       console.error(`Failed to fetch segment ${segmentId}:`, error)
       importProgress.segments_done++ // Still count as processed
-      updateETA('segments', state, options)
+      updateETA('segment_details', state, options)
     }
 
     // Emit progress event periodically (batch or time-based)
@@ -1300,7 +1306,7 @@ async function runPhotosPhase(
     }
 
     try {
-      await fetchAndStorePhotos(db, athleteId, activityId)
+      await fetchAndStorePhotos(athleteId, activityId)
       importProgress.photos_done++
       updateETA('photos', state, options)
       await sleep(RATE_LIMIT_DELAY_LONG_MS)
@@ -1323,96 +1329,80 @@ async function runPhotosPhase(
 // Storage Functions
 // ============================================================================
 
-function storeActivity(db: ReturnType<typeof getDatabase>, athleteId: number, activity: StravaActivity): void {
-  db.exec(
-    `INSERT INTO activities (
-      id, athlete_id, name, sport_type, start_date, start_date_local,
-      timezone, distance, moving_time, elapsed_time, total_elevation_gain,
-      average_speed, max_speed, average_heartrate, max_heartrate,
-      average_watts, max_watts, weighted_average_watts, kilojoules,
-      average_cadence, calories, suffer_score, gear_id, commute,
-      workout_type, location_city, location_state, location_country,
-      summary_polyline, start_lat, start_lng, description, device_name,
-      embed_token, trainer, private, kudos_count, photo_count
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (id) DO UPDATE SET
-      name = EXCLUDED.name, sport_type = EXCLUDED.sport_type,
-      distance = EXCLUDED.distance, moving_time = EXCLUDED.moving_time,
-      elapsed_time = EXCLUDED.elapsed_time, total_elevation_gain = EXCLUDED.total_elevation_gain,
-      average_speed = EXCLUDED.average_speed, max_speed = EXCLUDED.max_speed,
-      average_heartrate = EXCLUDED.average_heartrate, max_heartrate = EXCLUDED.max_heartrate,
-      average_watts = EXCLUDED.average_watts, max_watts = EXCLUDED.max_watts,
-      weighted_average_watts = EXCLUDED.weighted_average_watts, kilojoules = EXCLUDED.kilojoules,
-      average_cadence = EXCLUDED.average_cadence, calories = EXCLUDED.calories,
-      suffer_score = EXCLUDED.suffer_score, gear_id = EXCLUDED.gear_id,
-      summary_polyline = EXCLUDED.summary_polyline,
-      kudos_count = EXCLUDED.kudos_count, photo_count = EXCLUDED.photo_count`,
-    [
-      activity.id,
-      athleteId,
-      activity.name,
-      activity.sport_type || activity.type,
-      activity.start_date,
-      activity.start_date_local,
-      activity.timezone,
-      activity.distance,
-      activity.moving_time,
-      activity.elapsed_time,
-      activity.total_elevation_gain,
-      activity.average_speed,
-      activity.max_speed,
-      activity.average_heartrate ?? null,
-      activity.max_heartrate ?? null,
-      activity.average_watts ?? null,
-      activity.max_watts ?? null,
-      activity.weighted_average_watts ?? null,
-      activity.kilojoules ?? null,
-      activity.average_cadence ?? null,
-      activity.calories ?? null,
-      activity.suffer_score ?? null,
-      activity.gear_id ?? null,
-      activity.commute ? 1 : 0,
-      activity.workout_type ?? null,
-      activity.location_city ?? null,
-      activity.location_state ?? null,
-      activity.location_country ?? null,
-      activity.map?.summary_polyline ?? null,
-      activity.start_latlng?.[0] ?? null,
-      activity.start_latlng?.[1] ?? null,
-      activity.description ?? null,
-      activity.device_name ?? null,
-      activity.embed_token ?? null,
-      activity.trainer ? 1 : 0,
-      activity.private ? 1 : 0,
-      activity.kudos_count ?? 0,
-      activity.photo_count ?? 0,
-    ]
-  )
+/**
+ * Store activity in database. Returns true on success, false on failure.
+ */
+function storeActivity(athleteId: number, activity: StravaActivity): boolean {
+  try {
+    goSaveActivity({
+      id: activity.id,
+      athlete_id: athleteId,
+      name: activity.name,
+      sport_type: activity.sport_type || activity.type,
+      start_date: activity.start_date,
+      start_date_local: activity.start_date_local,
+      timezone: activity.timezone,
+      distance: activity.distance,
+      moving_time: activity.moving_time,
+      elapsed_time: activity.elapsed_time,
+      total_elevation_gain: activity.total_elevation_gain,
+      average_speed: activity.average_speed,
+      max_speed: activity.max_speed,
+      average_heartrate: activity.average_heartrate,
+      max_heartrate: activity.max_heartrate,
+      average_watts: activity.average_watts,
+      max_watts: activity.max_watts,
+      weighted_average_watts: activity.weighted_average_watts,
+      kilojoules: activity.kilojoules,
+      average_cadence: activity.average_cadence,
+      calories: activity.calories,
+      gear_id: activity.gear_id,
+      commute: activity.commute ?? false,
+      workout_type: activity.workout_type,
+      location_city: activity.location_city,
+      location_state: activity.location_state,
+      location_country: activity.location_country,
+      summary_polyline: activity.map?.summary_polyline,
+      start_lat: activity.start_latlng?.[0],
+      start_lng: activity.start_latlng?.[1],
+      description: activity.description,
+      device_name: activity.device_name,
+      trainer: activity.trainer ?? false,
+      private: activity.private ?? false,
+      kudos_count: activity.kudos_count ?? 0,
+      photo_count: activity.photo_count ?? 0,
+    })
+    return true
+  } catch (err) {
+    console.error(`[Import] Failed to store activity ${activity.id}:`, err)
+    return false
+  }
 }
 
-function storeGear(db: ReturnType<typeof getDatabase>, athleteId: number, gear: StravaGear): void {
-  db.exec(
-    `INSERT INTO gear (id, athlete_id, name, is_primary, retired, distance, brand_name, model_name, description, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'strava')
-     ON CONFLICT (id) DO UPDATE SET
-       name = EXCLUDED.name, is_primary = EXCLUDED.is_primary, retired = EXCLUDED.retired,
-       distance = EXCLUDED.distance, brand_name = EXCLUDED.brand_name,
-       model_name = EXCLUDED.model_name, description = EXCLUDED.description`,
-    [
-      gear.id,
-      athleteId,
-      gear.name,
-      gear.primary ? 1 : 0,
-      gear.retired ? 1 : 0,
-      gear.distance,
-      gear.brand_name ?? null,
-      gear.model_name ?? null,
-      gear.description ?? null,
-    ]
-  )
+/**
+ * Store gear in database. Returns true on success, false on failure.
+ */
+function storeGear(athleteId: number, gear: StravaGear): boolean {
+  try {
+    goSaveGear({
+      id: gear.id,
+      athlete_id: athleteId,
+      name: gear.name,
+      primary: gear.primary,
+      retired: gear.retired,
+      distance: gear.distance,
+      brand_name: gear.brand_name,
+      model_name: gear.model_name,
+      description: gear.description,
+    })
+    return true
+  } catch (err) {
+    console.error(`[Import] Failed to store gear ${gear.id}:`, err)
+    return false
+  }
 }
 
-async function fetchAndStoreStreams(db: ReturnType<typeof getDatabase>, activityId: number): Promise<boolean> {
+async function fetchAndStoreStreams(activityId: number): Promise<boolean> {
   try {
     const streamTypes = 'time,distance,latlng,altitude,heartrate,cadence,watts,temp'
     const streams = await stravaFetch<StravaStream[]>(
@@ -1424,18 +1414,21 @@ async function fetchAndStoreStreams(db: ReturnType<typeof getDatabase>, activity
     }
 
     for (const stream of streams) {
-      db.exec(
-        `INSERT INTO activity_streams (activity_id, stream_type, data, series_type, original_size, resolution)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT (activity_id, stream_type) DO UPDATE SET data = EXCLUDED.data`,
-        [activityId, stream.type, JSON.stringify(stream.data), stream.series_type, stream.original_size, stream.resolution]
-      )
+      goSaveStream({
+        activity_id: activityId,
+        stream_type: stream.type,
+        data: stream.data,
+        series_type: stream.series_type,
+        original_size: stream.original_size,
+        resolution: stream.resolution,
+      })
     }
 
     // Compute power best efforts if watts stream exists
+    // Go WASM reads the stream from DB and computes the values
     const wattsStream = streams.find((s) => s.type === 'watts')
     if (wattsStream && Array.isArray(wattsStream.data) && wattsStream.data.length > 0) {
-      computeAndStorePowerBests(db, activityId, wattsStream.data as number[])
+      computeAndStorePowerBests(activityId)
     }
 
     return true
@@ -1446,69 +1439,48 @@ async function fetchAndStoreStreams(db: ReturnType<typeof getDatabase>, activity
 
 /**
  * Compute power best efforts for an activity and store in database.
+ * Delegates to Go WASM which handles reading the watts stream and computing rolling max averages.
  */
-function computeAndStorePowerBests(
-  db: ReturnType<typeof getDatabase>,
-  activityId: number,
-  watts: number[]
-): void {
-  // Skip if algorithms not initialized
-  if (!algorithmsInitialized()) {
-    console.warn('[Import] Algorithms not initialized, skipping power computation')
-    return
-  }
-
+function computeAndStorePowerBests(activityId: number): void {
   const athlete = getAthlete()
   if (!athlete) return
 
-  for (const duration of POWER_DURATIONS) {
-    // Skip if activity is shorter than duration
-    if (watts.length < duration) continue
-
-    try {
-      const best = rollingMaxAverage(watts, duration)
-      if (best <= 0) continue
-
-      db.exec(
-        `INSERT INTO power_best_efforts (activity_id, athlete_id, duration_s, best_avg_watts, computed_at)
-         VALUES (?, ?, ?, ?, datetime('now'))
-         ON CONFLICT (activity_id, duration_s) DO UPDATE SET
-           best_avg_watts = EXCLUDED.best_avg_watts,
-           computed_at = EXCLUDED.computed_at`,
-        [activityId, athlete.id, duration, Math.round(best)]
-      )
-    } catch (err) {
-      console.error(`[Import] Failed to compute power for duration ${duration}s:`, err)
-    }
+  try {
+    goComputePowerBestEfforts({
+      activity_id: activityId,
+      athlete_id: athlete.id,
+    })
+  } catch (err) {
+    console.error(`[Import] Failed to compute power for activity ${activityId}:`, err)
   }
 }
 
-function storeSegmentFromEffort(db: ReturnType<typeof getDatabase>, seg: StravaSegment): void {
-  db.exec(
-    `INSERT INTO segments (
-      id, name, activity_type, distance, average_grade, maximum_grade,
-      elevation_high, elevation_low, climb_category, start_lat, start_lng,
-      end_lat, end_lng, starred
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (id) DO UPDATE SET
-      name = EXCLUDED.name, starred = EXCLUDED.starred`,
-    [
-      seg.id,
-      seg.name,
-      seg.activity_type,
-      seg.distance,
-      seg.average_grade,
-      seg.maximum_grade,
-      seg.elevation_high,
-      seg.elevation_low,
-      seg.climb_category,
-      seg.start_latlng?.[0] ?? null,
-      seg.start_latlng?.[1] ?? null,
-      seg.end_latlng?.[0] ?? null,
-      seg.end_latlng?.[1] ?? null,
-      seg.starred ? 1 : 0,
-    ]
-  )
+/**
+ * Store segment from effort (basic info). Returns true on success, false on failure.
+ */
+function storeSegmentFromEffort(seg: StravaSegment): boolean {
+  try {
+    goSaveSegment({
+      id: seg.id,
+      name: seg.name,
+      activity_type: seg.activity_type,
+      distance: seg.distance,
+      average_grade: seg.average_grade,
+      maximum_grade: seg.maximum_grade,
+      elevation_high: seg.elevation_high,
+      elevation_low: seg.elevation_low,
+      climb_category: seg.climb_category,
+      start_lat: seg.start_latlng?.[0],
+      start_lng: seg.start_latlng?.[1],
+      end_lat: seg.end_latlng?.[0],
+      end_lng: seg.end_latlng?.[1],
+      starred: seg.starred,
+    })
+    return true
+  } catch (err) {
+    console.error(`[Import] Failed to store segment ${seg.id}:`, err)
+    return false
+  }
 }
 
 function shouldFetchSegmentDetail(seg: StravaSegment): boolean {
@@ -1516,90 +1488,105 @@ function shouldFetchSegmentDetail(seg: StravaSegment): boolean {
   return !seg.map?.polyline || !seg.athlete_segment_stats
 }
 
-function storeSegmentDetail(db: ReturnType<typeof getDatabase>, seg: StravaSegment): void {
-  db.exec(
-    `UPDATE segments SET
-      polyline = ?,
-      athlete_kom_rank = ?,
-      athlete_pr_elapsed_time = ?,
-      athlete_pr_date = ?,
-      athlete_effort_count = ?
-    WHERE id = ?`,
-    [
-      seg.map?.polyline ?? null,
-      null, // KOM rank not available from this endpoint
-      seg.athlete_segment_stats?.pr_elapsed_time ?? null,
-      seg.athlete_segment_stats?.pr_date ?? null,
-      seg.athlete_segment_stats?.effort_count ?? null,
-      seg.id,
-    ]
-  )
+/**
+ * Store segment with full detail (polyline, athlete stats). Returns true on success, false on failure.
+ */
+function storeSegmentDetail(seg: StravaSegment): boolean {
+  try {
+    goSaveSegment({
+      id: seg.id,
+      name: seg.name,
+      activity_type: seg.activity_type,
+      distance: seg.distance,
+      average_grade: seg.average_grade,
+      maximum_grade: seg.maximum_grade,
+      elevation_high: seg.elevation_high,
+      elevation_low: seg.elevation_low,
+      climb_category: seg.climb_category,
+      start_lat: seg.start_latlng?.[0],
+      start_lng: seg.start_latlng?.[1],
+      end_lat: seg.end_latlng?.[0],
+      end_lng: seg.end_latlng?.[1],
+      starred: seg.starred,
+      polyline: seg.map?.polyline,
+      athlete_pr_elapsed_time: seg.athlete_segment_stats?.pr_elapsed_time,
+      athlete_pr_date: seg.athlete_segment_stats?.pr_date,
+      athlete_effort_count: seg.athlete_segment_stats?.effort_count,
+    })
+    return true
+  } catch (err) {
+    console.error(`[Import] Failed to store segment detail ${seg.id}:`, err)
+    return false
+  }
 }
 
+/**
+ * Store segment effort. Returns true on success, false on failure.
+ */
 function storeSegmentEffort(
-  db: ReturnType<typeof getDatabase>,
   athleteId: number,
   activityId: number,
-  effort: StravaSegmentEffort
-): void {
-  db.exec(
-    `INSERT INTO segment_efforts (
-      id, segment_id, activity_id, athlete_id, name,
-      elapsed_time, moving_time, start_date, start_date_local,
-      distance, average_watts, average_heartrate, max_heartrate, pr_rank
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (id) DO NOTHING`,
-    [
-      effort.id,
-      effort.segment.id,
-      activityId,
-      athleteId,
-      effort.name,
-      effort.elapsed_time,
-      effort.moving_time,
-      effort.start_date,
-      effort.start_date_local,
-      effort.distance,
-      effort.average_watts ?? null,
-      effort.average_heartrate ?? null,
-      effort.max_heartrate ?? null,
-      effort.pr_rank ?? null,
-    ]
-  )
+  effort: StravaSegmentEffort,
+): boolean {
+  try {
+    goSaveSegmentEffort({
+      id: effort.id,
+      segment_id: effort.segment.id,
+      activity_id: activityId,
+      athlete_id: athleteId,
+      name: effort.name,
+      elapsed_time: effort.elapsed_time,
+      moving_time: effort.moving_time,
+      start_date: effort.start_date,
+      start_date_local: effort.start_date_local,
+      distance: effort.distance,
+      average_watts: effort.average_watts,
+      average_heartrate: effort.average_heartrate,
+      max_heartrate: effort.max_heartrate,
+      pr_rank: effort.pr_rank,
+    })
+    return true
+  } catch (err) {
+    console.error(`[Import] Failed to store segment effort ${effort.id}:`, err)
+    return false
+  }
 }
 
+/**
+ * Store best effort. Returns true on success, false on failure.
+ */
 function storeBestEffort(
-  db: ReturnType<typeof getDatabase>,
   athleteId: number,
   activityId: number,
-  effort: StravaBestEffort
-): void {
-  // Map effort name to distance type
-  const distanceType = effort.name.toLowerCase().replace(/\s+/g, '_')
+  effort: StravaBestEffort,
+): boolean {
+  try {
+    // Map effort name to distance type
+    const distanceType = effort.name.toLowerCase().replace(/\s+/g, '_')
 
-  db.exec(
-    `INSERT INTO best_efforts (
-      athlete_id, activity_id, sport_type, distance_type, distance_m,
-      elapsed_time, start_index, end_index, start_date, pr_rank
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT DO NOTHING`,
-    [
-      athleteId,
-      activityId,
-      null, // sport_type determined from activity
-      distanceType,
-      effort.distance,
-      effort.elapsed_time,
-      effort.start_index ?? null,
-      effort.end_index ?? null,
-      effort.start_date,
-      effort.pr_rank ?? null,
-    ]
-  )
+    goSaveBestEfforts({
+      athlete_id: athleteId,
+      activity_id: activityId,
+      efforts: [
+        {
+          distance_type: distanceType,
+          distance_m: effort.distance,
+          elapsed_time: effort.elapsed_time,
+          start_index: effort.start_index,
+          end_index: effort.end_index,
+          start_date: effort.start_date,
+          pr_rank: effort.pr_rank,
+        },
+      ],
+    })
+    return true
+  } catch (err) {
+    console.error(`[Import] Failed to store best effort ${effort.name} for activity ${activityId}:`, err)
+    return false
+  }
 }
 
 async function fetchAndStorePhotos(
-  db: ReturnType<typeof getDatabase>,
   athleteId: number,
   activityId: number
 ): Promise<number> {
@@ -1616,22 +1603,16 @@ async function fetchAndStorePhotos(
 
       if (!url) continue
 
-      db.exec(
-        `INSERT INTO photos (id, athlete_id, activity_id, url, thumbnail_url, caption, location, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET
-           url = EXCLUDED.url, thumbnail_url = EXCLUDED.thumbnail_url, caption = EXCLUDED.caption`,
-        [
-          photo.unique_id,
-          athleteId,
-          activityId,
-          url,
-          thumbnailUrl,
-          photo.caption ?? null,
-          photo.location ? JSON.stringify(photo.location) : null,
-          photo.created_at,
-        ]
-      )
+      goSavePhoto({
+        id: photo.unique_id,
+        athlete_id: athleteId,
+        activity_id: activityId,
+        url: url,
+        thumbnail_url: thumbnailUrl,
+        caption: photo.caption,
+        location: photo.location ? JSON.stringify(photo.location) : undefined,
+        created_at: photo.created_at,
+      })
     }
     return photos.length
   } catch {
@@ -1664,11 +1645,6 @@ const MAX_ACTIVITY_IDS_IN_MEMORY = 50000
  * Yields to main thread periodically to keep UI responsive on large datasets.
  */
 export async function backfillPowerBests(): Promise<number> {
-  if (!algorithmsInitialized()) {
-    console.warn('[Import] Algorithms not initialized, cannot backfill power')
-    return 0
-  }
-
   const athlete = getAthlete()
   if (!athlete) {
     console.warn('[Import] Not authenticated, cannot backfill power')
@@ -1699,18 +1675,10 @@ export async function backfillPowerBests(): Promise<number> {
   let computed = 0
   let batchCount = 0
   for (const { id } of activities) {
-    const stream = db.queryOne<{ data: string }>(
-      `SELECT data FROM activity_streams WHERE activity_id = ? AND stream_type = 'watts'`,
-      [id]
-    )
-    if (!stream?.data) continue
-
     try {
-      const watts = JSON.parse(stream.data) as number[]
-      if (Array.isArray(watts) && watts.length > 0) {
-        computeAndStorePowerBests(db, id, watts)
-        computed++
-      }
+      // Go WASM reads the watts stream from DB and computes power
+      computeAndStorePowerBests(id)
+      computed++
     } catch (err) {
       console.error(`[Import] Failed to backfill power for activity ${id}:`, err)
     }

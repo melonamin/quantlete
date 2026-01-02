@@ -67,9 +67,9 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
     async function initialize() {
       try {
         if (isWasmMode()) {
-          // Lazy load WASM provider to avoid bundling in server mode
-          const { WasmProvider } = await import('./wasm/provider')
-          const provider = new WasmProvider()
+          // Lazy load Go WASM provider to avoid bundling in server mode
+          const { GoWasmProvider } = await import('./wasm/go-provider')
+          const provider = new GoWasmProvider()
           await provider.initialize()
           setState({ provider, initialized: true, error: null })
         } else {

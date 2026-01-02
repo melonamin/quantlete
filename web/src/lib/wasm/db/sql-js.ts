@@ -363,6 +363,22 @@ export class WasmDatabase {
     }
     return this.db.export().byteLength
   }
+
+  /**
+   * Get the internal sql.js Database instance.
+   * Used by Go WASM to share the same database.
+   */
+  getInternalDb(): Database | null {
+    return this.db
+  }
+
+  /**
+   * Get the sql.js SqlJsStatic instance.
+   * Used by Go WASM to share the same sql.js.
+   */
+  getSqlJs(): SqlJsStatic | null {
+    return this.SQL
+  }
 }
 
 // Singleton instance

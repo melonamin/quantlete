@@ -74,6 +74,18 @@ export function saveImportState(state: ImportState): void {
 }
 
 /**
+ * Map old phase names to new phase names for backward compatibility.
+ * This allows resuming imports that were saved with old phase names.
+ */
+function normalizePhase(phase: string): string {
+  const phaseMapping: Record<string, string> = {
+    details: 'activity_details',
+    segments: 'segment_details',
+  }
+  return phaseMapping[phase] ?? phase
+}
+
+/**
  * Validate and normalize loaded import state.
  * Returns null if state is invalid or corrupted.
  */
@@ -89,16 +101,22 @@ function validateImportState(parsed: unknown): ImportState | null {
   if (!Array.isArray(state.segmentIdsToFetch)) return null
   if (!Array.isArray(state.activitiesWithPhotos)) return null
 
+  // Normalize phase name (handle old -> new phase name migration)
+  const normalizedPhase = normalizePhase(state.phase as string)
+
   // Validate phase is resumable
-  const validPhases = ['activities', 'gear', 'streams', 'details', 'segments', 'photos']
-  if (!validPhases.includes(state.phase as string)) return null
+  const validPhases = ['activities', 'gear', 'streams', 'activity_details', 'segment_details', 'photos']
+  if (!validPhases.includes(normalizedPhase)) {
+    console.warn(`[ImportState] Unknown phase "${state.phase}", resetting import state`)
+    return null
+  }
 
   // Normalize numeric fields with defaults
   const normalizeNumber = (val: unknown, fallback: number): number =>
     typeof val === 'number' && !isNaN(val) ? val : fallback
 
   return {
-    phase: state.phase as ImportState['phase'],
+    phase: normalizedPhase as ImportState['phase'],
     activityIds: state.activityIds.filter((id): id is number => typeof id === 'number'),
     gearIds: state.gearIds.filter((id): id is string => typeof id === 'string'),
     segmentIdsToFetch: state.segmentIdsToFetch.filter((id): id is number => typeof id === 'number'),

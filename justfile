@@ -35,8 +35,8 @@ dev-web:
 # Code Generation
 # ============================================================================
 
-# Generate all code (SQL queries, schema)
-generate: generate-sql generate-schema
+# Generate all code (SQL queries, schema, TypeScript types)
+generate: generate-sql generate-schema generate-ts-types
 
 # Generate SQL query code (Go + TypeScript)
 generate-sql:
@@ -45,6 +45,32 @@ generate-sql:
 # Generate schema for browser WASM mode
 generate-schema:
     go run ./scripts/generate-schema
+
+# Generate TypeScript types from Go WASM bridge structs
+generate-ts-types:
+    go run ./scripts/generate-ts-types
+
+# ============================================================================
+# Go WASM Storage Layer
+# ============================================================================
+
+# Build Go storage layer to WASM
+build-go-wasm:
+    #!/usr/bin/env bash
+    set -e
+    mkdir -p web/public/wasm
+    echo "Building Go WASM..."
+    GOOS=js GOARCH=wasm go build -o web/public/wasm/quantlete.wasm ./cmd/wasm/
+    echo "Copying wasm_exec.js..."
+    # Go 1.24+ uses lib/wasm, older versions use misc/wasm
+    if [ -f "$(go env GOROOT)/lib/wasm/wasm_exec.js" ]; then
+        cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/public/wasm/
+    else
+        cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/public/wasm/
+    fi
+    echo "Copying sql-wasm.wasm..."
+    cp web/node_modules/sql.js/dist/sql-wasm.wasm web/public/wasm/ 2>/dev/null || true
+    ls -lh web/public/wasm/quantlete.wasm
 
 # ============================================================================
 # WASM Algorithms (TinyGo)
