@@ -62,6 +62,19 @@ cd web && yarn typecheck  # TypeScript check
 - Migrations in `schema/migrations/`
 - Pure Go driver: `modernc.org/sqlite`
 
+### SQL Queries
+
+**NEVER write raw SQL in Go or TypeScript code.** All queries must go through the codegen system:
+
+1. Define queries in `schema/queries/*.sql` using sqlc-style annotations
+2. Run `just generate-sql` to generate `queries.gen.go` and `queries.gen.ts`
+3. Use the generated `Queries` struct methods in storage layer code
+
+Raw SQL requires explicit confirmation from Sasha. This ensures:
+- Parity between Go backend and TypeScript WASM provider
+- Single source of truth for all queries
+- Type-safe query methods with proper row types
+
 ## Testing
 
 - Go: `go test` with testify

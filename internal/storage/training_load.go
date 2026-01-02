@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"math"
 	"strings"
 	"time"
@@ -341,45 +340,31 @@ func round2(v float64) float64 {
 }
 
 func (r *TrainingLoadRepository) GetSummary(ctx context.Context, athleteID int64) (*DailyTrainingLoadPoint, error) {
-	var day SQLiteTime
-	var tss, ctl, atl, tsb float64
-	err := r.db.QueryRowContext(ctx, `
-		SELECT day, tss, ctl, atl, tsb
-		FROM daily_training_load
-		WHERE athlete_id = ?
-		ORDER BY day DESC
-		LIMIT 1
-	`, athleteID).Scan(&day, &tss, &ctl, &atl, &tsb)
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetTrainingLoadSummary(ctx, athleteID)
 	if err != nil {
-		if isNotFound(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
+	if row == nil {
+		return nil, nil
+	}
 	return &DailyTrainingLoadPoint{
-		Day: day.Format("2006-01-02"),
-		TSS: round2(tss),
-		CTL: round2(ctl),
-		ATL: round2(atl),
-		TSB: round2(tsb),
+		Day: row.Day,
+		TSS: round2(row.TSS),
+		CTL: round2(row.CTL),
+		ATL: round2(row.ATL),
+		TSB: round2(row.TSB),
 	}, nil
 }
 
 func (r *TrainingLoadRepository) GetActivityTSS(ctx context.Context, athleteID, activityID int64) (float64, error) {
-	var tss sql.NullFloat64
-	err := r.db.QueryRowContext(ctx, `
-		SELECT tss
-		FROM activity_training_load
-		WHERE athlete_id = ? AND activity_id = ?
-	`, athleteID, activityID).Scan(&tss)
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetActivityTSSByAthlete(ctx, athleteID, activityID)
 	if err != nil {
-		if isNotFound(err) {
-			return 0, nil
-		}
 		return 0, err
 	}
-	if !tss.Valid {
+	if row == nil {
 		return 0, nil
 	}
-	return tss.Float64, nil
+	return row.TSS, nil
 }

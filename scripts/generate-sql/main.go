@@ -18,6 +18,21 @@ import (
 	"unicode"
 )
 
+// Column represents a column in a SELECT query.
+type Column struct {
+	SQLName  string // Original column name (e.g., "athlete_id")
+	GoName   string // PascalCase name (e.g., "AthleteID")
+	GoType   string // Go type (e.g., "int64")
+	JSONName string // JSON tag name (e.g., "athlete_id")
+}
+
+// Param represents a query parameter.
+type Param struct {
+	Position string // Parameter position (e.g., "1", "2")
+	Name     string // Inferred parameter name (e.g., "athleteID")
+	GoType   string // Go type (e.g., "int64")
+}
+
 // Query represents a parsed SQL query.
 type Query struct {
 	Name       string   // Function name (e.g., GetEddingtonDays)
@@ -28,6 +43,8 @@ type Query struct {
 	HasSlice   bool     // Whether query has a SLICE placeholder
 	SliceName  string   // Name of the slice parameter
 	File       string   // Source file name
+	Columns    []Column // Parsed columns from SELECT (for Go generation)
+	ParamInfos []Param  // Inferred parameter info (for Go generation)
 }
 
 // QueryFile represents a parsed query file.
@@ -148,6 +165,8 @@ func parseQueryFile(path string) ([]Query, error) {
 			if current != nil && len(sqlLines) > 0 {
 				current.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 				current.Params = extractParams(current.SQL)
+				current.Columns = parseSelectColumns(current.SQL)
+				current.ParamInfos = inferParamInfo(current.SQL, current.Params)
 				if match := sliceRe.FindStringSubmatch(current.SQL); match != nil {
 					current.HasSlice = true
 					current.SliceName = match[1]
@@ -194,6 +213,8 @@ func parseQueryFile(path string) ([]Query, error) {
 	if current != nil && len(sqlLines) > 0 {
 		current.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 		current.Params = extractParams(current.SQL)
+		current.Columns = parseSelectColumns(current.SQL)
+		current.ParamInfos = inferParamInfo(current.SQL, current.Params)
 		if match := sliceRe.FindStringSubmatch(current.SQL); match != nil {
 			current.HasSlice = true
 			current.SliceName = match[1]
@@ -214,45 +235,625 @@ func extractParams(sql string) []string {
 			params = append(params, m[1])
 		}
 	}
-	sort.Strings(params)
+	// Sort numerically, not alphabetically (otherwise "10" < "2")
+	sort.Slice(params, func(i, j int) bool {
+		var a, b int
+		fmt.Sscanf(params[i], "%d", &a)
+		fmt.Sscanf(params[j], "%d", &b)
+		return a < b
+	})
 	return params
 }
 
+// parseSelectColumns extracts columns from a SELECT statement.
+func parseSelectColumns(sql string) []Column {
+	// Find SELECT ... FROM portion (FROM must be at depth 0, not inside subquery)
+	upperSQL := strings.ToUpper(sql)
+	selectIdx := strings.Index(upperSQL, "SELECT")
+	if selectIdx == -1 {
+		return nil
+	}
+
+	// Find FROM that is not inside parentheses
+	fromIdx := findFromOutsideParens(upperSQL, selectIdx+6)
+	if fromIdx == -1 {
+		return nil
+	}
+
+	// Extract column list
+	columnPart := strings.TrimSpace(sql[selectIdx+6 : fromIdx])
+
+	// Split by comma, handling nested parentheses
+	columns := splitColumns(columnPart)
+
+	var result []Column
+	for _, col := range columns {
+		col = strings.TrimSpace(col)
+		if col == "" {
+			continue
+		}
+
+		c := parseColumn(col, sql)
+		if c.SQLName != "" {
+			result = append(result, c)
+		}
+	}
+
+	return result
+}
+
+// splitColumns splits a column list by commas, respecting parentheses.
+func splitColumns(s string) []string {
+	var result []string
+	var current strings.Builder
+	depth := 0
+
+	for _, r := range s {
+		switch r {
+		case '(':
+			depth++
+			current.WriteRune(r)
+		case ')':
+			depth--
+			current.WriteRune(r)
+		case ',':
+			if depth == 0 {
+				result = append(result, current.String())
+				current.Reset()
+			} else {
+				current.WriteRune(r)
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+
+	return result
+}
+
+// parseColumn parses a single column expression.
+// fullSQL is passed for context (e.g., to detect gear table queries).
+func parseColumn(col string, fullSQL string) Column {
+	col = strings.TrimSpace(col)
+
+	// Normalize whitespace (replace newlines and multiple spaces with single space)
+	col = strings.Join(strings.Fields(col), " ")
+
+	// Check for AS alias (must be outside of parentheses)
+	asIdx := findASOutsideParens(col)
+	if asIdx != -1 {
+		alias := strings.TrimSpace(col[asIdx+4:])
+		// Remove any trailing comments or extra stuff
+		if spaceIdx := strings.IndexAny(alias, " \t\n"); spaceIdx != -1 {
+			alias = alias[:spaceIdx]
+		}
+		return Column{
+			SQLName:  alias,
+			GoName:   toPascalCase(alias),
+			GoType:   inferGoType(alias, col, fullSQL),
+			JSONName: alias,
+		}
+	}
+
+	// Check for table.column format (but not inside parentheses)
+	if !strings.HasPrefix(col, "(") {
+		if dotIdx := strings.LastIndex(col, "."); dotIdx != -1 {
+			name := strings.TrimSpace(col[dotIdx+1:])
+			return Column{
+				SQLName:  name,
+				GoName:   toPascalCase(name),
+				GoType:   inferGoType(name, col, fullSQL),
+				JSONName: name,
+			}
+		}
+	}
+
+	// Simple column name
+	return Column{
+		SQLName:  col,
+		GoName:   toPascalCase(col),
+		GoType:   inferGoType(col, col, fullSQL),
+		JSONName: col,
+	}
+}
+
+// findFromOutsideParens finds "FROM" that is not inside parentheses.
+// Returns the index relative to the start of the string, or -1 if not found.
+func findFromOutsideParens(upperSQL string, startIdx int) int {
+	depth := 0
+	for i := startIdx; i < len(upperSQL)-4; i++ {
+		switch upperSQL[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+		// Look for FROM preceded by whitespace/newline (not part of another word)
+		if depth == 0 && i+4 <= len(upperSQL) {
+			if (i == startIdx || isWhitespace(upperSQL[i-1])) && upperSQL[i:i+4] == "FROM" {
+				// Check it's followed by whitespace (not FROMAGE or something)
+				if i+4 == len(upperSQL) || isWhitespace(upperSQL[i+4]) {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
+func isWhitespace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+// findASOutsideParens finds the position of " AS " that is not inside parentheses.
+// Returns -1 if not found.
+func findASOutsideParens(col string) int {
+	upperCol := strings.ToUpper(col)
+	depth := 0
+	for i := 0; i < len(upperCol)-3; i++ {
+		switch upperCol[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+		if depth == 0 && i+4 <= len(upperCol) && upperCol[i:i+4] == " AS " {
+			return i
+		}
+	}
+	return -1
+}
+
+// inferGoType determines the Go type for a column based on its name and expression.
+// fullSQL is provided for additional context (e.g., to detect gear table queries).
+func inferGoType(name, expr, fullSQL string) string {
+	lowerName := strings.ToLower(name)
+	lowerExpr := strings.ToLower(expr)
+	lowerSQL := strings.ToLower(fullSQL)
+
+	// Check if wrapped in COALESCE - makes it non-nullable
+	hasCoalesce := strings.Contains(lowerExpr, "coalesce(")
+
+	// Check if this is a gear table query (gear IDs are strings like "b12345")
+	isGearQuery := strings.Contains(lowerSQL, "from gear") ||
+		strings.Contains(lowerSQL, "from v_gear")
+
+	// ID fields - gear IDs are strings (Strava format: "b12345")
+	if lowerName == "id" {
+		if isGearQuery {
+			return "string"
+		}
+		return "int64"
+	}
+	if lowerName == "gear_id" {
+		return "string"
+	}
+	if strings.HasSuffix(lowerName, "_id") {
+		return "int64"
+	}
+
+	// Count fields - athlete_effort_count is nullable
+	if lowerName == "count" || lowerName == "activity_count" || lowerName == "segment_count" ||
+		strings.HasPrefix(lowerName, "total_") && !strings.Contains(lowerName, "distance") && !strings.Contains(lowerName, "elevation") && !strings.Contains(lowerName, "time") {
+		return "int"
+	}
+	// Nullable count fields
+	if strings.HasSuffix(lowerName, "_count") {
+		if hasCoalesce {
+			return "int"
+		}
+		return "*int"
+	}
+
+	// Rank fields - nullable integers
+	if strings.HasSuffix(lowerName, "_rank") || lowerName == "pr_rank" {
+		if hasCoalesce {
+			return "int"
+		}
+		return "*int"
+	}
+
+	// Climb category
+	if lowerName == "climb_category" {
+		return "int"
+	}
+
+	// Workout type
+	if lowerName == "workout_type" {
+		return "*int"
+	}
+
+	// Time duration fields (seconds) - some are nullable
+	if lowerName == "moving_time" || lowerName == "elapsed_time" || lowerName == "total_time" {
+		return "int"
+	}
+	// Nullable time fields
+	if strings.HasSuffix(lowerName, "_elapsed_time") || strings.HasSuffix(lowerName, "_time") && !strings.Contains(lowerName, "date") {
+		if hasCoalesce {
+			return "int"
+		}
+		return "*int"
+	}
+
+	// Date/time fields - some are nullable
+	if strings.HasSuffix(lowerName, "_at") || lowerName == "date" || lowerName == "day" ||
+		lowerName == "month" || lowerName == "year" || lowerName == "week" || lowerName == "week_start" {
+		return "string" // Dates as strings in SQLite
+	}
+	// Nullable date fields (athlete_pr_date, etc.)
+	if strings.HasSuffix(lowerName, "_date") && lowerName != "start_date" && lowerName != "start_date_local" {
+		if hasCoalesce {
+			return "string"
+		}
+		return "*string"
+	}
+	// Non-nullable start_date fields
+	if strings.HasPrefix(lowerName, "start_date") {
+		return "string"
+	}
+
+	// Boolean fields
+	if lowerName == "commute" || lowerName == "private" || lowerName == "trainer" ||
+		lowerName == "starred" || lowerName == "retired" || lowerName == "is_primary" ||
+		strings.HasPrefix(lowerName, "is_") || strings.HasPrefix(lowerName, "has_") {
+		return "bool"
+	}
+
+	// Coordinate fields - nullable unless COALESCE
+	if strings.HasSuffix(lowerName, "_lat") || strings.HasSuffix(lowerName, "_lng") ||
+		lowerName == "start_lat" || lowerName == "start_lng" ||
+		lowerName == "end_lat" || lowerName == "end_lng" {
+		if hasCoalesce {
+			return "float64"
+		}
+		return "*float64"
+	}
+
+	// Nullable numeric fields - power, HR, cadence, price, etc.
+	if strings.Contains(lowerName, "watts") || strings.Contains(lowerName, "heartrate") ||
+		strings.Contains(lowerName, "cadence") || lowerName == "kilojoules" ||
+		lowerName == "calories" || lowerName == "suffer_score" ||
+		lowerName == "average_grade" || lowerName == "maximum_grade" ||
+		lowerName == "elev_high" || lowerName == "elev_low" ||
+		lowerName == "max_heartrate" || lowerName == "purchase_price" {
+		if hasCoalesce {
+			return "float64"
+		}
+		return "*float64"
+	}
+
+	// Distance and elevation - often with COALESCE
+	if strings.Contains(lowerName, "distance") || strings.Contains(lowerName, "elevation") ||
+		lowerName == "total_elevation_gain" || lowerName == "elevation_high" || lowerName == "elevation_low" {
+		return "float64"
+	}
+
+	// Training load metrics
+	if lowerName == "tss" || lowerName == "ctl" || lowerName == "atl" || lowerName == "tsb" ||
+		lowerName == "normalized_power" || lowerName == "intensity_factor" || lowerName == "ftp_used" {
+		return "float64"
+	}
+
+	// Speed fields
+	if strings.Contains(lowerName, "speed") {
+		return "float64"
+	}
+
+	// Numeric aggregates (SUM, AVG, etc.)
+	if strings.Contains(lowerExpr, "sum(") || strings.Contains(lowerExpr, "avg(") ||
+		strings.Contains(lowerExpr, "min(") || strings.Contains(lowerExpr, "max(") {
+		return "float64"
+	}
+
+	// COUNT
+	if strings.Contains(lowerExpr, "count(") {
+		return "int"
+	}
+
+	// Default to string
+	return "string"
+}
+
+// inferParamInfo creates parameter info with inferred names and types.
+func inferParamInfo(sql string, params []string) []Param {
+	result := make([]Param, len(params))
+
+	// Build a map of param position to context
+	paramContexts := make(map[string]string)
+	lines := strings.Split(sql, "\n")
+	for _, line := range lines {
+		for _, p := range params {
+			placeholder := "?" + p
+			if strings.Contains(line, placeholder) {
+				paramContexts[p] = line
+			}
+		}
+	}
+
+	for i, p := range params {
+		ctx := paramContexts[p]
+		result[i] = Param{
+			Position: p,
+			Name:     inferParamName(p, ctx),
+			GoType:   inferParamType(p, ctx, sql),
+		}
+	}
+
+	return result
+}
+
+// inferParamName determines a parameter name from its context.
+func inferParamName(pos, context string) string {
+	lowerCtx := strings.ToLower(context)
+	placeholder := "?" + pos
+
+	// Common patterns
+	patterns := []struct {
+		contains string
+		name     string
+	}{
+		{"athlete_id = " + placeholder, "athleteID"},
+		{"athlete_id=" + placeholder, "athleteID"},
+		{"sport_type = " + placeholder, "sportType"},
+		{"sport_type=" + placeholder, "sportType"},
+		{"gear_id = " + placeholder, "gearID"},
+		{"gear_id=" + placeholder, "gearID"},
+		{"activity_id = " + placeholder, "activityID"},
+		{"activity_id=" + placeholder, "activityID"},
+		{"segment_id = " + placeholder, "segmentID"},
+		{"segment_id=" + placeholder, "segmentID"},
+		{"start_date >= " + placeholder, "after"},
+		{"start_date <= " + placeholder, "before"},
+		{"start_date > " + placeholder, "after"},
+		{"start_date < " + placeholder, "before"},
+		{"day >= " + placeholder, "after"},
+		{"day <= " + placeholder, "before"},
+		{"limit " + placeholder, "limit"},
+		{"offset " + placeholder, "offset"},
+		{"year = " + placeholder, "year"},
+		{"month = " + placeholder, "month"},
+		{"country = " + placeholder, "country"},
+		{"activity_type = " + placeholder, "activityType"},
+	}
+
+	for _, p := range patterns {
+		if strings.Contains(lowerCtx, p.contains) {
+			return p.name
+		}
+	}
+
+	// Default to param + position
+	return "arg" + pos
+}
+
+// inferParamType determines a parameter type from its context.
+// fullSQL is provided for additional context (e.g., to detect gear table queries).
+func inferParamType(pos, context, fullSQL string) string {
+	lowerCtx := strings.ToLower(context)
+	lowerSQL := strings.ToLower(fullSQL)
+	placeholder := "?" + pos
+
+	// Check if this is a gear table query (gear IDs are strings like "b12345")
+	isGearQuery := strings.Contains(lowerSQL, "from gear") ||
+		strings.Contains(lowerSQL, "from v_gear")
+
+	// Gear ID is a string (Strava format: "b12345")
+	if strings.Contains(lowerCtx, "gear_id = "+placeholder) || strings.Contains(lowerCtx, "gear_id="+placeholder) {
+		return "string"
+	}
+
+	// Other _id fields (athlete_id, activity_id, etc.) are always int64
+	if strings.Contains(lowerCtx, "_id = "+placeholder) || strings.Contains(lowerCtx, "_id="+placeholder) {
+		return "int64"
+	}
+
+	// In gear queries, bare id (g.id or gear.id) is a string
+	if isGearQuery {
+		if strings.Contains(lowerCtx, "id = "+placeholder) || strings.Contains(lowerCtx, "id="+placeholder) {
+			return "string"
+		}
+	}
+
+	// Other bare id fields are int64
+	if strings.Contains(lowerCtx, "id = "+placeholder) {
+		return "int64"
+	}
+
+	// Pagination
+	if strings.Contains(lowerCtx, "limit "+placeholder) || strings.Contains(lowerCtx, "offset "+placeholder) {
+		return "int64"
+	}
+
+	// Year
+	if strings.Contains(lowerCtx, "year = "+placeholder) || strings.Contains(lowerCtx, "year="+placeholder) {
+		return "int"
+	}
+
+	// Default to string (dates, sport_type, etc.)
+	return "string"
+}
+
+// toPascalCase converts snake_case to PascalCase.
+func toPascalCase(s string) string {
+	parts := strings.Split(s, "_")
+	for i, p := range parts {
+		if len(p) > 0 {
+			// Handle common abbreviations
+			upper := strings.ToUpper(p)
+			if upper == "ID" || upper == "URL" || upper == "API" || upper == "SQL" ||
+				upper == "HTTP" || upper == "JSON" || upper == "XML" || upper == "TSS" ||
+				upper == "CTL" || upper == "ATL" || upper == "TSB" || upper == "FTP" ||
+				upper == "HR" || upper == "NP" || upper == "PR" || upper == "KOM" {
+				parts[i] = upper
+			} else {
+				parts[i] = strings.ToUpper(p[:1]) + strings.ToLower(p[1:])
+			}
+		}
+	}
+	return strings.Join(parts, "")
+}
+
 // Go code generation
+
+// goQueryData holds the data for generating a single query.
+type goQueryData struct {
+	Query
+	SQLConstName   string
+	ParamSignature string
+	ParamArgs      string
+	ScanFields     string
+	HasColumns     bool
+}
+
+// prepareGoQueryData prepares query data for template execution.
+func prepareGoQueryData(q Query) goQueryData {
+	data := goQueryData{
+		Query:        q,
+		SQLConstName: toLowerFirst(q.Name) + "SQL",
+		HasColumns:   len(q.Columns) > 0 && q.ReturnType != ":exec",
+	}
+
+	// Build parameter signature
+	var sigParts []string
+	for _, p := range q.ParamInfos {
+		sigParts = append(sigParts, fmt.Sprintf("%s %s", p.Name, p.GoType))
+	}
+	if len(sigParts) > 0 {
+		data.ParamSignature = ", " + strings.Join(sigParts, ", ")
+	}
+
+	// Build parameter args
+	var argParts []string
+	for _, p := range q.ParamInfos {
+		argParts = append(argParts, p.Name)
+	}
+	if len(argParts) > 0 {
+		data.ParamArgs = ", " + strings.Join(argParts, ", ")
+	}
+
+	// Build scan fields
+	var scanParts []string
+	for _, c := range q.Columns {
+		scanParts = append(scanParts, "&i."+c.GoName)
+	}
+	data.ScanFields = strings.Join(scanParts, ", ")
+
+	return data
+}
+
+func toLowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToLower(r[0])
+	return string(r)
+}
 
 var goTemplate = template.Must(template.New("go").Parse(`// Code generated by scripts/generate-sql. DO NOT EDIT.
 
 package storage
 
 import (
+	"context"
 	"database/sql"
 )
 
-// Queries provides generated query functions.
+// DBTX is the interface for database operations (supports both *sql.DB and *sql.Tx).
+type DBTX interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Queries provides generated query methods.
 type Queries struct {
-	db *sql.DB
+	db DBTX
 }
 
 // NewQueries creates a new Queries instance.
-func NewQueries(db *sql.DB) *Queries {
+func NewQueries(db DBTX) *Queries {
 	return &Queries{db: db}
 }
 
-{{range .Files}}
-// ============================================================================
-// {{.Name}} queries
-// ============================================================================
+// WithTx returns a new Queries instance that uses the provided transaction.
+func (q *Queries) WithTx(tx *sql.Tx) *Queries {
+	return &Queries{db: tx}
+}
+
 {{range .Queries}}
-{{if .Comment}}// {{.Name}} - {{.Comment}}{{end}}
-const {{.Name}}SQL = ` + "`" + `{{.SQL}}` + "`" + `
+// ============================================================================
+// {{.Query.Name}}
+// ============================================================================
+{{if .HasColumns}}
+// {{.Query.Name}}Row represents a row returned by {{.Query.Name}}.
+type {{.Query.Name}}Row struct {
+{{range .Query.Columns}}	{{.GoName}} {{.GoType}} ` + "`" + `json:"{{.JSONName}}"` + "`" + `
+{{end}}}
+{{end}}
+{{if .Query.Comment}}// {{.Query.Name}} - {{.Query.Comment}}
+{{end}}const {{.SQLConstName}} = ` + "`" + `{{.Query.SQL}}` + "`" + `
+{{if eq .Query.ReturnType ":many"}}
+// {{.Query.Name}} executes the query and returns all rows.
+func (q *Queries) {{.Query.Name}}(ctx context.Context{{.ParamSignature}}) ([]{{.Query.Name}}Row, error) {
+	rows, err := q.db.QueryContext(ctx, {{.SQLConstName}}{{.ParamArgs}})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []{{.Query.Name}}Row
+	for rows.Next() {
+		var i {{.Query.Name}}Row
+		if err := rows.Scan({{.ScanFields}}); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+{{else if eq .Query.ReturnType ":one"}}
+// {{.Query.Name}} executes the query and returns a single row, or nil if not found.
+func (q *Queries) {{.Query.Name}}(ctx context.Context{{.ParamSignature}}) (*{{.Query.Name}}Row, error) {
+	row := q.db.QueryRowContext(ctx, {{.SQLConstName}}{{.ParamArgs}})
+	var i {{.Query.Name}}Row
+	err := row.Scan({{.ScanFields}})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &i, nil
+}
+{{else}}
+// {{.Query.Name}} executes the query.
+func (q *Queries) {{.Query.Name}}(ctx context.Context{{.ParamSignature}}) error {
+	_, err := q.db.ExecContext(ctx, {{.SQLConstName}}{{.ParamArgs}})
+	return err
+}
 {{end}}
 {{end}}
 `))
 
 func generateGoCode(files []QueryFile, output string) error {
+	// Prepare query data with computed fields
+	var allQueries []goQueryData
+	for _, file := range files {
+		for _, q := range file.Queries {
+			allQueries = append(allQueries, prepareGoQueryData(q))
+		}
+	}
+
 	var buf bytes.Buffer
 	if err := goTemplate.Execute(&buf, map[string]interface{}{
-		"Files": files,
+		"Queries": allQueries,
 	}); err != nil {
 		return fmt.Errorf("executing template: %w", err)
 	}
@@ -309,7 +910,12 @@ export const queries = {
 
 			// Function signature
 			funcName := toLowerCamelCase(q.Name)
-			buf.WriteString(fmt.Sprintf("  %s<T extends Record<string, unknown>>(db: WasmDatabase", funcName))
+			// Only add generic type parameter for queries that return data
+			if q.ReturnType == ":one" || q.ReturnType == ":many" {
+				buf.WriteString(fmt.Sprintf("  %s<T extends Record<string, unknown>>(db: WasmDatabase", funcName))
+			} else {
+				buf.WriteString(fmt.Sprintf("  %s(db: WasmDatabase", funcName))
+			}
 
 			// Parameters
 			for _, p := range q.Params {

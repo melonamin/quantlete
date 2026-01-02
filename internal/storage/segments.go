@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -358,34 +357,63 @@ func (r *SegmentRepository) List(ctx context.Context, athleteID int64, f Segment
 }
 
 func (r *SegmentRepository) GetByID(ctx context.Context, id int64) (*Segment, error) {
-	row := r.db.QueryRowContext(ctx, `
-		SELECT
-			id, name, activity_type, distance, average_grade, maximum_grade,
-			elevation_high, elevation_low, climb_category,
-			start_lat, start_lng, end_lat, end_lng,
-			starred, COALESCE(polyline, ''),
-			athlete_kom_rank, athlete_effort_count, athlete_pr_elapsed_time, athlete_pr_date,
-			created_at, updated_at
-		FROM segments
-		WHERE id = ?
-	`, id)
-
-	var s Segment
-	err := row.Scan(
-		&s.ID, &s.Name, &s.ActivityType, &s.Distance, &s.AverageGrade, &s.MaximumGrade,
-		&s.ElevationHigh, &s.ElevationLow, &s.ClimbCategory,
-		&s.StartLat, &s.StartLng, &s.EndLat, &s.EndLng,
-		&s.Starred, &s.Polyline,
-		&s.AthleteKOMRank, &s.AthleteEffortCount, &s.AthletePRElapsedTime, &s.AthletePRDate,
-		&s.CreatedAt, &s.UpdatedAt,
-	)
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetSegmentByID(ctx, id)
 	if err != nil {
-		if isNotFound(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	return &s, nil
+	if row == nil {
+		return nil, nil
+	}
+	// Map generated row to domain type
+	s := &Segment{
+		ID:                   row.ID,
+		Name:                 row.Name,
+		ActivityType:         row.ActivityType,
+		Distance:             row.Distance,
+		ElevationHigh:        row.ElevationHigh,
+		ElevationLow:         row.ElevationLow,
+		ClimbCategory:        row.ClimbCategory,
+		StartLat:             row.StartLat,
+		StartLng:             row.StartLng,
+		EndLat:               row.EndLat,
+		EndLng:               row.EndLng,
+		Starred:              row.Starred,
+		Polyline:             row.Polyline,
+		AthleteKOMRank:       row.AthleteKOMRank,
+		AthleteEffortCount:   row.AthleteEffortCount,
+		AthletePRElapsedTime: row.AthletePRElapsedTime,
+	}
+	// Handle nullable float64 pointers
+	if row.AverageGrade != nil {
+		s.AverageGrade = *row.AverageGrade
+	}
+	if row.MaximumGrade != nil {
+		s.MaximumGrade = *row.MaximumGrade
+	}
+	// Handle date strings to SQLiteTime
+	if row.AthletePRDate != nil && *row.AthletePRDate != "" {
+		if t, err := time.Parse("2006-01-02T15:04:05Z", *row.AthletePRDate); err == nil {
+			s.AthletePRDate = &SQLiteTime{Time: t}
+		} else if t, err := time.Parse("2006-01-02 15:04:05", *row.AthletePRDate); err == nil {
+			s.AthletePRDate = &SQLiteTime{Time: t}
+		}
+	}
+	if row.CreatedAt != "" {
+		if t, err := time.Parse("2006-01-02T15:04:05Z", row.CreatedAt); err == nil {
+			s.CreatedAt = SQLiteTime{Time: t}
+		} else if t, err := time.Parse("2006-01-02 15:04:05", row.CreatedAt); err == nil {
+			s.CreatedAt = SQLiteTime{Time: t}
+		}
+	}
+	if row.UpdatedAt != "" {
+		if t, err := time.Parse("2006-01-02T15:04:05Z", row.UpdatedAt); err == nil {
+			s.UpdatedAt = SQLiteTime{Time: t}
+		} else if t, err := time.Parse("2006-01-02 15:04:05", row.UpdatedAt); err == nil {
+			s.UpdatedAt = SQLiteTime{Time: t}
+		}
+	}
+	return s, nil
 }
 
 func (r *SegmentRepository) ListEfforts(ctx context.Context, athleteID, segmentID int64, limit int) ([]SegmentEffort, error) {
@@ -505,26 +533,16 @@ func (r *SegmentRepository) ListEffortsPaginated(ctx context.Context, athleteID,
 }
 
 func (r *SegmentRepository) GetCountries(ctx context.Context, athleteID int64) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT COALESCE(country, '') AS country
-		FROM segment_efforts
-		WHERE athlete_id = ? AND COALESCE(country, '') != ''
-		ORDER BY country ASC
-	`, athleteID)
+	q := NewQueries(r.db.Conn())
+	rows, err := q.GetSegmentEffortCountries(ctx, athleteID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	var out []string
-	for rows.Next() {
-		var c string
-		if err := rows.Scan(&c); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
+	out := make([]string, len(rows))
+	for i, row := range rows {
+		out[i] = row.Country
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 type CountryStat struct {
@@ -533,39 +551,29 @@ type CountryStat struct {
 }
 
 func (r *SegmentRepository) ListCountryStats(ctx context.Context, athleteID int64) ([]CountryStat, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT COALESCE(country, '') AS country, COUNT(DISTINCT segment_id) AS count
-		FROM segment_efforts
-		WHERE athlete_id = ? AND COALESCE(country, '') != ''
-		GROUP BY country
-		ORDER BY count DESC, country ASC
-	`, athleteID)
+	q := NewQueries(r.db.Conn())
+	rows, err := q.GetSegmentCountryStats(ctx, athleteID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	var out []CountryStat
-	for rows.Next() {
-		var s CountryStat
-		if err := rows.Scan(&s.Country, &s.Count); err != nil {
-			return nil, err
+	out := make([]CountryStat, len(rows))
+	for i, row := range rows {
+		out[i] = CountryStat{
+			Country: row.Country,
+			Count:   row.Count,
 		}
-		out = append(out, s)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (r *SegmentRepository) Count(ctx context.Context, athleteID int64) (int, error) {
-	var count int
-	err := r.db.QueryRowContext(ctx, `
-		SELECT COUNT(DISTINCT s.id)
-		FROM segments s
-		JOIN segment_efforts e ON e.segment_id = s.id
-		WHERE e.athlete_id = ?
-	`, athleteID).Scan(&count)
-	if err != nil && err != sql.ErrNoRows {
+	q := NewQueries(r.db.Conn())
+	row, err := q.CountSegmentsByAthlete(ctx, athleteID)
+	if err != nil {
 		return 0, fmt.Errorf("counting segments: %w", err)
 	}
-	return count, nil
+	if row == nil {
+		return 0, nil
+	}
+	return row.Count, nil
 }

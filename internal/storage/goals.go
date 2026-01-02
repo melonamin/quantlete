@@ -77,18 +77,18 @@ func NewGoalsRepository(db *DB) *GoalsRepository {
 }
 
 func (r *GoalsRepository) GetConfig(ctx context.Context, athleteID int64) (*TrainingGoalsConfig, error) {
-	var raw []byte
-	err := r.db.QueryRowContext(ctx, "SELECT config FROM training_goals WHERE athlete_id = ?", athleteID).Scan(&raw)
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetTrainingGoalsConfig(ctx, athleteID)
 	if err != nil {
-		if isNotFound(err) {
-			cfg := DefaultTrainingGoalsConfig()
-			return &cfg, nil
-		}
 		return nil, err
+	}
+	if row == nil {
+		cfg := DefaultTrainingGoalsConfig()
+		return &cfg, nil
 	}
 
 	var cfg TrainingGoalsConfig
-	if err := json.Unmarshal(raw, &cfg); err != nil {
+	if err := json.Unmarshal([]byte(row.Config), &cfg); err != nil {
 		return nil, fmt.Errorf("decoding training goals: %w", err)
 	}
 	if cfg.Version == 0 {

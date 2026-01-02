@@ -99,89 +99,135 @@ func (r *GearRepository) Upsert(ctx context.Context, g *Gear) error {
 
 // GetByID retrieves gear by ID.
 func (r *GearRepository) GetByID(ctx context.Context, id string) (*Gear, error) {
-	row := r.db.QueryRow(`
-		SELECT id, athlete_id, name, is_primary, retired, distance,
-			brand_name, model_name, description,
-			COALESCE(source, ''), COALESCE(hashtag, ''), purchase_price, COALESCE(purchase_currency, ''),
-			created_at, updated_at
-		FROM gear WHERE id = ?
-	`, id)
-
-	var g Gear
-	err := row.Scan(
-		&g.ID, &g.AthleteID, &g.Name, &g.Primary, &g.Retired, &g.Distance,
-		&g.BrandName, &g.ModelName, &g.Description,
-		&g.Source, &g.Hashtag, &g.PurchasePrice, &g.PurchaseCurrency,
-		&g.CreatedAt, &g.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetGearByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("querying gear: %w", err)
+	}
+	if row == nil {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, fmt.Errorf("scanning gear: %w", err)
-	}
 
-	return &g, nil
+	var createdAt, updatedAt SQLiteTime
+	_ = createdAt.Scan(row.CreatedAt)
+	_ = updatedAt.Scan(row.UpdatedAt)
+
+	return &Gear{
+		ID:               row.ID,
+		AthleteID:        row.AthleteID,
+		Name:             row.Name,
+		Primary:          row.IsPrimary,
+		Retired:          row.Retired,
+		Distance:         row.Distance,
+		BrandName:        row.BrandName,
+		ModelName:        row.ModelName,
+		Description:      row.Description,
+		Source:           row.Source,
+		Hashtag:          row.Hashtag,
+		PurchasePrice:    row.PurchasePrice,
+		PurchaseCurrency: row.PurchaseCurrency,
+		CreatedAt:        createdAt,
+		UpdatedAt:        updatedAt,
+	}, nil
 }
 
 // GetByAthleteID retrieves all gear for an athlete.
 func (r *GearRepository) GetByAthleteID(ctx context.Context, athleteID int64, includeRetired bool) ([]Gear, error) {
-	query := `
-		SELECT id, athlete_id, name, is_primary, retired, distance,
-			brand_name, model_name, description,
-			COALESCE(source, ''), COALESCE(hashtag, ''), purchase_price, COALESCE(purchase_currency, ''),
-			created_at, updated_at
-		FROM gear
-		WHERE athlete_id = ?
-	`
-	if !includeRetired {
-		query += " AND retired = FALSE"
-	}
-	query += " ORDER BY is_primary DESC, name ASC"
+	q := NewQueries(r.db.Conn())
 
-	rows, err := r.db.Query(query, athleteID)
+	if includeRetired {
+		rows, err := q.GetGear(ctx, athleteID)
+		if err != nil {
+			return nil, err
+		}
+		return mapGetGearRows(rows), nil
+	}
+
+	rows, err := q.GetActiveGear(ctx, athleteID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	return mapGetActiveGearRows(rows), nil
+}
 
-	var gear []Gear
-	for rows.Next() {
-		var g Gear
-		if err := rows.Scan(
-			&g.ID, &g.AthleteID, &g.Name, &g.Primary, &g.Retired, &g.Distance,
-			&g.BrandName, &g.ModelName, &g.Description,
-			&g.Source, &g.Hashtag, &g.PurchasePrice, &g.PurchaseCurrency,
-			&g.CreatedAt, &g.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scanning gear: %w", err)
+func mapGetGearRows(rows []GetGearRow) []Gear {
+	result := make([]Gear, len(rows))
+	for i, row := range rows {
+		var createdAt, updatedAt SQLiteTime
+		_ = createdAt.Scan(row.CreatedAt)
+		_ = updatedAt.Scan(row.UpdatedAt)
+		result[i] = Gear{
+			ID:               row.ID,
+			AthleteID:        row.AthleteID,
+			Name:             row.Name,
+			Primary:          row.IsPrimary,
+			Retired:          row.Retired,
+			Distance:         row.Distance,
+			BrandName:        row.BrandName,
+			ModelName:        row.ModelName,
+			Description:      row.Description,
+			Source:           row.Source,
+			Hashtag:          row.Hashtag,
+			PurchasePrice:    row.PurchasePrice,
+			PurchaseCurrency: row.PurchaseCurrency,
+			CreatedAt:        createdAt,
+			UpdatedAt:        updatedAt,
 		}
-		gear = append(gear, g)
 	}
+	return result
+}
 
-	return gear, rows.Err()
+func mapGetActiveGearRows(rows []GetActiveGearRow) []Gear {
+	result := make([]Gear, len(rows))
+	for i, row := range rows {
+		var createdAt, updatedAt SQLiteTime
+		_ = createdAt.Scan(row.CreatedAt)
+		_ = updatedAt.Scan(row.UpdatedAt)
+		result[i] = Gear{
+			ID:               row.ID,
+			AthleteID:        row.AthleteID,
+			Name:             row.Name,
+			Primary:          row.IsPrimary,
+			Retired:          row.Retired,
+			Distance:         row.Distance,
+			BrandName:        row.BrandName,
+			ModelName:        row.ModelName,
+			Description:      row.Description,
+			Source:           row.Source,
+			Hashtag:          row.Hashtag,
+			PurchasePrice:    row.PurchasePrice,
+			PurchaseCurrency: row.PurchaseCurrency,
+			CreatedAt:        createdAt,
+			UpdatedAt:        updatedAt,
+		}
+	}
+	return result
 }
 
 // GetTotalDistance returns the total distance for a piece of gear.
 func (r *GearRepository) GetTotalDistance(ctx context.Context, gearID string) (float64, error) {
-	var distance float64
-	err := r.db.QueryRow(`
-		SELECT COALESCE(SUM(distance), 0)
-		FROM activities
-		WHERE gear_id = ?
-	`, gearID).Scan(&distance)
-	return distance, err
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetGearTotalDistance(ctx, gearID)
+	if err != nil {
+		return 0, err
+	}
+	if row == nil {
+		return 0, nil
+	}
+	return row.TotalDistance, nil
 }
 
 // GetActivityCount returns the number of activities for a piece of gear.
 func (r *GearRepository) GetActivityCount(ctx context.Context, gearID string) (int, error) {
-	var count int
-	err := r.db.QueryRow(`
-		SELECT COUNT(*)
-		FROM activities
-		WHERE gear_id = ?
-	`, gearID).Scan(&count)
-	return count, err
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetGearActivityCount(ctx, gearID)
+	if err != nil {
+		return 0, err
+	}
+	if row == nil {
+		return 0, nil
+	}
+	return row.Count, nil
 }
 
 // GetActivityCountsBatch returns activity counts for multiple gear IDs in a single query.

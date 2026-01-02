@@ -213,33 +213,22 @@ type SportTypeStat struct {
 
 // GetStatsBySportType returns statistics grouped by sport type.
 func (r *StatsRepository) GetStatsBySportType(ctx context.Context, athleteID int64) ([]SportTypeStat, error) {
-	rows, err := r.db.Query(`
-		SELECT
-			sport_type,
-			COUNT(*) as activity_count,
-			COALESCE(SUM(distance), 0) as total_distance,
-			COALESCE(SUM(moving_time), 0) as total_time,
-			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
-		FROM activities
-		WHERE athlete_id = ?
-		GROUP BY sport_type
-		ORDER BY activity_count DESC
-	`, athleteID)
+	q := NewQueries(r.db.Conn())
+	rows, err := q.GetStatsBySportType(ctx, athleteID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	var stats []SportTypeStat
-	for rows.Next() {
-		var s SportTypeStat
-		if err := rows.Scan(&s.SportType, &s.ActivityCount, &s.TotalDistance, &s.TotalTime, &s.TotalElevation); err != nil {
-			return nil, err
+	stats := make([]SportTypeStat, len(rows))
+	for i, row := range rows {
+		stats[i] = SportTypeStat{
+			SportType:      row.SportType,
+			ActivityCount:  row.ActivityCount,
+			TotalDistance:  row.TotalDistance,
+			TotalTime:      row.TotalTime,
+			TotalElevation: row.TotalElevation,
 		}
-		stats = append(stats, s)
 	}
-
-	return stats, rows.Err()
+	return stats, nil
 }
 
 // MonthlyStat represents statistics for a single month.
@@ -458,33 +447,24 @@ type HeatmapFilters struct {
 
 // GetYearlyStats returns statistics grouped by year.
 func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) ([]YearStat, error) {
-	rows, err := r.db.Query(`
-		SELECT
-			CAST(strftime('%Y', start_date_local) AS INTEGER) as year,
-			COUNT(*) as activity_count,
-			COALESCE(SUM(distance), 0) as total_distance,
-			COALESCE(SUM(moving_time), 0) as total_time,
-			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
-		FROM activities
-		WHERE athlete_id = ?
-		GROUP BY year
-		ORDER BY year DESC
-	`, athleteID)
+	q := NewQueries(r.db.Conn())
+	rows, err := q.GetYearlyStats(ctx, athleteID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	var yearly []YearStat
-	for rows.Next() {
-		var s YearStat
-		if err := rows.Scan(&s.Year, &s.ActivityCount, &s.TotalDistance, &s.TotalTime, &s.TotalElevation); err != nil {
-			return nil, err
+	yearly := make([]YearStat, len(rows))
+	for i, row := range rows {
+		var year int
+		fmt.Sscanf(row.Year, "%d", &year)
+		yearly[i] = YearStat{
+			Year:           year,
+			ActivityCount:  row.ActivityCount,
+			TotalDistance:  row.TotalDistance,
+			TotalTime:      row.TotalTime,
+			TotalElevation: row.TotalElevation,
 		}
-		yearly = append(yearly, s)
 	}
-
-	return yearly, rows.Err()
+	return yearly, nil
 }
 
 // GetHeatmapData returns activities with polylines for heatmap visualization.

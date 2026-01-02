@@ -6,9 +6,46 @@ SELECT
     COUNT(*) AS total_activities,
     COALESCE(SUM(distance), 0) AS total_distance,
     COALESCE(SUM(moving_time), 0) AS total_time,
-    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation,
+    COALESCE(SUM(calories), 0) AS total_calories
 FROM activities
 WHERE athlete_id = ?1;
+
+-- name: GetDashboardStatsFromDate :one
+-- Get athlete statistics from a specific date.
+SELECT
+    COUNT(*) AS total_activities,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+WHERE athlete_id = ?1 AND DATE(start_date_local) >= ?2;
+
+-- name: GetStatsBySportType :many
+-- Get statistics grouped by sport type.
+SELECT
+    sport_type,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+WHERE athlete_id = ?1
+GROUP BY sport_type
+ORDER BY activity_count DESC;
+
+-- name: GetStatsBySportTypeFromDate :many
+-- Get statistics grouped by sport type from a specific date.
+SELECT
+    sport_type,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+WHERE athlete_id = ?1 AND DATE(start_date_local) >= ?2
+GROUP BY sport_type
+ORDER BY total_distance DESC;
 
 -- name: GetWeeklyStats :many
 -- Get weekly statistics for the last 12 weeks.
@@ -78,3 +115,31 @@ SELECT
 FROM v_yearly_stats
 WHERE athlete_id = ?1
 ORDER BY year DESC;
+
+-- name: GetDashboardConfig :one
+-- Get dashboard config for an athlete.
+SELECT config
+FROM dashboard_config
+WHERE athlete_id = ?1;
+
+-- name: UpsertDashboardConfig :exec
+-- Insert or update dashboard config.
+INSERT INTO dashboard_config (athlete_id, config, updated_at)
+VALUES (?1, ?2, ?3)
+ON CONFLICT (athlete_id) DO UPDATE SET
+    config = EXCLUDED.config,
+    updated_at = EXCLUDED.updated_at;
+
+-- name: GetTrainingGoalsConfig :one
+-- Get training goals config for an athlete.
+SELECT config
+FROM training_goals
+WHERE athlete_id = ?1;
+
+-- name: UpsertTrainingGoalsConfig :exec
+-- Insert or update training goals config.
+INSERT INTO training_goals (athlete_id, config, updated_at)
+VALUES (?1, ?2, ?3)
+ON CONFLICT (athlete_id) DO UPDATE SET
+    config = EXCLUDED.config,
+    updated_at = EXCLUDED.updated_at;

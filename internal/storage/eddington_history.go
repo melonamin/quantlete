@@ -13,54 +13,70 @@ type EddingtonHistoryPoint struct {
 
 // GetEddingtonHistory returns milestone points where the Eddington number increases.
 func (r *StatsRepository) GetEddingtonHistory(ctx context.Context, athleteID int64, sportTypes []string) ([]EddingtonHistoryPoint, error) {
-	query := `
-		SELECT
-			strftime('%Y-%m-%d', start_date_local) AS day,
-			SUM(distance) / 1000.0 AS distance_km
-		FROM activities
-		WHERE athlete_id = ?
-	`
-	args := []any{athleteID}
-	if len(sportTypes) > 0 {
+	type dayRow struct {
+		Day time.Time
+		KM  float64
+	}
+	var days []dayRow
+
+	if len(sportTypes) == 0 {
+		// Use generated query for the base case
+		q := NewQueries(r.db.Conn())
+		rows, err := q.GetEddingtonDaysChronological(ctx, athleteID)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			t, err := time.Parse("2006-01-02", row.Date)
+			if err != nil {
+				continue
+			}
+			days = append(days, dayRow{Day: t, KM: row.DistanceKm})
+		}
+	} else {
+		// Dynamic IN clause requires raw SQL
+		query := `
+			SELECT
+				strftime('%Y-%m-%d', start_date_local) AS day,
+				SUM(distance) / 1000.0 AS distance_km
+			FROM activities
+			WHERE athlete_id = ?
+		`
+		args := []any{athleteID}
 		placeholders := make([]string, len(sportTypes))
 		for i, st := range sportTypes {
 			placeholders[i] = "?"
 			args = append(args, st)
 		}
 		query += " AND sport_type IN (" + JoinStrings(placeholders, ",") + ")"
-	}
-	query += `
-		GROUP BY day
-		HAVING distance_km > 0
-		ORDER BY day ASC
-	`
+		query += `
+			GROUP BY day
+			HAVING distance_km > 0
+			ORDER BY day ASC
+		`
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	type dayRow struct {
-		Day time.Time
-		KM  float64
-	}
-	var days []dayRow
-	for rows.Next() {
-		var d dayRow
-		var dayStr string
-		if err := rows.Scan(&dayStr, &d.KM); err != nil {
+		rows, err := r.db.QueryContext(ctx, query, args...)
+		if err != nil {
 			return nil, err
 		}
-		t, err := time.Parse("2006-01-02", dayStr)
-		if err != nil {
-			continue
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var d dayRow
+			var dayStr string
+			if err := rows.Scan(&dayStr, &d.KM); err != nil {
+				return nil, err
+			}
+			t, err := time.Parse("2006-01-02", dayStr)
+			if err != nil {
+				continue
+			}
+			d.Day = t
+			days = append(days, d)
 		}
-		d.Day = t
-		days = append(days, d)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
 	}
 
 	// countsGE[k] = number of days with distance_km >= k (k in whole km).

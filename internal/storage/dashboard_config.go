@@ -70,18 +70,18 @@ func NewDashboardConfigRepository(db *DB) *DashboardConfigRepository {
 }
 
 func (r *DashboardConfigRepository) Get(ctx context.Context, athleteID int64) (*DashboardConfig, error) {
-	var raw []byte
-	err := r.db.QueryRowContext(ctx, "SELECT config FROM dashboard_config WHERE athlete_id = ?", athleteID).Scan(&raw)
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetDashboardConfig(ctx, athleteID)
 	if err != nil {
-		if isNotFound(err) {
-			cfg := DefaultDashboardConfig()
-			return &cfg, nil
-		}
 		return nil, err
+	}
+	if row == nil {
+		cfg := DefaultDashboardConfig()
+		return &cfg, nil
 	}
 
 	var cfg DashboardConfig
-	if err := json.Unmarshal(raw, &cfg); err != nil {
+	if err := json.Unmarshal([]byte(row.Config), &cfg); err != nil {
 		return nil, fmt.Errorf("decoding dashboard config: %w", err)
 	}
 	if cfg.Version == 0 {
