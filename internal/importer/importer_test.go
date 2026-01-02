@@ -2,6 +2,7 @@ package importer
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -353,5 +354,167 @@ func TestIsResourceGoneError(t *testing.T) {
 				t.Errorf("isResourceGoneError(%v) = %v, want %v", tt.err, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestSubscribe_Basic(t *testing.T) {
+	imp := &Importer{}
+
+	ch := make(chan Event, 10)
+	unsubscribe := imp.Subscribe(ch)
+
+	// Should have one subscriber
+	imp.subscribersMu.RLock()
+	if len(imp.subscribers) != 1 {
+		t.Errorf("expected 1 subscriber, got %d", len(imp.subscribers))
+	}
+	imp.subscribersMu.RUnlock()
+
+	// Unsubscribe should remove and close channel
+	unsubscribe()
+
+	imp.subscribersMu.RLock()
+	if len(imp.subscribers) != 0 {
+		t.Errorf("expected 0 subscribers after unsubscribe, got %d", len(imp.subscribers))
+	}
+	imp.subscribersMu.RUnlock()
+
+	// Channel should be closed
+	_, ok := <-ch
+	if ok {
+		t.Error("channel should be closed after unsubscribe")
+	}
+}
+
+func TestSubscribe_MultipleUnsubscribeCalls(t *testing.T) {
+	imp := &Importer{}
+
+	ch := make(chan Event, 10)
+	unsubscribe := imp.Subscribe(ch)
+
+	// Multiple unsubscribe calls should be safe (no panic)
+	unsubscribe()
+	unsubscribe()
+	unsubscribe()
+
+	imp.subscribersMu.RLock()
+	if len(imp.subscribers) != 0 {
+		t.Errorf("expected 0 subscribers, got %d", len(imp.subscribers))
+	}
+	imp.subscribersMu.RUnlock()
+}
+
+func TestSubscribe_ConcurrentUnsubscribe(t *testing.T) {
+	imp := &Importer{}
+
+	// Subscribe multiple channels
+	var unsubscribes []func()
+	for i := 0; i < 100; i++ {
+		ch := make(chan Event, 10)
+		unsubscribes = append(unsubscribes, imp.Subscribe(ch))
+	}
+
+	// Unsubscribe all concurrently - should not panic
+	var wg sync.WaitGroup
+	for _, unsub := range unsubscribes {
+		wg.Add(1)
+		go func(unsub func()) {
+			defer wg.Done()
+			unsub()
+		}(unsub)
+	}
+	wg.Wait()
+
+	imp.subscribersMu.RLock()
+	if len(imp.subscribers) != 0 {
+		t.Errorf("expected 0 subscribers after concurrent unsubscribe, got %d", len(imp.subscribers))
+	}
+	imp.subscribersMu.RUnlock()
+}
+
+func TestEmitEvent_ToSubscribers(t *testing.T) {
+	imp := &Importer{}
+
+	ch1 := make(chan Event, 10)
+	ch2 := make(chan Event, 10)
+	unsub1 := imp.Subscribe(ch1)
+	unsub2 := imp.Subscribe(ch2)
+	defer unsub1()
+	defer unsub2()
+
+	// Emit an event
+	event := Event{Type: EventSyncProgress, Data: "test"}
+	imp.emitEvent(event)
+
+	// Both channels should receive the event
+	select {
+	case e := <-ch1:
+		if e.Type != EventSyncProgress {
+			t.Errorf("expected EventSyncProgress, got %s", e.Type)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("ch1 did not receive event")
+	}
+
+	select {
+	case e := <-ch2:
+		if e.Type != EventSyncProgress {
+			t.Errorf("expected EventSyncProgress, got %s", e.Type)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("ch2 did not receive event")
+	}
+}
+
+func TestEmitEvent_DropsOnFullChannel(t *testing.T) {
+	imp := &Importer{}
+
+	// Create a channel with no buffer
+	ch := make(chan Event)
+	unsub := imp.Subscribe(ch)
+	defer unsub()
+
+	// Emit should not block even if channel is full
+	done := make(chan bool)
+	go func() {
+		imp.emitEvent(Event{Type: EventSyncProgress, Data: "test"})
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// Good - emit didn't block
+	case <-time.After(100 * time.Millisecond):
+		t.Error("emitEvent blocked on full channel")
+	}
+}
+
+func TestShouldEmitProgress(t *testing.T) {
+	imp := &Importer{}
+
+	// Should emit on batch boundary
+	if !imp.shouldEmitProgress(eventBatchSize) {
+		t.Error("should emit at eventBatchSize")
+	}
+	if !imp.shouldEmitProgress(eventBatchSize * 2) {
+		t.Error("should emit at 2*eventBatchSize")
+	}
+
+	// Should not emit mid-batch (when time hasn't elapsed)
+	imp.eventMu.Lock()
+	imp.lastEventEmitTime = time.Now()
+	imp.eventMu.Unlock()
+
+	if imp.shouldEmitProgress(1) {
+		t.Error("should not emit at 1 when time hasn't elapsed")
+	}
+
+	// Should emit when time threshold exceeded
+	imp.eventMu.Lock()
+	imp.lastEventEmitTime = time.Now().Add(-eventFlushInterval - time.Second)
+	imp.eventMu.Unlock()
+
+	if !imp.shouldEmitProgress(1) {
+		t.Error("should emit when time threshold exceeded")
 	}
 }

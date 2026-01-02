@@ -211,6 +211,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
 	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, streamRepo, stravaClient)
 	importHandler := handlers.NewImportHandler(imp, syncHistoryRepo, stravaClient)
+	importHandler.SetAllowedOrigins(allowedOrigins) // Configure CORS for SSE endpoint
 	dashboardHandler := handlers.NewDashboardHandler(statsRepo, dashboardConfigRepo, stravaClient)
 	goalsHandler := handlers.NewGoalsHandler(goalsRepo, stravaClient)
 	athleteHandler := handlers.NewAthleteHandler(metricsRepo, stravaClient)
@@ -298,6 +299,7 @@ func (r *Router) mountRoutes() {
 		router.Route("/import", func(router chi.Router) {
 			router.Post("/start", r.importHandler.Start)
 			router.Get("/progress", r.importHandler.Progress)
+			router.Get("/events", r.importHandler.Events) // SSE endpoint for real-time updates
 			router.Post("/cancel", r.importHandler.Cancel)
 			router.Post("/pause", r.importHandler.Pause)
 			router.Post("/resume", r.importHandler.Resume)

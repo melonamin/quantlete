@@ -97,7 +97,9 @@ import {
   getLatestSync as stravaGetLatestSync,
   getRateLimitInfo,
   backfillPowerBests,
+  subscribeToImportEvents,
 } from '@/lib/wasm/strava'
+import type { DataEventListener } from '../events'
 import type { SyncRun as ApiSyncRun, SyncWatermark } from '@/lib/api/import'
 import { fetchOpenMeteoWeather, computeFromTempStream } from '@/lib/wasm/weather'
 import { getCredentials, saveCredentials, hasCredentials } from '@/lib/wasm/strava/credentials'
@@ -106,8 +108,6 @@ export class WasmProvider implements DataProvider {
   private athleteId: number | null = null
 
   async initialize(): Promise<void> {
-    console.log('[WasmProvider] Initializing...')
-
     // Initialize database and WASM algorithms in parallel
     const [db] = await Promise.all([initializeDatabase(), initAlgorithms()])
 
@@ -118,7 +118,6 @@ export class WasmProvider implements DataProvider {
     if (authLoaded) {
       const athlete = getAthlete()
       this.athleteId = athlete?.id ?? null
-      console.log('[WasmProvider] Loaded auth', { athleteId: this.athleteId })
 
       // Backfill power bests for existing activities (runs in background)
       backfillPowerBests().catch((err) => {
@@ -129,8 +128,6 @@ export class WasmProvider implements DataProvider {
       const athleteRow = this.db.queryOne<{ id: number }>('SELECT id FROM athletes LIMIT 1')
       this.athleteId = athleteRow?.id ?? null
     }
-
-    console.log('[WasmProvider] Ready', { athleteId: this.athleteId, authenticated: isAuthenticated() })
   }
 
   private assertInitialized(): WasmDatabase {
@@ -2696,13 +2693,13 @@ export class WasmProvider implements DataProvider {
   async getImportProgress(): Promise<ImportProgress> {
     const progress = stravaGetImportProgress()
 
-    // Map status values between browser importer and API types
+    // Status values are now consistent between browser importer and API types
     const statusMap: Record<string, ImportProgress['status']> = {
       idle: 'idle',
       running: 'running',
-      complete: 'completed',
-      error: 'failed',
-      cancelled: 'canceled',
+      completed: 'completed',
+      failed: 'failed',
+      canceled: 'canceled',
       paused: 'paused',
     }
 
@@ -2906,5 +2903,12 @@ export class WasmProvider implements DataProvider {
   async updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus> {
     await saveCredentials(req.client_id, req.client_secret)
     return this.getCredentialsStatus()
+  }
+
+  // ============================================================================
+  // Events (Reactive Updates)
+  // ============================================================================
+  subscribeToEvents(listener: DataEventListener): () => void {
+    return subscribeToImportEvents(listener)
   }
 }

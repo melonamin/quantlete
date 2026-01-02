@@ -52,7 +52,6 @@ export function OAuthCallbackPage() {
       // Prevent double execution - check before any async work
       if (processedRef.current) return
 
-      console.log('[OAuth] handleCallback called', { initialized, hasProvider: !!provider, providerError })
       setDebugInfo(`initialized=${initialized}, provider=${!!provider}, error=${providerError || 'none'}`)
 
       // Check for provider initialization error
@@ -99,13 +98,10 @@ export function OAuthCallbackPage() {
 
       try {
         setDebugInfo('Exchanging code for tokens...')
-        console.log('[OAuth] Exchanging code for tokens')
 
         // Exchange code for tokens via Strava client
         const redirectUri = `${window.location.origin}/oauth/callback`
         await exchangeCode(search.code, redirectUri)
-
-        console.log('[OAuth] Token exchange successful')
 
         // Invalidate auth-related caches immediately to ensure all components
         // see the updated auth state (fixes race condition with Settings page)
@@ -121,9 +117,7 @@ export function OAuthCallbackPage() {
         setDebugInfo('Starting initial sync...')
         try {
           await startImportRef.current.mutateAsync({})
-          console.log('[OAuth] Import started')
-        } catch (importErr) {
-          console.error('[OAuth] Failed to start import:', importErr)
+        } catch {
           // Don't fail the auth flow if import fails to start
         }
 

@@ -6,25 +6,48 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/melonamin/quantlete/internal/importer"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
+// sseChannelBuffer is the buffer size for SSE event channels.
+// With eventBatchSize=25 and ~1000 items/second throughput, this provides
+// ~2.5 seconds of buffer before events are dropped. Adjust if you see
+// "SSE event dropped" log messages frequently.
+const sseChannelBuffer = 100
+
+// sseKeepaliveInterval is the interval for sending keepalive comments to SSE clients.
+// Most reverse proxies (nginx, cloudflare) have 60s default timeouts.
+// We use 30s to provide a safety margin for network latency.
+const sseKeepaliveInterval = 30 * time.Second
+
 // ImportHandler handles import-related endpoints.
 type ImportHandler struct {
-	importer     *importer.Importer
-	syncHistory  *storage.SyncHistoryRepository
-	stravaClient *strava.Client
+	importer       *importer.Importer
+	syncHistory    *storage.SyncHistoryRepository
+	stravaClient   *strava.Client
+	allowedOrigins map[string]bool
 }
 
 // NewImportHandler creates a new import handler.
 func NewImportHandler(imp *importer.Importer, syncHistory *storage.SyncHistoryRepository, stravaClient *strava.Client) *ImportHandler {
 	return &ImportHandler{
-		importer:     imp,
-		syncHistory:  syncHistory,
-		stravaClient: stravaClient,
+		importer:       imp,
+		syncHistory:    syncHistory,
+		stravaClient:   stravaClient,
+		allowedOrigins: make(map[string]bool),
+	}
+}
+
+// SetAllowedOrigins configures the allowed origins for CORS on the SSE endpoint.
+// This should be called after creation to set the allowed origins list.
+func (h *ImportHandler) SetAllowedOrigins(origins []string) {
+	h.allowedOrigins = make(map[string]bool, len(origins))
+	for _, o := range origins {
+		h.allowedOrigins[o] = true
 	}
 }
 
@@ -87,6 +110,100 @@ func (h *ImportHandler) Progress(w http.ResponseWriter, r *http.Request) {
 
 	progress := h.importer.Progress()
 	writeJSON(w, http.StatusOK, progress)
+}
+
+// Events handles GET /api/v1/import/events (SSE endpoint for real-time updates)
+func (h *ImportHandler) Events(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Create channel and subscribe early so we can defer unsubscribe before any panics
+	events := make(chan importer.Event, sseChannelBuffer)
+	unsubscribe := h.importer.Subscribe(events)
+
+	// Ensure cleanup happens even if handler panics
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("SSE handler panic", "error", r, "athlete_id", athlete.ID)
+		}
+		unsubscribe()
+	}()
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	// CORS headers for SSE (allows cross-origin EventSource)
+	// Only reflect origin if it's in the allowed origins list to prevent
+	// arbitrary origins from accessing authenticated SSE streams.
+	origin := r.Header.Get("Origin")
+	if origin != "" && h.allowedOrigins[origin] {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "SSE not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Send initial progress
+	progress := h.importer.Progress()
+	if err := sendSSEEvent(w, flusher, string(importer.EventSyncProgress), progress); err != nil {
+		slog.Debug("SSE: failed to send initial progress", "error", err)
+		return
+	}
+
+	// Start keepalive ticker to prevent connection timeouts
+	ticker := time.NewTicker(sseKeepaliveInterval)
+	defer ticker.Stop()
+
+	// Stream events until client disconnects
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Debug("SSE: client disconnected")
+			return
+		case <-ticker.C:
+			// Send SSE comment as keepalive (: prefix indicates comment)
+			if _, err := w.Write([]byte(": keepalive\n\n")); err != nil {
+				slog.Debug("SSE: keepalive failed, client disconnected", "error", err)
+				return
+			}
+			flusher.Flush()
+		case event, ok := <-events:
+			if !ok {
+				slog.Debug("SSE: event channel closed")
+				return
+			}
+			if err := sendSSEEvent(w, flusher, string(event.Type), event.Data); err != nil {
+				slog.Debug("SSE: failed to send event", "error", err)
+				return
+			}
+		}
+	}
+}
+
+// sendSSEEvent sends a single SSE event to the client.
+func sendSSEEvent(w http.ResponseWriter, f http.Flusher, eventType string, data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte("event: " + eventType + "\ndata: " + string(jsonData) + "\n\n"))
+	if err != nil {
+		return err
+	}
+	f.Flush()
+	return nil
 }
 
 // Cancel handles POST /api/v1/import/cancel

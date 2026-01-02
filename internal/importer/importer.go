@@ -27,6 +27,37 @@ const (
 	StatusCanceled  Status = "canceled"
 )
 
+// Event types for SSE streaming.
+type EventType string
+
+const (
+	EventSyncProgress EventType = "sync:progress"
+	EventSyncComplete EventType = "sync:complete"
+	EventDataChanged  EventType = "data:changed"
+)
+
+// Event represents an import event for SSE streaming.
+type Event struct {
+	Type EventType   `json:"type"`
+	Data interface{} `json:"data"`
+}
+
+// DataChangeSet represents what data types changed.
+type DataChangeSet struct {
+	Activities bool `json:"activities,omitempty"`
+	Streams    bool `json:"streams,omitempty"`
+	Segments   bool `json:"segments,omitempty"`
+	Gear       bool `json:"gear,omitempty"`
+	Photos     bool `json:"photos,omitempty"`
+	All        bool `json:"all,omitempty"`
+}
+
+// SyncCompleteData contains data for sync complete events.
+type SyncCompleteData struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
 // Progress tracks import progress.
 type Progress struct {
 	Status      Status    `json:"status"`
@@ -111,6 +142,14 @@ type Importer struct {
 	mu       sync.RWMutex // Protects progress
 	progress Progress
 	cancel   context.CancelFunc
+
+	// Subscribers for SSE event streaming.
+	subscribersMu sync.RWMutex
+	subscribers   []chan Event
+
+	// Time-based flush tracking (protected by eventMu).
+	eventMu           sync.Mutex
+	lastEventEmitTime time.Time
 }
 
 // New creates a new importer.
@@ -241,6 +280,11 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 	}
 	i.mu.Unlock()
 
+	// Reset event emit time under its own mutex
+	i.eventMu.Lock()
+	i.lastEventEmitTime = time.Now()
+	i.eventMu.Unlock()
+
 	// Run import in background
 	go func() {
 		defer func() {
@@ -277,6 +321,8 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 			slog.Error("import failed", "error", err)
 			if ctx.Err() == context.Canceled {
 				i.progress.Status = StatusCanceled
+				// Emit canceled event
+				i.emitSyncComplete("canceled", "")
 				// Log canceled run
 				if i.syncHistory != nil && i.currentRunID > 0 {
 					if logErr := i.syncHistory.CancelRun(context.Background(), i.currentRunID, counts); logErr != nil {
@@ -286,6 +332,8 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 			} else {
 				i.progress.Status = StatusFailed
 				i.progress.Error = err.Error()
+				// Emit failed event
+				i.emitSyncComplete("failed", err.Error())
 				// Log failed run
 				if i.syncHistory != nil && i.currentRunID > 0 {
 					if logErr := i.syncHistory.FailRun(context.Background(), i.currentRunID, err.Error(), counts); logErr != nil {
@@ -296,6 +344,10 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 		} else {
 			i.progress.Status = StatusCompleted
 			i.progress.Phase = PhaseCompleted
+
+			// Emit completed event and data changed
+			i.emitSyncComplete("completed", "")
+			i.emitDataChanged(DataChangeSet{All: true})
 
 			// Log completed run
 			if i.syncHistory != nil && i.currentRunID > 0 {
@@ -373,6 +425,110 @@ func (i *Importer) Progress() Progress {
 	return i.progress
 }
 
+// Subscribe registers a channel to receive import events.
+// Returns an unsubscribe function that closes the channel and removes it.
+// The unsubscribe function is safe to call multiple times.
+// Note: Only the importer (via unsubscribe) closes subscription channels;
+// external callers must not close them directly.
+func (i *Importer) Subscribe(ch chan Event) func() {
+	i.subscribersMu.Lock()
+	i.subscribers = append(i.subscribers, ch)
+	i.subscribersMu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			i.subscribersMu.Lock()
+			defer i.subscribersMu.Unlock()
+			for idx, sub := range i.subscribers {
+				if sub == ch {
+					i.subscribers = append(i.subscribers[:idx], i.subscribers[idx+1:]...)
+					close(ch)
+					return
+				}
+			}
+			// Channel not found in subscribers list - already removed by a previous call.
+			// Do NOT close here to avoid double-close panic. The sync.Once ensures
+			// this branch only executes if unsubscribe was somehow called after the
+			// channel was already removed (shouldn't happen with proper usage).
+		})
+	}
+}
+
+// emitEvent sends an event to all subscribers (non-blocking, best-effort delivery).
+// Events are dropped without blocking if a subscriber's channel is full.
+// This prevents slow subscribers from blocking the import process.
+func (i *Importer) emitEvent(event Event) {
+	i.subscribersMu.RLock()
+	defer i.subscribersMu.RUnlock()
+
+	for _, ch := range i.subscribers {
+		select {
+		case ch <- event:
+		default:
+			// Channel full, drop event (non-blocking to avoid backpressure)
+			slog.Debug("SSE event dropped: subscriber channel full", "type", event.Type)
+		}
+	}
+}
+
+// emitProgress sends a sync:progress event with current progress.
+func (i *Importer) emitProgress() {
+	progress := i.Progress()
+	i.emitEvent(Event{
+		Type: EventSyncProgress,
+		Data: progress,
+	})
+	i.eventMu.Lock()
+	i.lastEventEmitTime = time.Now()
+	i.eventMu.Unlock()
+}
+
+// shouldEmitProgress checks if we should emit a progress event based on batch count or time elapsed.
+// Returns true if either:
+// - itemsDone is a multiple of eventBatchSize (batch threshold)
+// - More than eventFlushInterval has elapsed since last emit (time threshold)
+func (i *Importer) shouldEmitProgress(itemsDone int) bool {
+	if itemsDone%eventBatchSize == 0 {
+		return true
+	}
+	i.eventMu.Lock()
+	elapsed := time.Since(i.lastEventEmitTime)
+	i.eventMu.Unlock()
+	return elapsed >= eventFlushInterval
+}
+
+// emitDataChanged sends a data:changed event.
+func (i *Importer) emitDataChanged(changes DataChangeSet) {
+	i.emitEvent(Event{
+		Type: EventDataChanged,
+		Data: changes,
+	})
+}
+
+// emitSyncComplete sends a sync:complete event.
+func (i *Importer) emitSyncComplete(status, errMsg string) {
+	i.emitEvent(Event{
+		Type: EventSyncComplete,
+		Data: SyncCompleteData{
+			Status: status,
+			Error:  errMsg,
+		},
+	})
+}
+
+// SSE Event Emission Constants
+// These constants control how frequently progress events are emitted to SSE subscribers.
+// IMPORTANT: Keep in sync with web/src/lib/wasm/strava/importer.ts
+// - eventBatchSize (25) <-> EVENT_BATCH_SIZE (25)
+// - eventFlushInterval (2s) <-> EVENT_FLUSH_INTERVAL_MS (2000)
+
+// eventBatchSize controls batch-based event emission (emit progress every N items).
+const eventBatchSize = 25
+
+// eventFlushInterval controls time-based event emission (emit if this much time elapsed).
+const eventFlushInterval = 2 * time.Second
+
 // runImport performs the actual import using a phased approach.
 func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 	slog.Info("starting phased import",
@@ -407,6 +563,8 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		}
 		i.state.Phase = PhaseGear
 		i.saveState(ctx)
+		i.emitDataChanged(DataChangeSet{Activities: true})
+		i.emitProgress()
 	}
 
 	// Phase 2: Gear (quick, needed for gear stats)
@@ -417,6 +575,8 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		}
 		i.state.Phase = PhaseStreams
 		i.saveState(ctx)
+		i.emitDataChanged(DataChangeSet{Gear: true})
+		i.emitProgress()
 	}
 
 	// Phase 3: Streams (enables training load, power analysis)
@@ -431,6 +591,8 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		}
 		i.state.Phase = PhaseActivityDetails
 		i.saveState(ctx)
+		i.emitDataChanged(DataChangeSet{Streams: true})
+		i.emitProgress()
 	}
 
 	// Phase 4: Activity Details (best efforts + segment efforts)
@@ -445,6 +607,8 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		}
 		i.state.Phase = PhaseSegmentDetails
 		i.saveState(ctx)
+		i.emitDataChanged(DataChangeSet{Segments: true})
+		i.emitProgress()
 	}
 
 	// Phase 5: Segment Details (for segments missing full data)
@@ -459,6 +623,8 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		}
 		i.state.Phase = PhasePhotos
 		i.saveState(ctx)
+		i.emitDataChanged(DataChangeSet{Segments: true})
+		i.emitProgress()
 	}
 
 	// Phase 6: Photos (cosmetic, last)
@@ -473,6 +639,8 @@ func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
 		}
 		i.state.Phase = PhaseCompleted
 		i.saveState(ctx)
+		i.emitDataChanged(DataChangeSet{Photos: true})
+		i.emitProgress()
 	}
 
 	slog.Info("import completed",
@@ -717,6 +885,12 @@ func (i *Importer) runActivitiesPhase(ctx context.Context, athleteID int64) erro
 
 			i.state.ActivitiesDone++
 
+			// Emit progress event periodically (batch or time-based)
+			if i.shouldEmitProgress(i.state.ActivitiesDone) {
+				i.updateProgress()
+				i.emitProgress()
+			}
+
 			// Track newest activity date for watermark
 			// Truncate to second precision to match Strava API (Unix timestamp)
 			if i.state.NewestActivityDate == nil || a.StartDate.After(*i.state.NewestActivityDate) {
@@ -805,6 +979,13 @@ func (i *Importer) runStreamsPhase(ctx context.Context) error {
 
 		i.state.StreamsLastIndex = idx + 1
 		i.updateProgress()
+
+		// Emit progress event periodically (batch or time-based)
+		if i.shouldEmitProgress(i.state.StreamsDone) {
+			i.emitProgress()
+			// Also emit data changed for incremental updates
+			i.emitDataChanged(DataChangeSet{Streams: true})
+		}
 
 		// Save state periodically
 		if idx%50 == 0 {

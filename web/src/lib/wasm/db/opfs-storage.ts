@@ -69,11 +69,9 @@ export class OPFSStorage {
         return null
       }
 
-      console.log(`[OPFS] Loaded database: ${buffer.byteLength} bytes`)
       return new Uint8Array(buffer)
     } catch (error) {
       if ((error as Error).name === 'NotFoundError') {
-        console.log('[OPFS] No existing database found')
         return null
       }
       throw error
@@ -97,7 +95,6 @@ export class OPFSStorage {
       new Uint8Array(buffer).set(data)
       await writable.write(buffer)
       await writable.close()
-      console.log(`[OPFS] Saved database: ${data.byteLength} bytes`)
     } catch (error) {
       await writable.abort()
       throw error
@@ -111,7 +108,6 @@ export class OPFSStorage {
     try {
       const dir = await this.getDirectory()
       await dir.removeEntry(this.fileName)
-      console.log('[OPFS] Database deleted')
     } catch (error) {
       if ((error as Error).name !== 'NotFoundError') {
         throw error
@@ -231,10 +227,7 @@ export class IndexedDBStorage {
  */
 export function getStorageBackend(): OPFSStorage | IndexedDBStorage {
   if (OPFSStorage.isSupported()) {
-    console.log('[Storage] Using OPFS backend')
     return new OPFSStorage()
   }
-
-  console.log('[Storage] OPFS not supported, falling back to IndexedDB')
   return new IndexedDBStorage()
 }

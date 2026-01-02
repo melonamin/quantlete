@@ -31,6 +31,7 @@ export {
   getSyncHistory,
   getLatestSync,
   backfillPowerBests,
+  subscribeToImportEvents,
   type ImportOptions,
   type ImportProgress,
   type SyncRun,

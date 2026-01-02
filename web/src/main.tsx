@@ -8,7 +8,7 @@ import { DataProviderWrapper } from '@/lib/data/context'
 import { WelcomeModal } from '@/components/onboarding/welcome-modal'
 import { SyncProgressModal } from '@/components/sync/sync-progress-modal'
 import { useSyncProtection } from '@/hooks/use-sync-protection'
-import { useSyncInvalidation } from '@/hooks/use-sync-invalidation'
+import { useDataEvents } from '@/hooks/use-data-events'
 import { useTheme } from '@/hooks/use-theme'
 import { registerServiceWorker } from '@/lib/pwa'
 import './index.css'
@@ -17,7 +17,7 @@ import './index.css'
 function SyncEffects() {
   useTheme()
   useSyncProtection() // Prevents accidental page refresh during sync
-  useSyncInvalidation() // Auto-refresh UI when sync imports data
+  useDataEvents() // Event-driven UI updates when data changes
   return null
 }
 

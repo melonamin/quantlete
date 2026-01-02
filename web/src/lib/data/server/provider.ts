@@ -91,8 +91,11 @@ import type {
   UpdateCredentialsRequest,
 } from '../types'
 import type { SyncRun, SyncWatermark } from '@/lib/api/import'
+import type { DataEventListener } from '../events'
+import { ImportSSEClient } from './sse-client'
 
 export class ServerProvider implements DataProvider {
+  private sseClient = new ImportSSEClient()
   // ============================================================================
   // Auth
   // ============================================================================
@@ -570,5 +573,12 @@ export class ServerProvider implements DataProvider {
 
   async updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus> {
     return put<CredentialsStatus>('/setup/credentials', req)
+  }
+
+  // ============================================================================
+  // Events (Reactive Updates)
+  // ============================================================================
+  subscribeToEvents(listener: DataEventListener): () => void {
+    return this.sseClient.subscribe(listener)
   }
 }

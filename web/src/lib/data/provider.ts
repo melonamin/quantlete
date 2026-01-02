@@ -94,6 +94,9 @@ import type {
 // Import SyncRun from API types
 import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
+// Import event types
+import type { DataEventListener } from './events'
+
 export interface DataProvider {
   // ============================================================================
   // Auth
@@ -250,4 +253,14 @@ export interface DataProvider {
   // ============================================================================
   getCredentialsStatus(): Promise<CredentialsStatus>
   updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus>
+
+  // ============================================================================
+  // Events (Reactive Updates)
+  // ============================================================================
+  /**
+   * Subscribe to data events for reactive UI updates.
+   * @param listener Callback function to receive events
+   * @returns Unsubscribe function
+   */
+  subscribeToEvents(listener: DataEventListener): () => void
 }

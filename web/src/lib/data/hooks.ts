@@ -532,13 +532,8 @@ export function useImportProgress(enabled = true) {
       return provider.getImportProgress()
     },
     enabled: enabled && initialized && !error && !!provider,
-    refetchInterval: (query) => {
-      const data = query.state.data
-      if (data?.status === 'running' || data?.status === 'paused') {
-        return 1000 // Poll every second while running or paused
-      }
-      return false
-    },
+    // Data is updated via events from useDataEvents hook
+    staleTime: Infinity,
   })
 }
 

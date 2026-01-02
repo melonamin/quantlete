@@ -13,14 +13,10 @@ async function loadSqlJs(): Promise<
   (config?: { locateFile?: (file: string) => string }) => Promise<SqlJsStatic>
 > {
   const sqljs = await import('sql.js')
-  console.log('[sql.js] Module loaded:', Object.keys(sqljs))
-  console.log('[sql.js] default:', typeof sqljs.default)
-  console.log('[sql.js] Module.default:', sqljs.default ? Object.keys(sqljs.default) : 'N/A')
 
   // sql.js can export in different ways depending on bundler
   // Try different access patterns
   const initFn = sqljs.default?.default || sqljs.default || sqljs
-  console.log('[sql.js] initFn type:', typeof initFn)
 
   if (typeof initFn !== 'function') {
     throw new Error(`sql.js did not export a function. Got: ${typeof initFn}, keys: ${Object.keys(sqljs)}`)
@@ -64,8 +60,6 @@ export class WasmDatabase {
    * Loads existing data from storage or creates a new database.
    */
   async initialize(): Promise<void> {
-    console.log('[WasmDatabase] Initializing...')
-
     // Load sql.js
     const initSqlJs = await loadSqlJs()
     this.SQL = await initSqlJs({
@@ -76,11 +70,9 @@ export class WasmDatabase {
     const existingData = await this.storage.load()
 
     if (existingData) {
-      console.log('[WasmDatabase] Loading existing database')
       this.db = new this.SQL.Database(existingData)
       await this.checkMigrations()
     } else {
-      console.log('[WasmDatabase] Creating new database')
       this.db = new this.SQL.Database()
       await this.runMigrations()
     }
@@ -93,8 +85,6 @@ export class WasmDatabase {
         }
       }, this.autoPersistInterval)
     }
-
-    console.log('[WasmDatabase] Ready')
   }
 
   /**
@@ -119,9 +109,6 @@ export class WasmDatabase {
     const latestVersion = migrations[migrations.length - 1]?.version || 0
 
     if (currentVersion < latestVersion) {
-      console.log(
-        `[WasmDatabase] Schema upgrade needed: ${currentVersion} -> ${latestVersion}`
-      )
       await this.runMigrations(currentVersion)
     }
   }
@@ -130,17 +117,20 @@ export class WasmDatabase {
    * Run database migrations starting from a specific version.
    */
   private async runMigrations(fromVersion: number = 0): Promise<void> {
-    console.log(`[WasmDatabase] Running migrations from version ${fromVersion}...`)
-
     for (const migration of migrations) {
       if (migration.version > fromVersion) {
-        console.log(`[WasmDatabase] Applying migration ${migration.version}: ${migration.name}`)
-        this.exec(migration.sql)
+        this.runMigrationSql(migration.sql)
         this.dirty = true
       }
     }
+  }
 
-    console.log('[WasmDatabase] Migrations complete')
+  private runMigrationSql(sql: string): void {
+    if (!this.db) {
+      throw new Error('Database not initialized')
+    }
+    // Use db.exec for multi-statement migration scripts
+    this.db.exec(sql)
   }
 
   /**
@@ -315,8 +305,6 @@ export class WasmDatabase {
       this.db.close()
       this.db = null
     }
-
-    console.log('[WasmDatabase] Closed')
   }
 
   /**

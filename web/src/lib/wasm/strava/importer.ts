@@ -22,6 +22,13 @@ import {
   hasResumableState,
   type ImportState,
 } from './import-state'
+import {
+  DataEventEmitter,
+  createSyncProgressEvent,
+  createSyncCompleteEvent,
+  createDataChangedEvent,
+  type DataEventListener,
+} from '@/lib/data/events'
 
 // Standard durations for power curve (matching Go backend)
 const POWER_DURATIONS = [5, 10, 30, 60, 300, 480, 1200, 3600]
@@ -53,7 +60,7 @@ export interface ImportOptions {
 }
 
 export interface ImportProgress {
-  status: 'idle' | 'running' | 'complete' | 'error' | 'cancelled' | 'paused'
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'canceled' | 'paused'
   phase: ImportPhase
   error?: string
   sync_run_id?: number
@@ -261,12 +268,78 @@ let cancelRequested = false
 let pauseRequested = false
 let etaState: ETAState = createETAEstimator()
 
+// Event emitter for reactive updates
+const importEventEmitter = new DataEventEmitter()
+
+// SSE Event Emission Constants
+// These constants control how frequently progress events are emitted.
+// IMPORTANT: Keep in sync with internal/importer/importer.go
+// - EVENT_BATCH_SIZE (25) <-> eventBatchSize (25)
+// - EVENT_FLUSH_INTERVAL_MS (2000) <-> eventFlushInterval (2s)
+
+// EVENT_BATCH_SIZE controls batch-based event emission (emit progress every N items).
+const EVENT_BATCH_SIZE = 25
+
+// EVENT_FLUSH_INTERVAL_MS controls time-based event emission (emit if this much time elapsed).
+const EVENT_FLUSH_INTERVAL_MS = 2000
+
+// Track last event emission time for time-based flush
+let lastEventEmitTime = 0
+
 // ============================================================================
 // Public API
 // ============================================================================
 
 export function getImportProgress(): ImportProgress {
   return { ...importProgress }
+}
+
+/**
+ * Subscribe to import events for reactive UI updates.
+ * @returns Unsubscribe function
+ */
+export function subscribeToImportEvents(listener: DataEventListener): () => void {
+  return importEventEmitter.subscribe(listener)
+}
+
+/**
+ * Emit a sync progress event with current state.
+ */
+function emitProgressEvent(): void {
+  const event = createSyncProgressEvent(importProgress.phase, {
+    activities_done: importProgress.activities_done,
+    activities_total: importProgress.activities_total,
+    gear_done: importProgress.gear_done,
+    gear_total: importProgress.gear_total,
+    streams_done: importProgress.streams_done,
+    streams_total: importProgress.streams_total,
+    details_done: importProgress.details_done,
+    details_total: importProgress.details_total,
+    segments_done: importProgress.segments_done,
+    segments_total: importProgress.segments_total,
+    photos_done: importProgress.photos_done,
+    photos_total: importProgress.photos_total,
+    estimated_eta: importProgress.estimated_eta,
+  })
+  importEventEmitter.emit(event)
+  lastEventEmitTime = Date.now()
+}
+
+/**
+ * Check if we should emit a progress event based on batch count or time elapsed.
+ * Emits if either:
+ * - itemsDone is a multiple of EVENT_BATCH_SIZE (batch threshold)
+ * - More than EVENT_FLUSH_INTERVAL_MS has elapsed since last emit (time threshold)
+ */
+function shouldEmitProgress(itemsDone: number): boolean {
+  if (itemsDone % EVENT_BATCH_SIZE === 0) {
+    return true
+  }
+  const now = Date.now()
+  if (now - lastEventEmitTime >= EVENT_FLUSH_INTERVAL_MS) {
+    return true
+  }
+  return false
 }
 
 export function cancelImport(): void {
@@ -300,7 +373,7 @@ export function cancelImport(): void {
       } catch (err) {
         console.error('[Import] Failed to update sync_history on cancel:', err)
       }
-      importProgress.status = 'cancelled'
+      importProgress.status = 'canceled'
     }
   }
 }
@@ -593,6 +666,7 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   cancelRequested = false
   pauseRequested = false
   etaState = createETAEstimator()
+  lastEventEmitTime = Date.now() // Reset for time-based flush
   const db = getDatabase()
   const athleteId = athlete.id
   const startedAt = new Date().toISOString()
@@ -725,6 +799,9 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       if (cancelRequested) throw new Error('Cancelled')
       if (pauseRequested) throw new Error('Paused')
       await db.persist()
+      // Emit data changed event for activities
+      importEventEmitter.emit(createDataChangedEvent({ activities: true }))
+      emitProgressEvent()
     }
 
     // Phase 2: Gear (skip if resuming past this phase)
@@ -733,6 +810,9 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       if (cancelRequested) throw new Error('Cancelled')
       if (pauseRequested) throw new Error('Paused')
       await db.persist()
+      // Emit data changed event for gear
+      importEventEmitter.emit(createDataChangedEvent({ gear: true }))
+      emitProgressEvent()
     }
 
     // Phase 3: Streams
@@ -741,6 +821,9 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       if (cancelRequested) throw new Error('Cancelled')
       if (pauseRequested) throw new Error('Paused')
       await db.persist()
+      // Emit data changed event for streams
+      importEventEmitter.emit(createDataChangedEvent({ streams: true }))
+      emitProgressEvent()
     }
 
     // Phase 4: Activity Details (segment efforts + best efforts)
@@ -749,6 +832,9 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       if (cancelRequested) throw new Error('Cancelled')
       if (pauseRequested) throw new Error('Paused')
       await db.persist()
+      // Emit data changed event for segments
+      importEventEmitter.emit(createDataChangedEvent({ segments: true }))
+      emitProgressEvent()
     }
 
     // Phase 5: Segment Details (for incomplete segments)
@@ -757,6 +843,8 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       if (cancelRequested) throw new Error('Cancelled')
       if (pauseRequested) throw new Error('Paused')
       await db.persist()
+      // Segment details just updates existing segments
+      emitProgressEvent()
     }
 
     // Phase 6: Photos
@@ -765,12 +853,19 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       if (cancelRequested) throw new Error('Cancelled')
       if (pauseRequested) throw new Error('Paused')
       await db.persist()
+      // Emit data changed event for photos
+      importEventEmitter.emit(createDataChangedEvent({ photos: true }))
+      emitProgressEvent()
     }
 
     // Complete - clear saved state
     clearImportState()
-    importProgress.status = 'complete'
+    importProgress.status = 'completed'
     importProgress.phase = 'complete'
+
+    // Emit sync complete event
+    importEventEmitter.emit(createSyncCompleteEvent('completed'))
+    importEventEmitter.emit(createDataChangedEvent({ all: true }))
 
     // Update sync history
     if (syncRunId) {
@@ -803,14 +898,20 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
       // Pause was requested - state already saved, clear flag and return
       pauseRequested = false
       console.log('[Import] Paused')
+      // Emit paused event
+      importEventEmitter.emit(createSyncCompleteEvent('paused'))
       return
     } else if (errorMsg === 'Cancelled') {
-      importProgress.status = 'cancelled'
+      importProgress.status = 'canceled'
       clearImportState()
+      // Emit canceled event
+      importEventEmitter.emit(createSyncCompleteEvent('canceled'))
     } else {
-      importProgress.status = 'error'
+      importProgress.status = 'failed'
       importProgress.error = errorMsg
       clearImportState()
+      // Emit failed event
+      importEventEmitter.emit(createSyncCompleteEvent('failed', errorMsg))
     }
 
     // Update sync history with failure/cancellation
@@ -826,7 +927,7 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
         [
           completedAt,
           durationSeconds,
-          importProgress.status === 'cancelled' ? 'canceled' : 'failed',
+          importProgress.status === 'canceled' ? 'canceled' : 'failed',
           importProgress.error ?? null,
           importProgress.activities_total,
           importProgress.activities_done,
@@ -926,6 +1027,11 @@ async function runActivitiesPhase(
         await yieldToMain()
         batchCount = 0
       }
+
+      // Emit progress event periodically (batch or time-based)
+      if (shouldEmitProgress(importProgress.activities_done)) {
+        emitProgressEvent()
+      }
     }
 
     // Update ETA after each page
@@ -1024,6 +1130,13 @@ async function runStreamsPhase(
       importProgress.streams_done++ // Still count as done (skipped)
       updateETA('streams', state, options)
     }
+
+    // Emit progress event periodically (batch or time-based)
+    if (shouldEmitProgress(importProgress.streams_done)) {
+      emitProgressEvent()
+      // Also emit data changed event periodically for incremental updates
+      importEventEmitter.emit(createDataChangedEvent({ streams: true }))
+    }
   }
 
   console.log(`[Import] Phase 3 complete: ${importProgress.streams_done} streams`)
@@ -1098,6 +1211,11 @@ async function runActivityDetailsPhase(
       importProgress.details_done++ // Still count as processed
       updateETA('details', state, options)
     }
+
+    // Emit progress event periodically (batch or time-based)
+    if (shouldEmitProgress(importProgress.details_done)) {
+      emitProgressEvent()
+    }
   }
 
   console.log(`[Import] Phase 4 complete: ${importProgress.details_done} activities processed, ${state.segmentIdsToFetch.size} segments need detail`)
@@ -1133,6 +1251,11 @@ async function runSegmentDetailsPhase(
       console.error(`Failed to fetch segment ${segmentId}:`, error)
       importProgress.segments_done++ // Still count as processed
       updateETA('segments', state, options)
+    }
+
+    // Emit progress event periodically (batch or time-based)
+    if (shouldEmitProgress(importProgress.segments_done)) {
+      emitProgressEvent()
     }
   }
 
@@ -1185,6 +1308,11 @@ async function runPhotosPhase(
       console.error(`Failed to fetch photos for activity ${activityId}:`, error)
       importProgress.photos_done++ // Still count as processed
       updateETA('photos', state, options)
+    }
+
+    // Emit progress event periodically (batch or time-based)
+    if (shouldEmitProgress(importProgress.photos_done)) {
+      emitProgressEvent()
     }
   }
 

@@ -6,7 +6,7 @@
 name = "quantlete-strava-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
-account_id = "9790c6f97c4032b6a3933442ba9817ec"
+# account_id = "your-cloudflare-account-id"  # Set via CLOUDFLARE_ACCOUNT_ID env var or uncomment
 workers_dev = true
 
 # Optional environment variables (for backwards compatibility only)

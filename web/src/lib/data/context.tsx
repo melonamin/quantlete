@@ -65,24 +65,17 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
 
   useEffect(() => {
     async function initialize() {
-      console.log('[DataProvider] Starting initialization, isWasmMode:', isWasmMode())
       try {
         if (isWasmMode()) {
-          console.log('[DataProvider] Loading WasmProvider...')
           // Lazy load WASM provider to avoid bundling in server mode
           const { WasmProvider } = await import('./wasm/provider')
-          console.log('[DataProvider] WasmProvider loaded, creating instance...')
           const provider = new WasmProvider()
-          console.log('[DataProvider] Calling initialize()...')
           await provider.initialize()
-          console.log('[DataProvider] WasmProvider initialized successfully')
           setState({ provider, initialized: true, error: null })
         } else {
-          console.log('[DataProvider] Loading ServerProvider...')
           // Server mode - use ServerProvider
           const { ServerProvider } = await import('./server/provider')
           const provider = new ServerProvider()
-          console.log('[DataProvider] ServerProvider initialized')
           setState({ provider, initialized: true, error: null })
         }
       } catch (err) {

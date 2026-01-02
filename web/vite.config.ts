@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -92,5 +93,14 @@ export default defineConfig(({ mode }) => {
       },
       assetsInclude: ['**/*.wasm'],
     }),
+    // Vitest configuration
+    test: {
+      globals: true,
+      // Use 'node' for pure logic tests. Switch to 'jsdom' when testing React components
+      // or code that needs real DOM/browser APIs (e.g., document, window, localStorage).
+      // Per-file override: add `// @vitest-environment jsdom` at top of file.
+      environment: 'node',
+      include: ['src/**/*.test.ts'],
+    },
   }
 })
