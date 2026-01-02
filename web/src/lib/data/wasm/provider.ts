@@ -74,6 +74,7 @@ import type {
 } from '../types'
 import { WasmDatabase, initializeDatabase } from '@/lib/wasm/db'
 import { queries } from '@/lib/wasm/queries.gen'
+import { queryActivities, queryHeatmapActivities, querySegments } from '@/lib/wasm/query-builder'
 import {
   initAlgorithms,
   eddingtonNumber,
@@ -216,18 +217,15 @@ export class WasmProvider implements DataProvider {
 
     type ActivityRow = Activity & Record<string, unknown>
 
-    let data: ActivityRow[]
-    let total: number
-
-    if (filters.sport_type) {
-      data = queries.getActivitiesBySport<ActivityRow>(db, athleteId, filters.sport_type, perPage, offset)
-      const countRow = queries.countActivitiesBySport<{ count: number }>(db, athleteId, filters.sport_type)
-      total = countRow?.count ?? 0
-    } else {
-      data = queries.getActivities<ActivityRow>(db, athleteId, perPage, offset)
-      const countRow = queries.countActivities<{ count: number }>(db, athleteId)
-      total = countRow?.count ?? 0
-    }
+    // Use dynamic query builder for full filter support
+    // Mirrors Go logic in internal/storage/activities.go:216-268
+    const { data, total } = queryActivities<ActivityRow>(
+      db,
+      athleteId,
+      filters,
+      perPage,
+      offset
+    )
 
     return {
       data,
@@ -668,20 +666,9 @@ export class WasmProvider implements DataProvider {
       start_lng: number
     } & Record<string, unknown>
 
-    let activities: HeatmapRow[]
-
-    if (filters.sport_type) {
-      activities = queries.getHeatmapActivitiesBySport<HeatmapRow>(db, athleteId, filters.sport_type)
-    } else if (filters.after && filters.before) {
-      activities = queries.getHeatmapActivitiesByDateRange<HeatmapRow>(
-        db,
-        athleteId,
-        filters.after,
-        filters.before
-      )
-    } else {
-      activities = queries.getHeatmapActivities<HeatmapRow>(db, athleteId)
-    }
+    // Use dynamic query builder for full filter support
+    // Mirrors Go logic in internal/storage/heatmap.go
+    const activities = queryHeatmapActivities<HeatmapRow>(db, athleteId, filters)
 
     // Get countries for filter options
     type CountryRow = { country: string; count: number } & Record<string, unknown>
@@ -1658,8 +1645,12 @@ export class WasmProvider implements DataProvider {
     const db = this.assertInitialized()
     const athleteId = this.getAthleteId()
 
-    // Build query based on filters
-    let rows: Array<{
+    // Pagination params
+    const page = filters?.page && filters.page > 0 ? filters.page : 1
+    const perPage = filters?.per_page && filters.per_page > 0 ? Math.min(filters.per_page, 200) : 50
+    const offset = (page - 1) * perPage
+
+    type SegmentRow = {
       id: number
       name: string
       activity_type: string
@@ -1677,16 +1668,20 @@ export class WasmProvider implements DataProvider {
       times_completed: number
       last_effort_date: string | null
       best_elapsed_time: number | null
-    }>
+    } & Record<string, unknown>
 
-    if (filters?.country) {
-      rows = queries.getSegmentsByCountry(db, athleteId, filters.country)
-    } else {
-      rows = queries.getSegments(db, athleteId)
-    }
+    // Use dynamic query builder for full filter support
+    // Mirrors Go logic in internal/storage/segments.go:240-356
+    const { data: rows, total } = querySegments<SegmentRow>(
+      db,
+      athleteId,
+      filters,
+      perPage,
+      offset
+    )
 
-    // Apply additional filters in-memory
-    let result = rows.map((r) => ({
+    // Map to response format
+    const data = rows.map((r) => ({
       id: r.id,
       name: r.name,
       activity_type: r.activity_type,
@@ -1706,80 +1701,10 @@ export class WasmProvider implements DataProvider {
       best_elapsed_time: r.best_elapsed_time ?? undefined,
     }))
 
-    // Activity type filter
-    if (filters?.activity_type) {
-      result = result.filter((s) => s.activity_type === filters.activity_type)
-    }
-
-    // Starred filter
-    if (filters?.starred) {
-      result = result.filter((s) => s.starred)
-    }
-
-    // KOM only filter
-    if (filters?.kom_only) {
-      result = result.filter((s) => s.athlete_kom_rank === 1)
-    }
-
-    // Search filter
-    if (filters?.search) {
-      const searchLower = filters.search.toLowerCase()
-      result = result.filter((s) => s.name.toLowerCase().includes(searchLower))
-    }
-
-    // Get total after filtering but before pagination
-    const total = result.length
-
-    // Sorting
-    const orderBy = filters?.order_by || 'times_completed'
-    const orderDir = filters?.order_dir || 'desc'
-    const multiplier = orderDir === 'asc' ? 1 : -1
-
-    result.sort((a, b) => {
-      let av: number | string = 0
-      let bv: number | string = 0
-
-      switch (orderBy) {
-        case 'name':
-          av = a.name.toLowerCase()
-          bv = b.name.toLowerCase()
-          break
-        case 'distance':
-          av = a.distance ?? 0
-          bv = b.distance ?? 0
-          break
-        case 'maximum_grade':
-          av = a.maximum_grade ?? 0
-          bv = b.maximum_grade ?? 0
-          break
-        case 'times_completed':
-          av = a.times_completed ?? 0
-          bv = b.times_completed ?? 0
-          break
-        case 'last_effort_date':
-          av = a.last_effort_date ? new Date(a.last_effort_date).getTime() : 0
-          bv = b.last_effort_date ? new Date(b.last_effort_date).getTime() : 0
-          break
-        case 'best_elapsed_time':
-          av = a.best_elapsed_time ?? Number.MAX_SAFE_INTEGER
-          bv = b.best_elapsed_time ?? Number.MAX_SAFE_INTEGER
-          break
-      }
-
-      if (av < bv) return -1 * multiplier
-      if (av > bv) return 1 * multiplier
-      return a.id - b.id
-    })
-
-    // Pagination
-    const page = filters?.page && filters.page > 0 ? filters.page : 1
-    const perPage = filters?.per_page && filters.per_page > 0 ? Math.min(filters.per_page, 200) : 50
     const totalPages = Math.max(1, Math.ceil(total / perPage))
-    const offset = (page - 1) * perPage
-    const paginatedResult = result.slice(offset, offset + perPage)
 
     return {
-      data: paginatedResult,
+      data,
       total,
       page,
       per_page: perPage,
