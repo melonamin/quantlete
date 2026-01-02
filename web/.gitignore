@@ -1,5 +1,6 @@
 # Generated WASM files (copied from node_modules during build)
-public/wasm
+public/wasm/*.wasm
+public/wasm/sql-wasm.wasm
 
 # Vite
 dist-ssr

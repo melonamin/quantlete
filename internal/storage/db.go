@@ -9,8 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
-	_ "modernc.org/sqlite" // SQLite driver (pure Go)
+	// Driver import is in driver_server.go or driver_wasm.go based on build tags
 )
 
 // DB wraps a SQLite database connection.
@@ -34,7 +33,7 @@ func Open(dataDir, dbFile string) (*DB, error) {
 	dbPath := filepath.Join(dataDir, filename)
 
 	dsn := dbPath
-	conn, err := sql.Open("sqlite", dsn)
+	conn, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
