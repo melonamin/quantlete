@@ -417,25 +417,28 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
+    // Default history duration is 300s (5 min) - matches Go backend default
+    const historyDuration = 300
+
     const result = goStorage.getPowerStats({
       after: filters?.after,
       before: filters?.before,
       sport_types: filters?.sport_type ? [filters.sport_type] : undefined,
+      history_duration: historyDuration,
     })
 
     // Build durations from best array
     const durationsSet = new Set(result.best.map((b) => b.duration_s))
     const durations = Array.from(durationsSet).sort((a, b) => a - b)
 
-    // Group history by duration
+    // History is returned for a single duration (historyDuration)
+    // Key all history points under that duration
     const historyByDuration: Record<string, { date: string; watts: number }[]> = {}
-    for (const point of result.history) {
-      // History points include duration info - group them
-      const key = String(point.date.split('_')[0] || '300') // Default to 5min if no duration prefix
-      if (!historyByDuration[key]) {
-        historyByDuration[key] = []
-      }
-      historyByDuration[key].push(point)
+    if (result.history.length > 0) {
+      historyByDuration[String(historyDuration)] = result.history.map((point) => ({
+        date: point.date,
+        watts: point.watts,
+      }))
     }
 
     return {
@@ -557,15 +560,15 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async getDaytimeDistribution(): Promise<DistributionSlice[]> {
-    // This would need to analyze start times of activities
-    // Not implemented in Go storage yet
-    throw new Error('Not implemented yet')
+    this.assertInitialized()
+    this.getAthleteId()
+    return goStorage.getDaytimeDistribution()
   }
 
   async getWeekdayDistribution(): Promise<DistributionSlice[]> {
-    // This would need to analyze weekdays of activities
-    // Not implemented in Go storage yet
-    throw new Error('Not implemented yet')
+    this.assertInitialized()
+    this.getAthleteId()
+    return goStorage.getWeekdayDistribution()
   }
 
   // ============================================================================
@@ -1463,7 +1466,9 @@ export class GoWasmProvider implements DataProvider {
   // Export
   // ============================================================================
   async getExportStats(): Promise<ExportStats> {
-    throw new Error('Not implemented yet')
+    this.assertInitialized()
+    this.getAthleteId()
+    return goStorage.getExportStats()
   }
 
   // ============================================================================

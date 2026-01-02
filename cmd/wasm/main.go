@@ -112,15 +112,14 @@ func main() {
 
 		// Dashboard
 		"getDashboardStats":   js.FuncOf(getDashboardStats),
-		"getWeeklyStats":      js.FuncOf(getWeeklyStats),
-		"getRecentActivities": js.FuncOf(getRecentActivities),
-		"getSportTypeStats":   js.FuncOf(getSportTypeStats),
-		"getMonthlyStats":     js.FuncOf(getMonthlyStats),
-		"getYearlyStats":      js.FuncOf(getYearlyStats),
-		// TODO: implement these dashboard functions
-		// "getDaytimeDistribution": js.FuncOf(getDaytimeDistribution),
-		// "getWeekdayDistribution": js.FuncOf(getWeekdayDistribution),
-		// "getExportStats":         js.FuncOf(getExportStats),
+		"getWeeklyStats":         js.FuncOf(getWeeklyStats),
+		"getRecentActivities":    js.FuncOf(getRecentActivities),
+		"getSportTypeStats":      js.FuncOf(getSportTypeStats),
+		"getMonthlyStats":        js.FuncOf(getMonthlyStats),
+		"getYearlyStats":         js.FuncOf(getYearlyStats),
+		"getDaytimeDistribution": js.FuncOf(getDaytimeDistribution),
+		"getWeekdayDistribution": js.FuncOf(getWeekdayDistribution),
+		"getExportStats":         js.FuncOf(getExportStats),
 
 		// Heatmap
 		"getHeatmapData": js.FuncOf(getHeatmapData),

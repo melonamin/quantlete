@@ -85,6 +85,9 @@ declare global {
     getSportTypeStats(): string
     getMonthlyStats(year?: number): string
     getYearlyStats(): string
+    getDaytimeDistribution(): string
+    getWeekdayDistribution(): string
+    getExportStats(): string
 
     // Heatmap
     getHeatmapData(filtersJSON: string): string
@@ -671,6 +674,54 @@ export function getYearlyStats(): YearlyStat[] {
   }
   // Arrays are wrapped in {ok: true, data: [...]}
   return result.data ?? []
+}
+
+// ============================================================================
+// Distribution Stats
+// ============================================================================
+
+export interface DistributionSlice {
+  label: string
+  count: number
+}
+
+export function getDaytimeDistribution(): DistributionSlice[] {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<DistributionSlice[]>(goStorage.getDaytimeDistribution())
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to get daytime distribution')
+  }
+  return result.data ?? []
+}
+
+export function getWeekdayDistribution(): DistributionSlice[] {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<DistributionSlice[]>(goStorage.getWeekdayDistribution())
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to get weekday distribution')
+  }
+  return result.data ?? []
+}
+
+export interface ExportStats {
+  total_activities: number
+  first_activity: string | null
+  last_activity: string | null
+}
+
+export function getExportStats(): ExportStats {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<ExportStats>(goStorage.getExportStats())
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to get export stats')
+  }
+  return result.data ?? { total_activities: 0, first_activity: null, last_activity: null }
 }
 
 // ============================================================================
