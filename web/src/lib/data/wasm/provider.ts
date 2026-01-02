@@ -746,10 +746,10 @@ export class WasmProvider implements DataProvider {
     if (sportType) {
       // For filtered sport type, need chronological order
       days = db.query<DayRow>(
-        `SELECT DATE(start_date) AS date, SUM(distance) / 1000.0 AS distance_km
+        `SELECT DATE(start_date_local) AS date, SUM(distance) / 1000.0 AS distance_km
          FROM activities
          WHERE athlete_id = ? AND sport_type = ?
-         GROUP BY DATE(start_date)
+         GROUP BY DATE(start_date_local)
          HAVING distance_km > 0
          ORDER BY date ASC`,
         [athleteId, sportType]
@@ -827,7 +827,7 @@ export class WasmProvider implements DataProvider {
     const history: Record<string, { date: string; watts: number }[]> = {}
     for (const duration of durations) {
       const points = db.query<{ date: string; watts: number }>(
-        `SELECT DATE(a.start_date) as date, p.best_avg_watts as watts
+        `SELECT DATE(a.start_date_local) as date, p.best_avg_watts as watts
          FROM power_best_efforts p
          JOIN activities a ON a.id = p.activity_id
          WHERE ${whereClause} AND p.duration_s = ?
@@ -1062,7 +1062,7 @@ export class WasmProvider implements DataProvider {
     const athleteId = this.getAthleteId()
 
     const rows = db.query<{ year: string }>(
-      `SELECT DISTINCT strftime('%Y', start_date) as year
+      `SELECT DISTINCT strftime('%Y', start_date_local) as year
        FROM activities
        WHERE athlete_id = ?
        ORDER BY year DESC`,
@@ -1097,7 +1097,7 @@ export class WasmProvider implements DataProvider {
         COALESCE(SUM(kudos_count), 0) as kudos,
         COALESCE(SUM(CASE WHEN commute = 1 THEN distance ELSE 0 END), 0) as commute_distance_m
       FROM activities
-      WHERE athlete_id = ? AND strftime('%Y', start_date) = ?`,
+      WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?`,
       [athleteId, yearStr]
     )
 
@@ -1106,9 +1106,9 @@ export class WasmProvider implements DataProvider {
 
     // Get active days count
     const activeDays = db.queryOne<{ count: number }>(
-      `SELECT COUNT(DISTINCT DATE(start_date)) as count
+      `SELECT COUNT(DISTINCT DATE(start_date_local)) as count
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?`,
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?`,
       [athleteId, yearStr]
     )
 
@@ -1127,12 +1127,12 @@ export class WasmProvider implements DataProvider {
       elevation_m: number
     }>(
       `SELECT
-        strftime('%Y-%m', start_date) as month,
+        strftime('%Y-%m', start_date_local) as month,
         COUNT(*) as activities,
         COALESCE(SUM(distance), 0) as distance_m,
         COALESCE(SUM(total_elevation_gain), 0) as elevation_m
       FROM activities
-      WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+      WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
       GROUP BY month
       ORDER BY month`,
       [athleteId, yearStr]
@@ -1141,11 +1141,11 @@ export class WasmProvider implements DataProvider {
     // Get PR counts per month from best_efforts (pr_rank = 1)
     const prsByMonth = db.query<{ month: string; prs: number }>(
       `SELECT
-        strftime('%Y-%m', a.start_date) as month,
+        strftime('%Y-%m', a.start_date_local) as month,
         COUNT(*) as prs
       FROM best_efforts be
       JOIN activities a ON a.id = be.activity_id
-      WHERE a.athlete_id = ? AND strftime('%Y', a.start_date) = ? AND be.pr_rank = 1
+      WHERE a.athlete_id = ? AND strftime('%Y', a.start_date_local) = ? AND be.pr_rank = 1
       GROUP BY month`,
       [athleteId, yearStr]
     )
@@ -1163,7 +1163,7 @@ export class WasmProvider implements DataProvider {
     const sportTimes = db.query<{ sport_type: string; moving_time_s: number }>(
       `SELECT sport_type, COALESCE(SUM(moving_time), 0) as moving_time_s
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
        GROUP BY sport_type
        ORDER BY moving_time_s DESC`,
       [athleteId, yearStr]
@@ -1173,7 +1173,7 @@ export class WasmProvider implements DataProvider {
     const hourCounts = db.query<{ hour: number; count: number }>(
       `SELECT CAST(strftime('%H', start_date_local) AS INTEGER) as hour, COUNT(*) as count
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
        GROUP BY hour
        ORDER BY hour`,
       [athleteId, yearStr]
@@ -1186,7 +1186,7 @@ export class WasmProvider implements DataProvider {
         ROUND(start_lng, 2) as lng,
         COUNT(*) as count
       FROM activities
-      WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+      WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
         AND start_lat IS NOT NULL AND start_lng IS NOT NULL
       GROUP BY lat, lng
       ORDER BY count DESC
@@ -1196,9 +1196,9 @@ export class WasmProvider implements DataProvider {
 
     // Streaks calculation
     const activityDates = db.query<{ date: string }>(
-      `SELECT DISTINCT DATE(start_date) as date
+      `SELECT DISTINCT DATE(start_date_local) as date
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
        ORDER BY date`,
       [athleteId, yearStr]
     )
@@ -1242,7 +1242,7 @@ export class WasmProvider implements DataProvider {
     }>(
       `SELECT id as activity_id, name, sport_type, start_date_local, distance as value
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
        ORDER BY distance DESC
        LIMIT 1`,
       [athleteId, yearStr]
@@ -1257,7 +1257,7 @@ export class WasmProvider implements DataProvider {
     }>(
       `SELECT id as activity_id, name, sport_type, start_date_local, total_elevation_gain as value
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
        ORDER BY total_elevation_gain DESC
        LIMIT 1`,
       [athleteId, yearStr]
@@ -1272,7 +1272,7 @@ export class WasmProvider implements DataProvider {
     }>(
       `SELECT id as activity_id, name, sport_type, start_date_local, moving_time as value
        FROM activities
-       WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+       WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
        ORDER BY moving_time DESC
        LIMIT 1`,
       [athleteId, yearStr]
@@ -1288,7 +1288,7 @@ export class WasmProvider implements DataProvider {
       `SELECT p.id, p.activity_id, p.url, p.caption
        FROM photos p
        JOIN activities a ON a.id = p.activity_id
-       WHERE a.athlete_id = ? AND strftime('%Y', a.start_date) = ?
+       WHERE a.athlete_id = ? AND strftime('%Y', a.start_date_local) = ?
        ORDER BY RANDOM()
        LIMIT 1`,
       [athleteId, yearStr]
@@ -1617,7 +1617,7 @@ export class WasmProvider implements DataProvider {
       moving_time: number
     }>(
       `SELECT
-         strftime('%Y-%m', a.start_date) AS month,
+         strftime('%Y-%m', a.start_date_local) AS month,
          g.id AS gear_id,
          g.name AS gear_name,
          g.source,

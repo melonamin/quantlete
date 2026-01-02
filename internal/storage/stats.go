@@ -63,8 +63,8 @@ func NewStatsRepository(db *DB) *StatsRepository {
 // GetDashboardStats returns aggregated statistics for the dashboard.
 func (r *StatsRepository) GetDashboardStats(ctx context.Context, athleteID int64) (*DashboardStats, error) {
 	now := time.Now()
-	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	yearStart := fmt.Sprintf("%d-01-01", now.Year())
+	monthStart := fmt.Sprintf("%d-%02d-01", now.Year(), int(now.Month()))
 
 	stats := &DashboardStats{}
 
@@ -89,7 +89,7 @@ func (r *StatsRepository) GetDashboardStats(ctx context.Context, athleteID int64
 		return nil, err
 	}
 
-	// Year stats
+	// Year stats (use start_date_local for correct timezone grouping)
 	err = r.db.QueryRow(`
 		SELECT
 			COUNT(*),
@@ -97,7 +97,7 @@ func (r *StatsRepository) GetDashboardStats(ctx context.Context, athleteID int64
 			COALESCE(SUM(moving_time), 0),
 			COALESCE(SUM(total_elevation_gain), 0)
 		FROM activities
-		WHERE athlete_id = ? AND start_date >= ?
+		WHERE athlete_id = ? AND DATE(start_date_local) >= ?
 	`, athleteID, yearStart).Scan(
 		&stats.YearActivities,
 		&stats.YearDistance,
@@ -108,7 +108,7 @@ func (r *StatsRepository) GetDashboardStats(ctx context.Context, athleteID int64
 		return nil, err
 	}
 
-	// Month stats
+	// Month stats (use start_date_local for correct timezone grouping)
 	err = r.db.QueryRow(`
 		SELECT
 			COUNT(*),
@@ -116,7 +116,7 @@ func (r *StatsRepository) GetDashboardStats(ctx context.Context, athleteID int64
 			COALESCE(SUM(moving_time), 0),
 			COALESCE(SUM(total_elevation_gain), 0)
 		FROM activities
-		WHERE athlete_id = ? AND start_date >= ?
+		WHERE athlete_id = ? AND DATE(start_date_local) >= ?
 	`, athleteID, monthStart).Scan(
 		&stats.MonthActivities,
 		&stats.MonthDistance,
@@ -138,7 +138,7 @@ func (r *StatsRepository) GetWeeklyStats(ctx context.Context, athleteID int64) (
 	if weekday == 0 {
 		weekday = 7 // Sunday = 7
 	}
-	weekStart := time.Date(now.Year(), now.Month(), now.Day()-weekday+1, 0, 0, 0, 0, now.Location())
+	weekStart := fmt.Sprintf("%d-%02d-%02d", now.Year(), int(now.Month()), now.Day()-weekday+1)
 
 	rows, err := r.db.Query(`
 		SELECT
@@ -148,7 +148,7 @@ func (r *StatsRepository) GetWeeklyStats(ctx context.Context, athleteID int64) (
 			COALESCE(SUM(moving_time), 0) as total_time,
 			COALESCE(SUM(total_elevation_gain), 0) as total_elevation
 		FROM activities
-		WHERE athlete_id = ? AND start_date >= ?
+		WHERE athlete_id = ? AND DATE(start_date_local) >= ?
 		GROUP BY sport_type
 		ORDER BY total_distance DESC
 	`, athleteID, weekStart)
@@ -255,7 +255,7 @@ type MonthlyStat struct {
 func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, year int) ([]MonthlyStat, error) {
 	query := `
 		SELECT
-			strftime('%Y-%m', start_date) as month,
+			strftime('%Y-%m', start_date_local) as month,
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance,
 			COALESCE(SUM(moving_time), 0) as total_time,
@@ -266,7 +266,7 @@ func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, 
 	args := []interface{}{athleteID}
 
 	if year > 0 {
-		query += ` AND strftime('%Y', start_date) = ?`
+		query += ` AND strftime('%Y', start_date_local) = ?`
 		args = append(args, fmt.Sprintf("%d", year))
 	}
 
@@ -317,13 +317,13 @@ type CalendarActivity struct {
 func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, year int) ([]CalendarDay, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			strftime('%Y-%m-%d', start_date) as date,
+			strftime('%Y-%m-%d', start_date_local) as date,
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance,
 			COALESCE(SUM(moving_time), 0) as total_time,
 			COALESCE(SUM(calories), 0) as total_calories
 		FROM activities
-		WHERE athlete_id = ? AND strftime('%Y', start_date) = ?
+		WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
 		GROUP BY date
 		ORDER BY date ASC
 	`, athleteID, fmt.Sprintf("%d", year))
@@ -347,12 +347,12 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 // GetCalendarActivities returns activities for a specific month.
 func (r *StatsRepository) GetCalendarActivities(ctx context.Context, athleteID int64, year, month int) ([]CalendarActivity, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, sport_type, start_date, distance, moving_time, COALESCE(total_elevation_gain, 0)
+		SELECT id, name, sport_type, start_date_local, distance, moving_time, COALESCE(total_elevation_gain, 0)
 		FROM activities
 		WHERE athlete_id = ?
-		  AND CAST(strftime('%Y', start_date) AS INTEGER) = ?
-		  AND CAST(strftime('%m', start_date) AS INTEGER) = ?
-		ORDER BY start_date ASC
+		  AND CAST(strftime('%Y', start_date_local) AS INTEGER) = ?
+		  AND CAST(strftime('%m', start_date_local) AS INTEGER) = ?
+		ORDER BY start_date_local ASC
 	`, athleteID, year, month)
 	if err != nil {
 		return nil, err
@@ -398,8 +398,8 @@ func (r *StatsRepository) GetCalendarMonthSummary(ctx context.Context, athleteID
 			COALESCE(SUM(CASE WHEN workout_type IS NOT NULL AND workout_type != 0 THEN 1 ELSE 0 END), 0) AS workout_count
 		FROM activities
 		WHERE athlete_id = ?
-		  AND CAST(strftime('%Y', start_date) AS INTEGER) = ?
-		  AND CAST(strftime('%m', start_date) AS INTEGER) = ?
+		  AND CAST(strftime('%Y', start_date_local) AS INTEGER) = ?
+		  AND CAST(strftime('%m', start_date_local) AS INTEGER) = ?
 	`, athleteID, year, month).Scan(
 		&s.ActivityCount,
 		&s.TotalDistance,
@@ -460,7 +460,7 @@ type HeatmapFilters struct {
 func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) ([]YearStat, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			CAST(strftime('%Y', start_date) AS INTEGER) as year,
+			CAST(strftime('%Y', start_date_local) AS INTEGER) as year,
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance,
 			COALESCE(SUM(moving_time), 0) as total_time,
@@ -697,7 +697,7 @@ type EddingtonStep struct {
 func (r *StatsRepository) GetEddingtonData(ctx context.Context, athleteID int64, sportTypes []string) (*EddingtonResult, error) {
 	query := `
 		SELECT
-			strftime('%Y-%m-%d', start_date) as date,
+			strftime('%Y-%m-%d', start_date_local) as date,
 			SUM(distance) / 1000.0 as distance_km
 		FROM activities
 		WHERE athlete_id = ?
