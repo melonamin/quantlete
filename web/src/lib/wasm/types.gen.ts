@@ -10,6 +10,17 @@
 // From activities.go
 // ============================================================================
 
+/** ActivityTotals represents aggregate statistics. */
+export interface ActivityTotals {
+  count: number
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  elevation: number
+  calories: number
+  kilojoules: number
+}
+
 export interface GetActivitiesRequest {
   page: number
   per_page: number
@@ -20,6 +31,8 @@ export interface GetActivitiesRequest {
   commute?: boolean | null
   trainer?: boolean | null
   search: string
+  order_by: string
+  order_dir: string
 }
 
 export interface SaveActivityInput {
@@ -71,6 +84,37 @@ export interface SaveStreamInput {
 }
 
 // ============================================================================
+// From athlete.go
+// ============================================================================
+
+export interface FTPHistoryResponse {
+  cycling: unknown[]
+  running: unknown[]
+}
+
+export interface UpdateFTPRequest {
+  cycling: unknown[]
+  running: unknown[]
+}
+
+export interface UpdateWeightRequest {
+  points: unknown[]
+}
+
+export interface WeightHistoryResponse {
+  points: unknown[]
+}
+
+// ============================================================================
+// From athlete_metrics.go
+// ============================================================================
+
+export interface AthleteMetricPoint {
+  recorded_at: string
+  value: number
+}
+
+// ============================================================================
 // From athletes.go
 // ============================================================================
 
@@ -90,13 +134,44 @@ export interface SaveAthleteInput {
 }
 
 // ============================================================================
+// From auth.go
+// ============================================================================
+
+/** AuthStatusResponse represents the auth status response. */
+export interface AuthStatusResponse {
+  authenticated: boolean
+  demo_mode?: boolean
+  athlete?: unknown | null
+  expires_at?: number
+}
+
+// ============================================================================
 // From challenges.go
 // ============================================================================
+
+export interface Challenge {
+  id: string
+  athlete_id: number
+  name: string
+  slug?: string
+  badge_url?: string
+  local_badge_url?: string
+  completion_date?: string | null
+  month?: string
+  created_at: string
+}
 
 export interface GetChallengesRequest {
   month: string
   page: number
   per_page: number
+  order_by: string
+  order_dir: string
+}
+
+export interface NewChallengesHandlerBody {
+  html: string
+  url: string
 }
 
 // ============================================================================
@@ -107,6 +182,35 @@ export interface GetHeatmapDataRequest {
   sport_type: string
   year: number
   commute?: boolean | null
+  workout_type?: number | null
+  limit: number
+  offset: number
+}
+
+// ============================================================================
+// From dashboard_config.go
+// ============================================================================
+
+export interface DashboardConfig {
+  version: number
+  widgets: DashboardWidgetConfig[]
+}
+
+export interface DashboardWidgetConfig {
+  id: string
+  width: number
+  height?: number
+  hidden: boolean
+  settings?: Record<string, unknown>
+}
+
+// ============================================================================
+// From eddington_history.go
+// ============================================================================
+
+export interface EddingtonHistoryPoint {
+  date: string
+  number: number
 }
 
 // ============================================================================
@@ -136,8 +240,102 @@ export interface SaveGearInput {
 }
 
 // ============================================================================
+// From gear_stats.go
+// ============================================================================
+
+export interface GearMonthlyUsage {
+  month: string
+  gear_id: string
+  gear_name: string
+  source: string
+  hashtag?: string
+  retired: boolean
+  purchase_price?: number | null
+  purchase_currency?: string
+  activity_count: number
+  distance: number
+  moving_time: number
+}
+
+// ============================================================================
+// From goals.go
+// ============================================================================
+
+export interface GoalsMetricTargets {
+  distance_m?: number | null
+  elevation_m?: number | null
+  moving_time_s?: number | null
+}
+
+export interface GoalsProgress {
+  distance_m: number
+  elevation_m: number
+  moving_time_s: number
+  activity_count: number
+}
+
+export interface GoalsSportConfig {
+  name: string
+  sport_types: string[]
+  targets: Record<string, GoalsMetricTargets>
+}
+
+export interface TrainingGoalsConfig {
+  version: number
+  sports: GoalsSportConfig[]
+}
+
+export interface TrainingGoalsResponse {
+  config: TrainingGoalsConfig
+  progress: Record<string, Record<string, GoalsProgress>>
+}
+
+// ============================================================================
+// From health.go
+// ============================================================================
+
+/** ErrorResponse represents an error response. */
+export interface ErrorResponse {
+  error: string
+}
+
+/** HealthResponse represents the health check response. */
+export interface HealthResponse {
+  status: string
+}
+
+// ============================================================================
+// From import.go
+// ============================================================================
+
+/** By default, all data types are imported. Use skip_* fields to exclude specific types. */
+export interface StartImportRequest {
+  full_sync: boolean
+  resume: boolean
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+}
+
+// ============================================================================
 // From maintenance.go
 // ============================================================================
+
+export interface Component {
+  id: number
+  gear_id: string
+  name: string
+  image_url?: string
+  maintenance_hashtag?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ComponentWithRules {
+  rules: MaintenanceRule[]
+  last_completed_at?: string | null
+}
 
 export interface CreateComponentInput {
   gear_id: string
@@ -166,6 +364,14 @@ export interface DeleteHRZoneDefinitionRequest {
   effective_from: string
 }
 
+export interface DueComponent {
+  distance_since: number
+  moving_time_since: number
+  days_since: number
+  progress: RuleProgress[]
+  is_due: boolean
+}
+
 export interface GetCustomGearRequest {
   include_retired: boolean
   page: number
@@ -184,6 +390,29 @@ export interface LogMaintenanceRequest {
   component_id: number
   activity_id?: number | null
   completed_at: string
+}
+
+export interface MaintenanceLogEntry {
+  component_id: number
+  activity_id?: number | null
+  completed_at: string
+}
+
+export interface MaintenanceRule {
+  id: number
+  component_id: number
+  type: string
+  threshold_value: number
+  created_at: string
+  updated_at: string
+}
+
+export interface RuleProgress {
+  type: string
+  threshold_value: number
+  current_value: number
+  percent: number
+  due: boolean
 }
 
 export interface UpdateComponentInput {
@@ -218,6 +447,38 @@ export interface UpsertHRZoneDefinitionRequest {
 export interface GetPhotosRequest {
   page: number
   per_page: number
+  sport_types: string[]
+  country: string
+}
+
+export interface Photo {
+  id: string
+  athlete_id: number
+  activity_id: number
+  url: string
+  thumbnail_url?: string
+  caption?: string
+  location?: unknown
+  created_at: string
+}
+
+export interface PhotoFacetCount {
+  value: string
+  count: number
+}
+
+export interface PhotoListItem {
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+  location_country?: string
+}
+
+export interface PhotoListResult {
+  items: PhotoListItem[]
+  total: number
+  countries: PhotoFacetCount[]
+  sport_types: PhotoFacetCount[]
 }
 
 export interface SavePhotoInput {
@@ -232,8 +493,892 @@ export interface SavePhotoInput {
 }
 
 // ============================================================================
+// From power.go
+// ============================================================================
+
+export interface PeakPowerBest {
+  duration_s: number
+  watts: number
+  activity_id: number
+  start_date: string
+}
+
+export interface PeakPowerHistoryPoint {
+  date: string
+  watts: number
+}
+
+// ============================================================================
+// From queries.gen.go
+// ============================================================================
+
+/** CountActivitiesByDateRangeRow represents a row returned by CountActivitiesByDateRange. */
+export interface CountActivitiesByDateRangeRow {
+  count: number
+}
+
+/** CountActivitiesBySportAndDateRangeRow represents a row returned by CountActivitiesBySportAndDateRange. */
+export interface CountActivitiesBySportAndDateRangeRow {
+  count: number
+}
+
+/** CountActivitiesBySportRow represents a row returned by CountActivitiesBySport. */
+export interface CountActivitiesBySportRow {
+  count: number
+}
+
+/** CountActivitiesRow represents a row returned by CountActivities. */
+export interface CountActivitiesRow {
+  count: number
+}
+
+/** CountSegmentsByAthleteRow represents a row returned by CountSegmentsByAthlete. */
+export interface CountSegmentsByAthleteRow {
+  count: number
+}
+
+/** GetActiveGearRow represents a row returned by GetActiveGear. */
+export interface GetActiveGearRow {
+  id: string
+  athlete_id: number
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  created_at: string
+  updated_at: string
+}
+
+/** GetActivitiesByDateRangeRow represents a row returned by GetActivitiesByDateRange. */
+export interface GetActivitiesByDateRangeRow {
+  id: number
+  athlete_id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  average_watts?: number | null
+  max_watts?: number | null
+  weighted_average_watts?: number | null
+  kilojoules?: number | null
+  average_cadence?: number | null
+  calories?: number | null
+  suffer_score?: number | null
+  gear_id: string
+  commute: boolean
+  workout_type?: number | null
+  location_city: string
+  location_state: string
+  location_country: string
+  summary_polyline: string
+  start_lat?: number | null
+  start_lng?: number | null
+}
+
+/** GetActivitiesBySportAndDateRangeRow represents a row returned by GetActivitiesBySportAndDateRange. */
+export interface GetActivitiesBySportAndDateRangeRow {
+  id: number
+  athlete_id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  average_watts?: number | null
+  max_watts?: number | null
+  weighted_average_watts?: number | null
+  kilojoules?: number | null
+  average_cadence?: number | null
+  calories?: number | null
+  suffer_score?: number | null
+  gear_id: string
+  commute: boolean
+  workout_type?: number | null
+  location_city: string
+  location_state: string
+  location_country: string
+  summary_polyline: string
+  start_lat?: number | null
+  start_lng?: number | null
+}
+
+/** GetActivitiesBySportRow represents a row returned by GetActivitiesBySport. */
+export interface GetActivitiesBySportRow {
+  id: number
+  athlete_id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  average_watts?: number | null
+  max_watts?: number | null
+  weighted_average_watts?: number | null
+  kilojoules?: number | null
+  average_cadence?: number | null
+  calories?: number | null
+  suffer_score?: number | null
+  gear_id: string
+  commute: boolean
+  workout_type?: number | null
+  location_city: string
+  location_state: string
+  location_country: string
+  summary_polyline: string
+  start_lat?: number | null
+  start_lng?: number | null
+}
+
+/** GetActivitiesRow represents a row returned by GetActivities. */
+export interface GetActivitiesRow {
+  id: number
+  athlete_id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  average_watts?: number | null
+  max_watts?: number | null
+  weighted_average_watts?: number | null
+  kilojoules?: number | null
+  average_cadence?: number | null
+  calories?: number | null
+  suffer_score?: number | null
+  gear_id: string
+  commute: boolean
+  workout_type?: number | null
+  location_city: string
+  location_state: string
+  location_country: string
+  summary_polyline: string
+  start_lat?: number | null
+  start_lng?: number | null
+}
+
+/** GetActivityRow represents a row returned by GetActivity. */
+export interface GetActivityRow {
+  id: number
+  athlete_id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  average_watts?: number | null
+  max_watts?: number | null
+  weighted_average_watts?: number | null
+  kilojoules?: number | null
+  average_cadence?: number | null
+  calories?: number | null
+  suffer_score?: number | null
+  gear_id: string
+  commute: boolean
+  workout_type?: number | null
+  location_city: string
+  location_state: string
+  location_country: string
+  summary_polyline: string
+  start_lat?: number | null
+  start_lng?: number | null
+  description: string
+  device_name: string
+  embed_token: string
+  trainer: boolean
+  private: boolean
+}
+
+/** GetActivityStreamsRow represents a row returned by GetActivityStreams. */
+export interface GetActivityStreamsRow {
+  stream_type: string
+  data: string
+  series_type: string
+  original_size: string
+  resolution: string
+}
+
+/** GetActivityTSSByAthleteRow represents a row returned by GetActivityTSSByAthlete. */
+export interface GetActivityTSSByAthleteRow {
+  tss: number
+}
+
+/** GetActivityTSSRow represents a row returned by GetActivityTSS. */
+export interface GetActivityTSSRow {
+  tss: number
+  normalized_power: number
+  intensity_factor: number
+}
+
+/** GetAllDailyTSSRow represents a row returned by GetAllDailyTSS. */
+export interface GetAllDailyTSSRow {
+  day: string
+  tss: number
+}
+
+/** GetBestEffortPRsBySportRow represents a row returned by GetBestEffortPRsBySport. */
+export interface GetBestEffortPRsBySportRow {
+  distance_type: number
+  name: string
+  distance_m: number
+  elapsed_time: number
+  moving_time: number
+  pr_rank?: number | null
+  activity_id: number
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+}
+
+/** GetBestEffortPRsRow represents a row returned by GetBestEffortPRs. */
+export interface GetBestEffortPRsRow {
+  distance_type: number
+  name: string
+  distance_m: number
+  elapsed_time: number
+  moving_time: number
+  pr_rank?: number | null
+  activity_id: number
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+}
+
+/** GetBestEffortsForDistanceRow represents a row returned by GetBestEffortsForDistance. */
+export interface GetBestEffortsForDistanceRow {
+  distance_type: number
+  name: string
+  distance_m: number
+  elapsed_time: number
+  moving_time: number
+  pr_rank?: number | null
+  activity_id: number
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+  rn: string
+}
+
+/** GetCalendarActivitiesRow represents a row returned by GetCalendarActivities. */
+export interface GetCalendarActivitiesRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  distance: number
+  moving_time: number
+  total_elevation_gain: number
+}
+
+/** GetCalendarDataRow represents a row returned by GetCalendarData. */
+export interface GetCalendarDataRow {
+  date: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_calories: number
+}
+
+/** GetCalendarSummaryRow represents a row returned by GetCalendarSummary. */
+export interface GetCalendarSummaryRow {
+  activity_count: number
+  total_distance: number
+  total_elevation: number
+  total_time: number
+  total_calories: number
+  workout_count: number
+}
+
+/** GetCustomGearRow represents a row returned by GetCustomGear. */
+export interface GetCustomGearRow {
+  id: string
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  activity_count: number
+}
+
+/** GetDailyTSSRow represents a row returned by GetDailyTSS. */
+export interface GetDailyTSSRow {
+  day: string
+  tss: number
+}
+
+/** GetDashboardConfigRow represents a row returned by GetDashboardConfig. */
+export interface GetDashboardConfigRow {
+  config: string
+}
+
+/** GetDashboardStatsFromDateRow represents a row returned by GetDashboardStatsFromDate. */
+export interface GetDashboardStatsFromDateRow {
+  total_activities: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** GetDashboardStatsRow represents a row returned by GetDashboardStats. */
+export interface GetDashboardStatsRow {
+  total_activities: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+  total_calories: number
+}
+
+/** GetDaytimeDistributionRow represents a row returned by GetDaytimeDistribution. */
+export interface GetDaytimeDistributionRow {
+  hour: string
+  count: number
+}
+
+/** GetEddingtonDaysBySportRow represents a row returned by GetEddingtonDaysBySport. */
+export interface GetEddingtonDaysBySportRow {
+  date: string
+  distance_km: number
+}
+
+/** GetEddingtonDaysChronologicalRow represents a row returned by GetEddingtonDaysChronological. */
+export interface GetEddingtonDaysChronologicalRow {
+  date: string
+  distance_km: number
+}
+
+/** GetEddingtonDaysRow represents a row returned by GetEddingtonDays. */
+export interface GetEddingtonDaysRow {
+  date: string
+  distance_km: number
+}
+
+/** GetGearActivityCountRow represents a row returned by GetGearActivityCount. */
+export interface GetGearActivityCountRow {
+  count: number
+}
+
+/** GetGearByIDRow represents a row returned by GetGearByID. */
+export interface GetGearByIDRow {
+  id: string
+  athlete_id: number
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  created_at: string
+  updated_at: string
+}
+
+/** GetGearDetailRow represents a row returned by GetGearDetail. */
+export interface GetGearDetailRow {
+  id: string
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  activity_count: number
+}
+
+/** GetGearMonthlyUsageRow represents a row returned by GetGearMonthlyUsage. */
+export interface GetGearMonthlyUsageRow {
+  gear_id: string
+  gear_name: string
+  source: string
+  hashtag: string
+  retired: boolean
+  purchase_price?: number | null
+  purchase_currency: string
+  month: string
+  activity_count: number
+  distance: number
+  moving_time: number
+}
+
+/** GetGearRow represents a row returned by GetGear. */
+export interface GetGearRow {
+  id: string
+  athlete_id: number
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  created_at: string
+  updated_at: string
+}
+
+/** GetGearTotalDistanceRow represents a row returned by GetGearTotalDistance. */
+export interface GetGearTotalDistanceRow {
+  total_distance: number
+}
+
+/** GetHeatmapActivitiesByDateRangeRow represents a row returned by GetHeatmapActivitiesByDateRange. */
+export interface GetHeatmapActivitiesByDateRangeRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  summary_polyline: string
+  start_lat: number
+  start_lng: number
+}
+
+/** GetHeatmapActivitiesBySportAndDateRangeRow represents a row returned by GetHeatmapActivitiesBySportAndDateRange. */
+export interface GetHeatmapActivitiesBySportAndDateRangeRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  summary_polyline: string
+  start_lat: number
+  start_lng: number
+}
+
+/** GetHeatmapActivitiesBySportRow represents a row returned by GetHeatmapActivitiesBySport. */
+export interface GetHeatmapActivitiesBySportRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  summary_polyline: string
+  start_lat: number
+  start_lng: number
+}
+
+/** GetHeatmapActivitiesRow represents a row returned by GetHeatmapActivities. */
+export interface GetHeatmapActivitiesRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  summary_polyline: string
+  start_lat: number
+  start_lng: number
+}
+
+/** GetHeatmapCountriesRow represents a row returned by GetHeatmapCountries. */
+export interface GetHeatmapCountriesRow {
+  country: string
+  count: number
+}
+
+/** GetMonthlyDistributionRow represents a row returned by GetMonthlyDistribution. */
+export interface GetMonthlyDistributionRow {
+  month: string
+  count: number
+}
+
+/** GetMonthlyStatsRow represents a row returned by GetMonthlyStats. */
+export interface GetMonthlyStatsRow {
+  month: string
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** GetPowerBestsForDurationsRow represents a row returned by GetPowerBestsForDurations. */
+export interface GetPowerBestsForDurationsRow {
+  duration_s: string
+  watts?: number | null
+  activity_id: number
+  start_date: string
+  activity_name: string
+}
+
+/** GetPowerBestsRow represents a row returned by GetPowerBests. */
+export interface GetPowerBestsRow {
+  duration_s: string
+  watts?: number | null
+  activity_id: number
+  start_date: string
+  activity_name: string
+}
+
+/** GetPowerHistoryRow represents a row returned by GetPowerHistory. */
+export interface GetPowerHistoryRow {
+  duration_s: string
+  watts?: number | null
+  activity_id: number
+  start_date: string
+  activity_name: string
+  rn: string
+}
+
+/** GetRecentActivitiesRow represents a row returned by GetRecentActivities. */
+export interface GetRecentActivitiesRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  distance: number
+  moving_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+}
+
+/** GetSegmentByIDRow represents a row returned by GetSegmentByID. */
+export interface GetSegmentByIDRow {
+  id: number
+  name: string
+  activity_type: string
+  distance: number
+  average_grade?: number | null
+  maximum_grade?: number | null
+  elevation_high: number
+  elevation_low: number
+  climb_category: number
+  start_lat?: number | null
+  start_lng?: number | null
+  end_lat?: number | null
+  end_lng?: number | null
+  starred: boolean
+  polyline: string
+  athlete_kom_rank?: number | null
+  athlete_effort_count?: number | null
+  athlete_pr_elapsed_time?: number | null
+  athlete_pr_date?: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** GetSegmentCountriesRow represents a row returned by GetSegmentCountries. */
+export interface GetSegmentCountriesRow {
+  country: string
+  segment_count: number
+}
+
+/** GetSegmentCountryStatsRow represents a row returned by GetSegmentCountryStats. */
+export interface GetSegmentCountryStatsRow {
+  country: string
+  count: number
+}
+
+/** GetSegmentDetailRow represents a row returned by GetSegmentDetail. */
+export interface GetSegmentDetailRow {
+  id: number
+  name: string
+  activity_type: string
+  distance: number
+  average_grade?: number | null
+  maximum_grade?: number | null
+  elevation_high: number
+  elevation_low: number
+  climb_category: number
+  start_lat?: number | null
+  start_lng?: number | null
+  end_lat?: number | null
+  end_lng?: number | null
+  starred: boolean
+  polyline: string
+  athlete_kom_rank?: number | null
+  athlete_effort_count?: number | null
+  athlete_pr_elapsed_time?: number | null
+  athlete_pr_date?: string | null
+}
+
+/** GetSegmentEffortCountriesRow represents a row returned by GetSegmentEffortCountries. */
+export interface GetSegmentEffortCountriesRow {
+  country: string
+}
+
+/** GetSegmentEffortsRow represents a row returned by GetSegmentEfforts. */
+export interface GetSegmentEffortsRow {
+  id: number
+  segment_id: number
+  activity_id: number
+  athlete_id: number
+  name: string
+  elapsed_time: number
+  moving_time: number
+  start_date: string
+  start_date_local: string
+  distance: number
+  average_watts?: number | null
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  pr_rank?: number | null
+}
+
+/** GetSegmentsByCountryRow represents a row returned by GetSegmentsByCountry. */
+export interface GetSegmentsByCountryRow {
+  id: number
+  name: string
+  activity_type: string
+  distance: number
+  average_grade?: number | null
+  maximum_grade?: number | null
+  elevation_high: number
+  elevation_low: number
+  climb_category: number
+  starred: boolean
+  athlete_kom_rank?: number | null
+  athlete_effort_count?: number | null
+  athlete_pr_elapsed_time?: number | null
+  athlete_pr_date?: string | null
+  times_completed: string
+  last_effort_date?: string | null
+  best_elapsed_time?: number | null
+}
+
+/** GetSegmentsRow represents a row returned by GetSegments. */
+export interface GetSegmentsRow {
+  id: number
+  name: string
+  activity_type: string
+  distance: number
+  average_grade?: number | null
+  maximum_grade?: number | null
+  elevation_high: number
+  elevation_low: number
+  climb_category: number
+  starred: boolean
+  athlete_kom_rank?: number | null
+  athlete_effort_count?: number | null
+  athlete_pr_elapsed_time?: number | null
+  athlete_pr_date?: string | null
+  times_completed: string
+  last_effort_date?: string | null
+  best_elapsed_time?: number | null
+}
+
+/** GetSportTypeStatsRow represents a row returned by GetSportTypeStats. */
+export interface GetSportTypeStatsRow {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** GetStatsBySportTypeFromDateRow represents a row returned by GetStatsBySportTypeFromDate. */
+export interface GetStatsBySportTypeFromDateRow {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** GetStatsBySportTypeRow represents a row returned by GetStatsBySportType. */
+export interface GetStatsBySportTypeRow {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** GetTrainingGoalsConfigRow represents a row returned by GetTrainingGoalsConfig. */
+export interface GetTrainingGoalsConfigRow {
+  config: string
+}
+
+/** GetTrainingLoadSummaryRow represents a row returned by GetTrainingLoadSummary. */
+export interface GetTrainingLoadSummaryRow {
+  day: string
+  tss: number
+  ctl: number
+  atl: number
+  tsb: number
+}
+
+/** GetWeekdayDistributionRow represents a row returned by GetWeekdayDistribution. */
+export interface GetWeekdayDistributionRow {
+  weekday: string
+  count: number
+}
+
+/** GetWeeklyStatsRow represents a row returned by GetWeeklyStats. */
+export interface GetWeeklyStatsRow {
+  week: string
+  week_start: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** GetYearlyStatsRow represents a row returned by GetYearlyStats. */
+export interface GetYearlyStatsRow {
+  year: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+// ============================================================================
+// From rewind.go
+// ============================================================================
+
+export interface RewindBiggest {
+  longest_distance?: RewindBiggestActivity | null
+  most_elevation?: RewindBiggestActivity | null
+  longest_duration?: RewindBiggestActivity | null
+}
+
+export interface RewindBiggestActivity {
+  activity_id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  value: number
+}
+
+export interface RewindHourCount {
+  hour: number
+  count: number
+}
+
+export interface RewindLocationPoint {
+  lat: number
+  lng: number
+  count: number
+}
+
+export interface RewindMonth {
+  month: string
+  activities: number
+  distance_m: number
+  elevation_m: number
+  prs: number
+}
+
+export interface RewindPhoto {
+  id: string
+  activity_id: number
+  url: string
+  thumbnail_url?: string
+  caption?: string
+}
+
+export interface RewindReport {
+  year: number
+  range_start: string
+  range_end: string
+  total_days: number
+  active_days: number
+  rest_days: number
+  totals: RewindTotals
+  months?: RewindMonth[]
+  moving_time_by_sport: RewindSportTime[]
+  start_times_by_hour: RewindHourCount[]
+  locations: RewindLocationPoint[]
+  streaks: RewindStreaks
+  random_photo?: RewindPhoto | null
+  biggest: RewindBiggest
+}
+
+export interface RewindSportTime {
+  sport_type: string
+  moving_time_s: number
+}
+
+export interface RewindStreaks {
+  longest_active_days: number
+  longest_rest_days: number
+}
+
+export interface RewindTotals {
+  activities: number
+  distance_m: number
+  elevation_m: number
+  moving_time_s: number
+  kudos: number
+  commute_distance_m: number
+  carbon_saved_kg: number
+}
+
+// ============================================================================
 // From segments.go
 // ============================================================================
+
+export interface CountryStat {
+  country: string
+  count: number
+}
 
 export interface GetSegmentEffortsRequest {
   segment_id: number
@@ -248,6 +1393,11 @@ export interface GetSegmentsRequest {
   per_page: number
   starred?: boolean | null
   search: string
+  activity_type: string
+  country: string
+  kom_only: boolean
+  order_by: string
+  order_dir: string
 }
 
 export interface SaveSegmentEffortInput {
@@ -289,13 +1439,152 @@ export interface SaveSegmentInput {
   athlete_pr_date: string
 }
 
+export interface SegmentListItem {
+  times_completed: number
+  last_effort_date?: string | null
+  best_elapsed_time?: number | null
+}
+
+// ============================================================================
+// From settings.go
+// ============================================================================
+
+export interface AthleteSettings {
+  version: number
+  virtual_world_tile_layers: Record<string, VirtualWorldTileLayer>
+  eddington_definitions?: EddingtonDefinition[]
+  scheduler: SchedulerSettings
+  enable_public_badges: boolean
+}
+
+export interface EddingtonDefinition {
+  id: string
+  name: string
+  sport_types?: string[]
+  show_in_nav?: boolean
+  show_in_dashboard_widget?: boolean
+}
+
+export interface PullSettings {
+  enabled: boolean
+  schedule: string
+}
+
+export interface PushSettings {
+  enabled: boolean
+}
+
+export interface SchedulerSettings {
+  version: number
+  pull: PullSettings
+  push: PushSettings
+}
+
+export interface VirtualWorldTileLayer {
+  name: string
+  url: string
+  attribution?: string
+  max_zoom?: number
+}
+
+// ============================================================================
+// From setup.go
+// ============================================================================
+
+/** CredentialsStatusResponse represents the credentials status response. */
+export interface CredentialsStatusResponse {
+  configured: boolean
+  client_id?: string
+  source?: string
+  redirect_uri: string
+}
+
+/** UpdateCredentialsRequest represents the request to update credentials. */
+export interface UpdateCredentialsRequest {
+  client_id: string
+  client_secret: string
+}
+
 // ============================================================================
 // From stats.go
 // ============================================================================
 
+/** CalendarActivity represents an activity summary for the calendar view. */
+export interface CalendarActivity {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  moving_time: number
+  total_elevation_gain: number
+}
+
+/** CalendarDay represents activity data for a single day. */
+export interface CalendarDay {
+  date: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_calories: number
+}
+
+export interface CalendarMonthSummary {
+  year: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_elevation_gain: number
+  total_moving_time: number
+  total_calories: number
+  workout_count: number
+  challenges_completed: number
+}
+
 export interface ComputePowerBestEffortsInput {
   activity_id: number
   athlete_id: number
+}
+
+/** DashboardStats represents aggregated statistics for the dashboard. */
+export interface DashboardStats {
+  total_activities: number
+  total_distance: number
+  total_moving_time: number
+  total_elevation_gain: number
+  total_calories: number
+  year_activities: number
+  year_distance: number
+  year_moving_time: number
+  year_elevation_gain: number
+  month_activities: number
+  month_distance: number
+  month_moving_time: number
+  month_elevation_gain: number
+}
+
+export interface DistributionSlice {
+  label: string
+  count: number
+}
+
+/** EddingtonDay represents a day's distance for Eddington calculation. */
+export interface EddingtonDay {
+  date: string
+  distance: number
+}
+
+/** EddingtonResult contains the Eddington number calculation result. */
+export interface EddingtonResult {
+  number: number
+  distribution: EddingtonDay[]
+  next_steps: EddingtonStep[]
+}
+
+/** EddingtonStep shows how many rides needed to reach the next Eddington number. */
+export interface EddingtonStep {
+  target: number
+  rides_needed: number
 }
 
 export interface GetEddingtonDataRequest {
@@ -303,16 +1592,67 @@ export interface GetEddingtonDataRequest {
 }
 
 export interface GetPowerStatsRequest {
-  durations: number[]
   after: string
   before: string
   sport_types: string[]
-  history_duration: number
 }
 
 export interface GetTrainingLoadRequest {
   after: string
   before: string
+}
+
+export interface HRZonesResponse {
+  method: string
+  zones: HRZoneConfig
+  seconds_by_zone: number[]
+  total_seconds: number
+}
+
+/** When modifying fields, update both the struct and the SQL query together. */
+export interface HeatmapActivity {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  summary_polyline: string
+  start_lat: number
+  start_lng: number
+}
+
+export interface HeatmapCountryStat {
+  country: string
+  iso2?: string
+  count: number
+}
+
+/** MonthlyStat represents statistics for a single month. */
+export interface MonthlyStat {
+  month: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface PowerZonesResponse {
+  ftp_watts?: number
+  seconds_by_zone: number[]
+  total_seconds: number
+  bounds: number[]
+}
+
+/** RecentActivity represents a simplified activity for the dashboard. */
+export interface RecentActivity {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  moving_time: number
+  elevation_gain: number
+  summary_polyline?: string
 }
 
 export interface SaveBestEffortsInput {
@@ -328,6 +1668,33 @@ export interface SaveBestEffortsInput {
   end_index?: number | null
   pr_rank?: number | null
   start_date: string
+}
+
+/** SportTypeStat represents statistics for a single sport type. */
+export interface SportTypeStat {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** WeeklyStat represents statistics for a single sport type in the current week. */
+export interface WeeklyStat {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** YearStat represents statistics for a single year. */
+export interface YearStat {
+  year: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
 }
 
 // ============================================================================
@@ -366,5 +1733,88 @@ export interface UpdateSyncRunInput {
   streams_imported: number
   failed_count: number
   newest_activity_date: string
+}
+
+// ============================================================================
+// From sync_history.go
+// ============================================================================
+
+/** SyncRun represents a single import/sync run. */
+export interface SyncRun {
+  id: number
+  athlete_id: number
+  started_at: string
+  completed_at?: string | null
+  duration_seconds?: number | null
+  status: string
+  error?: string
+  activities_total: number
+  activities_imported: number
+  activities_skipped: number
+  gear_imported: number
+  streams_imported: number
+  segments_imported: number
+  photos_imported: number
+  failed_count: number
+  full_sync: boolean
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+  newest_activity_date?: string | null
+  created_at: string
+}
+
+/** SyncWatermark stores the sync watermark for incremental syncs. */
+export interface SyncWatermark {
+  last_synced_at: string
+  newest_activity_date?: string | null
+}
+
+// ============================================================================
+// From training_load.go
+// ============================================================================
+
+export interface DailyTrainingLoadPoint {
+  day: string
+  tss: number
+  ctl: number
+  atl: number
+  tsb: number
+}
+
+// ============================================================================
+// From webhooks.go
+// ============================================================================
+
+export interface StravaWebhookEvent {
+  object_type: string
+  object_id: number
+  aspect_type: string
+  owner_id: number
+  subscription_id: number
+  event_time: number
+  updates?: Record<string, unknown>
+}
+
+/** {"hub.challenge":"..."} */
+export interface StravaWebhookValidationResponse {
+  'hub.challenge': string
+}
+
+// ============================================================================
+// From zones.go
+// ============================================================================
+
+export interface HRZoneConfig {
+  bounds: number[]
+  hr_max?: number
+}
+
+export interface HRZoneDefinition {
+  sport_type: string
+  effective_from: string
+  method: string
+  zones: unknown
 }
 

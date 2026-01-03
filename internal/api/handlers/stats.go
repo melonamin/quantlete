@@ -2,60 +2,43 @@ package handlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
 type StatsHandler struct {
-	db           *storage.DB
-	stats        *storage.StatsRepository
-	power        *storage.PowerRepository
-	streams      *storage.StreamRepository
-	metrics      *storage.AthleteMetricsRepository
-	zones        *storage.ZonesRepository
-	bestEfforts  *storage.BestEffortsRepository
-	trainingLoad *storage.TrainingLoadRepository
-	strava       *strava.Client
+	svc     *services.StatsService
+	db      *storage.DB
+	streams *storage.StreamRepository
+	metrics *storage.AthleteMetricsRepository
+	zones   *storage.ZonesRepository
+	strava  *strava.Client
 }
 
 func NewStatsHandler(
+	svc *services.StatsService,
 	db *storage.DB,
-	stats *storage.StatsRepository,
-	power *storage.PowerRepository,
 	streams *storage.StreamRepository,
 	metrics *storage.AthleteMetricsRepository,
 	zones *storage.ZonesRepository,
-	bestEfforts *storage.BestEffortsRepository,
-	trainingLoad *storage.TrainingLoadRepository,
 	stravaClient *strava.Client,
 ) *StatsHandler {
 	return &StatsHandler{
-		db:           db,
-		stats:        stats,
-		power:        power,
-		streams:      streams,
-		metrics:      metrics,
-		zones:        zones,
-		bestEfforts:  bestEfforts,
-		trainingLoad: trainingLoad,
-		strava:       stravaClient,
+		svc:     svc,
+		db:      db,
+		streams: streams,
+		metrics: metrics,
+		zones:   zones,
+		strava:  stravaClient,
 	}
-}
-
-// HeatmapResponse contains the heatmap data and summary statistics.
-type HeatmapResponse struct {
-	Activities []storage.HeatmapActivity    `json:"activities"`
-	Total      int                          `json:"total"`
-	Limit      int                          `json:"limit,omitempty"`
-	Offset     int                          `json:"offset,omitempty"`
-	Countries  []storage.HeatmapCountryStat `json:"countries,omitempty"`
 }
 
 // GetHeatmapData handles GET /api/v1/stats/heatmap
@@ -67,37 +50,33 @@ func (h *StatsHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	filters := storage.HeatmapFilters{}
+	input := services.GetHeatmapDataInput{
+		AthleteID: athlete.ID,
+	}
 
 	// Parse sport types
 	if sportTypes := q.Get("sport_type"); sportTypes != "" {
-		filters.SportTypes = strings.Split(sportTypes, ",")
+		input.SportTypes = strings.Split(sportTypes, ",")
 	}
 
 	// Parse date range
-	if after := q.Get("after"); after != "" {
-		if t, err := time.Parse("2006-01-02", after); err == nil {
-			filters.StartAfter = &t
-		}
+	if t, ok := shared.ParseDateParam(q.Get("after")); ok {
+		input.StartAfter = &t
 	}
-
-	if before := q.Get("before"); before != "" {
-		if t, err := time.Parse("2006-01-02", before); err == nil {
-			filters.StartBefore = &t
-		}
+	if t, ok := shared.ParseDateParam(q.Get("before")); ok {
+		input.StartBefore = &t
 	}
 
 	// Parse commute filter
 	if commute := q.Get("commute"); commute != "" {
 		v := commute == "true" || commute == "1"
-		filters.Commute = &v
+		input.Commute = &v
 	}
 
 	// Parse workout type filter
 	if wt := q.Get("workout_type"); wt != "" {
 		if parsed, err := strconv.Atoi(wt); err == nil {
-			v := parsed
-			filters.WorkoutType = &v
+			input.WorkoutType = &parsed
 		}
 	}
 
@@ -107,41 +86,22 @@ func (h *StatsHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request) {
 			if parsed > MaxPageSize {
 				parsed = MaxPageSize
 			}
-			filters.Limit = parsed
+			input.Limit = parsed
 		}
 	}
 	if offset := q.Get("offset"); offset != "" {
 		if parsed, err := strconv.Atoi(offset); err == nil && parsed >= 0 {
-			filters.Offset = parsed
+			input.Offset = parsed
 		}
 	}
 
-	// Get total count for pagination metadata (before applying limit/offset)
-	total, err := h.stats.CountHeatmapActivities(r.Context(), athlete.ID, filters)
+	result, err := h.svc.GetHeatmapData(r.Context(), input)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to count heatmap data"})
+		handleServiceError(w, err)
 		return
 	}
 
-	activities, err := h.stats.GetHeatmapData(r.Context(), athlete.ID, filters)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get heatmap data"})
-		return
-	}
-
-	if activities == nil {
-		activities = []storage.HeatmapActivity{}
-	}
-
-	countries, _ := h.stats.GetHeatmapCountries(r.Context(), athlete.ID, filters)
-
-	writeJSON(w, http.StatusOK, HeatmapResponse{
-		Activities: activities,
-		Total:      total,
-		Limit:      filters.Limit,
-		Offset:     filters.Offset,
-		Countries:  countries,
-	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 // GetEddingtonData handles GET /api/v1/stats/eddington
@@ -152,16 +112,17 @@ func (h *StatsHandler) GetEddingtonData(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Parse sport types filter
 	var sportTypes []string
 	if st := r.URL.Query().Get("sport_type"); st != "" {
 		sportTypes = strings.Split(st, ",")
 	}
 
-	result, err := h.stats.GetEddingtonData(r.Context(), athlete.ID, sportTypes)
+	result, err := h.svc.GetEddingtonData(r.Context(), services.GetEddingtonDataInput{
+		AthleteID:  athlete.ID,
+		SportTypes: sportTypes,
+	})
 	if err != nil {
-		slog.Error("failed to get eddington data", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get eddington data"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -181,31 +142,16 @@ func (h *StatsHandler) GetEddingtonHistory(w http.ResponseWriter, r *http.Reques
 		sportTypes = strings.Split(st, ",")
 	}
 
-	points, err := h.stats.GetEddingtonHistory(r.Context(), athlete.ID, sportTypes)
+	points, err := h.svc.GetEddingtonHistory(r.Context(), services.GetEddingtonHistoryInput{
+		AthleteID:  athlete.ID,
+		SportTypes: sportTypes,
+	})
 	if err != nil {
-		slog.Error("failed to get eddington history", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get eddington history"})
+		handleServiceError(w, err)
 		return
 	}
 
-	if points == nil {
-		points = []storage.EddingtonHistoryPoint{}
-	}
-
 	writeJSON(w, http.StatusOK, points)
-}
-
-type BestEffortPRResponse struct {
-	DistanceType   string  `json:"distance_type"`
-	Name           string  `json:"name"`
-	DistanceM      float64 `json:"distance_m"`
-	ElapsedTimeS   int     `json:"elapsed_time_s"`
-	MovingTimeS    *int    `json:"moving_time_s,omitempty"`
-	PRRank         *int    `json:"pr_rank,omitempty"`
-	ActivityID     int64   `json:"activity_id"`
-	ActivityName   string  `json:"activity_name"`
-	SportType      string  `json:"sport_type"`
-	StartDateLocal string  `json:"start_date_local"`
 }
 
 // GetBestEfforts handles GET /api/v1/stats/best-efforts
@@ -217,54 +163,21 @@ func (h *StatsHandler) GetBestEfforts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.bestEfforts == nil {
-		writeJSON(w, http.StatusOK, []BestEffortPRResponse{})
-		return
-	}
-
 	var sportTypes []string
 	if st := r.URL.Query().Get("sport_type"); st != "" {
 		sportTypes = strings.Split(st, ",")
 	}
 
-	prs, err := h.bestEfforts.ListPRs(r.Context(), athlete.ID, sportTypes)
+	prs, err := h.svc.GetBestEffortPRs(r.Context(), services.GetBestEffortPRsInput{
+		AthleteID:  athlete.ID,
+		SportTypes: sportTypes,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load best efforts"})
+		handleServiceError(w, err)
 		return
 	}
 
-	out := make([]BestEffortPRResponse, 0, len(prs))
-	for _, p := range prs {
-		out = append(out, BestEffortPRResponse{
-			DistanceType:   p.DistanceType,
-			Name:           p.Name,
-			DistanceM:      p.DistanceM,
-			ElapsedTimeS:   p.ElapsedTimeS,
-			MovingTimeS:    p.MovingTimeS,
-			PRRank:         p.PRRank,
-			ActivityID:     p.ActivityID,
-			ActivityName:   p.ActivityName,
-			SportType:      p.SportType,
-			StartDateLocal: p.StartDateLocal.Format(time.RFC3339),
-		})
-	}
-
-	writeJSON(w, http.StatusOK, out)
-}
-
-type BestEffortListItemResponse struct {
-	DistanceType   string  `json:"distance_type"`
-	Name           string  `json:"name"`
-	DistanceM      float64 `json:"distance_m"`
-	ElapsedTimeS   int     `json:"elapsed_time_s"`
-	MovingTimeS    *int    `json:"moving_time_s,omitempty"`
-	PRRank         *int    `json:"pr_rank,omitempty"`
-	StartIndex     *int    `json:"start_index,omitempty"`
-	EndIndex       *int    `json:"end_index,omitempty"`
-	ActivityID     int64   `json:"activity_id"`
-	ActivityName   string  `json:"activity_name"`
-	SportType      string  `json:"sport_type"`
-	StartDateLocal string  `json:"start_date_local"`
+	writeJSON(w, http.StatusOK, prs)
 }
 
 // GetBestEffortsByDistance handles GET /api/v1/stats/best-efforts/{distanceType}
@@ -275,47 +188,23 @@ func (h *StatsHandler) GetBestEffortsByDistance(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if h.bestEfforts == nil {
-		writeJSON(w, http.StatusOK, []BestEffortListItemResponse{})
-		return
-	}
-
 	distanceType := chi.URLParam(r, "distanceType")
-	if strings.TrimSpace(distanceType) == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "distanceType is required"})
-		return
-	}
-
 	var sportTypes []string
 	if st := r.URL.Query().Get("sport_type"); st != "" {
 		sportTypes = strings.Split(st, ",")
 	}
 
-	items, err := h.bestEfforts.ListByDistanceType(r.Context(), athlete.ID, distanceType, sportTypes)
+	items, err := h.svc.GetBestEffortsForType(r.Context(), services.GetBestEffortsForTypeInput{
+		AthleteID:    athlete.ID,
+		DistanceType: distanceType,
+		SportTypes:   sportTypes,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load best efforts"})
+		handleServiceError(w, err)
 		return
 	}
 
-	out := make([]BestEffortListItemResponse, 0, len(items))
-	for _, it := range items {
-		out = append(out, BestEffortListItemResponse{
-			DistanceType:   it.DistanceType,
-			Name:           it.Name,
-			DistanceM:      it.DistanceM,
-			ElapsedTimeS:   it.ElapsedTimeS,
-			MovingTimeS:    it.MovingTimeS,
-			PRRank:         it.PRRank,
-			StartIndex:     it.StartIndex,
-			EndIndex:       it.EndIndex,
-			ActivityID:     it.ActivityID,
-			ActivityName:   it.ActivityName,
-			SportType:      it.SportType,
-			StartDateLocal: it.StartDateLocal.Format(time.RFC3339),
-		})
-	}
-
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, items)
 }
 
 // GetRewindYears handles GET /api/v1/stats/rewind/years
@@ -326,14 +215,14 @@ func (h *StatsHandler) GetRewindYears(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	years, err := h.stats.ListRewindYears(r.Context(), athlete.ID)
+	years, err := h.svc.GetRewindYears(r.Context(), services.GetRewindYearsInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load rewind years"})
+		handleServiceError(w, err)
 		return
 	}
-	if years == nil {
-		years = []int{}
-	}
+
 	writeJSON(w, http.StatusOK, years)
 }
 
@@ -354,18 +243,16 @@ func (h *StatsHandler) GetRewind(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	report, err := h.stats.GetRewind(r.Context(), athlete.ID, year)
+	report, err := h.svc.GetRewind(r.Context(), services.GetRewindInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to build rewind"})
+		handleServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, report)
-}
 
-type PowerStatsResponse struct {
-	DurationsS []int                                   `json:"durations_s"`
-	Best       []storage.PeakPowerBest                 `json:"best"`
-	History    map[int][]storage.PeakPowerHistoryPoint `json:"history"`
+	writeJSON(w, http.StatusOK, report)
 }
 
 // GetPowerStats handles GET /api/v1/stats/power
@@ -376,52 +263,28 @@ func (h *StatsHandler) GetPowerStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	durations := []int{5, 10, 30, 60, 300, 480, 1200, 3600}
-
-	var after *time.Time
-	var before *time.Time
-	if s := r.URL.Query().Get("after"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			after = &t
-		}
-	}
-	if s := r.URL.Query().Get("before"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			before = &t
-		}
+	input := services.GetPowerStatsInput{
+		AthleteID: athlete.ID,
 	}
 
-	var sportTypes []string
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("after")); ok {
+		input.After = &t
+	}
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("before")); ok {
+		input.Before = &t
+	}
+
 	if st := r.URL.Query().Get("sport_type"); st != "" {
-		sportTypes = strings.Split(st, ",")
+		input.SportTypes = strings.Split(st, ",")
 	}
 
-	if err := h.power.EnsureComputedForRange(r.Context(), athlete.ID, after, before, sportTypes, durations); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute power stats"})
-		return
-	}
-
-	best, err := h.power.GetBest(r.Context(), athlete.ID, durations, after, before, sportTypes)
+	result, err := h.svc.GetPowerStats(r.Context(), input)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load power stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	history := make(map[int][]storage.PeakPowerHistoryPoint)
-	for _, d := range durations {
-		points, err := h.power.GetHistory(r.Context(), athlete.ID, d, after, before, sportTypes)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load power history"})
-			return
-		}
-		history[d] = points
-	}
-
-	writeJSON(w, http.StatusOK, PowerStatsResponse{
-		DurationsS: durations,
-		Best:       best,
-		History:    history,
-	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 type HRZonesResponse struct {
@@ -441,15 +304,11 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 
 	var after *time.Time
 	var before *time.Time
-	if s := r.URL.Query().Get("after"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			after = &t
-		}
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("after")); ok {
+		after = &t
 	}
-	if s := r.URL.Query().Get("before"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			before = &t
-		}
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("before")); ok {
+		before = &t
 	}
 
 	var sportTypes []string
@@ -602,15 +461,11 @@ func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 
 	var after *time.Time
 	var before *time.Time
-	if s := r.URL.Query().Get("after"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			after = &t
-		}
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("after")); ok {
+		after = &t
 	}
-	if s := r.URL.Query().Get("before"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			before = &t
-		}
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("before")); ok {
+		before = &t
 	}
 
 	// Standard 5-zone bounds based on FTP percentage.
@@ -704,11 +559,6 @@ func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type TrainingLoadResponse struct {
-	Series  []storage.DailyTrainingLoadPoint `json:"series"`
-	Summary *storage.DailyTrainingLoadPoint  `json:"summary,omitempty"`
-}
-
 // GetTrainingLoad handles GET /api/v1/stats/training-load
 func (h *StatsHandler) GetTrainingLoad(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
@@ -717,42 +567,24 @@ func (h *StatsHandler) GetTrainingLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var after *time.Time
-	var before *time.Time
-	if s := r.URL.Query().Get("after"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			after = &t
-		}
-	}
-	if s := r.URL.Query().Get("before"); s != "" {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
-			before = &t
-		}
-	}
-	if after == nil && before == nil {
-		// Default to last 180 days.
-		t := time.Now().AddDate(0, 0, -180)
-		after = &t
+	input := services.GetTrainingLoadInput{
+		AthleteID: athlete.ID,
 	}
 
-	if err := h.trainingLoad.EnsureComputedForRange(r.Context(), athlete.ID, after, before); err != nil {
-		slog.Error("failed to compute training load", "error", err)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute training load"})
-		return
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("after")); ok {
+		input.After = &t
+	}
+	if t, ok := shared.ParseDateParam(r.URL.Query().Get("before")); ok {
+		input.Before = &t
 	}
 
-	series, err := h.trainingLoad.GetDailySeries(r.Context(), athlete.ID, after, before)
+	result, err := h.svc.GetTrainingLoad(r.Context(), input)
 	if err != nil {
-		slog.Error("failed to load training load", "error", err)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load training load"})
+		handleServiceError(w, err)
 		return
 	}
-	summary, _ := h.trainingLoad.GetSummary(r.Context(), athlete.ID)
 
-	writeJSON(w, http.StatusOK, TrainingLoadResponse{
-		Series:  series,
-		Summary: summary,
-	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 func sportGroup(sportType string) string {

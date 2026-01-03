@@ -2,39 +2,27 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // DashboardHandler handles dashboard-related endpoints.
 type DashboardHandler struct {
-	stats  *storage.StatsRepository
-	config *storage.DashboardConfigRepository
+	svc    *services.DashboardService
 	strava *strava.Client
 }
 
 // NewDashboardHandler creates a new dashboard handler.
-func NewDashboardHandler(stats *storage.StatsRepository, configRepo *storage.DashboardConfigRepository, stravaClient *strava.Client) *DashboardHandler {
+func NewDashboardHandler(svc *services.DashboardService, stravaClient *strava.Client) *DashboardHandler {
 	return &DashboardHandler{
-		stats:  stats,
-		config: configRepo,
+		svc:    svc,
 		strava: stravaClient,
 	}
-}
-
-// DashboardResponse combines all dashboard data.
-type DashboardResponse struct {
-	Stats            *storage.DashboardStats  `json:"stats"`
-	WeeklyStats      []storage.WeeklyStat     `json:"weekly_stats"`
-	RecentActivities []storage.RecentActivity `json:"recent_activities"`
-	SportTypeStats   []storage.SportTypeStat  `json:"sport_type_stats"`
 }
 
 // GetDashboardConfig handles GET /api/v1/dashboard/config
@@ -45,9 +33,11 @@ func (h *DashboardHandler) GetDashboardConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	cfg, err := h.config.Get(r.Context(), athlete.ID)
+	cfg, err := h.svc.GetConfig(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get dashboard config"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -62,43 +52,22 @@ func (h *DashboardHandler) UpdateDashboardConfig(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var cfg storage.DashboardConfig
+	var cfg services.DashboardConfigOutput
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
 		return
 	}
 
-	if err := validateDashboardConfig(cfg); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+	result, err := h.svc.UpdateConfig(r.Context(), services.UpdateDashboardConfigInput{
+		AthleteID: athlete.ID,
+		Config:    cfg,
+	})
+	if err != nil {
+		handleServiceError(w, err)
 		return
 	}
 
-	if err := h.config.Upsert(r.Context(), athlete.ID, cfg); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to save dashboard config"})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, cfg)
-}
-
-func validateDashboardConfig(cfg storage.DashboardConfig) error {
-	seen := make(map[string]bool)
-	for _, w := range cfg.Widgets {
-		if strings.TrimSpace(w.ID) == "" {
-			return fmt.Errorf("widget id is required")
-		}
-		if seen[w.ID] {
-			return fmt.Errorf("duplicate widget id: %s", w.ID)
-		}
-		seen[w.ID] = true
-
-		switch w.Width {
-		case storage.WidgetWidthOneThird, storage.WidgetWidthHalf, storage.WidgetWidthTwoThird, storage.WidgetWidthFull:
-		default:
-			return fmt.Errorf("invalid widget width for %s", w.ID)
-		}
-	}
-	return nil
+	writeJSON(w, http.StatusOK, result)
 }
 
 // GetDashboard handles GET /api/v1/dashboard
@@ -110,45 +79,15 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx := r.Context()
-
-	// Fetch all dashboard data
-	stats, err := h.stats.GetDashboardStats(ctx, athlete.ID)
+	result, err := h.svc.GetDashboard(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		slog.Error("failed to get dashboard stats", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	weeklyStats, err := h.stats.GetWeeklyStats(ctx, athlete.ID)
-	if err != nil {
-		slog.Error("failed to get weekly stats", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get weekly stats"})
-		return
-	}
-
-	recentActivities, err := h.stats.GetRecentActivities(ctx, athlete.ID, 5)
-	if err != nil {
-		slog.Error("failed to get recent activities", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get recent activities"})
-		return
-	}
-
-	sportTypeStats, err := h.stats.GetStatsBySportType(ctx, athlete.ID)
-	if err != nil {
-		slog.Error("failed to get sport type stats", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get sport type stats"})
-		return
-	}
-
-	resp := DashboardResponse{
-		Stats:            stats,
-		WeeklyStats:      weeklyStats,
-		RecentActivities: recentActivities,
-		SportTypeStats:   sportTypeStats,
-	}
-
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // GetStats handles GET /api/v1/dashboard/stats
@@ -159,9 +98,11 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats, err := h.stats.GetDashboardStats(r.Context(), athlete.ID)
+	stats, err := h.svc.GetStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get stats"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -176,9 +117,11 @@ func (h *DashboardHandler) GetWeeklyStats(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	stats, err := h.stats.GetWeeklyStats(r.Context(), athlete.ID)
+	stats, err := h.svc.GetWeeklyStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get weekly stats"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -200,9 +143,12 @@ func (h *DashboardHandler) GetRecentActivities(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	activities, err := h.stats.GetRecentActivities(r.Context(), athlete.ID, limit)
+	activities, err := h.svc.GetRecentActivities(r.Context(), services.GetRecentActivitiesInput{
+		AthleteID: athlete.ID,
+		Limit:     limit,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get recent activities"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -217,9 +163,11 @@ func (h *DashboardHandler) GetSportTypeStats(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	stats, err := h.stats.GetStatsBySportType(r.Context(), athlete.ID)
+	stats, err := h.svc.GetSportTypeStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get sport type stats"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -241,9 +189,12 @@ func (h *DashboardHandler) GetMonthlyStats(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	stats, err := h.stats.GetMonthlyStats(r.Context(), athlete.ID, year)
+	stats, err := h.svc.GetMonthlyStats(r.Context(), services.GetMonthlyStatsInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get monthly stats"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -258,9 +209,11 @@ func (h *DashboardHandler) GetYearlyStats(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	stats, err := h.stats.GetYearlyStats(r.Context(), athlete.ID)
+	stats, err := h.svc.GetYearlyStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get yearly stats"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -282,9 +235,12 @@ func (h *DashboardHandler) GetCalendarData(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	data, err := h.stats.GetCalendarData(r.Context(), athlete.ID, year)
+	data, err := h.svc.GetCalendarData(r.Context(), services.GetCalendarDataInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar data"})
+		handleServiceError(w, err)
 		return
 	}
 
@@ -317,16 +273,17 @@ func (h *DashboardHandler) GetCalendarActivities(w http.ResponseWriter, r *http.
 		}
 	}
 
-	activities, err := h.stats.GetCalendarActivities(r.Context(), athlete.ID, year, month)
+	activities, err := h.svc.GetCalendarActivities(r.Context(), services.GetCalendarActivitiesInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+		Month:     month,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar activities"})
+		handleServiceError(w, err)
 		return
 	}
 
-	if activities == nil {
-		activities = []storage.CalendarActivity{}
-	}
-
+	// The service already returns an empty slice if nil
 	writeJSON(w, http.StatusOK, activities)
 }
 
@@ -354,11 +311,23 @@ func (h *DashboardHandler) GetCalendarSummary(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	summary, err := h.stats.GetCalendarMonthSummary(r.Context(), athlete.ID, year, month)
+	summary, err := h.svc.GetCalendarSummary(r.Context(), services.GetCalendarActivitiesInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+		Month:     month,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar summary"})
+		handleServiceError(w, err)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, summary)
+}
+
+// parseSportTypes parses sport_type query parameter into a slice.
+func parseSportTypes(r *http.Request) []string {
+	if st := r.URL.Query().Get("sport_type"); st != "" {
+		return strings.Split(st, ",")
+	}
+	return nil
 }

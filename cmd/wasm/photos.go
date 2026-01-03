@@ -9,6 +9,7 @@ import (
 	"syscall/js"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -16,8 +17,11 @@ import (
 // Photos Write
 // ============================================================================
 
+//wasm:category Photos - Write
+
 // savePhoto stores a photo in the database
 // Called from JS: goStorage.savePhoto(photoJSON)
+//wasm:export
 func savePhoto(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("savePhoto")
 
@@ -63,7 +67,7 @@ func savePhoto(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := photos.Upsert(ctx, photo); err != nil {
+	if err := bridge.photos.Upsert(ctx, photo); err != nil {
 		return errorJSON(err)
 	}
 
@@ -74,14 +78,19 @@ func savePhoto(this js.Value, args []js.Value) interface{} {
 // Photos Read
 // ============================================================================
 
+//wasm:category Photos - Read
+
 // getPhotos retrieves paginated photos list
 // Called from JS: goStorage.getPhotos(filtersJSON)
+//wasm:export
 func getPhotos(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getPhotos")
 
 	var req struct {
-		Page    int `json:"page"`
-		PerPage int `json:"per_page"`
+		Page       int      `json:"page"`
+		PerPage    int      `json:"per_page"`
+		SportTypes []string `json:"sport_types"`
+		Country    string   `json:"country"`
 	}
 	if len(args) > 0 && args[0].String() != "" {
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
@@ -89,40 +98,33 @@ func getPhotos(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	page := req.Page
-	if page == 0 {
-		page = 1
-	}
-	perPage := req.PerPage
-	if perPage == 0 {
-		perPage = 50
-	}
-
 	ctx := context.Background()
-	result, err := photos.List(ctx, athleteID, storage.PhotoListFilters{}, page, perPage)
+	result, err := bridge.photosService.List(ctx, services.ListPhotosInput{
+		AthleteID:  bridge.athleteID,
+		SportTypes: req.SportTypes,
+		Country:    req.Country,
+		Page:       req.Page,
+		PerPage:    req.PerPage,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, p := range result.Items {
-		items[i] = photoListItemToMap(p)
-	}
-
-	totalPages := (result.Total + perPage - 1) / perPage
-
 	return toJSON(map[string]interface{}{
 		"ok":          true,
-		"data":        items,
+		"data":        result.Data,
 		"total":       result.Total,
-		"page":        page,
-		"per_page":    perPage,
-		"total_pages": totalPages,
+		"page":        result.Page,
+		"per_page":    result.PerPage,
+		"total_pages": result.TotalPages,
+		"countries":   result.Countries,
+		"sport_types": result.SportTypes,
 	})
 }
 
 // getActivityPhotos retrieves photos for a specific activity
 // Called from JS: goStorage.getActivityPhotos(activityId)
+//wasm:export
 func getActivityPhotos(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getActivityPhotos")
 
@@ -133,61 +135,13 @@ func getActivityPhotos(this js.Value, args []js.Value) interface{} {
 	activityID := int64(args[0].Int())
 	ctx := context.Background()
 
-	photoList, err := photos.ListByActivity(ctx, athleteID, activityID)
+	items, err := bridge.photosService.ListByActivity(ctx, services.GetActivityPhotosInput{
+		AthleteID:  bridge.athleteID,
+		ActivityID: activityID,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	items := make([]map[string]interface{}, len(photoList))
-	for i, p := range photoList {
-		items[i] = photoToMap(p)
-	}
-
 	return dataJSON(items)
-}
-
-// ============================================================================
-// Photo Map Helpers
-// ============================================================================
-
-func photoListItemToMap(p storage.PhotoListItem) map[string]interface{} {
-	m := map[string]interface{}{
-		"id":               p.ID,
-		"athlete_id":       p.AthleteID,
-		"activity_id":      p.ActivityID,
-		"url":              p.URL,
-		"thumbnail_url":    p.ThumbnailURL,
-		"created_at":       p.CreatedAt.Format(time.RFC3339),
-		"activity_name":    p.ActivityName,
-		"sport_type":       p.SportType,
-		"start_date_local": p.StartDateLocal.Format(time.RFC3339),
-	}
-	if p.Caption != "" {
-		m["caption"] = p.Caption
-	}
-	if len(p.Location) > 0 {
-		m["location"] = string(p.Location)
-	}
-	if p.LocationCountry != "" {
-		m["location_country"] = p.LocationCountry
-	}
-	return m
-}
-
-func photoToMap(p storage.Photo) map[string]interface{} {
-	m := map[string]interface{}{
-		"id":            p.ID,
-		"athlete_id":    p.AthleteID,
-		"activity_id":   p.ActivityID,
-		"url":           p.URL,
-		"thumbnail_url": p.ThumbnailURL,
-		"created_at":    p.CreatedAt.Format(time.RFC3339),
-	}
-	if p.Caption != "" {
-		m["caption"] = p.Caption
-	}
-	if len(p.Location) > 0 {
-		m["location"] = string(p.Location)
-	}
-	return m
 }

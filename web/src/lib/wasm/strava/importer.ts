@@ -28,6 +28,7 @@ import {
   createDataChangedEvent,
   type DataEventListener,
 } from '@/lib/data/events'
+import { ImportEventBatchSize, ImportEventFlushIntervalMs } from '@/lib/shared/constants.gen'
 import {
   saveActivity as goSaveActivity,
   saveStream as goSaveStream,
@@ -37,6 +38,10 @@ import {
   saveBestEfforts as goSaveBestEfforts,
   savePhoto as goSavePhoto,
   computePowerBestEfforts as goComputePowerBestEfforts,
+  createSyncRun as goCreateSyncRun,
+  updateSyncRun as goUpdateSyncRun,
+  completeSyncRun as goCompleteSyncRun,
+  getSyncHistory as goGetSyncHistory,
 } from '../go-storage'
 
 // Rate limiting delays between API calls (milliseconds)
@@ -61,6 +66,7 @@ export interface ImportOptions {
   fullSync?: boolean
   skipStreams?: boolean
   skipSegments?: boolean
+  skipBestEfforts?: boolean
   skipPhotos?: boolean
   resume?: boolean
 }
@@ -277,18 +283,6 @@ let etaState: ETAState = createETAEstimator()
 // Event emitter for reactive updates
 const importEventEmitter = new DataEventEmitter()
 
-// SSE Event Emission Constants
-// These constants control how frequently progress events are emitted.
-// IMPORTANT: Keep in sync with internal/importer/importer.go
-// - EVENT_BATCH_SIZE (25) <-> eventBatchSize (25)
-// - EVENT_FLUSH_INTERVAL_MS (2000) <-> eventFlushInterval (2s)
-
-// EVENT_BATCH_SIZE controls batch-based event emission (emit progress every N items).
-const EVENT_BATCH_SIZE = 25
-
-// EVENT_FLUSH_INTERVAL_MS controls time-based event emission (emit if this much time elapsed).
-const EVENT_FLUSH_INTERVAL_MS = 2000
-
 // Track last event emission time for time-based flush
 let lastEventEmitTime = 0
 
@@ -334,15 +328,15 @@ function emitProgressEvent(): void {
 /**
  * Check if we should emit a progress event based on batch count or time elapsed.
  * Emits if either:
- * - itemsDone is a multiple of EVENT_BATCH_SIZE (batch threshold)
- * - More than EVENT_FLUSH_INTERVAL_MS has elapsed since last emit (time threshold)
+ * - itemsDone is a multiple of ImportEventBatchSize (batch threshold)
+ * - More than ImportEventFlushIntervalMs has elapsed since last emit (time threshold)
  */
 function shouldEmitProgress(itemsDone: number): boolean {
-  if (itemsDone % EVENT_BATCH_SIZE === 0) {
+  if (itemsDone % ImportEventBatchSize === 0) {
     return true
   }
   const now = Date.now()
-  if (now - lastEventEmitTime >= EVENT_FLUSH_INTERVAL_MS) {
+  if (now - lastEventEmitTime >= ImportEventFlushIntervalMs) {
     return true
   }
   return false
@@ -358,24 +352,15 @@ export function cancelImport(): void {
     // If cancelling from paused state, update sync_history immediately
     // (running state will be updated when the import loop catches the cancel)
     if (wasPaused && importProgress.sync_run_id) {
-      const db = getDatabase()
       try {
-        const completedAt = new Date().toISOString()
-        db.exec(
-          `UPDATE sync_history SET
-            completed_at = ?, status = 'canceled',
-            activities_total = ?, activities_imported = ?,
-            streams_imported = ?, failed_count = ?
-          WHERE id = ?`,
-          [
-            completedAt,
-            importProgress.activities_total,
-            importProgress.activities_done,
-            importProgress.streams_done,
-            importProgress.failed_count,
-            importProgress.sync_run_id,
-          ]
-        )
+        goCompleteSyncRun({
+          id: importProgress.sync_run_id,
+          status: 'canceled',
+          activities_total: importProgress.activities_total,
+          activities_imported: importProgress.activities_done,
+          streams_imported: importProgress.streams_done,
+          failed_count: importProgress.failed_count,
+        })
       } catch (err) {
         console.error('[Import] Failed to update sync_history on cancel:', err)
       }
@@ -407,55 +392,32 @@ export function hasResumableImport(): boolean {
 }
 
 export function getSyncHistory(limit = 10): SyncRun[] {
-  const db = getDatabase()
   const athlete = getAthlete()
   if (!athlete) return []
 
-  const rows = db.query<{
-    id: number
-    athlete_id: number
-    started_at: string
-    completed_at: string | null
-    duration_seconds: number | null
-    status: string
-    error: string | null
-    activities_total: number
-    activities_imported: number
-    activities_skipped: number
-    streams_imported: number
-    failed_count: number
-    full_sync: number
-    skip_streams: number
-    newest_activity_date: string | null
-  }>(
-    `SELECT id, athlete_id, started_at, completed_at, duration_seconds,
-            status, error, activities_total, activities_imported,
-            activities_skipped, streams_imported, failed_count,
-            full_sync, skip_streams, newest_activity_date
-     FROM sync_history
-     WHERE athlete_id = ?
-     ORDER BY started_at DESC
-     LIMIT ?`,
-    [athlete.id, limit]
-  )
-
-  return rows.map((r) => ({
-    id: r.id,
-    athlete_id: r.athlete_id,
-    started_at: r.started_at,
-    completed_at: r.completed_at ?? undefined,
-    duration_seconds: r.duration_seconds ?? undefined,
-    status: r.status,
-    error: r.error ?? undefined,
-    activities_total: r.activities_total,
-    activities_imported: r.activities_imported,
-    activities_skipped: r.activities_skipped,
-    streams_imported: r.streams_imported,
-    failed_count: r.failed_count,
-    full_sync: r.full_sync === 1,
-    skip_streams: r.skip_streams === 1,
-    newest_activity_date: r.newest_activity_date ?? undefined,
-  }))
+  try {
+    const items = goGetSyncHistory(limit)
+    return items.map((r) => ({
+      id: r.id,
+      athlete_id: r.athlete_id,
+      started_at: r.started_at,
+      completed_at: r.completed_at,
+      duration_seconds: r.duration_seconds,
+      status: r.status,
+      error: r.error,
+      activities_total: r.activities_total,
+      activities_imported: r.activities_imported,
+      activities_skipped: r.activities_skipped,
+      streams_imported: r.streams_imported,
+      failed_count: r.failed_count,
+      full_sync: r.full_sync,
+      skip_streams: r.skip_streams,
+      newest_activity_date: r.newest_activity_date,
+    }))
+  } catch (err) {
+    console.error('[Import] Failed to get sync history:', err)
+    return []
+  }
 }
 
 export function getLatestSync(): SyncRun | null {
@@ -603,21 +565,15 @@ function checkPauseRequested(
 
   // Update sync_history to reflect paused status
   if (importProgress.sync_run_id) {
-    const db = getDatabase()
     try {
-      db.exec(
-        `UPDATE sync_history SET status = 'paused',
-          activities_total = ?, activities_imported = ?,
-          streams_imported = ?, failed_count = ?
-        WHERE id = ?`,
-        [
-          importProgress.activities_total,
-          importProgress.activities_done,
-          importProgress.streams_done,
-          importProgress.failed_count,
-          importProgress.sync_run_id,
-        ]
-      )
+      goUpdateSyncRun({
+        id: importProgress.sync_run_id,
+        status: 'paused',
+        activities_total: importProgress.activities_total,
+        activities_imported: importProgress.activities_done,
+        streams_imported: importProgress.streams_done,
+        failed_count: importProgress.failed_count,
+      })
     } catch (err) {
       console.error('[Import] Failed to update sync_history on pause:', err)
     }
@@ -675,7 +631,6 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   lastEventEmitTime = Date.now() // Reset for time-based flush
   const db = getDatabase()
   const athleteId = athlete.id
-  const startedAt = new Date().toISOString()
 
   // Check for resumable state
   const savedState = options.resume ? loadImportState() : null
@@ -690,21 +645,26 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
   // When resuming, the previous sync run retains its terminal state (paused/failed)
   let syncRunId: number | null = null
   try {
-    db.exec(
-      `INSERT INTO sync_history (
-        athlete_id, started_at, status, full_sync, skip_streams
-      ) VALUES (?, ?, 'running', ?, ?)`,
-      [athleteId, startedAt, effectiveOptions.fullSync ? 1 : 0, effectiveOptions.skipStreams ? 1 : 0]
-    )
-    const result = db.queryOne<{ id: number }>('SELECT last_insert_rowid() as id')
-    syncRunId = result?.id ?? null
+    syncRunId = goCreateSyncRun({
+      athlete_id: athleteId,
+      full_sync: effectiveOptions.fullSync ?? false,
+      skip_streams: effectiveOptions.skipStreams ?? false,
+      skip_segments: effectiveOptions.skipSegments ?? false,
+      skip_best_efforts: effectiveOptions.skipBestEfforts ?? false,
+      skip_photos: effectiveOptions.skipPhotos ?? false,
+    })
 
-    // If resuming, update the old sync run to mark it was resumed
+    // If resuming, mark the old sync run as resumed
     if (isResuming && savedState.syncRunId) {
-      db.exec(
-        `UPDATE sync_history SET status = 'resumed', error = ? WHERE id = ? AND status IN ('paused', 'running')`,
-        [`Resumed in sync run ${syncRunId}`, savedState.syncRunId]
-      )
+      try {
+        goCompleteSyncRun({
+          id: savedState.syncRunId,
+          status: 'canceled',
+          error: `Resumed in sync run ${syncRunId}`,
+        })
+      } catch (err) {
+        console.error('[Import] Failed to mark previous sync as canceled:', err)
+      }
     }
   } catch (err) {
     console.error('[Import] Failed to create sync history record:', err)
@@ -875,26 +835,19 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
 
     // Update sync history
     if (syncRunId) {
-      const completedAt = new Date().toISOString()
-      const durationSeconds = Math.floor((new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-      db.exec(
-        `UPDATE sync_history SET
-          completed_at = ?, duration_seconds = ?, status = 'completed',
-          activities_total = ?, activities_imported = ?, activities_skipped = ?,
-          streams_imported = ?, failed_count = ?, newest_activity_date = ?
-        WHERE id = ?`,
-        [
-          completedAt,
-          durationSeconds,
-          importProgress.activities_total,
-          importProgress.activities_done,
-          0, // skipped is calculated differently now
-          importProgress.streams_done,
-          importProgress.failed_count,
-          state.newestActivityDate,
-          syncRunId,
-        ]
-      )
+      try {
+        goCompleteSyncRun({
+          id: syncRunId,
+          status: 'completed',
+          activities_total: importProgress.activities_total,
+          activities_imported: importProgress.activities_done,
+          streams_imported: importProgress.streams_done,
+          failed_count: importProgress.failed_count,
+          newest_activity_date: state.newestActivityDate ?? undefined,
+        })
+      } catch (err) {
+        console.error('[Import] Failed to complete sync run:', err)
+      }
       await db.persist()
     }
   } catch (error) {
@@ -922,31 +875,23 @@ export async function startImport(options: ImportOptions = {}): Promise<void> {
 
     // Update sync history with failure/cancellation
     if (syncRunId) {
-      const completedAt = new Date().toISOString()
-      const durationSeconds = Math.floor((new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-      db.exec(
-        `UPDATE sync_history SET
-          completed_at = ?, duration_seconds = ?, status = ?,
-          error = ?, activities_total = ?, activities_imported = ?,
-          activities_skipped = ?, streams_imported = ?, failed_count = ?
-        WHERE id = ?`,
-        [
-          completedAt,
-          durationSeconds,
-          importProgress.status === 'canceled' ? 'canceled' : 'failed',
-          importProgress.error ?? null,
-          importProgress.activities_total,
-          importProgress.activities_done,
-          0,
-          importProgress.streams_done,
-          importProgress.failed_count,
-          syncRunId,
-        ]
-      )
+      try {
+        goCompleteSyncRun({
+          id: syncRunId,
+          status: importProgress.status === 'canceled' ? 'canceled' : 'failed',
+          error: importProgress.error ?? undefined,
+          activities_total: importProgress.activities_total,
+          activities_imported: importProgress.activities_done,
+          streams_imported: importProgress.streams_done,
+          failed_count: importProgress.failed_count,
+        })
+      } catch (err) {
+        console.error('[Import] Failed to record sync failure:', err)
+      }
       try {
         await db.persist()
-      } catch {
-        // Ignore persist error during failure handling
+      } catch (err) {
+        console.error('[Import] Failed to persist database during failure handling:', err)
       }
     }
 
@@ -1202,8 +1147,8 @@ async function runActivityDetailsPhase(
         }
       }
 
-      // Store best efforts
-      if (detailed.best_efforts && detailed.best_efforts.length > 0) {
+      // Store best efforts (unless skipped)
+      if (!options.skipBestEfforts && detailed.best_efforts && detailed.best_efforts.length > 0) {
         for (const effort of detailed.best_efforts) {
           storeBestEffort(athleteId, activityId, effort)
         }
@@ -1554,6 +1499,7 @@ function storeSegmentEffort(
 
 /**
  * Store best effort. Returns true on success, false on failure.
+ * Note: Go WASM handles canonicalization of distance_type from name and distance_m.
  */
 function storeBestEffort(
   athleteId: number,
@@ -1561,15 +1507,12 @@ function storeBestEffort(
   effort: StravaBestEffort,
 ): boolean {
   try {
-    // Map effort name to distance type
-    const distanceType = effort.name.toLowerCase().replace(/\s+/g, '_')
-
     goSaveBestEfforts({
       athlete_id: athleteId,
       activity_id: activityId,
       efforts: [
         {
-          distance_type: distanceType,
+          name: effort.name,
           distance_m: effort.distance,
           elapsed_time: effort.elapsed_time,
           start_index: effort.start_index,

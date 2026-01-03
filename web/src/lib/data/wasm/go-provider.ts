@@ -39,7 +39,7 @@ import type {
   DistributionSlice,
   Gear,
   GearFilters,
-  GearResponse,
+  GearListResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
   SegmentCountryStat,
@@ -191,6 +191,8 @@ export class GoWasmProvider implements DataProvider {
       commute: filters.commute,
       trainer: filters.trainer,
       search: filters.search,
+      order_by: filters.order_by,
+      order_dir: filters.order_dir,
     })
 
     return {
@@ -348,13 +350,37 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async getDashboardConfig(): Promise<DashboardConfig> {
-    // TODO: Implement in Go
-    return { version: 1, widgets: [] }
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getDashboardConfig()
+    return {
+      version: result.version,
+      widgets: result.widgets.map((w) => ({
+        id: w.id,
+        width: w.width,
+        height: w.height,
+        hidden: w.hidden,
+        settings: w.settings,
+      })),
+    }
   }
 
-  async updateDashboardConfig(_config: DashboardConfig): Promise<DashboardConfig> {
-    // TODO: Implement in Go
-    return { version: 1, widgets: [] }
+  async updateDashboardConfig(config: DashboardConfig): Promise<DashboardConfig> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.updateDashboardConfig(config)
+    return {
+      version: result.version,
+      widgets: result.widgets.map((w) => ({
+        id: w.id,
+        width: w.width,
+        height: w.height,
+        hidden: w.hidden,
+        settings: w.settings,
+      })),
+    }
   }
 
   // ============================================================================
@@ -367,6 +393,9 @@ export class GoWasmProvider implements DataProvider {
     const data = goStorage.getHeatmapData({
       sport_type: filters.sport_type,
       commute: filters.commute,
+      workout_type: filters.workout_type,
+      limit: filters.limit,
+      offset: filters.offset,
     })
 
     return {
@@ -392,8 +421,14 @@ export class GoWasmProvider implements DataProvider {
     const result = goStorage.getEddingtonData({ sport_types: sportType ? [sportType] : undefined })
     return {
       number: result.number,
-      distribution: [], // Not provided by Go implementation
-      next_steps: [], // Would need to calculate from history
+      distribution: result.distribution.map((d) => ({
+        date: d.date,
+        distance: d.distance,
+      })),
+      next_steps: result.next_steps.map((s) => ({
+        target: s.target,
+        rides_needed: s.rides_needed,
+      })),
     }
   }
 
@@ -712,7 +747,7 @@ export class GoWasmProvider implements DataProvider {
   // ============================================================================
   // Gear
   // ============================================================================
-  async getGear(filters?: GearFilters): Promise<GearResponse> {
+  async getGear(filters?: GearFilters): Promise<GearListResponse> {
     this.assertInitialized()
     this.getAthleteId()
 
@@ -769,7 +804,7 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getCustomGear(filters?: GearFilters): Promise<GearResponse> {
+  async getCustomGear(filters?: GearFilters): Promise<GearListResponse> {
     this.assertInitialized()
     this.getAthleteId()
 

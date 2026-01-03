@@ -144,4 +144,4 @@ WHERE gear_id = ?1;
 -- Get activity count for a piece of gear.
 SELECT COUNT(*) AS count
 FROM activities
-WHERE gear_id = ?1;
+WHERE gear_id = ?1 AND athlete_id = ?2;

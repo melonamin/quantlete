@@ -1,12 +1,36 @@
 // Code generation script for TypeScript types from Go WASM bridge structs.
-// Parses cmd/wasm/*.go files and generates TypeScript interfaces
-// that match the JSON serialization format used by the WASM bridge.
+//
+// This script parses Go source files from:
+//   - cmd/wasm/*.go (anonymous request structs)
+//   - internal/storage/*.go (database-facing structs)
+//   - internal/api/handlers/*.go (API response structs)
+//
+// And generates TypeScript interfaces in web/src/lib/wasm/types.gen.ts that
+// match the JSON serialization format used by the WASM bridge.
+//
+// # Parser Limitations (regex-based, intentionally simple)
+//
+// This parser uses regular expressions rather than Go's AST parser for simplicity.
+// The following limitations apply:
+//
+//   - Only fields with `json:"..."` tags are emitted
+//   - The json tag must be the first (or only) struct tag
+//   - Embedded/anonymous struct fields are not supported
+//   - Multi-line field declarations are not supported
+//   - Only basic type aliases (type X <primitive>) are handled
+//   - Complex generic types are not supported
+//
+// If you encounter issues with specific struct definitions, consider adding
+// manual type definitions in the appropriate web/src/lib/api/*.ts file.
+//
+// Run with: just generate-ts-types
 package main
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,21 +63,60 @@ func main() {
 	}
 
 	wasmDir := filepath.Join(root, "cmd", "wasm")
+	storageDir := filepath.Join(root, "internal", "storage")
+	handlersDir := filepath.Join(root, "internal", "api", "handlers")
 	tsOutput := filepath.Join(root, "web", "src", "lib", "wasm", "types.gen.ts")
 
-	// Parse all WASM Go files
-	structs, err := parseWasmDir(wasmDir)
+	// Parse WASM Go files (anonymous structs for inputs)
+	wasmStructs, err := parseDir(wasmDir, true)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing WASM files: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Parse storage Go files (named structs for responses)
+	storageStructs, err := parseDir(storageDir, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing storage files: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Parse handlers Go files (named structs for API responses)
+	handlerStructs, err := parseDir(handlersDir, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing handler files: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Combine all structs
+	allStructs := append(wasmStructs, storageStructs...)
+	allStructs = append(allStructs, handlerStructs...)
+
+	// Sort and deduplicate
+	sort.Slice(allStructs, func(i, j int) bool {
+		return allStructs[i].Name < allStructs[j].Name
+	})
+
+	seen := make(map[string]bool)
+	var unique []GoStruct
+	for _, s := range allStructs {
+		if !seen[s.Name] {
+			seen[s.Name] = true
+			unique = append(unique, s)
+		}
+	}
+
+	// Populate knownStructs for cross-referencing types
+	for _, s := range unique {
+		knownStructs[s.Name] = true
+	}
+
 	// Generate TypeScript code
-	if err := generateTypeScript(structs, tsOutput); err != nil {
+	if err := generateTypeScript(unique, tsOutput); err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating TypeScript: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Generated: %s (%d types)\n", tsOutput, len(structs))
+	fmt.Printf("Generated: %s (%d types)\n", tsOutput, len(unique))
 }
 
 func findProjectRoot() (string, error) {
@@ -74,7 +137,10 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-func parseWasmDir(dir string) ([]GoStruct, error) {
+// parseDir parses Go files in a directory.
+// If anonOnly is true, only anonymous structs (var x struct{}) are parsed.
+// If false, named structs (type X struct{}) are also parsed.
+func parseDir(dir string, anonOnly bool) ([]GoStruct, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading directory: %w", err)
@@ -85,9 +151,13 @@ func parseWasmDir(dir string) ([]GoStruct, error) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 			continue
 		}
+		// Skip test files
+		if strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
 
 		path := filepath.Join(dir, entry.Name())
-		structs, err := parseGoFile(path)
+		structs, err := parseGoFile(path, anonOnly)
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", entry.Name(), err)
 		}
@@ -95,27 +165,16 @@ func parseWasmDir(dir string) ([]GoStruct, error) {
 		allStructs = append(allStructs, structs...)
 	}
 
-	// Sort by name for deterministic output
-	sort.Slice(allStructs, func(i, j int) bool {
-		return allStructs[i].Name < allStructs[j].Name
-	})
-
-	// Deduplicate by name (keep first occurrence)
-	seen := make(map[string]bool)
-	var unique []GoStruct
-	for _, s := range allStructs {
-		if !seen[s.Name] {
-			seen[s.Name] = true
-			unique = append(unique, s)
-		}
-	}
-
-	return unique, nil
+	return allStructs, nil
 }
 
 var (
 	// Match anonymous struct: var req struct { ... }
 	anonStructRe = regexp.MustCompile(`var\s+(\w+)\s+struct\s*\{`)
+	// Match named struct: type StructName struct { ... }
+	namedStructRe = regexp.MustCompile(`^type\s+(\w+)\s+struct\s*\{`)
+	// Match type alias: type TypeName BaseType
+	typeAliasRe = regexp.MustCompile(`^type\s+(\w+)\s+(int|int8|int16|int32|int64|uint|uint8|uint16|uint32|uint64|float32|float64|string|bool)\s*$`)
 	// Match field with JSON tag: FieldName Type `json:"json_name"`
 	fieldRe = regexp.MustCompile(`^\s*(\w+)\s+(\S+)\s+` + "`" + `json:"([^"]+)"` + "`")
 	// Match function definition: func funcName(...)
@@ -124,7 +183,13 @@ var (
 	commentRe = regexp.MustCompile(`^//\s*(.*)$`)
 )
 
-func parseGoFile(path string) ([]GoStruct, error) {
+// typeAliases maps Go type aliases to their base types (e.g., WidgetWidth -> int).
+// This is a process-global variable populated during parsing and used during
+// type conversion. It is NOT concurrency-safe and is intended for single-threaded
+// CLI execution only. If parsing is ever parallelized, this would need synchronization.
+var typeAliases = make(map[string]string)
+
+func parseGoFile(path string, anonOnly bool) ([]GoStruct, error) {
 	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, err
@@ -155,7 +220,14 @@ func parseGoFile(path string) ([]GoStruct, error) {
 			continue
 		}
 
-		// Check for struct start
+		// Track type aliases (e.g., type WidgetWidth int)
+		if matches := typeAliasRe.FindStringSubmatch(line); matches != nil {
+			typeAliases[matches[1]] = matches[2]
+			lastComment = ""
+			continue
+		}
+
+		// Check for anonymous struct start
 		if matches := anonStructRe.FindStringSubmatch(line); matches != nil {
 			structName := deriveTypeName(matches[1], currentFunc, lastComment)
 			current = &GoStruct{
@@ -167,6 +239,34 @@ func parseGoFile(path string) ([]GoStruct, error) {
 			braceDepth = 1
 			lastComment = ""
 			continue
+		}
+
+		// Check for named struct start (only if not anonOnly)
+		if !anonOnly {
+			if matches := namedStructRe.FindStringSubmatch(line); matches != nil {
+				structName := matches[1]
+				// Skip non-exported types (lowercase first letter)
+				if len(structName) > 0 && structName[0] >= 'a' && structName[0] <= 'z' {
+					lastComment = ""
+					continue
+				}
+				// Skip repository/handler types (they're not data types)
+				if strings.HasSuffix(structName, "Repository") ||
+					strings.HasSuffix(structName, "Handler") ||
+					strings.HasSuffix(structName, "Router") {
+					lastComment = ""
+					continue
+				}
+				current = &GoStruct{
+					Name:     structName,
+					FileName: filepath.Base(path),
+					Comment:  lastComment,
+				}
+				inStruct = true
+				braceDepth = 1
+				lastComment = ""
+				continue
+			}
 		}
 
 		// Inside struct, parse fields
@@ -187,10 +287,15 @@ func parseGoFile(path string) ([]GoStruct, error) {
 
 			// Parse field
 			if matches := fieldRe.FindStringSubmatch(line); matches != nil {
+				jsonName := parseJSONTag(matches[3])
+				// Skip ignored fields (json:"-")
+				if isIgnoredField(jsonName) {
+					continue
+				}
 				field := GoField{
 					GoName:   matches[1],
 					GoType:   matches[2],
-					JSONName: parseJSONTag(matches[3]),
+					JSONName: jsonName,
 					Optional: isOptionalType(matches[2]) || hasOmitempty(matches[3]),
 				}
 				current.Fields = append(current.Fields, field)
@@ -245,6 +350,23 @@ func parseJSONTag(tag string) string {
 	return parts[0]
 }
 
+// isIgnoredField checks if a field should be skipped (json:"-")
+func isIgnoredField(jsonName string) bool {
+	return jsonName == "-"
+}
+
+// needsQuoting checks if a field name needs to be quoted in TypeScript
+func needsQuoting(name string) bool {
+	// Field names with dots, dashes, or other special chars need quoting
+	for _, r := range name {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_') {
+			return true
+		}
+	}
+	return false
+}
+
 // hasOmitempty checks if JSON tag has omitempty
 func hasOmitempty(tag string) bool {
 	return strings.Contains(tag, "omitempty")
@@ -255,11 +377,26 @@ func isOptionalType(goType string) bool {
 	return strings.HasPrefix(goType, "*")
 }
 
+// knownStructs holds all parsed struct names for cross-referencing during
+// type conversion. When a field references another struct (e.g., storage.BestEffort),
+// this map is checked to determine if the type should be rendered as a known
+// interface name or as "unknown".
+//
+// This is a process-global variable populated in main() after parsing is complete.
+// It is NOT concurrency-safe and is intended for single-threaded CLI execution only.
+// If parsing is ever parallelized, this would need synchronization.
+var knownStructs = make(map[string]bool)
+
 // goTypeToTS converts a Go type to TypeScript
 func goTypeToTS(goType string) string {
 	// Handle pointer types
 	isPointer := strings.HasPrefix(goType, "*")
 	baseType := strings.TrimPrefix(goType, "*")
+
+	// Resolve type aliases (e.g., WidgetWidth -> int -> number)
+	if aliasBase, ok := typeAliases[baseType]; ok {
+		baseType = aliasBase
+	}
 
 	var tsType string
 	switch baseType {
@@ -271,6 +408,9 @@ func goTypeToTS(goType string) string {
 		tsType = "string"
 	case "bool":
 		tsType = "boolean"
+	case "time.Time", "SQLiteTime":
+		// time.Time and SQLiteTime serialize to ISO 8601 string in JSON
+		tsType = "string"
 	case "interface{}":
 		tsType = "unknown"
 	case "json.RawMessage":
@@ -281,8 +421,42 @@ func goTypeToTS(goType string) string {
 			elemType := strings.TrimPrefix(baseType, "[]")
 			return goTypeToTS(elemType) + "[]"
 		}
-		// Unknown type, use unknown
-		tsType = "unknown"
+		// Check for map types: map[K]V -> Record<K, V>
+		if strings.HasPrefix(baseType, "map[") {
+			// Find the closing bracket for the key type
+			closeBracket := strings.Index(baseType, "]")
+			if closeBracket > 4 { // "map[" is 4 chars
+				keyType := baseType[4:closeBracket]
+				valueType := baseType[closeBracket+1:]
+
+				// Convert Go key type to TS
+				var tsKeyType string
+				switch keyType {
+				case "string":
+					tsKeyType = "string"
+				case "int", "int8", "int16", "int32", "int64",
+					"uint", "uint8", "uint16", "uint32", "uint64":
+					tsKeyType = "number"
+				default:
+					tsKeyType = "string" // Fallback for unknown key types
+				}
+
+				return fmt.Sprintf("Record<%s, %s>", tsKeyType, goTypeToTS(valueType))
+			}
+		}
+		// Strip package prefix (e.g., "storage.DailyTrainingLoadPoint" -> "DailyTrainingLoadPoint")
+		typeName := baseType
+		if idx := strings.LastIndex(baseType, "."); idx >= 0 {
+			typeName = baseType[idx+1:]
+		}
+		// Check if it's a known struct type
+		if knownStructs[typeName] {
+			tsType = typeName
+		} else {
+			// Unknown type - log warning for visibility
+			log.Printf("WARNING: unknown Go type %q (base: %q) - falling back to 'unknown'", goType, typeName)
+			tsType = "unknown"
+		}
 	}
 
 	if isPointer {
@@ -385,7 +559,12 @@ func generateTypeScript(structs []GoStruct, output string) error {
 				if f.Optional {
 					optionalMark = "?"
 				}
-				buf.WriteString(fmt.Sprintf("  %s%s: %s\n", f.JSONName, optionalMark, tsType))
+				// Quote field names with special characters
+				fieldName := f.JSONName
+				if needsQuoting(fieldName) {
+					fieldName = fmt.Sprintf("'%s'", fieldName)
+				}
+				buf.WriteString(fmt.Sprintf("  %s%s: %s\n", fieldName, optionalMark, tsType))
 			}
 
 			buf.WriteString("}\n\n")

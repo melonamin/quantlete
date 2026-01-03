@@ -5,19 +5,26 @@ package main
 import (
 	"context"
 	"syscall/js"
+
+	"github.com/melonamin/quantlete/internal/services"
 )
 
 // ============================================================================
 // Rewind Functions
 // ============================================================================
 
+//wasm:category Rewind
+
 // getRewindYears returns years that have activity data for rewind
 // Called from JS: goStorage.getRewindYears()
+//wasm:export
 func getRewindYears(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getRewindYears")
 
 	ctx := context.Background()
-	years, err := stats.ListRewindYears(ctx, athleteID)
+	years, err := bridge.statsService.GetRewindYears(ctx, services.GetRewindYearsInput{
+		AthleteID: bridge.athleteID,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -30,6 +37,7 @@ func getRewindYears(this js.Value, args []js.Value) interface{} {
 
 // getRewind returns the rewind report for a specific year
 // Called from JS: goStorage.getRewind(year)
+//wasm:export
 func getRewind(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getRewind")
 
@@ -39,7 +47,10 @@ func getRewind(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	report, err := stats.GetRewind(ctx, athleteID, year)
+	report, err := bridge.statsService.GetRewind(ctx, services.GetRewindInput{
+		AthleteID: bridge.athleteID,
+		Year:      year,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}

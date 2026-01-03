@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"syscall/js"
-	"time"
 
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -16,15 +16,20 @@ import (
 // Challenges
 // ============================================================================
 
+//wasm:category Challenges
+
 // getChallenges returns paginated challenges for the athlete
 // Called from JS: goStorage.getChallenges(filtersJSON)
+//wasm:export
 func getChallenges(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getChallenges")
 
 	var req struct {
-		Month   string `json:"month"`
-		Page    int    `json:"page"`
-		PerPage int    `json:"per_page"`
+		Month    string `json:"month"`
+		Page     int    `json:"page"`
+		PerPage  int    `json:"per_page"`
+		OrderBy  string `json:"order_by"`
+		OrderDir string `json:"order_dir"`
 	}
 	if len(args) > 0 && args[0].String() != "" {
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
@@ -33,47 +38,21 @@ func getChallenges(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	filters := storage.ChallengeFilters{
-		Month: req.Month,
-	}
-	filters.Page = req.Page
-	filters.PerPage = req.PerPage
-
-	result, err := challenges.ListPaginated(ctx, athleteID, filters)
+	result, err := bridge.challengesService.List(ctx, services.ListChallengesInput{
+		AthleteID: bridge.athleteID,
+		Month:     req.Month,
+		Page:      req.Page,
+		PerPage:   req.PerPage,
+		OrderBy:   req.OrderBy,
+		OrderDir:  req.OrderDir,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, c := range result.Items {
-		item := map[string]interface{}{
-			"id":         c.ID,
-			"athlete_id": c.AthleteID,
-			"name":       c.Name,
-			"created_at": c.CreatedAt.Format(time.RFC3339),
-		}
-		if c.Slug != "" {
-			item["slug"] = c.Slug
-		}
-		if c.BadgeURL != "" {
-			item["badge_url"] = c.BadgeURL
-		}
-		if c.LocalBadgeURL != "" {
-			item["local_badge_url"] = c.LocalBadgeURL
-		}
-		if c.CompletionDate != nil {
-			item["completion_date"] = c.CompletionDate.Format(time.RFC3339)
-		}
-		if c.Month != "" {
-			item["month"] = c.Month
-		}
-		items[i] = item
-	}
-
 	return toJSON(map[string]interface{}{
 		"ok":          true,
-		"data":        items,
+		"data":        result.Data,
 		"total":       result.Total,
 		"page":        result.Page,
 		"per_page":    result.PerPage,
@@ -85,15 +64,18 @@ func getChallenges(this js.Value, args []js.Value) interface{} {
 // Training Goals
 // ============================================================================
 
+//wasm:category Training Goals
+
 // getTrainingGoals returns training goals config and progress
 // Called from JS: goStorage.getTrainingGoals(year?)
+//wasm:export
 func getTrainingGoals(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getTrainingGoals")
 
 	ctx := context.Background()
 
 	// Get config
-	cfg, err := goals.GetConfig(ctx, athleteID)
+	cfg, err := bridge.goals.GetConfig(ctx, bridge.athleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -103,7 +85,7 @@ func getTrainingGoals(this js.Value, args []js.Value) interface{} {
 	for _, sport := range cfg.Sports {
 		sportProgress := make(map[string]interface{})
 		for period := range sport.Targets {
-			p, err := goals.GetProgress(ctx, athleteID, sport.SportTypes, period)
+			p, err := bridge.goals.GetProgress(ctx, bridge.athleteID, sport.SportTypes, period)
 			if err != nil {
 				continue
 			}
@@ -126,6 +108,7 @@ func getTrainingGoals(this js.Value, args []js.Value) interface{} {
 
 // updateTrainingGoals updates training goals config
 // Called from JS: goStorage.updateTrainingGoals(configJSON)
+//wasm:export
 func updateTrainingGoals(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("updateTrainingGoals")
 
@@ -139,7 +122,7 @@ func updateTrainingGoals(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := goals.UpsertConfig(ctx, athleteID, cfg); err != nil {
+	if err := bridge.goals.UpsertConfig(ctx, bridge.athleteID, cfg); err != nil {
 		return errorJSON(err)
 	}
 

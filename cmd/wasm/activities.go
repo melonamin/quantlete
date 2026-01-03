@@ -9,6 +9,8 @@ import (
 	"syscall/js"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -16,22 +18,25 @@ import (
 // Auth
 // ============================================================================
 
+//wasm:category Auth
+
 // getAuthStatus returns the current authentication status
 // Called from JS: goStorage.getAuthStatus()
+//wasm:export
 func getAuthStatus(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getAuthStatus")
 
 	ctx := context.Background()
 
 	// Check if we have an athlete
-	if athleteID == 0 {
+	if bridge == nil || bridge.athleteID == 0 {
 		return toJSON(map[string]interface{}{
 			"authenticated": false,
 		})
 	}
 
 	// Get athlete info
-	athlete, err := athletes.GetByID(ctx, athleteID)
+	athlete, err := bridge.athletes.GetByID(ctx, bridge.athleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -58,8 +63,11 @@ func getAuthStatus(this js.Value, args []js.Value) interface{} {
 // Activities Read
 // ============================================================================
 
+//wasm:category Activities - Read
+
 // getActivities retrieves activities with filters and pagination
 // Called from JS: goStorage.getActivities(filtersJSON)
+//wasm:export
 func getActivities(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getActivities")
 
@@ -86,75 +94,56 @@ func getActivities(this js.Value, args []js.Value) interface{} {
 		Commute   *bool  `json:"commute"`
 		Trainer   *bool  `json:"trainer"`
 		Search    string `json:"search"`
+		OrderBy   string `json:"order_by"`
+		OrderDir  string `json:"order_dir"`
 	}
 	if err := json.Unmarshal([]byte(filtersJSON), &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing filters: %w", err))
 	}
 
-	// Build storage filters
-	filters := storage.ActivityFilters{
-		AthleteID: athleteID,
+	// Build service input
+	input := services.ListActivitiesInput{
+		AthleteID: bridge.athleteID,
 		GearID:    req.GearID,
 		Commute:   req.Commute,
 		Trainer:   req.Trainer,
 		Search:    req.Search,
+		Page:      req.Page,
+		PerPage:   req.PerPage,
+		OrderBy:   req.OrderBy,
+		OrderDir:  req.OrderDir,
 	}
 
 	if req.SportType != "" {
-		filters.SportTypes = []string{req.SportType}
+		input.SportTypes = []string{req.SportType}
 	}
 
-	if req.After != "" {
-		t, err := time.Parse(time.RFC3339, req.After)
-		if err == nil {
-			filters.StartAfter = &t
-		}
+	if t, ok := shared.ParseDateParam(req.After); ok {
+		input.StartAfter = &t
 	}
-
-	if req.Before != "" {
-		t, err := time.Parse(time.RFC3339, req.Before)
-		if err == nil {
-			filters.StartBefore = &t
-		}
-	}
-
-	// Pagination
-	page := storage.Pagination{
-		Page:    req.Page,
-		PerPage: req.PerPage,
-	}
-	if page.Page == 0 {
-		page.Page = 1
-	}
-	if page.PerPage == 0 {
-		page.PerPage = 50
+	if t, ok := shared.ParseDateParam(req.Before); ok {
+		input.StartBefore = &t
 	}
 
 	ctx := context.Background()
-	activityList, total, err := activities.List(ctx, filters, page)
+	result, err := bridge.activityService.List(ctx, input)
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	data := make([]map[string]interface{}, len(activityList))
-	for i, a := range activityList {
-		data[i] = activityToMap(a)
-	}
-
-	totalPages := (total + page.PerPage - 1) / page.PerPage
-
-	return dataJSON(map[string]interface{}{
-		"data":        data,
-		"total":       total,
-		"page":        page.Page,
-		"per_page":    page.PerPage,
-		"total_pages": totalPages,
+	return toJSON(map[string]interface{}{
+		"ok":          true,
+		"data":        result.Data,
+		"total":       result.Total,
+		"page":        result.Page,
+		"per_page":    result.PerPage,
+		"total_pages": result.TotalPages,
 	})
 }
 
 // getActivity retrieves a single activity by ID
 // Called from JS: goStorage.getActivity(id)
+//wasm:export
 func getActivity(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getActivity")
 
@@ -165,20 +154,20 @@ func getActivity(this js.Value, args []js.Value) interface{} {
 	id := int64(args[0].Int())
 	ctx := context.Background()
 
-	activity, err := activities.GetByID(ctx, id)
+	result, err := bridge.activityService.GetByID(ctx, services.GetActivityInput{
+		AthleteID:  bridge.athleteID,
+		ActivityID: id,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	if activity == nil {
-		return errorJSON(fmt.Errorf("activity not found"))
-	}
-
-	return dataJSON(activityToMap(*activity))
+	return dataJSON(result)
 }
 
 // getActivityStreams retrieves streams for an activity
 // Called from JS: goStorage.getActivityStreams(activityId)
+//wasm:export
 func getActivityStreams(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getActivityStreams")
 
@@ -186,33 +175,29 @@ func getActivityStreams(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("missing activity ID"))
 	}
 
-	activityID := int64(args[0].Int())
+	id := int64(args[0].Int())
 	ctx := context.Background()
 
-	streamList, err := streams.GetByActivityID(ctx, activityID)
+	result, err := bridge.activityService.GetStreams(ctx, services.GetActivityStreamsInput{
+		AthleteID:  bridge.athleteID,
+		ActivityID: id,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert streams to response format
-	data := make([]map[string]interface{}, len(streamList))
-	for i, s := range streamList {
-		data[i] = map[string]interface{}{
-			"type":       s.StreamType,
-			"data":       s.Data,
-			"resolution": s.Resolution,
-		}
-	}
-
-	return dataJSON(data)
+	return dataJSON(result)
 }
 
 // ============================================================================
 // Activities Write
 // ============================================================================
 
+//wasm:category Activities - Write
+
 // saveActivity stores an activity in the database
 // Called from JS: goStorage.saveActivity(activityJSON)
+//wasm:export
 func saveActivity(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("saveActivity")
 
@@ -314,7 +299,7 @@ func saveActivity(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := activities.Upsert(ctx, activity); err != nil {
+	if err := bridge.activities.Upsert(ctx, activity); err != nil {
 		return errorJSON(err)
 	}
 
@@ -323,6 +308,7 @@ func saveActivity(this js.Value, args []js.Value) interface{} {
 
 // saveStream stores an activity stream in the database
 // Called from JS: goStorage.saveStream(streamJSON)
+//wasm:export
 func saveStream(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("saveStream")
 
@@ -364,92 +350,9 @@ func saveStream(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := streams.Upsert(ctx, stream); err != nil {
+	if err := bridge.streams.Upsert(ctx, stream); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON(fmt.Sprintf("Stream %s for activity %d saved", req.StreamType, req.ActivityID))
-}
-
-// ============================================================================
-// Activity Map Helper
-// ============================================================================
-
-// activityToMap converts an Activity to a map for JSON serialization
-func activityToMap(a storage.Activity) map[string]interface{} {
-	m := map[string]interface{}{
-		"id":                   a.ID,
-		"athlete_id":           a.AthleteID,
-		"name":                 a.Name,
-		"sport_type":           a.SportType,
-		"start_date":           a.StartDate.Format(time.RFC3339),
-		"start_date_local":     a.StartDateLocal.Format(time.RFC3339),
-		"timezone":             a.Timezone,
-		"distance":             a.Distance,
-		"moving_time":          a.MovingTime,
-		"elapsed_time":         a.ElapsedTime,
-		"total_elevation_gain": a.TotalElevationGain,
-		"average_speed":        a.AverageSpeed,
-		"max_speed":            a.MaxSpeed,
-		"kudos_count":          a.KudosCount,
-		"comment_count":        a.CommentCount,
-		"photo_count":          a.PhotoCount,
-		"commute":              a.Commute,
-		"private":              a.Private,
-		"trainer":              a.Trainer,
-		"gear_id":              a.GearID,
-		"summary_polyline":     a.SummaryPolyline,
-	}
-
-	// Add optional fields
-	if a.Description != "" {
-		m["description"] = a.Description
-	}
-	if a.LocationCity != "" {
-		m["location_city"] = a.LocationCity
-	}
-	if a.LocationState != "" {
-		m["location_state"] = a.LocationState
-	}
-	if a.LocationCountry != "" {
-		m["location_country"] = a.LocationCountry
-	}
-	if a.AverageHeartrate != nil {
-		m["average_heartrate"] = *a.AverageHeartrate
-	}
-	if a.MaxHeartrate != nil {
-		m["max_heartrate"] = *a.MaxHeartrate
-	}
-	if a.AverageWatts != nil {
-		m["average_watts"] = *a.AverageWatts
-	}
-	if a.MaxWatts != nil {
-		m["max_watts"] = *a.MaxWatts
-	}
-	if a.WeightedAverageWatts != nil {
-		m["weighted_average_watts"] = *a.WeightedAverageWatts
-	}
-	if a.Kilojoules != nil {
-		m["kilojoules"] = *a.Kilojoules
-	}
-	if a.AverageCadence != nil {
-		m["average_cadence"] = *a.AverageCadence
-	}
-	if a.Calories != nil {
-		m["calories"] = *a.Calories
-	}
-	if a.DeviceName != "" {
-		m["device_name"] = a.DeviceName
-	}
-	if a.WorkoutType != nil {
-		m["workout_type"] = *a.WorkoutType
-	}
-	if a.StartLat != nil {
-		m["start_lat"] = *a.StartLat
-	}
-	if a.StartLng != nil {
-		m["start_lng"] = *a.StartLng
-	}
-
-	return m
 }

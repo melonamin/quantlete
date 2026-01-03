@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -486,16 +487,16 @@ func (i *Importer) emitProgress() {
 
 // shouldEmitProgress checks if we should emit a progress event based on batch count or time elapsed.
 // Returns true if either:
-// - itemsDone is a multiple of eventBatchSize (batch threshold)
-// - More than eventFlushInterval has elapsed since last emit (time threshold)
+// - itemsDone is a multiple of shared.ImportEventBatchSize (batch threshold)
+// - More than shared.ImportEventFlushIntervalMs has elapsed since last emit (time threshold)
 func (i *Importer) shouldEmitProgress(itemsDone int) bool {
-	if itemsDone%eventBatchSize == 0 {
+	if itemsDone%shared.ImportEventBatchSize == 0 {
 		return true
 	}
 	i.eventMu.Lock()
 	elapsed := time.Since(i.lastEventEmitTime)
 	i.eventMu.Unlock()
-	return elapsed >= eventFlushInterval
+	return elapsed >= time.Duration(shared.ImportEventFlushIntervalMs)*time.Millisecond
 }
 
 // emitDataChanged sends a data:changed event.
@@ -516,18 +517,6 @@ func (i *Importer) emitSyncComplete(status, errMsg string) {
 		},
 	})
 }
-
-// SSE Event Emission Constants
-// These constants control how frequently progress events are emitted to SSE subscribers.
-// IMPORTANT: Keep in sync with web/src/lib/wasm/strava/importer.ts
-// - eventBatchSize (25) <-> EVENT_BATCH_SIZE (25)
-// - eventFlushInterval (2s) <-> EVENT_FLUSH_INTERVAL_MS (2000)
-
-// eventBatchSize controls batch-based event emission (emit progress every N items).
-const eventBatchSize = 25
-
-// eventFlushInterval controls time-based event emission (emit if this much time elapsed).
-const eventFlushInterval = 2 * time.Second
 
 // runImport performs the actual import using a phased approach.
 func (i *Importer) runImport(ctx context.Context, opts ImportOptions) error {
@@ -1284,53 +1273,10 @@ func (i *Importer) importActivity(ctx context.Context, a *strava.Activity, athle
 	return nil
 }
 
+// canonicalBestEffortDistanceType is a wrapper around the shared implementation.
+// See shared.CanonicalBestEffortDistanceType for details.
 func canonicalBestEffortDistanceType(distanceM float64, name string) (distanceType string, canonicalM float64) {
-	// Prefer matching by distance (tolerant to minor rounding).
-	type candidate struct {
-		Type string
-		M    float64
-	}
-	candidates := []candidate{
-		{Type: "400m", M: 400},
-		{Type: "0.5mi", M: 804.672},
-		{Type: "1k", M: 1000},
-		{Type: "1mi", M: 1609.344},
-		{Type: "2mi", M: 3218.688},
-		{Type: "5k", M: 5000},
-		{Type: "10k", M: 10000},
-		{Type: "15k", M: 15000},
-		{Type: "10mi", M: 16093.44},
-		{Type: "20k", M: 20000},
-		{Type: "half_marathon", M: 21097.5},
-		{Type: "30k", M: 30000},
-		{Type: "marathon", M: 42195},
-		{Type: "50k", M: 50000},
-		{Type: "100k", M: 100000},
-	}
-
-	if distanceM > 0 {
-		for _, c := range candidates {
-			// Accept within 1% or 25m.
-			tol := 25.0
-			if c.M*0.01 > tol {
-				tol = c.M * 0.01
-			}
-			if distanceM >= c.M-tol && distanceM <= c.M+tol {
-				return c.Type, c.M
-			}
-		}
-	}
-
-	// Fallback: best-effort name or rounded meters.
-	n := strings.ToLower(strings.TrimSpace(name))
-	n = strings.ReplaceAll(n, " ", "_")
-	n = strings.ReplaceAll(n, "/", "_")
-	n = strings.ReplaceAll(n, "-", "_")
-	n = strings.Trim(n, "_")
-	if n != "" {
-		return n, distanceM
-	}
-	return fmt.Sprintf("m_%d", int(distanceM+0.5)), distanceM
+	return shared.CanonicalBestEffortDistanceType(distanceM, name)
 }
 
 func (i *Importer) importBestEfforts(ctx context.Context, a *strava.Activity, athleteID int64) error {

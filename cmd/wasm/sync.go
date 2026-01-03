@@ -16,8 +16,11 @@ import (
 // Sync History Write
 // ============================================================================
 
+//wasm:category Sync History - Write
+
 // createSyncRun creates a new sync history record
 // Called from JS: goStorage.createSyncRun(dataJSON)
+//wasm:export
 func createSyncRun(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("createSyncRun")
 
@@ -39,7 +42,7 @@ func createSyncRun(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	run, err := syncHistory.StartRun(ctx, req.AthleteID, storage.SyncRunOptions{
+	run, err := bridge.syncHistory.StartRun(ctx, req.AthleteID, storage.SyncRunOptions{
 		FullSync:        req.FullSync,
 		SkipStreams:     req.SkipStreams,
 		SkipSegments:    req.SkipSegments,
@@ -58,6 +61,7 @@ func createSyncRun(this js.Value, args []js.Value) interface{} {
 
 // updateSyncRun updates a sync history record status (for pause/resume)
 // Called from JS: goStorage.updateSyncRun(dataJSON)
+//wasm:export
 func updateSyncRun(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("updateSyncRun")
 
@@ -100,7 +104,7 @@ func updateSyncRun(this js.Value, args []js.Value) interface{} {
 	var err error
 	switch req.Status {
 	case "canceled":
-		err = syncHistory.CancelRun(ctx, req.ID, counts)
+		err = bridge.syncHistory.CancelRun(ctx, req.ID, counts)
 	case "paused":
 		// For pause, just update the counts - no dedicated method, keep status as running
 		// The TS side handles pause state
@@ -118,6 +122,7 @@ func updateSyncRun(this js.Value, args []js.Value) interface{} {
 
 // completeSyncRun marks a sync run as complete
 // Called from JS: goStorage.completeSyncRun(dataJSON)
+//wasm:export
 func completeSyncRun(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("completeSyncRun")
 
@@ -168,11 +173,11 @@ func completeSyncRun(this js.Value, args []js.Value) interface{} {
 	var err error
 	switch req.Status {
 	case "completed":
-		err = syncHistory.CompleteRun(ctx, req.ID, counts)
+		err = bridge.syncHistory.CompleteRun(ctx, req.ID, counts)
 	case "failed":
-		err = syncHistory.FailRun(ctx, req.ID, req.Error, counts)
+		err = bridge.syncHistory.FailRun(ctx, req.ID, req.Error, counts)
 	case "canceled":
-		err = syncHistory.CancelRun(ctx, req.ID, counts)
+		err = bridge.syncHistory.CancelRun(ctx, req.ID, counts)
 	default:
 		return errorJSON(fmt.Errorf("unknown status for completion: %s", req.Status))
 	}
@@ -188,8 +193,11 @@ func completeSyncRun(this js.Value, args []js.Value) interface{} {
 // Sync History Read
 // ============================================================================
 
+//wasm:category Sync History - Read
+
 // getSyncHistory retrieves sync history records
 // Called from JS: goStorage.getSyncHistory(limit?)
+//wasm:export
 func getSyncHistory(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getSyncHistory")
 
@@ -199,7 +207,7 @@ func getSyncHistory(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	runs, err := syncHistory.GetLatest(ctx, athleteID, limit)
+	runs, err := bridge.syncHistory.GetLatest(ctx, bridge.athleteID, limit)
 	if err != nil {
 		return errorJSON(err)
 	}

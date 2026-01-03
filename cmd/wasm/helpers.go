@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"syscall/js"
+
+	"github.com/melonamin/quantlete/internal/shared"
 )
 
 // Maximum allowed array sizes to prevent memory exhaustion
@@ -31,47 +33,33 @@ func validateArraySize(length, maxSize int, name string) error {
 	return nil
 }
 
-// toJSON converts a Go value to a JSON string (internal helper)
+// toJSON converts a Go value to a JSON string.
+// Used for custom response structures that don't fit the standard Response format.
+// Prefer dataJSON/errorJSON/successJSON for standard responses.
 func toJSON(v interface{}) string {
 	b, err := json.Marshal(v)
 	if err != nil {
-		return fmt.Sprintf(`{"ok":false,"error":"JSON marshal error: %s"}`, err.Error())
+		return shared.ErrorMessage("JSON marshal error").ToJSON()
 	}
 	return string(b)
 }
 
-// dataJSON converts a Go value to JSON with "ok":true prepended
-// This is used for read operations that return data to TypeScript
+// dataJSON wraps data in a success response and returns as JSON string.
+// Uses shared.Response for consistent response format.
 func dataJSON(v interface{}) string {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Sprintf(`{"ok":false,"error":"JSON marshal error: %s"}`, err.Error())
-	}
-
-	jsonStr := string(b)
-	if len(jsonStr) > 0 && jsonStr[0] == '{' {
-		// For objects, inject "ok":true at the start
-		return `{"ok":true,` + jsonStr[1:]
-	}
-
-	// For arrays or primitives, wrap in an object with "data" field
-	return fmt.Sprintf(`{"ok":true,"data":%s}`, jsonStr)
+	return shared.SuccessResponse(v).ToJSON()
 }
 
-// errorJSON returns an error response as JSON
+// errorJSON returns an error response as JSON string.
+// Uses shared.Response for consistent response format.
 func errorJSON(err error) string {
-	return toJSON(map[string]interface{}{
-		"ok":    false,
-		"error": err.Error(),
-	})
+	return shared.ErrorResponse(err).ToJSON()
 }
 
-// successJSON returns a success response as JSON
+// successJSON returns a success response with a message as JSON string.
+// Uses shared.Response for consistent response format.
 func successJSON(message string) string {
-	return toJSON(map[string]interface{}{
-		"ok":      true,
-		"message": message,
-	})
+	return shared.SuccessMessage(message).ToJSON()
 }
 
 // jsArrayToFloat64 converts a JS array to []float64 with size validation
@@ -111,7 +99,7 @@ func jsArrayToFloat64WithLimit(jsArr js.Value, maxSize int) ([]float64, error) {
 
 // ensureInitialized checks if the database is initialized
 func ensureInitialized() error {
-	if db == nil {
+	if bridge == nil || bridge.db == nil {
 		return fmt.Errorf("storage not initialized - call init() first")
 	}
 	return nil
@@ -119,7 +107,7 @@ func ensureInitialized() error {
 
 // ensureAthleteID checks if athleteID is set
 func ensureAthleteID() error {
-	if athleteID == 0 {
+	if bridge == nil || bridge.athleteID == 0 {
 		return fmt.Errorf("athlete ID not set - call setAthleteId() first")
 	}
 	return nil

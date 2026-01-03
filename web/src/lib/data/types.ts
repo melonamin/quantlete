@@ -56,7 +56,7 @@ export type {
 export type {
   Gear,
   GearFilters,
-  GearResponse,
+  GearListResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
 } from '@/lib/api/gear'

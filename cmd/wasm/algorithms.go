@@ -13,8 +13,11 @@ import (
 // Algorithm Functions - Power
 // ============================================================================
 
+//wasm:category Algorithms - Power
+
 // normalizedPowerFn calculates normalized power from power data
-// Called from JS: goStorage.normalizedPower(wattsJSON)
+// Called from JS: goStorage.normalizedPower(watts)
+//wasm:export normalizedPower
 func normalizedPowerFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("normalizedPower")
 
@@ -35,7 +38,8 @@ func normalizedPowerFn(this js.Value, args []js.Value) interface{} {
 }
 
 // rollingMaxAverageFn finds the maximum rolling average over a given window
-// Called from JS: goStorage.rollingMaxAverage(valuesJSON, windowSeconds)
+// Called from JS: goStorage.rollingMaxAverage(values, windowSeconds)
+//wasm:export rollingMaxAverage
 func rollingMaxAverageFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("rollingMaxAverage")
 
@@ -58,6 +62,7 @@ func rollingMaxAverageFn(this js.Value, args []js.Value) interface{} {
 
 // intensityFactorFn calculates the intensity factor: IF = NP / FTP
 // Called from JS: goStorage.intensityFactor(np, ftp)
+//wasm:export intensityFactor
 func intensityFactorFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("intensityFactor")
 
@@ -76,6 +81,7 @@ func intensityFactorFn(this js.Value, args []js.Value) interface{} {
 
 // trainingStressScoreFn calculates TSS
 // Called from JS: goStorage.trainingStressScore(durationSeconds, np, ftp)
+//wasm:export trainingStressScore
 func trainingStressScoreFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("trainingStressScore")
 
@@ -97,8 +103,11 @@ func trainingStressScoreFn(this js.Value, args []js.Value) interface{} {
 // Algorithm Functions - Eddington
 // ============================================================================
 
+//wasm:category Algorithms - Eddington
+
 // eddingtonNumberFn calculates the Eddington number from daily distances
-// Called from JS: goStorage.eddingtonNumber(distancesJSON)
+// Called from JS: goStorage.eddingtonNumber(distances)
+//wasm:export eddingtonNumber
 func eddingtonNumberFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("eddingtonNumber")
 
@@ -119,7 +128,8 @@ func eddingtonNumberFn(this js.Value, args []js.Value) interface{} {
 }
 
 // eddingtonNextStepsFn calculates days needed for next Eddington numbers
-// Called from JS: goStorage.eddingtonNextSteps(distancesJSON, currentE, stepsToCalculate)
+// Called from JS: goStorage.eddingtonNextSteps(distances, currentE, stepsToCalculate)
+//wasm:export eddingtonNextSteps
 func eddingtonNextStepsFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("eddingtonNextSteps")
 
@@ -152,7 +162,8 @@ func eddingtonNextStepsFn(this js.Value, args []js.Value) interface{} {
 }
 
 // eddingtonHistoryFn calculates progressive Eddington numbers over time
-// Called from JS: goStorage.eddingtonHistory(distancesJSON)
+// Called from JS: goStorage.eddingtonHistory(distances)
+//wasm:export eddingtonHistory
 func eddingtonHistoryFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("eddingtonHistory")
 
@@ -176,8 +187,11 @@ func eddingtonHistoryFn(this js.Value, args []js.Value) interface{} {
 // Algorithm Functions - Training Load
 // ============================================================================
 
+//wasm:category Algorithms - Training Load
+
 // calculateTrainingLoadFn calculates training load metrics from daily TSS
-// Called from JS: goStorage.calculateTrainingLoad(dailyTssJSON, ctlTau, atlTau)
+// Called from JS: goStorage.calculateTrainingLoad(dailyTss, ctlTau, atlTau)
+//wasm:export calculateTrainingLoad
 func calculateTrainingLoadFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("calculateTrainingLoad")
 
@@ -211,7 +225,8 @@ func calculateTrainingLoadFn(this js.Value, args []js.Value) interface{} {
 }
 
 // calculateTrainingLoadWithInitialFn calculates training load from existing CTL/ATL
-// Called from JS: goStorage.calculateTrainingLoadWithInitial(dailyTssJSON, initialCtl, initialAtl, ctlTau, atlTau)
+// Called from JS: goStorage.calculateTrainingLoadWithInitial(dailyTss, initialCtl, initialAtl, ctlTau, atlTau)
+//wasm:export calculateTrainingLoadWithInitial
 func calculateTrainingLoadWithInitialFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("calculateTrainingLoadWithInitial")
 
@@ -248,6 +263,7 @@ func calculateTrainingLoadWithInitialFn(this js.Value, args []js.Value) interfac
 
 // predictAfterWorkoutFn calculates predicted TSB after a planned workout
 // Called from JS: goStorage.predictAfterWorkout(currentCtl, currentAtl, plannedTss, ctlTau, atlTau)
+//wasm:export predictAfterWorkout
 func predictAfterWorkoutFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("predictAfterWorkout")
 
@@ -272,6 +288,7 @@ func predictAfterWorkoutFn(this js.Value, args []js.Value) interface{} {
 
 // tssForTargetTsbFn calculates TSS needed to reach a target TSB
 // Called from JS: goStorage.tssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau)
+//wasm:export tssForTargetTsb
 func tssForTargetTsbFn(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("tssForTargetTsb")
 

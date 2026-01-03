@@ -9,6 +9,8 @@ import (
 	"syscall/js"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -19,8 +21,11 @@ var powerDurations = []int{5, 10, 30, 60, 300, 480, 1200, 3600}
 // Best Efforts Write
 // ============================================================================
 
+//wasm:category Best Efforts - Write
+
 // saveBestEfforts stores best efforts for an activity (replaces existing)
 // Called from JS: goStorage.saveBestEfforts(dataJSON)
+//wasm:export
 func saveBestEfforts(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("saveBestEfforts")
 
@@ -54,16 +59,18 @@ func saveBestEfforts(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("too many best efforts: %d > %d", len(req.Efforts), maxBestEffortsPerSave))
 	}
 
-	// Convert to storage format
+	// Convert to storage format with canonicalization
 	efforts := make([]storage.BestEffort, 0, len(req.Efforts))
 	for _, e := range req.Efforts {
+		// Apply canonical distance type mapping
+		distanceType, canonicalM := shared.CanonicalBestEffortDistanceType(e.DistanceM, e.Name)
 		be := storage.BestEffort{
 			AthleteID:    req.AthleteID,
 			ActivityID:   req.ActivityID,
 			SportType:    req.SportType,
-			DistanceType: e.DistanceType,
+			DistanceType: distanceType,
 			Name:         e.Name,
-			DistanceM:    e.DistanceM,
+			DistanceM:    canonicalM,
 			ElapsedTimeS: e.ElapsedTime,
 			MovingTimeS:  e.MovingTime,
 			StartIndex:   e.StartIndex,
@@ -79,7 +86,7 @@ func saveBestEfforts(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := bestEfforts.ReplaceForActivity(ctx, req.AthleteID, req.ActivityID, req.SportType, efforts); err != nil {
+	if err := bridge.bestEfforts.ReplaceForActivity(ctx, req.AthleteID, req.ActivityID, req.SportType, efforts); err != nil {
 		return errorJSON(err)
 	}
 
@@ -90,8 +97,11 @@ func saveBestEfforts(this js.Value, args []js.Value) interface{} {
 // Best Efforts Read
 // ============================================================================
 
+//wasm:category Best Efforts - Read
+
 // getBestEffortPRs retrieves personal records by distance type
 // Called from JS: goStorage.getBestEffortPRs(sportType?)
+//wasm:export
 func getBestEffortPRs(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getBestEffortPRs")
 
@@ -101,7 +111,10 @@ func getBestEffortPRs(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	prs, err := bestEfforts.ListPRs(ctx, athleteID, sportTypes)
+	prs, err := bridge.statsService.GetBestEffortPRs(ctx, services.GetBestEffortPRsInput{
+		AthleteID:  bridge.athleteID,
+		SportTypes: sportTypes,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -114,7 +127,7 @@ func getBestEffortPRs(this js.Value, args []js.Value) interface{} {
 			"elapsed_time":  pr.ElapsedTimeS,
 			"activity_id":   pr.ActivityID,
 			"activity_name": pr.ActivityName,
-			"start_date":    pr.StartDateLocal.Format(time.RFC3339),
+			"start_date":    pr.StartDateLocal,
 		}
 	}
 
@@ -126,6 +139,7 @@ func getBestEffortPRs(this js.Value, args []js.Value) interface{} {
 
 // getBestEffortsForType retrieves all efforts for a specific distance type
 // Called from JS: goStorage.getBestEffortsForType(distanceType, sportType?)
+//wasm:export
 func getBestEffortsForType(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getBestEffortsForType")
 
@@ -140,7 +154,11 @@ func getBestEffortsForType(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	efforts, err := bestEfforts.ListByDistanceType(ctx, athleteID, distanceType, sportTypes)
+	efforts, err := bridge.statsService.GetBestEffortsForType(ctx, services.GetBestEffortsForTypeInput{
+		AthleteID:    bridge.athleteID,
+		DistanceType: distanceType,
+		SportTypes:   sportTypes,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -152,7 +170,7 @@ func getBestEffortsForType(this js.Value, args []js.Value) interface{} {
 			"distance_m":    e.DistanceM,
 			"elapsed_time":  e.ElapsedTimeS,
 			"activity_id":   e.ActivityID,
-			"start_date":    e.StartDateLocal.Format(time.RFC3339),
+			"start_date":    e.StartDateLocal,
 		}
 		if e.PRRank != nil {
 			items[i]["pr_rank"] = *e.PRRank
@@ -169,8 +187,11 @@ func getBestEffortsForType(this js.Value, args []js.Value) interface{} {
 // Eddington Data
 // ============================================================================
 
-// getEddingtonData returns Eddington history and computes the current number
+//wasm:category Eddington
+
+// getEddingtonData returns Eddington data including current number, distribution, and next steps
 // Called from JS: goStorage.getEddingtonData(filtersJSON)
+//wasm:export
 func getEddingtonData(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getEddingtonData")
 
@@ -186,15 +207,21 @@ func getEddingtonData(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	history, err := stats.GetEddingtonHistory(ctx, athleteID, sportTypes)
+	result, err := bridge.statsService.GetEddingtonData(ctx, services.GetEddingtonDataInput{
+		AthleteID:  bridge.athleteID,
+		SportTypes: sportTypes,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// The current Eddington number is the last point in history
-	currentE := 0
-	if len(history) > 0 {
-		currentE = history[len(history)-1].Number
+	// Also get history for backward compatibility
+	history, err := bridge.statsService.GetEddingtonHistory(ctx, services.GetEddingtonHistoryInput{
+		AthleteID:  bridge.athleteID,
+		SportTypes: sportTypes,
+	})
+	if err != nil {
+		return errorJSON(err)
 	}
 
 	// Convert history to response format
@@ -206,10 +233,30 @@ func getEddingtonData(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
+	// Convert distribution to response format
+	distributionData := make([]map[string]interface{}, len(result.Distribution))
+	for i, d := range result.Distribution {
+		distributionData[i] = map[string]interface{}{
+			"date":     d.Date,
+			"distance": d.Distance,
+		}
+	}
+
+	// Convert next steps to response format
+	nextStepsData := make([]map[string]interface{}, len(result.NextSteps))
+	for i, s := range result.NextSteps {
+		nextStepsData[i] = map[string]interface{}{
+			"target":       s.Target,
+			"rides_needed": s.RidesNeeded,
+		}
+	}
+
 	return toJSON(map[string]interface{}{
-		"ok":      true,
-		"number":  currentE,
-		"history": historyData,
+		"ok":           true,
+		"number":       result.Number,
+		"history":      historyData,
+		"distribution": distributionData,
+		"next_steps":   nextStepsData,
 	})
 }
 
@@ -217,8 +264,11 @@ func getEddingtonData(this js.Value, args []js.Value) interface{} {
 // Power Functions
 // ============================================================================
 
+//wasm:category Power
+
 // computePowerBestEfforts computes and stores power best efforts for an activity
 // Called from JS: goStorage.computePowerBestEfforts(dataJSON)
+//wasm:export
 func computePowerBestEfforts(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("computePowerBestEfforts")
 
@@ -236,7 +286,7 @@ func computePowerBestEfforts(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := power.EnsureActivityComputed(ctx, req.AthleteID, req.ActivityID, powerDurations); err != nil {
+	if err := bridge.power.EnsureActivityComputed(ctx, req.AthleteID, req.ActivityID, powerDurations); err != nil {
 		return errorJSON(err)
 	}
 
@@ -247,12 +297,18 @@ func computePowerBestEfforts(this js.Value, args []js.Value) interface{} {
 // Training Load
 // ============================================================================
 
+//wasm:category Training Load
+
 // getTrainingLoad returns training load data (daily series + summary)
 // Called from JS: goStorage.getTrainingLoad(filtersJSON)
+//wasm:export
 func getTrainingLoad(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getTrainingLoad")
 
-	var after, before *time.Time
+	input := services.GetTrainingLoadInput{
+		AthleteID: bridge.athleteID,
+	}
+
 	if len(args) > 0 && args[0].String() != "" {
 		var req struct {
 			After  string `json:"after"`
@@ -261,37 +317,23 @@ func getTrainingLoad(this js.Value, args []js.Value) interface{} {
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
 			return errorJSON(fmt.Errorf("parsing filters: %w", err))
 		}
-		if req.After != "" {
-			t, err := time.Parse(time.RFC3339, req.After)
-			if err == nil {
-				after = &t
-			}
+		if t, ok := shared.ParseDateParam(req.After); ok {
+			input.After = &t
 		}
-		if req.Before != "" {
-			t, err := time.Parse(time.RFC3339, req.Before)
-			if err == nil {
-				before = &t
-			}
+		if t, ok := shared.ParseDateParam(req.Before); ok {
+			input.Before = &t
 		}
 	}
 
 	ctx := context.Background()
-
-	// Get daily series
-	series, err := trainingLoad.GetDailySeries(ctx, athleteID, after, before)
-	if err != nil {
-		return errorJSON(err)
-	}
-
-	// Get summary (latest CTL/ATL/TSB)
-	summary, err := trainingLoad.GetSummary(ctx, athleteID)
+	result, err := bridge.statsService.GetTrainingLoad(ctx, input)
 	if err != nil {
 		return errorJSON(err)
 	}
 
 	// Convert series to response format
-	seriesData := make([]map[string]interface{}, len(series))
-	for i, p := range series {
+	seriesData := make([]map[string]interface{}, len(result.Series))
+	for i, p := range result.Series {
 		seriesData[i] = map[string]interface{}{
 			"day": p.Day,
 			"tss": p.TSS,
@@ -301,108 +343,92 @@ func getTrainingLoad(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	result := map[string]interface{}{
+	output := map[string]interface{}{
 		"ok":     true,
 		"series": seriesData,
 	}
 
-	if summary != nil {
-		result["summary"] = map[string]interface{}{
-			"day": summary.Day,
-			"tss": summary.TSS,
-			"ctl": summary.CTL,
-			"atl": summary.ATL,
-			"tsb": summary.TSB,
+	if result.Summary != nil {
+		output["summary"] = map[string]interface{}{
+			"day": result.Summary.Day,
+			"tss": result.Summary.TSS,
+			"ctl": result.Summary.CTL,
+			"atl": result.Summary.ATL,
+			"tsb": result.Summary.TSB,
 		}
 	}
 
-	return dataJSON(result)
+	return dataJSON(output)
 }
 
 // ============================================================================
 // Power Stats
 // ============================================================================
 
+//wasm:category Power Stats
+
 // getPowerStats returns power best efforts and history
 // Called from JS: goStorage.getPowerStats(filtersJSON)
+//wasm:export
 func getPowerStats(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getPowerStats")
 
-	// Default durations matching the Go backend
-	durations := []int{5, 10, 30, 60, 300, 480, 1200, 3600}
-	var after, before *time.Time
-	var sportTypes []string
-	historyDuration := 300 // Default to 5 minutes for history
+	input := services.GetPowerStatsInput{
+		AthleteID: bridge.athleteID,
+	}
 
 	if len(args) > 0 && args[0].String() != "" {
 		var req struct {
-			Durations       []int    `json:"durations"`
-			After           string   `json:"after"`
-			Before          string   `json:"before"`
-			SportTypes      []string `json:"sport_types"`
-			HistoryDuration int      `json:"history_duration"`
+			After      string   `json:"after"`
+			Before     string   `json:"before"`
+			SportTypes []string `json:"sport_types"`
 		}
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
 			return errorJSON(fmt.Errorf("parsing filters: %w", err))
 		}
-		if len(req.Durations) > 0 {
-			durations = req.Durations
+		if t, ok := shared.ParseDateParam(req.After); ok {
+			input.After = &t
 		}
-		if req.After != "" {
-			t, err := time.Parse(time.RFC3339, req.After)
-			if err == nil {
-				after = &t
-			}
+		if t, ok := shared.ParseDateParam(req.Before); ok {
+			input.Before = &t
 		}
-		if req.Before != "" {
-			t, err := time.Parse(time.RFC3339, req.Before)
-			if err == nil {
-				before = &t
-			}
-		}
-		sportTypes = req.SportTypes
-		if req.HistoryDuration > 0 {
-			historyDuration = req.HistoryDuration
-		}
+		input.SportTypes = req.SportTypes
 	}
 
 	ctx := context.Background()
-
-	// Get best efforts for each duration
-	best, err := power.GetBest(ctx, athleteID, durations, after, before, sportTypes)
-	if err != nil {
-		return errorJSON(err)
-	}
-
-	// Get history for the specified duration
-	history, err := power.GetHistory(ctx, athleteID, historyDuration, after, before, sportTypes)
+	result, err := bridge.statsService.GetPowerStats(ctx, input)
 	if err != nil {
 		return errorJSON(err)
 	}
 
 	// Convert best efforts to response format
-	bestData := make([]map[string]interface{}, len(best))
-	for i, b := range best {
+	bestData := make([]map[string]interface{}, len(result.Best))
+	for i, b := range result.Best {
 		bestData[i] = map[string]interface{}{
 			"duration_s":  b.DurationS,
 			"watts":       b.Watts,
 			"activity_id": b.ActivityID,
-			"start_date":  b.StartDate.Format(time.RFC3339),
+			"start_date":  b.StartDate,
 		}
 	}
 
-	// Convert history to response format
-	historyData := make([]map[string]interface{}, len(history))
-	for i, h := range history {
-		historyData[i] = map[string]interface{}{
-			"date":  h.Date,
-			"watts": h.Watts,
+	// Convert history to response format (use first available duration's history)
+	historyData := make(map[string]interface{})
+	for dur, points := range result.History {
+		durPoints := make([]map[string]interface{}, len(points))
+		for i, h := range points {
+			durPoints[i] = map[string]interface{}{
+				"date":  h.Date,
+				"watts": h.Watts,
+			}
 		}
+		historyData[fmt.Sprintf("%d", dur)] = durPoints
 	}
 
 	return toJSON(map[string]interface{}{
-		"ok":      true,
-		"best":    bestData,
-		"history": historyData,
+		"ok":        true,
+		"durations": result.DurationsS,
+		"best":      bestData,
+		"history":   historyData,
 	})
 }

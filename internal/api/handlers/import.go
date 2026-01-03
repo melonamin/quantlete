@@ -286,7 +286,8 @@ func (h *ImportHandler) History(w http.ResponseWriter, r *http.Request) {
 
 	runs, err := h.syncHistory.GetLatest(r.Context(), athlete.ID, 20)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		slog.Error("failed to load sync history", "error", err, "athlete_id", athlete.ID)
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load sync history"})
 		return
 	}
 
@@ -312,7 +313,8 @@ func (h *ImportHandler) Watermark(w http.ResponseWriter, r *http.Request) {
 
 	wm, err := h.syncHistory.GetWatermark(r.Context(), athlete.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		slog.Error("failed to load watermark", "error", err, "athlete_id", athlete.ID)
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load watermark"})
 		return
 	}
 

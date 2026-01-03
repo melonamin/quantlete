@@ -1,47 +1,11 @@
-// API Response types
+// API Response types - re-exported from generated types for single source of truth.
 
-export interface Activity {
-  id: number
-  name: string
-  description?: string
-  sport_type: string
-  start_date: string
-  start_date_local: string
-  timezone?: string
-  distance: number
-  moving_time: number
-  elapsed_time: number
-  total_elevation_gain: number
-  elev_high?: number
-  elev_low?: number
-  average_speed: number
-  max_speed: number
-  average_heartrate?: number
-  max_heartrate?: number
-  average_watts?: number
-  max_watts?: number
-  weighted_average_watts?: number
-  kilojoules?: number
-  average_cadence?: number
-  calories?: number
-  kudos_count: number
-  comment_count: number
-  photo_count: number
-  commute: boolean
-  private: boolean
-  trainer: boolean
-  workout_type?: number
-  device_name?: string
-  gear_id?: string
-  start_lat?: number
-  start_lng?: number
-  end_lat?: number
-  end_lng?: number
-  summary_polyline?: string
-  location_city?: string
-  location_country?: string
-}
+import type { ActivityResponse } from '@/lib/wasm/types.gen'
 
+// Re-export generated types with API-friendly aliases
+export type Activity = ActivityResponse
+
+// Generic paginated response template - used across API
 export interface PaginatedResponse<T> {
   data: T[]
   total: number
@@ -52,6 +16,7 @@ export interface PaginatedResponse<T> {
 
 export type ActivitiesResponse = PaginatedResponse<Activity>
 
+// ActivityFilters - manual with optional fields (generated GetActivitiesRequest has required fields)
 export interface ActivityFilters {
   sport_type?: string
   after?: string
@@ -66,6 +31,7 @@ export interface ActivityFilters {
   order_dir?: 'asc' | 'desc'
 }
 
+// AuthStatus - manual (generated uses different structure)
 export interface AuthStatus {
   authenticated: boolean
   demo_mode?: boolean

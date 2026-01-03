@@ -11,6 +11,7 @@
  */
 
 import { initializeDatabase, getDatabase } from './db'
+import type { GoStorageInterface } from './go-storage.gen'
 
 // Declare global Go WASM types
 declare global {
@@ -35,176 +36,8 @@ declare global {
     run(instance: WebAssembly.Instance): Promise<void>
   }
 
-  // goStorage namespace registered by Go WASM
-  const goStorage: {
-    // Initialization
-    init(): string
-    setAthleteId(id: number): string
-    exportDb(): Uint8Array
-
-    // Auth
-    getAuthStatus(): string
-
-    // Activities - Read
-    getActivities(filtersJSON: string): string
-    getActivity(id: number): string
-    getActivityStreams(activityId: number): string
-
-    // Activities - Write
-    saveActivity(activityJSON: string): string
-    saveStream(streamJSON: string): string
-
-    // Athlete - Write
-    saveAthlete(athleteJSON: string): string
-
-    // Gear - Write
-    saveGear(gearJSON: string): string
-
-    // Segments - Write
-    saveSegment(segmentJSON: string): string
-    saveSegmentEffort(effortJSON: string): string
-
-    // Best Efforts - Write
-    saveBestEfforts(dataJSON: string): string
-
-    // Photos - Write
-    savePhoto(photoJSON: string): string
-
-    // Power - Write (compute and store)
-    computePowerBestEfforts(dataJSON: string): string
-
-    // Sync History - Write
-    createSyncRun(dataJSON: string): string
-    updateSyncRun(dataJSON: string): string
-    completeSyncRun(dataJSON: string): string
-
-    // Dashboard
-    getDashboardStats(): string
-    getWeeklyStats(): string
-    getRecentActivities(limit: number): string
-    getSportTypeStats(): string
-    getMonthlyStats(year?: number): string
-    getYearlyStats(): string
-    getDaytimeDistribution(): string
-    getWeekdayDistribution(): string
-    getExportStats(): string
-
-    // Heatmap
-    getHeatmapData(filtersJSON: string): string
-
-    // Gear - Read
-    getGear(filtersJSON: string): string
-    getGearDetail(id: string): string
-
-    // Segments - Read
-    getSegments(filtersJSON: string): string
-    getSegmentDetail(id: number): string
-
-    // Photos - Read
-    getPhotos(filtersJSON: string): string
-    getActivityPhotos(activityId: number): string
-
-    // Calendar - Read
-    getCalendarData(year: number): string
-
-    // Best Efforts - Read
-    getBestEffortPRs(sportType?: string): string
-    getBestEffortsForType(distanceType: string, sportType?: string): string
-
-    // Sync History - Read
-    getSyncHistory(limit?: number): string
-
-    // Algorithms - Power
-    normalizedPower(watts: number[]): string
-    rollingMaxAverage(values: number[], windowSeconds: number): string
-    intensityFactor(np: number, ftp: number): string
-    trainingStressScore(durationSeconds: number, np: number, ftp: number): string
-
-    // Algorithms - Eddington
-    eddingtonNumber(distances: number[]): string
-    eddingtonNextSteps(distances: number[], currentE: number, stepsToCalculate: number): string
-    eddingtonHistory(distances: number[]): string
-
-    // Algorithms - Training Load
-    calculateTrainingLoad(dailyTss: number[], ctlTau: number, atlTau: number): string
-    calculateTrainingLoadWithInitial(
-      dailyTss: number[],
-      initialCtl: number,
-      initialAtl: number,
-      ctlTau: number,
-      atlTau: number,
-    ): string
-    predictAfterWorkout(
-      currentCtl: number,
-      currentAtl: number,
-      plannedTss: number,
-      ctlTau: number,
-      atlTau: number,
-    ): string
-    tssForTargetTsb(
-      currentCtl: number,
-      currentAtl: number,
-      targetTsb: number,
-      ctlTau: number,
-      atlTau: number,
-    ): string
-
-    // Eddington
-    getEddingtonData(filtersJSON: string): string
-
-    // Gear Stats
-    getGearMonthlyUsage(filtersJSON: string): string
-
-    // Segment Efforts
-    getSegmentEfforts(filtersJSON: string): string
-    getSegmentCountries(): string
-
-    // Rewind
-    getRewindYears(): string
-    getRewind(year: number): string
-
-    // Athlete Metrics (FTP/Weight)
-    getFtpHistory(): string
-    getWeightHistory(): string
-    updateFtpHistory(entriesJSON: string): string
-    updateWeightHistory(entriesJSON: string): string
-
-    // Training Load
-    getTrainingLoad(filtersJSON: string): string
-
-    // Power Stats
-    getPowerStats(filtersJSON: string): string
-
-    // Challenges
-    getChallenges(filtersJSON: string): string
-
-    // Training Goals
-    getTrainingGoals(): string
-    updateTrainingGoals(configJSON: string): string
-
-    // Maintenance
-    getMaintenanceDue(): string
-    getGearComponents(filtersJSON: string): string
-    createComponent(componentJSON: string): string
-    updateComponent(componentJSON: string): string
-    deleteComponent(id: number): string
-    logMaintenance(logJSON: string): string
-
-    // Settings
-    getAppSettings(): string
-    updateAppSettings(settingsJSON: string): string
-
-    // Custom Gear
-    getCustomGear(filtersJSON: string): string
-    createCustomGear(gearJSON: string): string
-    updateCustomGear(gearJSON: string): string
-    deleteCustomGear(deleteJSON: string): string
-
-    // HR Zones
-    getHrZoneDefinitions(): string
-    upsertHrZoneDefinition(zoneJSON: string): string
-    deleteHrZoneDefinition(deleteJSON: string): string
-  }
+  // goStorage namespace registered by Go WASM - uses generated interface
+  const goStorage: GoStorageInterface
 }
 
 export interface GoStorageResult<T = unknown> {
@@ -457,6 +290,8 @@ export interface ActivityFilters {
   commute?: boolean
   trainer?: boolean
   search?: string
+  order_by?: string
+  order_dir?: string
 }
 
 export interface ActivitiesResult {
@@ -560,6 +395,45 @@ export interface DashboardStats {
   first_activity_date?: string
   last_activity_date?: string
   sport_types: string[]
+}
+
+export interface DashboardWidgetConfig {
+  id: string
+  width: number
+  height?: number
+  hidden?: boolean
+  settings?: Record<string, unknown>
+}
+
+export interface DashboardConfig {
+  version: number
+  widgets: DashboardWidgetConfig[]
+}
+
+export function getDashboardConfig(): DashboardConfig {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<DashboardConfig>(goStorage.getDashboardConfig())
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to get dashboard config')
+  }
+  const cfg = result.data ?? { version: 1, widgets: [] }
+  return { version: cfg.version, widgets: cfg.widgets ?? [] }
+}
+
+export function updateDashboardConfig(config: DashboardConfig): DashboardConfig {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<DashboardConfig>(
+    goStorage.updateDashboardConfig(JSON.stringify(config)),
+  )
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to update dashboard config')
+  }
+  const cfg = result.data ?? { version: config.version, widgets: config.widgets }
+  return { version: cfg.version, widgets: cfg.widgets ?? [] }
 }
 
 export function getDashboardStats(): DashboardStats {
@@ -732,6 +606,9 @@ export interface HeatmapFilters {
   sport_type?: string
   year?: number
   commute?: boolean
+  workout_type?: number
+  limit?: number
+  offset?: number
 }
 
 export interface HeatmapActivity {
@@ -1284,8 +1161,7 @@ export function saveSegmentEffort(effort: SaveSegmentEffortInput): void {
 }
 
 export interface BestEffortInput {
-  distance_type: string
-  name?: string
+  name: string
   distance_m: number
   elapsed_time: number
   moving_time?: number | null
@@ -1293,6 +1169,7 @@ export interface BestEffortInput {
   end_index?: number | null
   pr_rank?: number | null
   start_date?: string
+  // distance_type is computed by Go from name + distance_m
 }
 
 export interface SaveBestEffortsInput {
@@ -1347,7 +1224,6 @@ export interface ComputePowerBestEffortsInput {
 /**
  * Compute and store power best efforts for an activity.
  * Uses the Go storage layer to read the watts stream and compute rolling max averages.
- * This replaces the TypeScript algorithms.wasm computation.
  */
 export function computePowerBestEfforts(input: ComputePowerBestEffortsInput): void {
   if (!initialized) {
@@ -1432,6 +1308,39 @@ export function completeSyncRun(input: CompleteSyncRunInput): void {
   if (!result.ok) {
     throw new Error(result.error || 'Failed to complete sync run')
   }
+}
+
+// ============================================================================
+// Sync History - Read
+// ============================================================================
+
+export interface SyncHistoryItem {
+  id: number
+  athlete_id: number
+  started_at: string
+  completed_at?: string
+  duration_seconds?: number
+  status: string
+  error?: string
+  activities_total: number
+  activities_imported: number
+  activities_skipped: number
+  streams_imported: number
+  failed_count: number
+  full_sync: boolean
+  skip_streams: boolean
+  newest_activity_date?: string
+}
+
+export function getSyncHistory(limit = 10): SyncHistoryItem[] {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<{ data: SyncHistoryItem[] }>(goStorage.getSyncHistory(limit))
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to get sync history')
+  }
+  return result.data ?? []
 }
 
 // ============================================================================
@@ -1670,9 +1579,21 @@ export interface EddingtonHistoryPoint {
   number: number
 }
 
+export interface EddingtonDistributionDay {
+  date: string
+  distance: number
+}
+
+export interface EddingtonNextStep {
+  target: number
+  rides_needed: number
+}
+
 export interface EddingtonDataResult {
   number: number
   history: EddingtonHistoryPoint[]
+  distribution: EddingtonDistributionDay[]
+  next_steps: EddingtonNextStep[]
 }
 
 export function getEddingtonData(filters?: EddingtonFilters): EddingtonDataResult {
@@ -1685,7 +1606,12 @@ export function getEddingtonData(filters?: EddingtonFilters): EddingtonDataResul
   if (!result.ok) {
     throw new Error(result.error || 'Failed to get Eddington data')
   }
-  return { number: result.number, history: result.history } as EddingtonDataResult
+  return {
+    number: result.number,
+    history: result.history || [],
+    distribution: result.distribution || [],
+    next_steps: result.next_steps || [],
+  } as EddingtonDataResult
 }
 
 // ============================================================================

@@ -12,56 +12,24 @@ import (
 
 	"github.com/melonamin/quantlete/internal/challenges"
 	"github.com/melonamin/quantlete/internal/pagination"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
-type challengesListResponse struct {
-	Data       []challengeResponse `json:"data"`
-	Total      int                 `json:"total"`
-	Page       int                 `json:"page"`
-	PerPage    int                 `json:"per_page"`
-	TotalPages int                 `json:"total_pages"`
-}
-
+// ChallengesHandler handles challenges-related endpoints.
 type ChallengesHandler struct {
-	repo       *storage.ChallengeRepository
+	svc        *services.ChallengesService
 	strava     *strava.Client
 	downloader *challenges.BadgeDownloader
 }
 
-func NewChallengesHandler(repo *storage.ChallengeRepository, stravaClient *strava.Client, dataDir string) *ChallengesHandler {
+// NewChallengesHandler creates a new challenges handler.
+func NewChallengesHandler(svc *services.ChallengesService, stravaClient *strava.Client, dataDir string) *ChallengesHandler {
 	return &ChallengesHandler{
-		repo:       repo,
+		svc:        svc,
 		strava:     stravaClient,
 		downloader: challenges.NewBadgeDownloader(dataDir),
-	}
-}
-
-type challengeResponse struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	Slug           string  `json:"slug,omitempty"`
-	BadgeURL       string  `json:"badge_url,omitempty"`
-	LocalBadgeURL  string  `json:"local_badge_url,omitempty"`
-	CompletionDate *string `json:"completion_date,omitempty"` // YYYY-MM-DD
-	Month          string  `json:"month,omitempty"`
-}
-
-func challengeToResponse(c storage.Challenge) challengeResponse {
-	var completion *string
-	if c.CompletionDate != nil && !c.CompletionDate.IsZero() {
-		v := c.CompletionDate.Format("2006-01-02")
-		completion = &v
-	}
-	return challengeResponse{
-		ID:             c.ID,
-		Name:           c.Name,
-		Slug:           c.Slug,
-		BadgeURL:       c.BadgeURL,
-		LocalBadgeURL:  c.LocalBadgeURL,
-		CompletionDate: completion,
-		Month:          c.Month,
 	}
 }
 
@@ -74,30 +42,22 @@ func (h *ChallengesHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	f := storage.ChallengeFilters{
-		Month:       strings.TrimSpace(q.Get("month")),
-		QueryParams: pagination.ParseQueryParams(q),
-	}
+	params := pagination.ParseQueryParams(q)
 
-	result, err := h.repo.ListPaginated(r.Context(), athlete.ID, f)
+	result, err := h.svc.List(r.Context(), services.ListChallengesInput{
+		AthleteID: athlete.ID,
+		Month:     strings.TrimSpace(q.Get("month")),
+		Page:      params.Page,
+		PerPage:   params.PerPage,
+		OrderBy:   params.OrderBy,
+		OrderDir:  params.OrderDir,
+	})
 	if err != nil {
-		slog.Error("failed to list challenges", "error", err, "athlete_id", athlete.ID, "filters", f)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch challenges"})
+		handleServiceError(w, err)
 		return
 	}
 
-	out := make([]challengeResponse, 0, len(result.Items))
-	for _, c := range result.Items {
-		out = append(out, challengeToResponse(c))
-	}
-
-	writeJSON(w, http.StatusOK, challengesListResponse{
-		Data:       out,
-		Total:      result.Total,
-		Page:       result.Page,
-		PerPage:    result.PerPage,
-		TotalPages: result.TotalPages,
-	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 type importResponse struct {
@@ -211,8 +171,8 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 			Month:          strings.TrimSpace(p.Month),
 			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
 		}
-		if err := h.repo.Upsert(r.Context(), c); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to store challenges"})
+		if err := h.svc.Import(r.Context(), c); err != nil {
+			handleServiceError(w, err)
 			return
 		}
 		imported++
@@ -275,8 +235,8 @@ func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Req
 			Month:          month,
 			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
 		}
-		if err := h.repo.Upsert(r.Context(), c); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to store challenges"})
+		if err := h.svc.Import(r.Context(), c); err != nil {
+			handleServiceError(w, err)
 			return
 		}
 		imported++

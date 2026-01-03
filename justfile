@@ -35,10 +35,10 @@ dev-web:
 # Code Generation
 # ============================================================================
 
-# Generate all code (SQL queries, schema, TypeScript types)
-generate: generate-sql generate-schema generate-ts-types
+# Generate all code (SQL queries, schema, TypeScript types, WASM bridge, adapters)
+generate: generate-sql generate-schema generate-ts-types generate-go-storage generate-wasm-registration generate-adapters
 
-# Generate SQL query code (Go + TypeScript)
+# Generate SQL query code (Go only - TypeScript uses Go WASM)
 generate-sql:
     go run ./scripts/generate-sql
 
@@ -49,6 +49,18 @@ generate-schema:
 # Generate TypeScript types from Go WASM bridge structs
 generate-ts-types:
     go run ./scripts/generate-ts-types
+
+# Generate goStorage TypeScript interface from Go WASM functions
+generate-go-storage:
+    go run ./scripts/generate-go-storage
+
+# Generate WASM function registration from //wasm:export comments
+generate-wasm-registration:
+    go run ./scripts/generate-wasm-registration
+
+# Generate WASM and HTTP adapters from service definitions
+generate-adapters:
+    go run ./scripts/generate-adapters
 
 # ============================================================================
 # Go WASM Storage Layer
@@ -71,38 +83,6 @@ build-go-wasm:
     echo "Copying sql-wasm.wasm..."
     cp web/node_modules/sql.js/dist/sql-wasm.wasm web/public/wasm/ 2>/dev/null || true
     ls -lh web/public/wasm/quantlete.wasm
-
-# ============================================================================
-# WASM Algorithms (TinyGo)
-# ============================================================================
-
-# Build shared WASM algorithms with TinyGo
-build-algorithms:
-    #!/usr/bin/env bash
-    set -e
-    which tinygo > /dev/null || (echo "Error: TinyGo not installed. Run: yay -S tinygo-bin" && exit 1)
-    mkdir -p algorithms/build web/public/wasm
-    tinygo build -o algorithms/build/algorithms.wasm -target wasm -opt 2 -no-debug ./algorithms/go/wasm
-    cp algorithms/build/algorithms.wasm web/public/wasm/
-    cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/public/wasm/
-
-# Build algorithms for development (with debug info, larger binary)
-build-algorithms-debug:
-    #!/usr/bin/env bash
-    set -e
-    which tinygo > /dev/null || (echo "Error: TinyGo not installed. Run: yay -S tinygo-bin" && exit 1)
-    mkdir -p algorithms/build web/public/wasm
-    tinygo build -o algorithms/build/algorithms.wasm -target wasm ./algorithms/go/wasm
-    cp algorithms/build/algorithms.wasm web/public/wasm/
-    cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/public/wasm/
-
-# Test algorithms (native Go)
-test-algorithms:
-    go test -v ./algorithms/go/...
-
-# Check TinyGo installation
-check-tinygo:
-    @which tinygo > /dev/null && tinygo version || echo "TinyGo not installed. Run: yay -S tinygo-bin"
 
 # ============================================================================
 # Building
@@ -289,7 +269,7 @@ preview-wasm:
 # ============================================================================
 
 # Install all dependencies
-setup: setup-go setup-web setup-worker setup-landing check-tinygo
+setup: setup-go setup-web setup-worker setup-landing
 
 # Install Go dependencies
 setup-go:

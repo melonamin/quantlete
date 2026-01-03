@@ -16,6 +16,7 @@ import (
 	"github.com/melonamin/quantlete/internal/api/handlers"
 	"github.com/melonamin/quantlete/internal/config"
 	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -206,23 +207,33 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
 	weatherRepo := storage.NewWeatherRepository(db.Conn())
 
+	// Create services
+	activityService := services.NewActivityService(activityRepo, streamRepo)
+	gearService := services.NewGearService(gearRepo)
+	photosService := services.NewPhotosService(photoRepo)
+	dashboardService := services.NewDashboardService(db, statsRepo, dashboardConfigRepo)
+	statsService := services.NewStatsService(statsRepo, powerRepo, bestEffortsRepo, trainingLoadRepo)
+	maintenanceService := services.NewMaintenanceService(maintenanceRepo)
+	challengesService := services.NewChallengesService(challengeRepo)
+	segmentsService := services.NewSegmentsService(segmentRepo)
+
 	// Create handlers
 	webhooksHandler := handlers.NewStravaWebhookHandler(cfg, imp, activityRepo, settingsRepo, stravaClient)
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
-	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, streamRepo, stravaClient)
+	activitiesHandler := handlers.NewActivitiesHandler(activityService, stravaClient)
 	importHandler := handlers.NewImportHandler(imp, syncHistoryRepo, stravaClient)
 	importHandler.SetAllowedOrigins(allowedOrigins) // Configure CORS for SSE endpoint
-	dashboardHandler := handlers.NewDashboardHandler(statsRepo, dashboardConfigRepo, stravaClient)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardService, stravaClient)
 	goalsHandler := handlers.NewGoalsHandler(goalsRepo, stravaClient)
 	athleteHandler := handlers.NewAthleteHandler(metricsRepo, stravaClient)
-	statsHandler := handlers.NewStatsHandler(db, statsRepo, powerRepo, streamRepo, metricsRepo, zonesRepo, bestEffortsRepo, trainingLoadRepo, stravaClient)
+	statsHandler := handlers.NewStatsHandler(statsService, db, streamRepo, metricsRepo, zonesRepo, stravaClient)
 	zonesHandler := handlers.NewZonesHandler(zonesRepo, stravaClient)
 	settingsHandler := handlers.NewSettingsHandler(settingsRepo, stravaClient)
-	segmentsHandler := handlers.NewSegmentsHandler(segmentRepo, stravaClient)
-	gearHandler := handlers.NewGearHandler(gearRepo, stravaClient)
-	maintenanceHandler := handlers.NewMaintenanceHandler(maintenanceRepo, stravaClient)
-	photosHandler := handlers.NewPhotosHandler(photoRepo, stravaClient)
-	challengesHandler := handlers.NewChallengesHandler(challengeRepo, stravaClient, cfg.Storage.DataDir)
+	segmentsHandler := handlers.NewSegmentsHandler(segmentsService, stravaClient)
+	gearHandler := handlers.NewGearHandler(gearService, stravaClient)
+	maintenanceHandler := handlers.NewMaintenanceHandler(maintenanceService, stravaClient)
+	photosHandler := handlers.NewPhotosHandler(photosService, stravaClient)
+	challengesHandler := handlers.NewChallengesHandler(challengesService, stravaClient, cfg.Storage.DataDir)
 	exportHandler := handlers.NewExportHandler(activityRepo, stravaClient)
 	weatherHandler := handlers.NewWeatherHandler(weatherRepo, activityRepo, streamRepo, stravaClient, slog.Default())
 	setupHandler := handlers.NewSetupHandler(cfg, appStateRepo, stravaClient)

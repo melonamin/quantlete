@@ -9,6 +9,7 @@ import (
 	"syscall/js"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -16,67 +17,18 @@ import (
 // Maintenance
 // ============================================================================
 
+//wasm:category Maintenance
+
 // getMaintenanceDue returns components with maintenance status
 // Called from JS: goStorage.getMaintenanceDue()
+//wasm:export
 func getMaintenanceDue(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getMaintenanceDue")
 
 	ctx := context.Background()
-	due, err := maintenance.Due(ctx, athleteID)
+	items, err := bridge.maintenanceService.ListDue(ctx, bridge.athleteID)
 	if err != nil {
 		return errorJSON(err)
-	}
-
-	// Convert to response format
-	items := make([]map[string]interface{}, len(due))
-	for i, d := range due {
-		item := map[string]interface{}{
-			"id":                d.ID,
-			"gear_id":           d.GearID,
-			"name":              d.Name,
-			"created_at":        d.CreatedAt.Format(time.RFC3339),
-			"updated_at":        d.UpdatedAt.Format(time.RFC3339),
-			"distance_since":    d.DistanceSince,
-			"moving_time_since": d.MovingTimeSince,
-			"days_since":        d.DaysSince,
-			"is_due":            d.IsDue,
-		}
-		if d.ImageURL != "" {
-			item["image_url"] = d.ImageURL
-		}
-		if d.MaintenanceHashtag != "" {
-			item["maintenance_hashtag"] = d.MaintenanceHashtag
-		}
-		if d.LastCompletedAt != nil {
-			item["last_completed_at"] = d.LastCompletedAt.Format(time.RFC3339)
-		}
-
-		// Add rules
-		rules := make([]map[string]interface{}, len(d.Rules))
-		for j, r := range d.Rules {
-			rules[j] = map[string]interface{}{
-				"id":              r.ID,
-				"component_id":    r.ComponentID,
-				"type":            r.Type,
-				"threshold_value": r.ThresholdValue,
-			}
-		}
-		item["rules"] = rules
-
-		// Add progress
-		progress := make([]map[string]interface{}, len(d.Progress))
-		for j, p := range d.Progress {
-			progress[j] = map[string]interface{}{
-				"type":            p.Type,
-				"threshold_value": p.ThresholdValue,
-				"current_value":   p.CurrentValue,
-				"percent":         p.Percent,
-				"due":             p.Due,
-			}
-		}
-		item["progress"] = progress
-
-		items[i] = item
 	}
 
 	return toJSON(map[string]interface{}{
@@ -87,6 +39,7 @@ func getMaintenanceDue(this js.Value, args []js.Value) interface{} {
 
 // getGearComponents returns components for a specific gear item
 // Called from JS: goStorage.getGearComponents(filtersJSON)
+//wasm:export
 func getGearComponents(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getGearComponents")
 
@@ -103,58 +56,20 @@ func getGearComponents(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing filters: %w", err))
 	}
 
-	if req.GearID == "" {
-		return errorJSON(fmt.Errorf("gear_id is required"))
-	}
-
 	ctx := context.Background()
-	filters := storage.ComponentFilters{}
-	filters.Page = req.Page
-	filters.PerPage = req.PerPage
-
-	result, err := maintenance.ListComponentsPaginated(ctx, athleteID, req.GearID, filters)
+	result, err := bridge.maintenanceService.ListComponents(ctx, services.ListComponentsInput{
+		AthleteID: bridge.athleteID,
+		GearID:    req.GearID,
+		Page:      req.Page,
+		PerPage:   req.PerPage,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, c := range result.Items {
-		item := map[string]interface{}{
-			"id":         c.ID,
-			"gear_id":    c.GearID,
-			"name":       c.Name,
-			"created_at": c.CreatedAt.Format(time.RFC3339),
-			"updated_at": c.UpdatedAt.Format(time.RFC3339),
-		}
-		if c.ImageURL != "" {
-			item["image_url"] = c.ImageURL
-		}
-		if c.MaintenanceHashtag != "" {
-			item["maintenance_hashtag"] = c.MaintenanceHashtag
-		}
-		if c.LastCompletedAt != nil {
-			item["last_completed_at"] = c.LastCompletedAt.Format(time.RFC3339)
-		}
-
-		// Add rules
-		rules := make([]map[string]interface{}, len(c.Rules))
-		for j, r := range c.Rules {
-			rules[j] = map[string]interface{}{
-				"id":              r.ID,
-				"component_id":    r.ComponentID,
-				"type":            r.Type,
-				"threshold_value": r.ThresholdValue,
-			}
-		}
-		item["rules"] = rules
-
-		items[i] = item
-	}
-
 	return toJSON(map[string]interface{}{
 		"ok":          true,
-		"data":        items,
+		"data":        result.Data,
 		"total":       result.Total,
 		"page":        result.Page,
 		"per_page":    result.PerPage,
@@ -164,6 +79,7 @@ func getGearComponents(this js.Value, args []js.Value) interface{} {
 
 // createComponent creates a new component for a gear item
 // Called from JS: goStorage.createComponent(componentJSON)
+//wasm:export
 func createComponent(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("createComponent")
 
@@ -185,43 +101,36 @@ func createComponent(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing component: %w", err))
 	}
 
-	if req.GearID == "" {
-		return errorJSON(fmt.Errorf("gear_id is required"))
-	}
-
-	input := storage.CreateComponentInput{
-		Name:               req.Name,
-		ImageURL:           req.ImageURL,
-		MaintenanceHashtag: req.MaintenanceHashtag,
-	}
+	rules := make([]services.RuleInput, 0, len(req.Rules))
 	for _, r := range req.Rules {
-		input.Rules = append(input.Rules, storage.CreateRuleInput{
+		rules = append(rules, services.RuleInput{
 			Type:           r.Type,
 			ThresholdValue: r.ThresholdValue,
 		})
 	}
 
 	ctx := context.Background()
-	comp, err := maintenance.CreateComponent(ctx, athleteID, req.GearID, input)
+	comp, err := bridge.maintenanceService.CreateComponent(ctx, services.CreateComponentInput{
+		AthleteID:          bridge.athleteID,
+		GearID:             req.GearID,
+		Name:               req.Name,
+		ImageURL:           req.ImageURL,
+		MaintenanceHashtag: req.MaintenanceHashtag,
+		Rules:              rules,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
-	if comp == nil {
-		return errorJSON(fmt.Errorf("gear not found or not owned"))
-	}
 
 	return toJSON(map[string]interface{}{
-		"ok": true,
-		"data": map[string]interface{}{
-			"id":      comp.ID,
-			"gear_id": comp.GearID,
-			"name":    comp.Name,
-		},
+		"ok":   true,
+		"data": comp,
 	})
 }
 
 // updateComponent updates an existing component
 // Called from JS: goStorage.updateComponent(componentJSON)
+//wasm:export
 func updateComponent(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("updateComponent")
 
@@ -243,47 +152,40 @@ func updateComponent(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing component: %w", err))
 	}
 
-	if req.ID == 0 {
-		return errorJSON(fmt.Errorf("id is required"))
-	}
-
-	input := storage.UpdateComponentInput{
-		Name:               req.Name,
-		ImageURL:           req.ImageURL,
-		MaintenanceHashtag: req.MaintenanceHashtag,
-	}
+	var rules *[]services.RuleInput
 	if req.Rules != nil {
-		rules := make([]storage.CreateRuleInput, len(*req.Rules))
-		for i, r := range *req.Rules {
-			rules[i] = storage.CreateRuleInput{
-				Type:           r.Type,
-				ThresholdValue: r.ThresholdValue,
+		r := make([]services.RuleInput, len(*req.Rules))
+		for i, rule := range *req.Rules {
+			r[i] = services.RuleInput{
+				Type:           rule.Type,
+				ThresholdValue: rule.ThresholdValue,
 			}
 		}
-		input.Rules = &rules
+		rules = &r
 	}
 
 	ctx := context.Background()
-	comp, err := maintenance.UpdateComponent(ctx, athleteID, req.ID, input)
+	comp, err := bridge.maintenanceService.UpdateComponent(ctx, services.UpdateComponentInput{
+		AthleteID:          bridge.athleteID,
+		ComponentID:        req.ID,
+		Name:               req.Name,
+		ImageURL:           req.ImageURL,
+		MaintenanceHashtag: req.MaintenanceHashtag,
+		Rules:              rules,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
-	if comp == nil {
-		return errorJSON(fmt.Errorf("component not found or not owned"))
-	}
 
 	return toJSON(map[string]interface{}{
-		"ok": true,
-		"data": map[string]interface{}{
-			"id":      comp.ID,
-			"gear_id": comp.GearID,
-			"name":    comp.Name,
-		},
+		"ok":   true,
+		"data": comp,
 	})
 }
 
 // deleteComponent deletes a component
 // Called from JS: goStorage.deleteComponent(id)
+//wasm:export
 func deleteComponent(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("deleteComponent")
 
@@ -294,7 +196,7 @@ func deleteComponent(this js.Value, args []js.Value) interface{} {
 	id := int64(args[0].Int())
 	ctx := context.Background()
 
-	if err := maintenance.DeleteComponent(ctx, athleteID, id); err != nil {
+	if err := bridge.maintenanceService.DeleteComponent(ctx, bridge.athleteID, id); err != nil {
 		return errorJSON(err)
 	}
 
@@ -303,6 +205,7 @@ func deleteComponent(this js.Value, args []js.Value) interface{} {
 
 // logMaintenance logs a maintenance event for a component
 // Called from JS: goStorage.logMaintenance(logJSON)
+//wasm:export
 func logMaintenance(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("logMaintenance")
 
@@ -319,10 +222,6 @@ func logMaintenance(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing log: %w", err))
 	}
 
-	if req.ComponentID == 0 {
-		return errorJSON(fmt.Errorf("component_id is required"))
-	}
-
 	completedAt := time.Now()
 	if req.CompletedAt != "" {
 		t, err := time.Parse(time.RFC3339, req.CompletedAt)
@@ -333,7 +232,12 @@ func logMaintenance(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := maintenance.LogMaintenance(ctx, athleteID, req.ComponentID, req.ActivityID, completedAt); err != nil {
+	if err := bridge.maintenanceService.LogMaintenance(ctx, services.LogMaintenanceInput{
+		AthleteID:   bridge.athleteID,
+		ComponentID: req.ComponentID,
+		ActivityID:  req.ActivityID,
+		CompletedAt: completedAt,
+	}); err != nil {
 		return errorJSON(err)
 	}
 
@@ -344,13 +248,16 @@ func logMaintenance(this js.Value, args []js.Value) interface{} {
 // Settings
 // ============================================================================
 
+//wasm:category Settings
+
 // getAppSettings returns the athlete's app settings
 // Called from JS: goStorage.getAppSettings()
+//wasm:export
 func getAppSettings(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getAppSettings")
 
 	ctx := context.Background()
-	s, err := settings.Get(ctx, athleteID)
+	s, err := bridge.settings.Get(ctx, bridge.athleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -363,6 +270,7 @@ func getAppSettings(this js.Value, args []js.Value) interface{} {
 
 // updateAppSettings updates the athlete's app settings
 // Called from JS: goStorage.updateAppSettings(settingsJSON)
+//wasm:export
 func updateAppSettings(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("updateAppSettings")
 
@@ -376,7 +284,7 @@ func updateAppSettings(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := settings.Upsert(ctx, athleteID, s); err != nil {
+	if err := bridge.settings.Upsert(ctx, bridge.athleteID, s); err != nil {
 		return errorJSON(err)
 	}
 
@@ -387,8 +295,11 @@ func updateAppSettings(this js.Value, args []js.Value) interface{} {
 // Custom Gear
 // ============================================================================
 
+//wasm:category Custom Gear
+
 // getCustomGear returns paginated custom gear for the athlete
 // Called from JS: goStorage.getCustomGear(filtersJSON)
+//wasm:export
 func getCustomGear(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getCustomGear")
 
@@ -406,46 +317,21 @@ func getCustomGear(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	filters := storage.GearFilters{
+	result, err := bridge.gearService.ListCustom(ctx, services.ListGearInput{
+		AthleteID:      bridge.athleteID,
 		IncludeRetired: req.IncludeRetired,
-	}
-	filters.Page = req.Page
-	filters.PerPage = req.PerPage
-	filters.OrderBy = req.OrderBy
-	filters.OrderDir = req.OrderDir
-
-	result, err := gear.ListCustomPaginated(ctx, athleteID, filters)
+		Page:           req.Page,
+		PerPage:        req.PerPage,
+		OrderBy:        req.OrderBy,
+		OrderDir:       req.OrderDir,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, g := range result.Items {
-		item := map[string]interface{}{
-			"id":         g.ID,
-			"athlete_id": g.AthleteID,
-			"name":       g.Name,
-			"primary":    g.Primary,
-			"retired":    g.Retired,
-			"distance":   g.Distance,
-			"source":     g.Source,
-		}
-		if g.Hashtag != "" {
-			item["hashtag"] = g.Hashtag
-		}
-		if g.PurchasePrice != nil {
-			item["purchase_price"] = *g.PurchasePrice
-		}
-		if g.PurchaseCurrency != "" {
-			item["purchase_currency"] = g.PurchaseCurrency
-		}
-		items[i] = item
-	}
-
 	return toJSON(map[string]interface{}{
 		"ok":          true,
-		"data":        items,
+		"data":        result.Data,
 		"total":       result.Total,
 		"page":        result.Page,
 		"per_page":    result.PerPage,
@@ -455,6 +341,7 @@ func getCustomGear(this js.Value, args []js.Value) interface{} {
 
 // createCustomGear creates a new custom gear item
 // Called from JS: goStorage.createCustomGear(gearJSON)
+//wasm:export
 func createCustomGear(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("createCustomGear")
 
@@ -473,34 +360,25 @@ func createCustomGear(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing gear: %w", err))
 	}
 
-	input := storage.CustomGearCreate{
+	ctx := context.Background()
+	result, err := bridge.gearService.CreateCustom(ctx, services.CreateCustomGearInput{
+		AthleteID:        bridge.athleteID,
 		Name:             req.Name,
 		Hashtag:          req.Hashtag,
 		Retired:          req.Retired,
 		PurchasePrice:    req.PurchasePrice,
 		PurchaseCurrency: req.PurchaseCurrency,
-	}
-
-	ctx := context.Background()
-	g, err := gear.CreateCustom(ctx, athleteID, input)
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok": true,
-		"data": map[string]interface{}{
-			"id":       g.ID,
-			"name":     g.Name,
-			"hashtag":  g.Hashtag,
-			"retired":  g.Retired,
-			"distance": g.Distance,
-		},
-	})
+	return dataJSON(result)
 }
 
 // updateCustomGear updates an existing custom gear item
 // Called from JS: goStorage.updateCustomGear(gearJSON)
+//wasm:export
 func updateCustomGear(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("updateCustomGear")
 
@@ -520,41 +398,26 @@ func updateCustomGear(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing gear: %w", err))
 	}
 
-	if req.ID == "" {
-		return errorJSON(fmt.Errorf("id is required"))
-	}
-
-	input := storage.CustomGearUpdate{
+	ctx := context.Background()
+	result, err := bridge.gearService.UpdateCustom(ctx, services.UpdateCustomGearInput{
+		AthleteID:        bridge.athleteID,
+		GearID:           req.ID,
 		Name:             req.Name,
 		Hashtag:          req.Hashtag,
 		Retired:          req.Retired,
 		PurchasePrice:    req.PurchasePrice,
 		PurchaseCurrency: req.PurchaseCurrency,
-	}
-
-	ctx := context.Background()
-	g, err := gear.UpdateCustom(ctx, athleteID, req.ID, input)
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
-	if g == nil {
-		return errorJSON(fmt.Errorf("gear not found or not custom"))
-	}
 
-	return toJSON(map[string]interface{}{
-		"ok": true,
-		"data": map[string]interface{}{
-			"id":       g.ID,
-			"name":     g.Name,
-			"hashtag":  g.Hashtag,
-			"retired":  g.Retired,
-			"distance": g.Distance,
-		},
-	})
+	return dataJSON(result)
 }
 
 // deleteCustomGear deletes a custom gear item
 // Called from JS: goStorage.deleteCustomGear(deleteJSON)
+//wasm:export
 func deleteCustomGear(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("deleteCustomGear")
 
@@ -570,38 +433,33 @@ func deleteCustomGear(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing request: %w", err))
 	}
 
-	if req.ID == "" {
-		return errorJSON(fmt.Errorf("id is required"))
-	}
-
 	ctx := context.Background()
-	hadActivities, err := gear.DeleteCustom(ctx, athleteID, req.ID, req.Force)
+	result, err := bridge.gearService.DeleteCustom(ctx, services.DeleteCustomGearInput{
+		AthleteID: bridge.athleteID,
+		GearID:    req.ID,
+		Force:     req.Force,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	if hadActivities && !req.Force {
-		return toJSON(map[string]interface{}{
-			"ok":             false,
-			"has_activities": true,
-			"message":        "Gear has activities. Set force=true to delete anyway.",
-		})
-	}
-
-	return successJSON("Custom gear deleted")
+	return dataJSON(result)
 }
 
 // ============================================================================
 // HR Zones
 // ============================================================================
 
+//wasm:category HR Zones
+
 // getHrZoneDefinitions returns HR zone definitions for the athlete
 // Called from JS: goStorage.getHrZoneDefinitions()
+//wasm:export
 func getHrZoneDefinitions(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getHrZoneDefinitions")
 
 	ctx := context.Background()
-	defs, err := zones.ListHR(ctx, athleteID)
+	defs, err := bridge.zones.ListHR(ctx, bridge.athleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -625,6 +483,7 @@ func getHrZoneDefinitions(this js.Value, args []js.Value) interface{} {
 
 // upsertHrZoneDefinition creates or updates an HR zone definition
 // Called from JS: goStorage.upsertHrZoneDefinition(zoneJSON)
+//wasm:export
 func upsertHrZoneDefinition(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("upsertHrZoneDefinition")
 
@@ -650,7 +509,7 @@ func upsertHrZoneDefinition(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := zones.UpsertHR(ctx, athleteID, def); err != nil {
+	if err := bridge.zones.UpsertHR(ctx, bridge.athleteID, def); err != nil {
 		return errorJSON(err)
 	}
 
@@ -659,6 +518,7 @@ func upsertHrZoneDefinition(this js.Value, args []js.Value) interface{} {
 
 // deleteHrZoneDefinition deletes an HR zone definition
 // Called from JS: goStorage.deleteHrZoneDefinition(deleteJSON)
+//wasm:export
 func deleteHrZoneDefinition(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("deleteHrZoneDefinition")
 
@@ -675,7 +535,7 @@ func deleteHrZoneDefinition(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := zones.DeleteHR(ctx, athleteID, req.SportType, req.EffectiveFrom); err != nil {
+	if err := bridge.zones.DeleteHR(ctx, bridge.athleteID, req.SportType, req.EffectiveFrom); err != nil {
 		return errorJSON(err)
 	}
 

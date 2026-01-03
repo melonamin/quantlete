@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,37 +9,26 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/melonamin/quantlete/internal/pagination"
-	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
-type componentsListResponse struct {
-	Data       []storage.ComponentWithRules `json:"data"`
-	Total      int                          `json:"total"`
-	Page       int                          `json:"page"`
-	PerPage    int                          `json:"per_page"`
-	TotalPages int                          `json:"total_pages"`
-}
-
+// MaintenanceHandler handles maintenance-related HTTP requests.
 type MaintenanceHandler struct {
-	repo   *storage.MaintenanceRepository
+	svc    *services.MaintenanceService
 	strava *strava.Client
 }
 
-func NewMaintenanceHandler(repo *storage.MaintenanceRepository, stravaClient *strava.Client) *MaintenanceHandler {
-	return &MaintenanceHandler{repo: repo, strava: stravaClient}
-}
-
-type maintenanceRuleInput struct {
-	Type           string  `json:"type"`
-	ThresholdValue float64 `json:"threshold_value"`
+// NewMaintenanceHandler creates a new maintenance handler.
+func NewMaintenanceHandler(svc *services.MaintenanceService, stravaClient *strava.Client) *MaintenanceHandler {
+	return &MaintenanceHandler{svc: svc, strava: stravaClient}
 }
 
 type createComponentRequest struct {
-	Name               string                 `json:"name"`
-	ImageURL           string                 `json:"image_url,omitempty"`
-	MaintenanceHashtag string                 `json:"maintenance_hashtag,omitempty"`
-	Rules              []maintenanceRuleInput `json:"rules,omitempty"`
+	Name               string              `json:"name"`
+	ImageURL           string              `json:"image_url,omitempty"`
+	MaintenanceHashtag string              `json:"maintenance_hashtag,omitempty"`
+	Rules              []services.RuleInput `json:"rules,omitempty"`
 }
 
 // ListGearComponents handles GET /api/v1/gear/{id}/components
@@ -52,35 +40,23 @@ func (h *MaintenanceHandler) ListGearComponents(w http.ResponseWriter, r *http.R
 	}
 
 	gearID := chi.URLParam(r, "id")
-	if gearID == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "gear id required"})
-		return
-	}
-
 	q := r.URL.Query()
-	f := storage.ComponentFilters{
-		QueryParams: pagination.ParseQueryParams(q),
-	}
+	params := pagination.ParseQueryParams(q)
 
-	result, err := h.repo.ListComponentsPaginated(r.Context(), athlete.ID, gearID, f)
+	result, err := h.svc.ListComponents(r.Context(), services.ListComponentsInput{
+		AthleteID: athlete.ID,
+		GearID:    gearID,
+		Page:      params.Page,
+		PerPage:   params.PerPage,
+		OrderBy:   params.OrderBy,
+		OrderDir:  params.OrderDir,
+	})
 	if err != nil {
-		slog.Error("failed to list gear components", "error", err, "athlete_id", athlete.ID, "gear_id", gearID, "filters", f)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch components"})
+		handleServiceError(w, err)
 		return
 	}
 
-	items := result.Items
-	if items == nil {
-		items = []storage.ComponentWithRules{}
-	}
-
-	writeJSON(w, http.StatusOK, componentsListResponse{
-		Data:       items,
-		Total:      result.Total,
-		Page:       result.Page,
-		PerPage:    result.PerPage,
-		TotalPages: result.TotalPages,
-	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 // CreateGearComponent handles POST /api/v1/gear/{id}/components
@@ -92,10 +68,6 @@ func (h *MaintenanceHandler) CreateGearComponent(w http.ResponseWriter, r *http.
 	}
 
 	gearID := chi.URLParam(r, "id")
-	if gearID == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "gear id required"})
-		return
-	}
 
 	var req createComponentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -103,36 +75,27 @@ func (h *MaintenanceHandler) CreateGearComponent(w http.ResponseWriter, r *http.
 		return
 	}
 
-	rules := make([]storage.CreateRuleInput, 0, len(req.Rules))
-	for _, rule := range req.Rules {
-		rules = append(rules, storage.CreateRuleInput{
-			Type:           rule.Type,
-			ThresholdValue: rule.ThresholdValue,
-		})
-	}
-
-	created, err := h.repo.CreateComponent(r.Context(), athlete.ID, gearID, storage.CreateComponentInput{
+	created, err := h.svc.CreateComponent(r.Context(), services.CreateComponentInput{
+		AthleteID:          athlete.ID,
+		GearID:             gearID,
 		Name:               req.Name,
 		ImageURL:           req.ImageURL,
 		MaintenanceHashtag: req.MaintenanceHashtag,
-		Rules:              rules,
+		Rules:              req.Rules,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		handleServiceError(w, err)
 		return
 	}
-	if created == nil {
-		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "gear not found"})
-		return
-	}
+
 	writeJSON(w, http.StatusCreated, created)
 }
 
 type updateComponentRequest struct {
-	Name               *string                 `json:"name,omitempty"`
-	ImageURL           *string                 `json:"image_url,omitempty"`
-	MaintenanceHashtag *string                 `json:"maintenance_hashtag,omitempty"`
-	Rules              *[]maintenanceRuleInput `json:"rules,omitempty"`
+	Name               *string               `json:"name,omitempty"`
+	ImageURL           *string               `json:"image_url,omitempty"`
+	MaintenanceHashtag *string               `json:"maintenance_hashtag,omitempty"`
+	Rules              *[]services.RuleInput `json:"rules,omitempty"`
 }
 
 // UpdateComponent handles PUT /api/v1/components/{id}
@@ -156,32 +119,19 @@ func (h *MaintenanceHandler) UpdateComponent(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var rules *[]storage.CreateRuleInput
-	if req.Rules != nil {
-		out := make([]storage.CreateRuleInput, 0, len(*req.Rules))
-		for _, rule := range *req.Rules {
-			out = append(out, storage.CreateRuleInput{
-				Type:           rule.Type,
-				ThresholdValue: rule.ThresholdValue,
-			})
-		}
-		rules = &out
-	}
-
-	updated, err := h.repo.UpdateComponent(r.Context(), athlete.ID, id, storage.UpdateComponentInput{
+	updated, err := h.svc.UpdateComponent(r.Context(), services.UpdateComponentInput{
+		AthleteID:          athlete.ID,
+		ComponentID:        id,
 		Name:               req.Name,
 		ImageURL:           req.ImageURL,
 		MaintenanceHashtag: req.MaintenanceHashtag,
-		Rules:              rules,
+		Rules:              req.Rules,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		handleServiceError(w, err)
 		return
 	}
-	if updated == nil {
-		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "component not found"})
-		return
-	}
+
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -200,10 +150,11 @@ func (h *MaintenanceHandler) DeleteComponent(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := h.repo.DeleteComponent(r.Context(), athlete.ID, id); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to delete component"})
+	if err := h.svc.DeleteComponent(r.Context(), athlete.ID, id); err != nil {
+		handleServiceError(w, err)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
 }
 
@@ -247,8 +198,13 @@ func (h *MaintenanceHandler) LogMaintenance(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	if err := h.repo.LogMaintenance(r.Context(), athlete.ID, id, req.ActivityID, completed); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to log maintenance"})
+	if err := h.svc.LogMaintenance(r.Context(), services.LogMaintenanceInput{
+		AthleteID:   athlete.ID,
+		ComponentID: id,
+		ActivityID:  req.ActivityID,
+		CompletedAt: completed,
+	}); err != nil {
+		handleServiceError(w, err)
 		return
 	}
 
@@ -263,13 +219,11 @@ func (h *MaintenanceHandler) Due(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.repo.Due(r.Context(), athlete.ID)
+	items, err := h.svc.ListDue(r.Context(), athlete.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch due maintenance"})
+		handleServiceError(w, err)
 		return
 	}
-	if items == nil {
-		items = []storage.DueComponent{}
-	}
+
 	writeJSON(w, http.StatusOK, items)
 }

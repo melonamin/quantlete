@@ -1,148 +1,24 @@
-// Types for dashboard-related data structures. Hook implementations are provided
-// by the shared data layer to support both server and WASM deployments.
+// Types for dashboard-related data structures.
+// Re-exported from generated types for single source of truth.
 
-export interface DashboardStats {
-  total_activities: number
-  total_distance: number
-  total_moving_time: number
-  total_elevation_gain: number
-  total_calories: number
-  year_activities: number
-  year_distance: number
-  year_moving_time: number
-  year_elevation_gain: number
-  month_activities: number
-  month_distance: number
-  month_moving_time: number
-  month_elevation_gain: number
-}
+export type {
+  DashboardStats,
+  WeeklyStat,
+  RecentActivity,
+  SportTypeStat,
+  MonthlyStat,
+  CalendarDay,
+  CalendarActivity,
+  CalendarMonthSummary,
+  HeatmapActivity,
+  HeatmapResponse,
+  EddingtonDay,
+  EddingtonStep,
+  EddingtonResult,
+  EddingtonHistoryPoint,
+} from '@/lib/wasm/types.gen'
 
-export interface WeeklyStat {
-  sport_type: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export interface RecentActivity {
-  id: number
-  name: string
-  sport_type: string
-  start_date: string
-  distance: number
-  moving_time: number
-  elevation_gain: number
-  summary_polyline?: string
-}
-
-export interface SportTypeStat {
-  sport_type: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export interface DashboardData {
-  stats: DashboardStats
-  weekly_stats: WeeklyStat[]
-  recent_activities: RecentActivity[]
-  sport_type_stats: SportTypeStat[]
-}
-
-export interface MonthlyStat {
-  month: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export interface YearlyStat {
-  year: number
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export interface CalendarDay {
-  date: string
-  activity_count: number
-  total_distance: number
-  total_time: number // moving_time in seconds
-  total_calories: number
-}
-
-export interface CalendarActivity {
-  id: number
-  name: string
-  sport_type: string
-  start_date: string
-  distance: number
-  moving_time: number
-  total_elevation_gain: number
-}
-
-export interface CalendarMonthSummary {
-  year: number
-  month: number
-  activity_count: number
-  total_distance: number
-  total_elevation_gain: number
-  total_moving_time: number
-  total_calories: number
-  workout_count: number
-  challenges_completed: number
-}
-
-export interface HeatmapActivity {
-  id: number
-  name: string
-  sport_type: string
-  start_date: string
-  distance: number
-  summary_polyline: string
-  start_lat: number
-  start_lng: number
-}
-
-export interface HeatmapResponse {
-  activities: HeatmapActivity[]
-  total: number
-  countries?: { country: string; iso2?: string; count: number }[]
-}
-
-export interface HeatmapFilters {
-  sport_type?: string
-  after?: string
-  before?: string
-  commute?: boolean
-  workout_type?: number
-}
-
-export interface EddingtonDay {
-  date: string
-  distance: number
-}
-
-export interface EddingtonStep {
-  target: number
-  rides_needed: number
-}
-
-export interface EddingtonResult {
-  number: number
-  distribution: EddingtonDay[]
-  next_steps: EddingtonStep[]
-}
-
-export interface EddingtonHistoryPoint {
-  date: string
-  number: number
-}
-
+// Widget types with stricter width/height unions (generated uses plain number)
 export type WidgetWidth = 4 | 6 | 8 | 12
 export type WidgetHeight = 1 | 2 | 3
 
@@ -157,6 +33,34 @@ export interface DashboardWidgetConfig {
 export interface DashboardConfig {
   version: number
   widgets: DashboardWidgetConfig[]
+}
+
+// DashboardData combines multiple dashboard stats - not in generated types
+export interface DashboardData {
+  stats: import('@/lib/wasm/types.gen').DashboardStats
+  weekly_stats: import('@/lib/wasm/types.gen').WeeklyStat[]
+  recent_activities: import('@/lib/wasm/types.gen').RecentActivity[]
+  sport_type_stats: import('@/lib/wasm/types.gen').SportTypeStat[]
+}
+
+// YearlyStat - not in generated types (uses number for year)
+export interface YearlyStat {
+  year: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+// HeatmapFilters - not in generated types (query-only)
+export interface HeatmapFilters {
+  sport_type?: string
+  after?: string
+  before?: string
+  commute?: boolean
+  workout_type?: number
+  limit?: number
+  offset?: number
 }
 
 export {

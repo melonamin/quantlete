@@ -1,14 +1,5 @@
-export interface ActivityStream {
-  activity_id: number
-  stream_type: string
-  original_size: number
-  resolution: string
-  series_type: string
-  data: unknown
-}
+// Re-export from generated types
+import type { ActivityStreamResponse } from '@/lib/wasm/types.gen'
+export type ActivityStream = ActivityStreamResponse
 
-export {
-  useActivities,
-  useActivity,
-  useActivityStreams,
-} from '@/lib/data'
+export { useActivities, useActivity, useActivityStreams } from '@/lib/data'

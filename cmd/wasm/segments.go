@@ -9,6 +9,7 @@ import (
 	"syscall/js"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -16,8 +17,11 @@ import (
 // Segments Write
 // ============================================================================
 
+//wasm:category Segments - Write
+
 // saveSegment stores a segment in the database
 // Called from JS: goStorage.saveSegment(segmentJSON)
+//wasm:export
 func saveSegment(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("saveSegment")
 
@@ -80,7 +84,7 @@ func saveSegment(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := segments.UpsertSegment(ctx, seg); err != nil {
+	if err := bridge.segments.UpsertSegment(ctx, seg); err != nil {
 		return errorJSON(err)
 	}
 
@@ -89,6 +93,7 @@ func saveSegment(this js.Value, args []js.Value) interface{} {
 
 // saveSegmentEffort stores a segment effort in the database
 // Called from JS: goStorage.saveSegmentEffort(effortJSON)
+//wasm:export
 func saveSegmentEffort(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("saveSegmentEffort")
 
@@ -145,7 +150,7 @@ func saveSegmentEffort(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := segments.UpsertEffort(ctx, effort); err != nil {
+	if err := bridge.segments.UpsertEffort(ctx, effort); err != nil {
 		return errorJSON(err)
 	}
 
@@ -156,16 +161,24 @@ func saveSegmentEffort(this js.Value, args []js.Value) interface{} {
 // Segments Read
 // ============================================================================
 
+//wasm:category Segments - Read
+
 // getSegments retrieves paginated segments list
 // Called from JS: goStorage.getSegments(filtersJSON)
+//wasm:export
 func getSegments(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getSegments")
 
 	var req struct {
-		Page    int    `json:"page"`
-		PerPage int    `json:"per_page"`
-		Starred *bool  `json:"starred"`
-		Search  string `json:"search"`
+		Page         int    `json:"page"`
+		PerPage      int    `json:"per_page"`
+		Starred      *bool  `json:"starred"`
+		Search       string `json:"search"`
+		ActivityType string `json:"activity_type"`
+		Country      string `json:"country"`
+		KOMOnly      bool   `json:"kom_only"`
+		OrderBy      string `json:"order_by"`
+		OrderDir     string `json:"order_dir"`
 	}
 	if len(args) > 0 && args[0].String() != "" {
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
@@ -174,31 +187,28 @@ func getSegments(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	result, err := segments.List(ctx, athleteID, storage.SegmentFilters{
-		Starred: req.Starred,
-		Search:  req.Search,
+	result, err := bridge.segmentsService.List(ctx, services.ListSegmentsInput{
+		AthleteID:    bridge.athleteID,
+		ActivityType: req.ActivityType,
+		Country:      req.Country,
+		Search:       req.Search,
+		KOMOnly:      req.KOMOnly,
+		Starred:      req.Starred,
+		Page:         req.Page,
+		PerPage:      req.PerPage,
+		OrderBy:      req.OrderBy,
+		OrderDir:     req.OrderDir,
 	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, s := range result.Items {
-		items[i] = segmentListItemToMap(s)
-	}
-
-	return toJSON(map[string]interface{}{
-		"ok":          true,
-		"data":        items,
-		"total":       result.Total,
-		"page":        result.Page,
-		"per_page":    result.PerPage,
-		"total_pages": result.TotalPages,
-	})
+	return dataJSON(result)
 }
 
-// getSegmentDetail retrieves a single segment by ID
+// getSegmentDetail retrieves a single segment by ID with its effort history
 // Called from JS: goStorage.getSegmentDetail(id)
+//wasm:export
 func getSegmentDetail(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getSegmentDetail")
 
@@ -209,23 +219,26 @@ func getSegmentDetail(this js.Value, args []js.Value) interface{} {
 	id := int64(args[0].Int())
 	ctx := context.Background()
 
-	seg, err := segments.GetByID(ctx, id)
+	result, err := bridge.segmentsService.GetByID(ctx, services.GetSegmentInput{
+		AthleteID: bridge.athleteID,
+		SegmentID: id,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
-	if seg == nil {
-		return errorJSON(fmt.Errorf("segment not found"))
-	}
 
-	return dataJSON(segmentToMap(*seg))
+	return dataJSON(result)
 }
 
 // ============================================================================
 // Segment Efforts
 // ============================================================================
 
+//wasm:category Segment Efforts
+
 // getSegmentEfforts returns paginated segment efforts for a segment
 // Called from JS: goStorage.getSegmentEfforts(filtersJSON)
+//wasm:export
 func getSegmentEfforts(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getSegmentEfforts")
 
@@ -244,179 +257,33 @@ func getSegmentEfforts(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("parsing filters: %w", err))
 	}
 
-	if req.SegmentID == 0 {
-		return errorJSON(fmt.Errorf("segment_id is required"))
-	}
-
 	ctx := context.Background()
-	filters := storage.SegmentEffortFilters{}
-	filters.Page = req.Page
-	filters.PerPage = req.PerPage
-	filters.OrderBy = req.OrderBy
-	filters.OrderDir = req.OrderDir
-	result, err := segments.ListEffortsPaginated(ctx, athleteID, req.SegmentID, filters)
+	result, err := bridge.segmentsService.ListEfforts(ctx, services.ListEffortsInput{
+		AthleteID: bridge.athleteID,
+		SegmentID: req.SegmentID,
+		Page:      req.Page,
+		PerPage:   req.PerPage,
+		OrderBy:   req.OrderBy,
+		OrderDir:  req.OrderDir,
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, e := range result.Items {
-		item := map[string]interface{}{
-			"id":           e.ID,
-			"segment_id":   e.SegmentID,
-			"activity_id":  e.ActivityID,
-			"athlete_id":   e.AthleteID,
-			"name":         e.Name,
-			"elapsed_time": e.ElapsedTime,
-			"moving_time":  e.MovingTime,
-			"distance":     e.Distance,
-			"country":      e.Country,
-		}
-		if e.StartDate != nil {
-			item["start_date"] = e.StartDate.Format(time.RFC3339)
-		}
-		if e.StartDateLocal != nil {
-			item["start_date_local"] = e.StartDateLocal.Format(time.RFC3339)
-		}
-		if e.AverageWatts != nil {
-			item["average_watts"] = *e.AverageWatts
-		}
-		if e.AverageHeartrate != nil {
-			item["average_heartrate"] = *e.AverageHeartrate
-		}
-		if e.MaxHeartrate != nil {
-			item["max_heartrate"] = *e.MaxHeartrate
-		}
-		if e.PRRank != nil {
-			item["pr_rank"] = *e.PRRank
-		}
-		items[i] = item
-	}
-
-	return toJSON(map[string]interface{}{
-		"ok":          true,
-		"data":        items,
-		"total":       result.Total,
-		"page":        result.Page,
-		"per_page":    result.PerPage,
-		"total_pages": result.TotalPages,
-	})
+	return dataJSON(result)
 }
 
 // getSegmentCountries returns country statistics for segments
 // Called from JS: goStorage.getSegmentCountries()
+//wasm:export
 func getSegmentCountries(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getSegmentCountries")
 
 	ctx := context.Background()
-	countryStats, err := segments.ListCountryStats(ctx, athleteID)
+	result, err := bridge.segmentsService.ListCountries(ctx, bridge.athleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	data := make([]map[string]interface{}, len(countryStats))
-	for i, cs := range countryStats {
-		data[i] = map[string]interface{}{
-			"country": cs.Country,
-			"count":   cs.Count,
-		}
-	}
-
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": data,
-	})
-}
-
-// ============================================================================
-// Segment Map Helpers
-// ============================================================================
-
-func segmentListItemToMap(s storage.SegmentListItem) map[string]interface{} {
-	m := map[string]interface{}{
-		"id":              s.ID,
-		"name":            s.Name,
-		"activity_type":   s.ActivityType,
-		"distance":        s.Distance,
-		"average_grade":   s.AverageGrade,
-		"maximum_grade":   s.MaximumGrade,
-		"elevation_high":  s.ElevationHigh,
-		"elevation_low":   s.ElevationLow,
-		"climb_category":  s.ClimbCategory,
-		"starred":         s.Starred,
-		"times_completed": s.TimesCompleted,
-	}
-	if s.StartLat != nil {
-		m["start_lat"] = *s.StartLat
-	}
-	if s.StartLng != nil {
-		m["start_lng"] = *s.StartLng
-	}
-	if s.EndLat != nil {
-		m["end_lat"] = *s.EndLat
-	}
-	if s.EndLng != nil {
-		m["end_lng"] = *s.EndLng
-	}
-	if s.Polyline != "" {
-		m["polyline"] = s.Polyline
-	}
-	if s.AthleteEffortCount != nil {
-		m["athlete_effort_count"] = *s.AthleteEffortCount
-	}
-	if s.AthletePRElapsedTime != nil {
-		m["athlete_pr_elapsed_time"] = *s.AthletePRElapsedTime
-	}
-	if s.AthletePRDate != nil {
-		m["athlete_pr_date"] = s.AthletePRDate.Format(time.RFC3339)
-	}
-	if s.LastEffortDate != nil {
-		m["last_effort_date"] = s.LastEffortDate.Format(time.RFC3339)
-	}
-	if s.BestElapsedTime != nil {
-		m["best_elapsed_time"] = *s.BestElapsedTime
-	}
-	return m
-}
-
-func segmentToMap(s storage.Segment) map[string]interface{} {
-	m := map[string]interface{}{
-		"id":             s.ID,
-		"name":           s.Name,
-		"activity_type":  s.ActivityType,
-		"distance":       s.Distance,
-		"average_grade":  s.AverageGrade,
-		"maximum_grade":  s.MaximumGrade,
-		"elevation_high": s.ElevationHigh,
-		"elevation_low":  s.ElevationLow,
-		"climb_category": s.ClimbCategory,
-		"starred":        s.Starred,
-	}
-	if s.StartLat != nil {
-		m["start_lat"] = *s.StartLat
-	}
-	if s.StartLng != nil {
-		m["start_lng"] = *s.StartLng
-	}
-	if s.EndLat != nil {
-		m["end_lat"] = *s.EndLat
-	}
-	if s.EndLng != nil {
-		m["end_lng"] = *s.EndLng
-	}
-	if s.Polyline != "" {
-		m["polyline"] = s.Polyline
-	}
-	if s.AthleteEffortCount != nil {
-		m["athlete_effort_count"] = *s.AthleteEffortCount
-	}
-	if s.AthletePRElapsedTime != nil {
-		m["athlete_pr_elapsed_time"] = *s.AthletePRElapsedTime
-	}
-	if s.AthletePRDate != nil {
-		m["athlete_pr_date"] = s.AthletePRDate.Format(time.RFC3339)
-	}
-	return m
+	return dataJSON(result)
 }

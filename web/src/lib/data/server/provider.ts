@@ -43,7 +43,7 @@ import type {
   // Gear
   Gear,
   GearFilters,
-  GearResponse,
+  GearListResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
   // Segments
@@ -306,8 +306,8 @@ export class ServerProvider implements DataProvider {
   // ============================================================================
   // Gear
   // ============================================================================
-  async getGear(filters: GearFilters = {}): Promise<GearResponse> {
-    return get<GearResponse>('/gear', {
+  async getGear(filters: GearFilters = {}): Promise<GearListResponse> {
+    return get<GearListResponse>('/gear', {
       include_retired: filters.include_retired,
       page: filters.page,
       per_page: filters.per_page,
@@ -320,8 +320,8 @@ export class ServerProvider implements DataProvider {
     return get<Gear>(`/gear/${id}`)
   }
 
-  async getCustomGear(filters: GearFilters = {}): Promise<GearResponse> {
-    return get<GearResponse>('/gear/custom', {
+  async getCustomGear(filters: GearFilters = {}): Promise<GearListResponse> {
+    return get<GearListResponse>('/gear/custom', {
       include_retired: filters.include_retired,
       page: filters.page,
       per_page: filters.per_page,

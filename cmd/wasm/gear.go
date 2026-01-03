@@ -8,15 +8,19 @@ import (
 	"fmt"
 	"syscall/js"
 
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // ============================================================================
-// Gear Write
+// Gear Write (for importer - uses repository directly)
 // ============================================================================
+
+//wasm:category Gear - Write
 
 // saveGear stores gear in the database
 // Called from JS: goStorage.saveGear(gearJSON)
+//wasm:export
 func saveGear(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("saveGear")
 
@@ -54,7 +58,7 @@ func saveGear(this js.Value, args []js.Value) interface{} {
 	}
 
 	ctx := context.Background()
-	if err := gear.Upsert(ctx, g); err != nil {
+	if err := bridge.gear.Upsert(ctx, g); err != nil {
 		return errorJSON(err)
 	}
 
@@ -62,50 +66,43 @@ func saveGear(this js.Value, args []js.Value) interface{} {
 }
 
 // ============================================================================
-// Gear Read
+// Gear Read (uses GearService)
 // ============================================================================
+
+//wasm:category Gear - Read
 
 // getGear retrieves paginated gear list
 // Called from JS: goStorage.getGear(filtersJSON)
+//wasm:export
 func getGear(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getGear")
 
-	// Parse optional filters
-	var req struct {
-		IncludeRetired bool `json:"include_retired"`
-		Page           int  `json:"page"`
-		PerPage        int  `json:"per_page"`
-	}
+	var input services.ListGearInput
+	input.AthleteID = bridge.athleteID
+
 	if len(args) > 0 && args[0].String() != "" {
+		var req struct {
+			IncludeRetired bool `json:"include_retired"`
+			Page           int  `json:"page"`
+			PerPage        int  `json:"per_page"`
+		}
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
 			return errorJSON(fmt.Errorf("parsing gear filters: %w", err))
 		}
+		input.IncludeRetired = req.IncludeRetired
+		input.Page = req.Page
+		input.PerPage = req.PerPage
 	}
 
 	ctx := context.Background()
-	result, err := gear.ListPaginated(ctx, athleteID, storage.GearFilters{
-		IncludeRetired: req.IncludeRetired,
-	})
+	result, err := bridge.gearService.List(ctx, input)
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Get activity counts for all gear
-	gearIDs := make([]string, len(result.Items))
-	for i, g := range result.Items {
-		gearIDs[i] = g.ID
-	}
-	counts, _ := gear.GetActivityCountsBatch(ctx, gearIDs)
-
-	// Convert to response format
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, g := range result.Items {
-		items[i] = gearToMap(g, counts[g.ID])
-	}
-
 	return toJSON(map[string]interface{}{
 		"ok":          true,
-		"data":        items,
+		"data":        result.Data,
 		"total":       result.Total,
 		"page":        result.Page,
 		"per_page":    result.PerPage,
@@ -114,7 +111,8 @@ func getGear(this js.Value, args []js.Value) interface{} {
 }
 
 // getGearDetail retrieves a single gear by ID
-// Called from JS: goStorage.getGearDetail(id)
+// Called from JS: goStorage.getGearDetail(gearId)
+//wasm:export
 func getGearDetail(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getGearDetail")
 
@@ -122,31 +120,33 @@ func getGearDetail(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("missing gear ID"))
 	}
 
-	id := args[0].String()
 	ctx := context.Background()
-
-	g, err := gear.GetByID(ctx, id)
+	result, err := bridge.gearService.GetByID(ctx, services.GetGearInput{
+		AthleteID: bridge.athleteID,
+		GearID:    args[0].String(),
+	})
 	if err != nil {
 		return errorJSON(err)
 	}
-	if g == nil {
-		return errorJSON(fmt.Errorf("gear not found"))
-	}
 
-	count, _ := gear.GetActivityCount(ctx, id)
-	return dataJSON(gearToMap(*g, count))
+	return dataJSON(result)
 }
 
 // ============================================================================
-// Gear Stats
+// Gear Stats (uses GearService)
 // ============================================================================
+
+//wasm:category Gear - Stats
 
 // getGearMonthlyUsage returns monthly usage statistics for gear
 // Called from JS: goStorage.getGearMonthlyUsage(filtersJSON)
+//wasm:export
 func getGearMonthlyUsage(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("getGearMonthlyUsage")
 
-	includeRetired := false
+	var input services.MonthlyUsageInput
+	input.AthleteID = bridge.athleteID
+
 	if len(args) > 0 && args[0].String() != "" {
 		var req struct {
 			IncludeRetired bool `json:"include_retired"`
@@ -154,72 +154,17 @@ func getGearMonthlyUsage(this js.Value, args []js.Value) interface{} {
 		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
 			return errorJSON(fmt.Errorf("parsing filters: %w", err))
 		}
-		includeRetired = req.IncludeRetired
+		input.IncludeRetired = req.IncludeRetired
 	}
 
 	ctx := context.Background()
-	usage, err := gear.GetMonthlyUsage(ctx, athleteID, includeRetired)
+	result, err := bridge.gearService.MonthlyUsage(ctx, input)
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	// Convert to response format
-	data := make([]map[string]interface{}, len(usage))
-	for i, u := range usage {
-		item := map[string]interface{}{
-			"month":          u.Month,
-			"gear_id":        u.GearID,
-			"gear_name":      u.GearName,
-			"source":         u.Source,
-			"retired":        u.Retired,
-			"activity_count": u.ActivityCount,
-			"distance":       u.Distance,
-			"moving_time":    u.MovingTime,
-		}
-		if u.Hashtag != "" {
-			item["hashtag"] = u.Hashtag
-		}
-		if u.PurchasePrice != nil {
-			item["purchase_price"] = *u.PurchasePrice
-		}
-		if u.PurchaseCurrency != "" {
-			item["purchase_currency"] = u.PurchaseCurrency
-		}
-		data[i] = item
-	}
-
 	return toJSON(map[string]interface{}{
 		"ok":   true,
-		"data": data,
+		"data": result,
 	})
-}
-
-// ============================================================================
-// Gear Map Helper
-// ============================================================================
-
-func gearToMap(g storage.Gear, activityCount int) map[string]interface{} {
-	m := map[string]interface{}{
-		"id":             g.ID,
-		"athlete_id":     g.AthleteID,
-		"name":           g.Name,
-		"primary":        g.Primary,
-		"retired":        g.Retired,
-		"distance":       g.Distance,
-		"brand_name":     g.BrandName,
-		"model_name":     g.ModelName,
-		"description":    g.Description,
-		"source":         g.Source,
-		"activity_count": activityCount,
-	}
-	if g.Hashtag != "" {
-		m["hashtag"] = g.Hashtag
-	}
-	if g.PurchasePrice != nil {
-		m["purchase_price"] = *g.PurchasePrice
-	}
-	if g.PurchaseCurrency != "" {
-		m["purchase_currency"] = g.PurchaseCurrency
-	}
-	return m
 }
