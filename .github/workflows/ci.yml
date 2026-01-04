@@ -33,6 +33,9 @@ jobs:
         with:
           version: latest
 
+      - name: Check adapter parity
+        run: go run ./scripts/check-adapter-parity
+
   go-wasm:
     name: Go WASM
     runs-on: ubuntu-latest

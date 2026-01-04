@@ -3,9 +3,6 @@
  *
  * This provider delegates all storage operations to Go code compiled to WASM,
  * eliminating the need for TypeScript query implementations.
- *
- * Currently implements: Auth, Activities, Dashboard, Heatmap
- * TODO: Add remaining methods (Gear, Segments, Rewind, etc.)
  */
 
 import type { DataProvider } from '../provider'
@@ -83,6 +80,7 @@ import {
   createSyncCompleteEvent,
   createDataChangedEvent,
 } from '../events'
+import { UnsupportedFeatureError } from '../errors'
 import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
 import * as goStorage from '@/lib/wasm/go-storage'
@@ -111,20 +109,51 @@ if (typeof window !== 'undefined') {
   }
 }
 
+export interface GoWasmProviderOptions {
+  /** Demo mode: load bundled database, skip OAuth */
+  demoMode?: boolean
+  /** URL to bundled demo database (required if demoMode is true) */
+  demoDatabaseUrl?: string
+}
+
 export class GoWasmProvider implements DataProvider {
   private athleteId: number | null = null
+  private options: GoWasmProviderOptions
+  private demoAthlete: { id: number; firstname: string; lastname: string } | null = null
+
+  constructor(options: GoWasmProviderOptions = {}) {
+    this.options = options
+  }
 
   async initialize(): Promise<void> {
-    // Initialize Go WASM storage
-    await goStorage.initGoStorage()
+    // Initialize Go WASM storage with options
+    await goStorage.initGoStorage({
+      demoMode: this.options.demoMode,
+      demoDatabaseUrl: this.options.demoDatabaseUrl,
+    })
 
-    // Try to load authentication
-    const authLoaded = await loadAuth()
-    if (authLoaded) {
-      const athlete = getAthlete()
-      if (athlete?.id) {
-        this.athleteId = athlete.id
-        goStorage.setAthleteId(athlete.id)
+    if (this.options.demoMode) {
+      // Demo mode: load athlete via repository (no auth tokens needed)
+      const athlete = goStorage.getFirstAthlete()
+      if (!athlete?.id) {
+        throw new Error('Demo database is empty or corrupted: no athlete found')
+      }
+      this.athleteId = athlete.id
+      this.demoAthlete = {
+        id: athlete.id,
+        firstname: athlete.firstname || 'Demo',
+        lastname: athlete.lastname || 'User',
+      }
+      goStorage.setAthleteId(this.athleteId)
+    } else {
+      // Normal mode: try to load authentication
+      const authLoaded = await loadAuth()
+      if (authLoaded) {
+        const athlete = getAthlete()
+        if (athlete?.id) {
+          this.athleteId = athlete.id
+          goStorage.setAthleteId(athlete.id)
+        }
       }
     }
   }
@@ -147,6 +176,21 @@ export class GoWasmProvider implements DataProvider {
   // ============================================================================
   async getAuthStatus(): Promise<AuthStatus> {
     this.assertInitialized()
+
+    // Demo mode: always authenticated with demo athlete
+    if (this.options.demoMode && this.demoAthlete) {
+      return {
+        authenticated: true,
+        demo_mode: true,
+        athlete: {
+          id: this.demoAthlete.id,
+          username: 'demo_user',
+          firstname: this.demoAthlete.firstname,
+          lastname: this.demoAthlete.lastname,
+          profile: '',
+        },
+      }
+    }
 
     if (!isAuthenticated()) {
       return { authenticated: false, athlete: undefined }
@@ -1262,12 +1306,18 @@ export class GoWasmProvider implements DataProvider {
 
   async importChallenges(_file: File): Promise<{ imported: number }> {
     // File import not supported in WASM mode
-    throw new Error('Not implemented yet')
+    throw new UnsupportedFeatureError(
+      'challengeImport',
+      'Challenge import is only available in server mode.'
+    )
   }
 
   async importChallengesFromProfile(_athleteId?: string): Promise<{ imported: number }> {
     // Profile import not supported in WASM mode
-    throw new Error('Not implemented yet')
+    throw new UnsupportedFeatureError(
+      'challengeImport',
+      'Challenge import is only available in server mode.'
+    )
   }
 
   // ============================================================================
@@ -1635,6 +1685,16 @@ export class GoWasmProvider implements DataProvider {
   // Setup (Strava Credentials)
   // ============================================================================
   async getCredentialsStatus(): Promise<CredentialsStatus> {
+    // Demo mode: credentials are always "configured" (not needed)
+    if (this.options.demoMode) {
+      return {
+        configured: true,
+        client_id: 'demo',
+        source: 'browser',
+        redirect_uri: '',
+      }
+    }
+
     const creds = getCredentials()
     return {
       configured: hasCredentials(),

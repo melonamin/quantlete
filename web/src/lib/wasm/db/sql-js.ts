@@ -39,6 +39,10 @@ export interface WasmDatabaseOptions {
   wasmPath?: string
   /** Auto-persist interval in ms. Set to 0 to disable. Defaults to 30000 (30s) */
   autoPersistInterval?: number
+  /** Demo mode: load bundled database, disable persistence */
+  demoMode?: boolean
+  /** URL to bundled demo database (required if demoMode is true) */
+  demoDatabaseUrl?: string
 }
 
 export class WasmDatabase {
@@ -49,11 +53,15 @@ export class WasmDatabase {
   private autoPersistInterval: number
   private persistTimer: ReturnType<typeof setInterval> | null = null
   private dirty = false
+  private demoMode: boolean
+  private demoDatabaseUrl: string | undefined
 
   constructor(options: WasmDatabaseOptions = {}) {
     this.storage = getStorageBackend()
     this.wasmPath = options.wasmPath || '/wasm/sql-wasm.wasm'
     this.autoPersistInterval = options.autoPersistInterval ?? 30000
+    this.demoMode = options.demoMode ?? false
+    this.demoDatabaseUrl = options.demoDatabaseUrl
   }
 
   /**
@@ -70,6 +78,34 @@ export class WasmDatabase {
     this.SQL = await initSqlJs({
       locateFile: () => this.wasmPath,
     })
+
+    // Demo mode: fetch bundled database, skip OPFS
+    if (this.demoMode) {
+      if (!this.demoDatabaseUrl) {
+        throw new Error('Demo mode requires demoDatabaseUrl to be set')
+      }
+
+      // Validate demo database URL is from same origin for security
+      const demoUrl = new URL(this.demoDatabaseUrl, window.location.origin)
+      if (demoUrl.origin !== window.location.origin) {
+        throw new Error(
+          `Demo database URL must be from same origin. Got: ${demoUrl.origin}, expected: ${window.location.origin}`
+        )
+      }
+
+      // Fetch with no-store to ensure fresh database on updates
+      const response = await fetch(this.demoDatabaseUrl, { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch demo database from ${this.demoDatabaseUrl}: ${response.status} ${response.statusText}`
+        )
+      }
+
+      const data = new Uint8Array(await response.arrayBuffer())
+      this.db = new this.SQL.Database(data)
+      // Don't start auto-persist timer in demo mode
+      return
+    }
 
     // Try to load existing database or create empty one
     // Migrations are handled by Go WASM after this initialization
@@ -95,6 +131,11 @@ export class WasmDatabase {
    * Persist database to storage.
    */
   async persist(): Promise<void> {
+    if (this.demoMode) {
+      // Skip persistence in demo mode - data is ephemeral
+      return
+    }
+
     if (!this.db) {
       throw new Error('Database not initialized')
     }

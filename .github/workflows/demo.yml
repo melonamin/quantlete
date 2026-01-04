@@ -1,0 +1,91 @@
+# Demo Site Deployment Pipeline
+# Builds and deploys demo.quantlete.fit with pre-populated sample data
+# Runs weekly to keep demo data dates fresh
+
+name: Deploy Demo
+
+on:
+  # Weekly scheduled deploy - keeps dates fresh
+  schedule:
+    - cron: "0 6 * * 0" # Every Sunday at 6 AM UTC
+
+  # Manual trigger
+  workflow_dispatch:
+
+  # Deploy on changes to demo-related files
+  push:
+    branches: [master]
+    paths:
+      - "internal/demo/**"
+      - "web/src/lib/mode.ts"
+      - "web/src/components/layout/demo-banner.tsx"
+      - ".github/workflows/demo.yml"
+
+env:
+  GO_VERSION: "1.24.5"
+  NODE_VERSION: "22"
+
+jobs:
+  deploy-demo:
+    name: Build and Deploy Demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+          cache-dependency-path: web/yarn.lock
+
+      - name: Install web dependencies
+        working-directory: web
+        run: yarn install --frozen-lockfile
+
+      - name: Generate code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-schema
+          go run ./scripts/generate-ts-types
+          go run ./scripts/generate-go-storage
+          go run ./scripts/generate-wasm-registration
+          go run ./scripts/generate-adapters
+
+      - name: Generate demo database
+        run: |
+          mkdir -p web/public/data
+          QUANTLETE_STORAGE_DATA_DIR=/tmp QUANTLETE_STORAGE_DB_FILE=demo.db \
+            go run ./cmd/quantlete demo --activities=100 --months=12 --athlete="Demo User"
+          cp /tmp/demo.db web/public/data/demo.db
+          ls -lh web/public/data/demo.db
+
+      - name: Build Go WASM
+        run: |
+          mkdir -p web/public/wasm
+          GOOS=js GOARCH=wasm go build -o web/public/wasm/quantlete.wasm ./cmd/wasm/
+          if [ -f "$(go env GOROOT)/lib/wasm/wasm_exec.js" ]; then
+            cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/public/wasm/
+          else
+            cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/public/wasm/
+          fi
+          ls -lh web/public/wasm/
+
+      - name: Build demo site
+        working-directory: web
+        run: yarn build:demo
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: quantlete-demo
+          directory: web/dist-demo
+          branch: main

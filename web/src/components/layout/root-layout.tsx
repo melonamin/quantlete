@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import { Sidebar, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_EXPANDED_WIDTH } from './sidebar'
+import { DemoBanner, DEMO_BANNER_HEIGHT } from './demo-banner'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useMediaQuery } from '@/lib/hooks'
 import { SyncRefresh } from '@/components/sync/sync-refresh'
+import { isDemoMode } from '@/lib/mode'
 
 interface RootLayoutProps {
   children: ReactNode
@@ -11,11 +13,14 @@ interface RootLayoutProps {
 export function RootLayout({ children }: RootLayoutProps) {
   const { collapsed } = useSidebarStore()
   const isDesktop = useMediaQuery('(min-width: 768px)')
+  const demoMode = isDemoMode()
 
   const marginLeft = isDesktop ? (collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH) : 0
+  const paddingTop = demoMode ? DEMO_BANNER_HEIGHT : 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={{ paddingTop }}>
+      {demoMode && <DemoBanner />}
       <SyncRefresh />
       <Sidebar />
 

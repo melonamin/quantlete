@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -14,21 +13,24 @@ import (
 // Uses the shared Response wrapper for consistent API format.
 func handleServiceError(w http.ResponseWriter, err error) {
 	status := errorToStatus(err)
-	shared.WriteErrorWithStatus(w, status, err)
+	if status == http.StatusInternalServerError {
+		slog.Error("internal server error", "error", err)
+	}
+	shared.WriteJSONResponse(w, status, shared.ErrorMessage(services.ClientMessage(err)))
 }
 
 // errorToStatus maps service errors to HTTP status codes.
 func errorToStatus(err error) int {
-	switch {
-	case errors.Is(err, services.ErrNotFound):
+	switch services.ErrorKindFor(err) {
+	case services.ErrorKindNotFound:
 		return http.StatusNotFound
-	case errors.Is(err, services.ErrUnauthorized):
+	case services.ErrorKindUnauthorized:
 		return http.StatusUnauthorized
-	case errors.Is(err, services.ErrForbidden):
+	case services.ErrorKindForbidden:
 		return http.StatusForbidden
-	case errors.Is(err, services.ErrBadRequest):
+	case services.ErrorKindBadRequest:
 		return http.StatusBadRequest
-	case errors.Is(err, services.ErrConflict):
+	case services.ErrorKindConflict:
 		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError

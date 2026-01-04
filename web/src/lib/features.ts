@@ -19,6 +19,8 @@ export const features = {
   webhooks: isServerMode(),
   /** Challenge scraping from Strava profile */
   challengeScraping: isServerMode(),
+  /** Challenge import from Strava trophy case HTML */
+  challengeImport: isServerMode(),
 
   // Data Sources
   /** REST API access to Go backend */

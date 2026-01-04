@@ -84,6 +84,35 @@ func (t SQLiteTime) Value() (driver.Value, error) {
 	return t.Format("2006-01-02 15:04:05-07:00"), nil
 }
 
+// SQLiteTimePtr wraps a *time.Time into an SQLiteTime value suitable for SQL parameters.
+// Returns nil if the pointer is nil, avoiding nil pointer dereference.
+func SQLiteTimePtr(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return SQLiteTime{Time: *t}
+}
+
+// AddTimeRangeFilter appends time range conditions to a WHERE clause builder.
+// It handles both start (>=) and end (<=) bounds, wrapping times in SQLiteTime.
+//
+// Example usage:
+//
+//	var conditions []string
+//	var args []any
+//	conditions, args = AddTimeRangeFilter(conditions, args, "start_date", filters.StartAfter, filters.StartBefore)
+func AddTimeRangeFilter(conditions []string, args []any, column string, start, end *time.Time) ([]string, []any) {
+	if start != nil {
+		conditions = append(conditions, column+" >= ?")
+		args = append(args, SQLiteTime{Time: *start})
+	}
+	if end != nil {
+		conditions = append(conditions, column+" <= ?")
+		args = append(args, SQLiteTime{Time: *end})
+	}
+	return conditions, args
+}
+
 // MaxSliceParamLength is the maximum number of elements allowed in a slice parameter.
 // This prevents DoS attacks from excessively large IN clauses.
 const MaxSliceParamLength = 100

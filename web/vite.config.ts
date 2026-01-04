@@ -35,13 +35,14 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const buildMode = env.VITE_BUILD_MODE || 'server'
   const isWasmMode = buildMode === 'wasm'
+  const isDemoMode = env.VITE_DEMO_MODE === 'true'
 
   return {
     plugins: [
       react(),
       tailwindcss(),
-      // Only include sql.js WASM copy plugin in wasm mode
-      ...(isWasmMode ? [copySqlJsWasm()] : []),
+      // Include sql.js WASM copy plugin in wasm mode or demo mode
+      ...(isWasmMode || isDemoMode ? [copySqlJsWasm()] : []),
     ],
     resolve: {
       alias: {
@@ -70,7 +71,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       // Different output directories for each mode
-      outDir: isWasmMode ? 'dist-wasm' : 'dist',
+      outDir: isDemoMode ? 'dist-demo' : isWasmMode ? 'dist-wasm' : 'dist',
       sourcemap: true,
       // Use terser in production for better console removal control
       minify: mode === 'production' ? 'terser' : 'esbuild',
@@ -85,8 +86,8 @@ export default defineConfig(({ mode }) => {
             }
           : undefined,
     },
-    // WASM mode: handle sql.js WASM files
-    ...(isWasmMode && {
+    // WASM mode and demo mode: handle sql.js WASM files
+    ...((isWasmMode || isDemoMode) && {
       optimizeDeps: {
         // Include sql.js for proper CommonJS->ESM conversion
         include: ['sql.js'],

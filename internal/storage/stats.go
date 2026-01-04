@@ -487,19 +487,16 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 
 	if filters.StartAfter != nil {
 		query += " AND start_date >= ?"
-		args = append(args, *filters.StartAfter)
+		args = append(args, SQLiteTime{Time: *filters.StartAfter})
 	}
-
 	if filters.StartBefore != nil {
 		query += " AND start_date <= ?"
-		args = append(args, *filters.StartBefore)
+		args = append(args, SQLiteTime{Time: *filters.StartBefore})
 	}
-
 	if filters.Commute != nil {
 		query += " AND commute = ?"
 		args = append(args, *filters.Commute)
 	}
-
 	if filters.WorkoutType != nil {
 		query += " AND workout_type = ?"
 		args = append(args, *filters.WorkoutType)
@@ -554,12 +551,12 @@ func (r *StatsRepository) CountHeatmapActivities(ctx context.Context, athleteID 
 
 	if filters.StartAfter != nil {
 		query += " AND start_date >= ?"
-		args = append(args, *filters.StartAfter)
+		args = append(args, SQLiteTime{Time: *filters.StartAfter})
 	}
 
 	if filters.StartBefore != nil {
 		query += " AND start_date <= ?"
-		args = append(args, *filters.StartBefore)
+		args = append(args, SQLiteTime{Time: *filters.StartBefore})
 	}
 
 	if filters.Commute != nil {
@@ -603,11 +600,11 @@ func (r *StatsRepository) GetHeatmapCountries(ctx context.Context, athleteID int
 	}
 	if filters.StartAfter != nil {
 		query += " AND start_date >= ?"
-		args = append(args, *filters.StartAfter)
+		args = append(args, SQLiteTime{Time: *filters.StartAfter})
 	}
 	if filters.StartBefore != nil {
 		query += " AND start_date <= ?"
-		args = append(args, *filters.StartBefore)
+		args = append(args, SQLiteTime{Time: *filters.StartBefore})
 	}
 	if filters.Commute != nil {
 		query += " AND commute = ?"

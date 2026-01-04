@@ -119,16 +119,16 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Sport Type</label>
             <Select
-              value={filters.sport_type ?? ''}
+              value={filters.sport_type ?? '__all__'}
               onValueChange={(value) =>
-                onFiltersChange({ sport_type: value || undefined, page: 1 })
+                onFiltersChange({ sport_type: value === '__all__' ? undefined : value, page: 1 })
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All types</SelectItem>
+                <SelectItem value="__all__">All types</SelectItem>
                 {SPORT_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}

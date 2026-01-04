@@ -57,11 +57,11 @@ func (r *TrainingLoadRepository) EnsureComputedForRange(ctx context.Context, ath
 	args := []any{athleteID}
 	if after != nil {
 		query += " AND a.start_date >= ?"
-		args = append(args, *after)
+		args = append(args, SQLiteTime{Time: *after})
 	}
 	if before != nil {
 		query += " AND a.start_date <= ?"
-		args = append(args, *before)
+		args = append(args, SQLiteTime{Time: *before})
 	}
 	query += " ORDER BY a.start_date ASC"
 
@@ -223,11 +223,11 @@ func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID i
 	args := []any{athleteID}
 	if after != nil {
 		query += " AND a.start_date_local >= ?"
-		args = append(args, *after)
+		args = append(args, SQLiteTime{Time: *after})
 	}
 	if before != nil {
 		query += " AND a.start_date_local <= ?"
-		args = append(args, *before)
+		args = append(args, SQLiteTime{Time: *before})
 	}
 	query += `
 		GROUP BY day

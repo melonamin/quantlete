@@ -55,13 +55,14 @@ export function MonthlyStatsChart({
   }
 
   const formatValue = (value: number) => {
+    const v = value ?? 0
     switch (metric) {
       case 'distance':
-        return `${value.toFixed(1)} km`
+        return `${v.toFixed(1)} km`
       case 'count':
-        return `${value} activities`
+        return `${v} activities`
       case 'time':
-        return `${value.toFixed(1)} hours`
+        return `${v.toFixed(1)} hours`
     }
   }
 

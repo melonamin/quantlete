@@ -19,7 +19,8 @@ interface WeightEditorProps {
 }
 
 function parseISODate(d: string) {
-  const t = new Date(d + 'T00:00:00')
+  // Handle both date-only ("2025-01-04") and full ISO timestamps ("2025-01-04T10:25:49-05:00")
+  const t = d.includes('T') ? new Date(d) : new Date(d + 'T00:00:00')
   return Number.isFinite(t.getTime()) ? t : null
 }
 

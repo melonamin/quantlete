@@ -77,7 +77,11 @@ var startImport = wrapWasmRaw("startImport", func(this js.Value, args []js.Value
 	// Create adapters
 	stravaAdapter := NewWasmStravaAdapter()
 	stravaAdapter.SetAthlete(&athlete)
-	storageAdapter := NewWasmStorageAdapter()
+	b := getBridge()
+	if b == nil || b.registry == nil {
+		return errorJSON(fmt.Errorf("storage not initialized - call init() first"))
+	}
+	storageAdapter := importer.NewWasmStorageAdapter(b.registry)
 
 	// Create importer
 	imp, err := importer.New(stravaAdapter, storageAdapter)
@@ -204,7 +208,11 @@ var getImportState = wrapWasmRaw("getImportState", func(this js.Value, args []js
 	}
 
 	ctx := context.Background()
-	storageAdapter := NewWasmStorageAdapter()
+	b := getBridge()
+	if b == nil || b.registry == nil {
+		return errorJSON(fmt.Errorf("storage not initialized - call init() first"))
+	}
+	storageAdapter := importer.NewWasmStorageAdapter(b.registry)
 	state, err := storageAdapter.LoadImportState(ctx)
 	if err != nil {
 		return errorJSON(err)
@@ -227,7 +235,11 @@ var clearImportState = wrapWasmRaw("clearImportState", func(this js.Value, args 
 	}
 
 	ctx := context.Background()
-	storageAdapter := NewWasmStorageAdapter()
+	b := getBridge()
+	if b == nil || b.registry == nil {
+		return errorJSON(fmt.Errorf("storage not initialized - call init() first"))
+	}
+	storageAdapter := importer.NewWasmStorageAdapter(b.registry)
 	if err := storageAdapter.ClearImportState(ctx); err != nil {
 		return errorJSON(err)
 	}

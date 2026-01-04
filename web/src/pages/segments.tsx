@@ -111,12 +111,12 @@ export function SegmentsPage() {
 
   // Filter change handlers that also reset pagination
   const handleActivityTypeChange = (value: string) => {
-    setActivityType(value)
+    setActivityType(value === '__all__' ? '' : value)
     setPage(1)
   }
 
   const handleCountryChange = (value: string) => {
-    setCountry(value)
+    setCountry(value === '__all__' ? '' : value)
     setPage(1)
   }
 
@@ -238,12 +238,12 @@ export function SegmentsPage() {
             {/* Sport type dropdown */}
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Sport Type</Label>
-              <Select value={activityType} onValueChange={handleActivityTypeChange}>
+              <Select value={activityType || '__all__'} onValueChange={handleActivityTypeChange}>
                 <SelectTrigger size="sm">
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="__all__">All types</SelectItem>
                   {sportOptions.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type}
@@ -256,12 +256,12 @@ export function SegmentsPage() {
             {/* Country dropdown */}
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Country</Label>
-              <Select value={country} onValueChange={handleCountryChange}>
+              <Select value={country || '__all__'} onValueChange={handleCountryChange}>
                 <SelectTrigger size="sm">
                   <SelectValue placeholder="All countries" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All countries</SelectItem>
+                  <SelectItem value="__all__">All countries</SelectItem>
                   {(countries ?? []).map((c) => (
                     <SelectItem key={c.country} value={c.country}>
                       {flagEmoji(c.iso2)} {c.country} ({c.count})

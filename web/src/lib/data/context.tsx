@@ -8,7 +8,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { DataProvider } from './provider'
-import { isWasmMode } from '@/lib/mode'
+import { isWasmMode, isDemoMode, getDemoDbUrl } from '@/lib/mode'
 
 interface DataProviderState {
   provider: DataProvider | null
@@ -66,7 +66,16 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
   useEffect(() => {
     async function initialize() {
       try {
-        if (isWasmMode()) {
+        if (isDemoMode()) {
+          // Demo mode - use GoWasmProvider with bundled database
+          const { GoWasmProvider } = await import('./wasm/go-provider')
+          const provider = new GoWasmProvider({
+            demoMode: true,
+            demoDatabaseUrl: getDemoDbUrl(),
+          })
+          await provider.initialize()
+          setState({ provider, initialized: true, error: null })
+        } else if (isWasmMode()) {
           // Lazy load Go WASM provider to avoid bundling in server mode
           const { GoWasmProvider } = await import('./wasm/go-provider')
           const provider = new GoWasmProvider()

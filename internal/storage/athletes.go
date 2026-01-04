@@ -102,6 +102,34 @@ func (r *AthleteRepository) GetByID(ctx context.Context, id int64) (*Athlete, er
 	return &a, nil
 }
 
+// GetFirst retrieves the first athlete in the database.
+// Used for demo mode initialization where we need to identify the demo user.
+func (r *AthleteRepository) GetFirst(ctx context.Context) (*Athlete, error) {
+	row := r.db.QueryRow(`
+		SELECT id, username, firstname, lastname, city, state, country,
+			sex, premium, summit, profile_medium, profile, weight,
+			created_at, updated_at
+		FROM athletes
+		ORDER BY id
+		LIMIT 1
+	`)
+
+	var a Athlete
+	err := row.Scan(
+		&a.ID, &a.Username, &a.FirstName, &a.LastName, &a.City, &a.State, &a.Country,
+		&a.Sex, &a.Premium, &a.Summit, &a.ProfileMedium, &a.Profile, &a.Weight,
+		&a.CreatedAt, &a.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("scanning athlete: %w", err)
+	}
+
+	return &a, nil
+}
+
 // GetAll retrieves all athletes.
 func (r *AthleteRepository) GetAll(ctx context.Context) ([]Athlete, error) {
 	rows, err := r.db.Query(`

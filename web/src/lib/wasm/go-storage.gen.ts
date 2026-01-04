@@ -198,6 +198,10 @@ export interface GoStorageInterface {
   /** Export */
   getExportStats(): string
 
+  // Athlete - Read
+  /** Athlete Read */
+  getFirstAthlete(): string
+
   // Athlete - Metrics
   /** Athlete Metrics (FTP/Weight) */
   getFtpHistory(): string

@@ -249,15 +249,7 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 		conditions = append(conditions, fmt.Sprintf("sport_type IN (%s)", strings.Join(placeholders, ",")))
 	}
 
-	if filters.StartAfter != nil {
-		conditions = append(conditions, "start_date >= ?")
-		args = append(args, *filters.StartAfter)
-	}
-
-	if filters.StartBefore != nil {
-		conditions = append(conditions, "start_date <= ?")
-		args = append(args, *filters.StartBefore)
-	}
+	conditions, args = AddTimeRangeFilter(conditions, args, "start_date", filters.StartAfter, filters.StartBefore)
 
 	if filters.GearID != "" {
 		conditions = append(conditions, "gear_id = ?")
@@ -384,15 +376,7 @@ func (r *ActivityRepository) GetTotals(ctx context.Context, filters ActivityFilt
 		conditions = append(conditions, fmt.Sprintf("sport_type IN (%s)", strings.Join(placeholders, ",")))
 	}
 
-	if filters.StartAfter != nil {
-		conditions = append(conditions, "start_date >= ?")
-		args = append(args, *filters.StartAfter)
-	}
-
-	if filters.StartBefore != nil {
-		conditions = append(conditions, "start_date <= ?")
-		args = append(args, *filters.StartBefore)
-	}
+	conditions, args = AddTimeRangeFilter(conditions, args, "start_date", filters.StartAfter, filters.StartBefore)
 
 	where := ""
 	if len(conditions) > 0 {

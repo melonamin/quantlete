@@ -636,6 +636,8 @@ export function parseGoResult<T>(result: string, operation?: string): GoStorageR
 /**
  * Helper for calling Go storage functions that return data directly.
  * Handles initialization check, parsing, and error handling.
+ * Note: Go WASM wraps responses in {"ok": true, "data": <result>},
+ * so we extract .data when present.
  */
 export function callGoStorage<T>(
   fn: () => string,
@@ -647,6 +649,11 @@ export function callGoStorage<T>(
   const result = parseGoResult<T>(fn(), operation)
   if (!result.ok) {
     throw new Error(result.error || ` + "`" + `Failed to ${operation}` + "`" + `)
+  }
+  // Go WASM wraps responses in {ok, data}, extract .data if present
+  // Otherwise return the result directly (for backwards compatibility with inline fields)
+  if (result.data !== undefined) {
+    return result.data as T
   }
   return result as T
 }

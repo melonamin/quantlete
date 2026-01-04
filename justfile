@@ -62,6 +62,10 @@ generate-wasm-registration:
 generate-adapters:
     go run ./scripts/generate-adapters
 
+# Check for parity between WASM and HTTP adapter annotations
+check-adapter-parity:
+    go run ./scripts/check-adapter-parity
+
 # ============================================================================
 # Go WASM Storage Layer
 # ============================================================================
@@ -112,6 +116,8 @@ clean:
     rm -rf bin/
     rm -rf web/dist/
     rm -rf web/dist-wasm/
+    rm -rf web/dist-demo/
+    rm -f web/public/data/demo.db
 
 # ============================================================================
 # Testing
@@ -263,6 +269,35 @@ deploy-cf: deploy-worker deploy-wasm
 # Preview WASM mode locally
 preview-wasm:
     cd web && yarn preview:wasm
+
+# ============================================================================
+# Demo Mode (demo.quantlete.fit)
+# ============================================================================
+
+# Generate demo database for static hosting
+generate-demo-db:
+    #!/usr/bin/env bash
+    set -e
+    mkdir -p web/public/data
+    echo "Generating demo database..."
+    rm -f /tmp/demo.db
+    QUANTLETE_STORAGE_DATA_DIR=/tmp QUANTLETE_STORAGE_DB_FILE=demo.db \
+        go run ./cmd/quantlete demo --activities=274 --months=24 --athlete="Demo User"
+    cp /tmp/demo.db web/public/data/demo.db
+    ls -lh web/public/data/demo.db
+    echo "Demo database generated at web/public/data/demo.db"
+
+# Build demo mode (WASM + bundled demo database)
+build-demo: generate generate-demo-db build-go-wasm
+    cd web && yarn build:demo
+
+# Deploy demo to Cloudflare Pages (demo.quantlete.fit)
+deploy-demo: build-demo
+    npx wrangler pages deploy web/dist-demo --project-name=quantlete-demo --branch=main --commit-dirty=true
+
+# Preview demo build locally
+preview-demo: build-demo
+    cd web && npx vite preview --outDir dist-demo
 
 # ============================================================================
 # Setup

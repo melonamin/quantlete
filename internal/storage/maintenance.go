@@ -555,7 +555,7 @@ func (r *MaintenanceRepository) LogMaintenance(ctx context.Context, athleteID, c
 		INSERT INTO maintenance_log (component_id, activity_id, completed_at, created_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (component_id, completed_at) DO NOTHING
-	`, componentID, activityID, completedAt, SQLiteTime{Time: time.Now()})
+	`, componentID, activityID, SQLiteTime{Time: completedAt}, SQLiteTime{Time: time.Now()})
 	return err
 }
 
@@ -585,7 +585,7 @@ func (r *MaintenanceRepository) LogFromActivityHashtags(ctx context.Context, ath
 	`, strings.Join(placeholders, ","))
 
 	params := make([]any, 0, 4+len(tagArgs))
-	params = append(params, activityID, completedAt, createdAt, athleteID)
+	params = append(params, activityID, SQLiteTime{Time: completedAt}, createdAt, athleteID)
 	params = append(params, tagArgs...)
 
 	res, err := r.db.ExecContext(ctx, query, params...)

@@ -75,26 +75,54 @@ This document describes the technical architecture for implementing the Statisti
 
 ### 1.3 Code Sharing Between Modes
 
-The storage layer (`internal/storage/*`) is **100% shared** between server and WASM builds:
+The storage, services, and importer layers are **shared** between server and WASM builds:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                          SHARED GO CODE                                 │
 │  internal/storage/     → 20+ repositories (activities, stats, gear...) │
-│  algorithms/go/        → Eddington, TSS, CTL/ATL/TSB, power metrics    │
+│  internal/services/    → Business logic layer (dashboard, stats, etc.) │
+│  internal/importer/    → Strava import orchestration (interface-driven)│
+│  internal/analysis/    → Eddington, TSS, CTL/ATL/TSB, power metrics    │
+│  internal/shared/      → Common date parsing, constants                 │
 ├────────────────────────────────┬────────────────────────────────────────┤
 │         SERVER-ONLY            │            WASM-ONLY                   │
-│  cmd/quantlete/                │  cmd/wasm/main.go (JS bridge)          │
-│  internal/api/                 │  web/src/lib/wasm/go-storage.ts        │
-│  internal/importer/            │  web/src/lib/data/wasm/go-provider.ts  │
-│  internal/strava/ (API client) │  web/src/lib/wasm/strava/importer.ts   │
-│  driver_server.go              │  driver_wasm.go                        │
+│  cmd/quantlete/                │  cmd/wasm/*.go (JS bridge, adapters)   │
+│  internal/api/handlers/        │  web/src/lib/wasm/go-storage*.ts       │
+│  internal/strava/ (API client) │  web/src/lib/data/wasm/provider.ts     │
+│  importer adapters:            │  importer adapters:                    │
+│    server_strava_adapter.go    │    import_strava_adapter.go (JS fetch) │
+│    server_storage_adapter.go   │    import_storage_adapter.go           │
+│  internal/storage/driver.go    │  internal/storage/driver_wasm.go       │
 └────────────────────────────────┴────────────────────────────────────────┘
 ```
 
 Build tags select the SQLite driver:
-- **Server:** `driver_server.go` → `modernc.org/sqlite` (file-based)
+- **Server:** `driver.go` → `modernc.org/sqlite` (file-based)
 - **WASM:** `driver_wasm.go` → `go-sqlite3-js` → `sql.js` → OPFS
+
+### 1.4 Interface-Driven Platform Adapters
+
+The importer uses interfaces to abstract platform differences:
+
+```go
+// internal/importer/interfaces.go
+type StravaClient interface {
+    GetActivities(ctx, opts) ([]Activity, error)
+    GetActivityStreams(ctx, id, types) (*StreamSet, error)
+    // ... other Strava API methods
+}
+
+type ImportStorage interface {
+    SaveActivity(ctx, activity) error
+    SaveStreams(ctx, activityID, streams) error
+    // ... other storage methods
+}
+```
+
+Each platform provides its own adapters:
+- **Server:** `ServerStravaAdapter` (uses `internal/strava` HTTP client)
+- **WASM:** `WasmStravaAdapter` (calls JavaScript's `stravaFetch` via syscall/js)
 
 ---
 
@@ -177,68 +205,99 @@ quantlete/
 ├── CLAUDE.md                   # Project-specific AI instructions
 │
 ├── cmd/
-│   └── quantlete/
-│       ├── main.go             # Entry point
-│       ├── root.go             # Root cobra command
-│       ├── serve.go            # `quantlete serve` - start web server
-│       ├── import.go           # `quantlete import` - manual import
-│       ├── export.go           # `quantlete export` - export data
-│       └── version.go          # `quantlete version`
+│   ├── quantlete/              # Server binary
+│   │   ├── main.go             # Entry point
+│   │   ├── root.go             # Root cobra command
+│   │   ├── serve.go            # `quantlete serve` - start web server
+│   │   ├── import.go           # `quantlete import` - manual import
+│   │   ├── export.go           # `quantlete export` - export data
+│   │   └── version.go          # `quantlete version`
+│   │
+│   └── wasm/                   # WebAssembly binary (browser-only mode)
+│       ├── main.go             # WASM entry point
+│       ├── helpers.go          # JSON helpers, validation
+│       ├── import.go           # WASM importer orchestration
+│       ├── import_strava_adapter.go   # StravaClient via JS stravaFetch
+│       ├── import_storage_adapter.go  # ImportStorage for WASM
+│       ├── adapters.gen.go     # Generated service wrappers
+│       └── registration.gen.go # Generated JS registration
+│
+├── scripts/                    # Code generation scripts
+│   ├── generate-ts-types/      # Go structs → TypeScript interfaces
+│   ├── generate-adapters/      # Service methods → WASM adapters
+│   ├── generate-wasm-registration/  # Go funcs → JS registration
+│   ├── generate-go-storage/    # Go funcs → TypeScript wrappers
+│   └── generate-sql/           # SQL queries → Go/TS methods
 │
 ├── internal/
 │   ├── api/
 │   │   ├── router.go           # Chi router setup
 │   │   ├── middleware.go       # Auth, logging, CORS
-│   │   ├── handlers/
-│   │   │   ├── activities.go
-│   │   │   ├── dashboard.go
-│   │   │   ├── segments.go
-│   │   │   ├── gear.go
-│   │   │   ├── auth.go         # OAuth flow handlers
-│   │   │   └── webhooks.go     # Strava webhook receiver
-│   │   └── responses.go        # Standard response helpers
+│   │   └── handlers/           # HTTP endpoint handlers
+│   │       ├── activities.go   # Activity endpoints
+│   │       ├── dashboard.go    # Dashboard data endpoints
+│   │       ├── segments.go     # Segment endpoints
+│   │       ├── gear.go         # Gear endpoints
+│   │       ├── stats.go        # Stats endpoints
+│   │       ├── auth.go         # OAuth flow handlers
+│   │       └── webhooks.go     # Strava webhook receiver
 │   │
-│   ├── config/
-│   │   ├── config.go           # Configuration struct
-│   │   └── loader.go           # Viper loading logic
+│   ├── services/               # Business logic layer (shared by server + WASM)
+│   │   ├── registry.go         # ServiceRegistry consolidates dependencies
+│   │   ├── activities.go       # Activity service
+│   │   ├── dashboard.go        # Dashboard aggregation
+│   │   ├── segments.go         # Segment service
+│   │   ├── gear.go             # Gear service
+│   │   ├── maintenance.go      # Gear maintenance tracking
+│   │   ├── stats.go            # Stats/analytics service
+│   │   ├── photos.go           # Photo service
+│   │   ├── challenges.go       # Challenges service
+│   │   └── errors.go           # Common service errors
 │   │
 │   ├── storage/
 │   │   ├── db.go               # SQLite connection management
+│   │   ├── driver.go           # Server-mode SQLite driver
+│   │   ├── driver_wasm.go      # WASM-mode SQLite driver (build tagged)
 │   │   ├── migrations.go       # Schema migrations
 │   │   ├── activities.go       # Activity repository
 │   │   ├── segments.go         # Segment repository
 │   │   ├── gear.go             # Gear repository
 │   │   ├── stats.go            # Aggregation queries
-│   │   └── queries/            # Embedded SQL files
-│   │       ├── activities.sql
-│   │       ├── dashboard.sql
-│   │       └── ...
+│   │   └── queries.gen.go      # Generated SQL queries (just generate-sql)
 │   │
-│   ├── strava/
-│   │   ├── client.go           # Strava API client
+│   ├── importer/               # Strava import (shared via interfaces)
+│   │   ├── interfaces.go       # StravaClient, ImportStorage interfaces
+│   │   ├── importer.go         # Import orchestration (6-phase)
+│   │   ├── state.go            # Import state management
+│   │   ├── strava_json.go      # Shared JSON types for Strava API
+│   │   ├── server_strava_adapter.go   # Server-side StravaClient impl
+│   │   ├── server_storage_adapter.go  # Server-side ImportStorage impl
+│   │   ├── converters.go       # Type conversion helpers
+│   │   └── eta.go              # Import time estimation
+│   │
+│   ├── strava/                 # Strava API client (server-only)
+│   │   ├── client.go           # HTTP client
 │   │   ├── oauth.go            # OAuth2 flow
-│   │   ├── activities.go       # Activity fetching
-│   │   ├── streams.go          # Stream data fetching
-│   │   ├── webhooks.go         # Webhook handling
 │   │   ├── ratelimit.go        # Rate limit tracking
-│   │   └── types.go            # Strava API types
+│   │   └── types.go            # Strava API wire types
 │   │
-│   ├── importer/
-│   │   ├── importer.go         # Import orchestration
-│   │   ├── activities.go       # Activity import logic
-│   │   ├── streams.go          # Stream import logic
-│   │   ├── weather.go          # Open-Meteo enrichment
-│   │   └── challenges.go       # Challenge scraping
+│   ├── analysis/               # Analytics algorithms
+│   │   ├── eddington.go        # Eddington number calculation
+│   │   ├── power.go            # Power metrics (NP, IF, TSS)
+│   │   └── training_load.go    # CTL/ATL/TSB fitness tracking
+│   │
+│   ├── shared/                 # Cross-package utilities
+│   │   └── dates.go            # Date parsing helpers
 │   │
 │   ├── scheduler/
 │   │   ├── scheduler.go        # Cron job management
 │   │   └── jobs.go             # Individual job definitions
 │   │
-│   └── domain/
-│       ├── activity.go         # Activity domain model
-│       ├── segment.go          # Segment domain model
-│       ├── gear.go             # Gear domain model
-│       └── athlete.go          # Athlete domain model
+│   ├── config/
+│   │   ├── config.go           # Configuration struct
+│   │   └── loader.go           # Viper loading logic
+│   │
+│   └── (other packages: badges, challenges, demo, geo, pagination, weather)
 │
 ├── embed.go                    # //go:embed web/dist/*
 │
@@ -336,15 +395,20 @@ quantlete/
 │   │   │   └── use-theme.ts
 │   │   │
 │   │   ├── lib/
-│   │   │   ├── db/
-│   │   │   │   ├── index.ts          # DataSource factory
-│   │   │   │   ├── types.ts          # Shared interfaces
-│   │   │   │   ├── api-client.ts     # REST API implementation
-│   │   │   │   └── wasm-client.ts    # SQLite-WASM implementation
+│   │   │   ├── data/                 # Data layer abstraction
+│   │   │   │   ├── context.tsx       # DataProvider context
+│   │   │   │   ├── provider.ts       # DataProvider interface
+│   │   │   │   ├── hooks.ts          # TanStack Query hooks
+│   │   │   │   ├── types.ts          # Shared data types
+│   │   │   │   ├── server/           # Server mode (REST API calls)
+│   │   │   │   └── wasm/             # WASM mode (Go WASM calls)
 │   │   │   │
-│   │   │   ├── strava/
-│   │   │   │   ├── client.ts         # Direct Strava API (WASM mode)
-│   │   │   │   └── oauth.ts          # OAuth helpers
+│   │   │   ├── wasm/                 # Go WASM bridge
+│   │   │   │   ├── go-storage.ts     # Main TypeScript wrappers
+│   │   │   │   ├── go-storage.gen.ts      # Generated wrappers
+│   │   │   │   ├── go-storage-wrappers.gen.ts  # Generated helpers
+│   │   │   │   ├── types.gen.ts      # Generated TypeScript types
+│   │   │   │   └── weather.ts        # Weather API client
 │   │   │   │
 │   │   │   ├── utils/
 │   │   │   │   ├── units.ts          # Metric/imperial conversion
@@ -363,10 +427,7 @@ quantlete/
 │   │   │   └── dashboard.ts          # Dashboard widget config
 │   │   │
 │   │   └── types/
-│   │       ├── activity.ts
-│   │       ├── segment.ts
-│   │       ├── gear.ts
-│   │       └── api.ts
+│   │       └── (generated in lib/wasm/types.gen.ts)
 │   │
 │   └── tests/
 │       ├── unit/
@@ -1152,6 +1213,36 @@ EXPOSE 8080
 CMD ["quantlete", "serve"]
 ```
 
+### 7.4 Code Generation
+
+The project uses several code generators to maintain consistency between Go and TypeScript:
+
+```bash
+# All generators available via just commands
+just generate-ts-types      # Go structs → TypeScript interfaces
+just generate-adapters      # Service methods → WASM adapter wrappers
+just generate-wasm-registration  # WASM functions → JS registration
+just generate-go-storage    # Go functions → TypeScript wrappers
+just generate-sql           # SQL queries → Go/TypeScript query methods
+```
+
+**Generator Scripts:**
+
+| Script | Input | Output | Purpose |
+|--------|-------|--------|---------|
+| `generate-ts-types` | `internal/services/*.go`, `internal/api/handlers/*.go` | `types.gen.ts` | TypeScript interfaces matching Go structs |
+| `generate-adapters` | `internal/services/*.go` | `adapters.gen.go` | WASM wrappers for service methods |
+| `generate-wasm-registration` | `cmd/wasm/*.go` functions | `registration.gen.go` | Register Go funcs to JS global |
+| `generate-go-storage` | `cmd/wasm/registration.gen.go` | `go-storage.gen.ts` | TypeScript wrappers for WASM calls |
+
+**Type Safety Guarantees:**
+
+The `generate-ts-types` script (AST-based) enforces:
+- **No type collisions**: Build fails if same type name exists in multiple packages
+- **No unknown types**: Build fails if a Go type would become `unknown` in TypeScript
+- **No malformed tags**: Build fails on invalid struct tag syntax
+- Services types take precedence over storage types when collisions are allowed
+
 ---
 
 ## 8. WASM Browser-Only Mode
@@ -1229,25 +1320,40 @@ The Worker only proxies - it doesn't store credentials.
 
 ### 8.3 Go WASM Bridge File Structure
 
-The WASM bridge code is organized into domain-specific files:
+The WASM bridge uses code generation for service adapters and JS registration:
 
 ```
 cmd/wasm/
-├── main.go         (325 lines)  # Entry point, WasmBridge struct, JS registration
-├── helpers.go      (126 lines)  # JSON helpers, validation, constants
-├── activities.go   (455 lines)  # Activity CRUD, streams, activityToMap
-├── algorithms.go   (293 lines)  # Power, Eddington, training load algorithms
-├── athletes.go     (199 lines)  # saveAthlete, FTP/weight history
-├── challenges.go   (147 lines)  # Challenges, training goals
-├── dashboard.go    (194 lines)  # Dashboard stats, heatmap, calendar
-├── gear.go         (225 lines)  # Gear CRUD, monthly usage
-├── maintenance.go  (683 lines)  # Components, settings, custom gear, HR zones
-├── photos.go       (193 lines)  # Photo CRUD
-├── rewind.go       (175 lines)  # Yearly rewind reports
-├── segments.go     (422 lines)  # Segment/effort CRUD, country stats
-├── stats.go        (408 lines)  # Best efforts, Eddington, power stats
-└── sync.go         (241 lines)  # Sync history management
+├── main.go                    # Entry point, WasmBridge struct setup
+├── helpers.go                 # JSON helpers, validation, constants
+├── app_state.go               # Application state management
+│
+├── # Domain-specific handlers (thin wrappers calling services)
+├── activities.go              # Activity operations
+├── algorithms.go              # Power, Eddington, training load algorithms
+├── athletes.go                # Athlete FTP/weight history
+├── challenges.go              # Challenges, training goals
+├── gear.go                    # Gear operations (delegated to service)
+├── maintenance.go             # Components, settings, custom gear, HR zones
+├── photos.go                  # Photo operations (delegated to service)
+├── rewind.go                  # Yearly rewind reports
+├── segments.go                # Segment operations (delegated to service)
+├── stats.go                   # Stats operations (delegated to service)
+├── sync.go                    # Sync history management
+│
+├── # Importer adapters (implement internal/importer interfaces)
+├── import.go                  # WASM importer orchestration
+├── import_strava_adapter.go   # StravaClient impl using JS stravaFetch
+├── import_storage_adapter.go  # ImportStorage impl wrapping repositories
+│
+├── # Generated files (via scripts/generate-*)
+├── adapters.gen.go            # Service adapter wrappers (just generate-adapters)
+└── registration.gen.go        # JS function registration (just generate-wasm-registration)
 ```
+
+The generated files reduce boilerplate:
+- `adapters.gen.go` wraps `internal/services` calls with JSON marshaling
+- `registration.gen.go` registers all Go functions to `window.goStorage`
 
 ### 8.4 WASM Bridge API Contract
 
@@ -1477,6 +1583,52 @@ Features:
 | Weather enrichment | Yes | Possible (Open-Meteo has CORS) |
 | Storage code | Go | Same Go (compiled to WASM) |
 | SQL queries | Go | Same Go (compiled to WASM) |
+
+### 8.6 JS-Go Bridge Security
+
+The WASM bridge uses a namespaced, frozen global object to reduce tampering risk:
+
+```typescript
+// web/src/lib/wasm/go-storage.ts
+const GO_WASM_NAMESPACE = '__quantlete_go_wasm__' as const
+
+Object.defineProperty(window, GO_WASM_NAMESPACE, {
+  value: Object.freeze({ stravaFetch }),
+  writable: false,
+  configurable: false,
+  enumerable: false,
+})
+```
+
+```go
+// cmd/wasm/import_strava_adapter.go
+const goWasmNamespace = "__quantlete_go_wasm__"
+
+nsObj := js.Global().Get(goWasmNamespace)
+stravaFetchJS := nsObj.Get("stravaFetch")
+```
+
+**Security properties:**
+
+| Property | Purpose |
+|----------|---------|
+| `writable: false` | Prevents reassignment via `window[namespace] = ...` |
+| `configurable: false` | Prevents deletion or property redefinition |
+| `Object.freeze()` | Prevents modification of the namespace object's properties |
+| `enumerable: false` | Hides from `Object.keys(window)` enumeration |
+
+**Namespace contract:**
+
+- The namespace constant `__quantlete_go_wasm__` must match exactly between Go and TypeScript
+- Go code reads from this namespace; TypeScript code writes to it
+- Strava tokens never touch Go WASM—only the JS fetch client handles OAuth
+- The Go bridge receives opaque JSON responses from the JS layer
+
+**Limitations:**
+
+- Does not prevent XSS that executes before namespace initialization
+- Scripts with access to `Object.getOwnPropertyDescriptor` can still inspect
+- This is defense-in-depth, not a security boundary
 
 ---
 

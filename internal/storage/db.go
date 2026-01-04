@@ -64,7 +64,7 @@ func Open(dataDir, dbFile string) (*DB, error) {
 
 // OpenInMemory opens an in-memory SQLite database (for testing).
 func OpenInMemory() (*DB, error) {
-	conn, err := sql.Open("sqlite", ":memory:")
+	conn, err := sql.Open(driverName, ":memory:")
 	if err != nil {
 		return nil, fmt.Errorf("opening in-memory database: %w", err)
 	}

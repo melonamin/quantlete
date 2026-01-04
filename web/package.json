@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "build:server": "tsc -b && vite build --mode server",
     "build:wasm": "tsc -b && vite build --mode wasm",
+    "build:demo": "tsc -b && vite build --mode demo",
     "preview": "vite preview",
     "preview:wasm": "vite preview --mode wasm",
     "lint": "eslint .",

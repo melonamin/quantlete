@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuthStatus, useCredentialsStatus, useUpdateCredentials } from '@/lib/data/hooks'
-import { isWasmMode } from '@/lib/mode'
+import { isWasmMode, isDemoMode } from '@/lib/mode'
 import { getAuthUrl as getWasmAuthUrl } from '@/lib/wasm/strava/client'
 import { useOnboardingStore } from '@/stores'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,20 @@ export function WelcomeModal() {
   const updateCredentials = useUpdateCredentials()
   const { dismissed, dismiss } = useOnboardingStore()
 
+  // Multi-step flow: welcome -> credentials (if not configured) -> connect
+  const [step, setStep] = useState<OnboardingStep>('welcome')
+
+  // Credentials form state
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+  const [showSecret, setShowSecret] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Skip onboarding entirely in demo mode - the bundled database is pre-authenticated
+  if (isDemoMode()) {
+    return null
+  }
+
   // Determine if we should show the modal
   const isAuthenticated = auth?.authenticated ?? false
   const credentialsConfigured = credentials?.configured ?? false
@@ -66,15 +80,6 @@ export function WelcomeModal() {
     credentialsConfigured,
     credentialsLoading
   )
-
-  // Multi-step flow: welcome -> credentials (if not configured) -> connect
-  const [step, setStep] = useState<OnboardingStep>('welcome')
-
-  // Credentials form state
-  const [clientId, setClientId] = useState('')
-  const [clientSecret, setClientSecret] = useState('')
-  const [showSecret, setShowSecret] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Derive effective step - auto-advance from credentials if they're configured
   const effectiveStep = credentialsConfigured && step === 'credentials' ? 'connect' : step

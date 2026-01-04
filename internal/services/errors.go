@@ -18,6 +18,48 @@ var (
 	ErrInternal     = errors.New("internal error")
 )
 
+// ErrorKind categorizes service errors for consistent handling.
+type ErrorKind int
+
+const (
+	ErrorKindUnknown ErrorKind = iota
+	ErrorKindNotFound
+	ErrorKindUnauthorized
+	ErrorKindForbidden
+	ErrorKindBadRequest
+	ErrorKindConflict
+)
+
+// ErrorKindFor maps an error to a service error category.
+func ErrorKindFor(err error) ErrorKind {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return ErrorKindNotFound
+	case errors.Is(err, ErrUnauthorized):
+		return ErrorKindUnauthorized
+	case errors.Is(err, ErrForbidden):
+		return ErrorKindForbidden
+	case errors.Is(err, ErrBadRequest):
+		return ErrorKindBadRequest
+	case errors.Is(err, ErrConflict):
+		return ErrorKindConflict
+	default:
+		return ErrorKindUnknown
+	}
+}
+
+// ClientMessage returns a safe error message for clients.
+// Internal and unknown errors are masked to avoid leaking server details.
+func ClientMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, ErrInternal) || ErrorKindFor(err) == ErrorKindUnknown {
+		return "internal server error"
+	}
+	return err.Error()
+}
+
 // ServiceError wraps an error with additional context.
 type ServiceError struct {
 	Err     error

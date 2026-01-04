@@ -3,6 +3,7 @@ import { useChallenges, useImportChallenges, type Challenge } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { features } from '@/lib/features'
 
 function monthLabel(month?: string) {
   if (!month) return 'Unknown'
@@ -16,6 +17,7 @@ export function ChallengesPage() {
   const { data, isLoading, error } = useChallenges()
   const importChallenges = useImportChallenges()
   const [file, setFile] = useState<File | null>(null)
+  const canImport = features.challengeImport
 
   const grouped = useMemo(() => {
     const byMonth = new Map<string, Challenge[]>()
@@ -44,15 +46,21 @@ export function ChallengesPage() {
           <div className="text-sm text-muted-foreground">
             Upload a Strava trophy case HTML export to import your completed challenges.
           </div>
+          {!canImport && (
+            <div className="text-sm text-muted-foreground">
+              Challenge import is only available in self-hosted mode.
+            </div>
+          )}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
               type="file"
               accept=".html,text/html"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              disabled={!canImport}
             />
             <Button
-              onClick={() => file && importChallenges.mutate({ file })}
-              disabled={!file || importChallenges.isPending}
+              onClick={() => canImport && file && importChallenges.mutate({ file })}
+              disabled={!canImport || !file || importChallenges.isPending}
             >
               {importChallenges.isPending ? 'Importing…' : 'Import'}
             </Button>

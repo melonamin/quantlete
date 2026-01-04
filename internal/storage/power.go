@@ -119,11 +119,11 @@ func (r *PowerRepository) EnsureComputedForRange(ctx context.Context, athleteID 
 
 	if after != nil {
 		query += " AND a.start_date >= ?"
-		args = append(args, *after)
+		args = append(args, SQLiteTime{Time: *after})
 	}
 	if before != nil {
 		query += " AND a.start_date <= ?"
-		args = append(args, *before)
+		args = append(args, SQLiteTime{Time: *before})
 	}
 	if len(sportTypes) > 0 {
 		placeholders := make([]string, len(sportTypes))
@@ -193,11 +193,11 @@ func (r *PowerRepository) GetBest(ctx context.Context, athleteID int64, duration
 
 	if after != nil {
 		query += " AND a.start_date >= ?"
-		args = append(args, *after)
+		args = append(args, SQLiteTime{Time: *after})
 	}
 	if before != nil {
 		query += " AND a.start_date <= ?"
-		args = append(args, *before)
+		args = append(args, SQLiteTime{Time: *before})
 	}
 	if len(sportTypes) > 0 {
 		stPlace := make([]string, len(sportTypes))
@@ -243,11 +243,11 @@ func (r *PowerRepository) GetHistory(ctx context.Context, athleteID int64, durat
 	args := []any{athleteID, duration}
 	if after != nil {
 		query += " AND a.start_date >= ?"
-		args = append(args, *after)
+		args = append(args, SQLiteTime{Time: *after})
 	}
 	if before != nil {
 		query += " AND a.start_date <= ?"
-		args = append(args, *before)
+		args = append(args, SQLiteTime{Time: *before})
 	}
 	if len(sportTypes) > 0 {
 		stPlace := make([]string, len(sportTypes))

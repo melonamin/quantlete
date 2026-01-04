@@ -57,5 +57,21 @@ export function getCfWorkerUrl(): string {
   return url
 }
 
+/**
+ * Check if running in demo mode.
+ * Demo mode bundles pre-populated data and skips OAuth.
+ */
+export function isDemoMode(): boolean {
+  return import.meta.env.VITE_DEMO_MODE === 'true'
+}
+
+/**
+ * Get the URL for the bundled demo database.
+ * Only valid in demo mode.
+ */
+export function getDemoDbUrl(): string {
+  return '/data/demo.db'
+}
+
 // Export the current mode as a constant for use in conditional rendering
 export const APP_MODE = getAppMode()

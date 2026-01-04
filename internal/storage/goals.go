@@ -139,7 +139,7 @@ func (r *GoalsRepository) GetProgress(ctx context.Context, athleteID int64, spor
 
 	if start := periodStart(time.Now(), period); start != nil {
 		query += " AND start_date >= ?"
-		args = append(args, *start)
+		args = append(args, SQLiteTime{Time: *start})
 	}
 
 	var p GoalsProgress

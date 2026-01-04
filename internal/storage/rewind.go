@@ -151,7 +151,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 			SUM(CASE WHEN commute AND sport_type LIKE '%Ride%' THEN distance ELSE 0 END) AS commute_distance_m
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
-	`, athleteID, start, end).Scan(&activities, &dist, &elev, &moving, &kudos, &commute); err != nil {
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end}).Scan(&activities, &dist, &elev, &moving, &kudos, &commute); err != nil {
 		return nil, err
 	}
 	totals.Activities = activities
@@ -180,7 +180,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		SELECT COUNT(DISTINCT date(start_date_local))
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
-	`, athleteID, start, end).Scan(&activeDays); err != nil {
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end}).Scan(&activeDays); err != nil {
 		return nil, err
 	}
 
@@ -228,7 +228,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 			WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 			GROUP BY m
 			ORDER BY m ASC
-		`, athleteID, start, end)
+		`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 		if err != nil {
 			return nil, err
 		}
@@ -283,7 +283,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 			WHERE dt >= ? AND (prev_best IS NULL OR best_so_far < prev_best)
 			GROUP BY mon
 			ORDER BY mon ASC
-		`, athleteID, end, start)
+		`, athleteID, SQLiteTime{Time: end}, SQLiteTime{Time: start})
 		if err == nil {
 			for prRows.Next() {
 				var mon int
@@ -308,7 +308,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		GROUP BY sport_type
 		ORDER BY seconds DESC
-	`, athleteID, start, end)
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		GROUP BY h
-	`, athleteID, start, end)
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +366,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		GROUP BY lat, lng
 		ORDER BY c DESC
 		LIMIT 2000
-	`, athleteID, start, end)
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +402,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		WHERE a.start_date_local >= ? AND a.start_date_local < ?
 		ORDER BY random()
 		LIMIT 1
-	`, athleteID, start, end).Scan(&photo.ID, &photo.ActivityID, &photo.URL, &photo.ThumbnailURL, &photo.Caption)
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end}).Scan(&photo.ID, &photo.ActivityID, &photo.URL, &photo.ThumbnailURL, &photo.Caption)
 	if err == nil && photo.ID != "" && photo.URL != "" {
 		report.RandomPhoto = &photo
 	}
@@ -416,7 +416,7 @@ func computeRewindStreaks(ctx context.Context, db *DB, athleteID int64, start, e
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		ORDER BY day ASC
-	`, athleteID, start, end)
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 	if err != nil {
 		return RewindStreaks{}
 	}
@@ -468,7 +468,7 @@ func queryBiggest(ctx context.Context, db *DB, athleteID int64, start, end time.
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		ORDER BY `+orderBy+` DESC
 		LIMIT 1
-	`, athleteID, start, end)
+	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 
 	var a RewindBiggestActivity
 	var startLocal SQLiteTime

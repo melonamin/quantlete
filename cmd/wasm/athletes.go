@@ -10,6 +10,34 @@ import (
 )
 
 // ============================================================================
+// Athlete Read
+// ============================================================================
+
+//wasm:category Athlete - Read
+
+// getFirstAthlete returns the first athlete in the database (for demo mode initialization)
+// Called from JS: goStorage.getFirstAthlete()
+//
+//wasm:export
+var getFirstAthlete = wrapWasm("getFirstAthlete", func(wc *WasmContext) interface{} {
+	athlete, err := wc.Registry.Athletes().GetFirst(wc.Ctx)
+	if err != nil {
+		return errorJSON(err)
+	}
+	if athlete == nil {
+		return dataJSON(nil)
+	}
+
+	return dataJSON(map[string]interface{}{
+		"id":        athlete.ID,
+		"firstname": athlete.FirstName,
+		"lastname":  athlete.LastName,
+		"username":  athlete.Username,
+		"profile":   athlete.Profile,
+	})
+})
+
+// ============================================================================
 // Athlete Write
 // ============================================================================
 

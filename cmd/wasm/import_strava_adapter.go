@@ -48,13 +48,21 @@ func (a *WasmStravaAdapter) GetAthlete() *importer.Athlete {
 	return a.athleteData
 }
 
+// goWasmNamespace is the namespaced global object for Go WASM interop.
+// This must match GO_WASM_NAMESPACE in go-storage.ts.
+const goWasmNamespace = "__quantlete_go_wasm__"
+
 // callStravaFetch calls JavaScript's stravaFetch and waits for the result.
 // Uses a channel to synchronize the async JS call with Go.
 func (a *WasmStravaAdapter) callStravaFetch(path string) (json.RawMessage, error) {
-	// Get the stravaFetch function from JS
-	stravaFetchJS := js.Global().Get("stravaFetch")
+	// Get the stravaFetch function from namespaced JS object
+	nsObj := js.Global().Get(goWasmNamespace)
+	if !nsObj.Truthy() {
+		return nil, fmt.Errorf("Go WASM namespace %q not available in JS global scope", goWasmNamespace)
+	}
+	stravaFetchJS := nsObj.Get("stravaFetch")
 	if !stravaFetchJS.Truthy() {
-		return nil, fmt.Errorf("stravaFetch not available in JS global scope")
+		return nil, fmt.Errorf("stravaFetch not available in %s namespace", goWasmNamespace)
 	}
 
 	// Create a channel to receive the result

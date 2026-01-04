@@ -55,7 +55,7 @@ func dataJSON(v interface{}) string {
 // errorJSON returns an error response as JSON string.
 // Uses shared.Response for consistent response format.
 func errorJSON(err error) string {
-	return shared.ErrorResponse(err).ToJSON()
+	return shared.ErrorMessage(services.ClientMessage(err)).ToJSON()
 }
 
 // successJSON returns a success response with a message as JSON string.

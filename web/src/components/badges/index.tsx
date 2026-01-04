@@ -12,29 +12,33 @@ const METERS_PER_MILE = 1609.34
 const METERS_PER_FOOT = 0.3048
 
 function formatDistance(meters: number, unitSystem: 'metric' | 'imperial'): string {
+  const m = meters ?? 0
   if (unitSystem === 'imperial') {
-    const miles = meters / METERS_PER_MILE
+    const miles = m / METERS_PER_MILE
     return `${miles.toFixed(1)} mi`
   }
-  const km = meters / METERS_PER_KM
+  const km = m / METERS_PER_KM
   return `${km.toFixed(1)} km`
 }
 
 function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
+  const s = seconds ?? 0
+  const hours = Math.floor(s / 3600)
+  const minutes = Math.floor((s % 3600) / 60)
   return `${hours}h ${minutes}m`
 }
 
 function formatElevation(meters: number, unitSystem: 'metric' | 'imperial'): string {
+  const m = meters ?? 0
   if (unitSystem === 'imperial') {
-    const feet = meters / METERS_PER_FOOT
+    const feet = m / METERS_PER_FOOT
     return `${formatNumber(Math.round(feet))} ft`
   }
-  return `${formatNumber(Math.round(meters))} m`
+  return `${formatNumber(Math.round(m))} m`
 }
 
 function formatNumber(n: number): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '0'
   return n.toLocaleString('en-US')
 }
 
