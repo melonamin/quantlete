@@ -54,8 +54,8 @@ jobs:
           go run ./scripts/generate-sql
           go run ./scripts/generate-schema
           go run ./scripts/generate-ts-types
-          go run ./scripts/generate-wasm-registration
           go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
           go run ./scripts/generate-go-storage
 
       - name: Generate demo database

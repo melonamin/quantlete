@@ -36,7 +36,8 @@ dev-web:
 # ============================================================================
 
 # Generate all code (SQL queries, schema, TypeScript types, WASM bridge, adapters)
-generate: generate-sql generate-schema generate-ts-types generate-go-storage generate-wasm-registration generate-adapters
+# Order matters: adapters -> wasm-registration -> go-storage (each depends on prior output)
+generate: generate-sql generate-schema generate-ts-types generate-adapters generate-wasm-registration generate-go-storage
 
 # Generate SQL query code (Go only - TypeScript uses Go WASM)
 generate-sql:
