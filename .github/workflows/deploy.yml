@@ -74,7 +74,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: quantlete-docs
           directory: docs
-          branch: main
+          branch: production
 
   # ==========================================================================
   # Deploy Main WASM App
@@ -141,4 +141,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: quantlete
           directory: web/dist-wasm
-          branch: main
+          branch: production
