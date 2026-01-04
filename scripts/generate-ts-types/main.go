@@ -1,39 +1,40 @@
-// Code generation script for TypeScript types from Go WASM bridge structs.
+// Code generation script for TypeScript types from Go structs using AST parsing.
 //
 // This script parses Go source files from:
 //   - cmd/wasm/*.go (anonymous request structs)
+//   - internal/services/*.go (service layer input/output types)
 //   - internal/storage/*.go (database-facing structs)
 //   - internal/api/handlers/*.go (API response structs)
+//   - internal/strava/*.go (external API types)
 //
 // And generates TypeScript interfaces in web/src/lib/wasm/types.gen.ts that
 // match the JSON serialization format used by the WASM bridge.
 //
-// # Parser Limitations (regex-based, intentionally simple)
+// Capabilities:
+//   - Multi-line struct definitions
+//   - Pointer types and optionality (json omitempty)
+//   - Type aliases to basic types
+//   - Slice and map types
+//   - Package-qualified types (e.g., time.Time)
 //
-// This parser uses regular expressions rather than Go's AST parser for simplicity.
-// The following limitations apply:
-//
-//   - Only fields with `json:"..."` tags are emitted
-//   - The json tag must be the first (or only) struct tag
-//   - Embedded/anonymous struct fields are not supported
-//   - Multi-line field declarations are not supported
-//   - Only basic type aliases (type X <primitive>) are handled
-//   - Complex generic types are not supported
-//
-// If you encounter issues with specific struct definitions, consider adding
-// manual type definitions in the appropriate web/src/lib/api/*.ts file.
+// Limitations:
+//   - Generic types are not supported (will become 'unknown')
+//   - Embedded struct fields are not flattened
+//   - Inline anonymous structs become 'unknown'
+//   - Only file-scope var declarations are detected for anonymous structs
 //
 // Run with: just generate-ts-types
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
-	"log"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -51,70 +52,147 @@ type GoStruct struct {
 	Name     string
 	Fields   []GoField
 	FileName string
+	Package  string // package path for collision detection
 	Comment  string
 }
 
+// ParserContext holds state for parsing and generation
+type ParserContext struct {
+	typeAliases   map[string]string   // Go type aliases to their base types
+	knownStructs  map[string]bool     // all parsed struct names for cross-referencing
+	unknownTypes  map[string][]string // unknown types mapped to their usage locations
+	malformedTags []string            // malformed struct tags encountered during parsing
+}
+
+// NewParserContext creates a new parser context
+func NewParserContext() *ParserContext {
+	return &ParserContext{
+		typeAliases:  make(map[string]string),
+		knownStructs: make(map[string]bool),
+		unknownTypes: make(map[string][]string),
+	}
+}
+
+// skipSuffixes defines type name suffixes to exclude from generation
+// These are typically internal implementation types, not API types
+var skipSuffixes = []string{
+	"Repository",
+	"Handler",
+	"Router",
+	"Service",
+}
+
+// allowedConfigTypes are Config types that ARE part of the public API
+// and should be generated despite the general "Config" exclusion rule
+var allowedConfigTypes = map[string]bool{
+	"TrainingGoalsConfig":    true,
+	"GoalsSportConfig":       true,
+	"HRZoneConfig":           true,
+	"DashboardConfig":        true,
+	"DashboardWidgetConfig":  true,
+}
+
+// shouldSkipType determines if a type should be excluded from generation
+func shouldSkipType(name string) bool {
+	for _, suffix := range skipSuffixes {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+
+	// Skip Config types unless explicitly allowed
+	if strings.HasSuffix(name, "Config") && !allowedConfigTypes[name] {
+		return true
+	}
+
+	return false
+}
+
+// DirConfig specifies how to parse a directory
+type DirConfig struct {
+	path     string
+	anonOnly bool
+}
+
 func main() {
-	// Find project root (where go.mod is)
 	root, err := findProjectRoot()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		os.Exit(1)
 	}
 
-	wasmDir := filepath.Join(root, "cmd", "wasm")
-	servicesDir := filepath.Join(root, "internal", "services")
-	storageDir := filepath.Join(root, "internal", "storage")
-	handlersDir := filepath.Join(root, "internal", "api", "handlers")
-	stravaDir := filepath.Join(root, "internal", "strava")
+	dirs := []DirConfig{
+		{filepath.Join(root, "cmd", "wasm"), true},
+		{filepath.Join(root, "internal", "services"), false},
+		{filepath.Join(root, "internal", "api", "handlers"), false},
+		{filepath.Join(root, "internal", "storage"), false},
+		// NOTE: internal/strava is NOT included - those are Strava API wire types,
+		// not our API output types. The frontend uses handler output types.
+	}
+
 	tsOutput := filepath.Join(root, "web", "src", "lib", "wasm", "types.gen.ts")
 
-	// Parse WASM Go files (anonymous structs for inputs)
-	wasmStructs, err := parseDir(wasmDir, true)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing WASM files: %v\n", err)
-		os.Exit(1)
+	ctx := NewParserContext()
+
+	// Phase 1: Collect ALL type aliases from all directories first
+	// This ensures aliases are resolved correctly regardless of parse order
+	for _, dir := range dirs {
+		if err := collectTypeAliases(dir.path, ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Error collecting aliases from %s: %v\n", dir.path, err)
+			os.Exit(1)
+		}
 	}
 
-	// Parse services Go files (service layer input/output types)
-	servicesStructs, err := parseDir(servicesDir, false)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing services files: %v\n", err)
-		os.Exit(1)
+	// Phase 2: Parse structs with complete alias map
+	var allStructs []GoStruct
+	for _, dir := range dirs {
+		structs, err := parseDir(dir.path, dir.anonOnly, ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", dir.path, err)
+			os.Exit(1)
+		}
+		allStructs = append(allStructs, structs...)
 	}
 
-	// Parse storage Go files (named structs for responses)
-	storageStructs, err := parseDir(storageDir, false)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing storage files: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Parse handlers Go files (named structs for API responses)
-	handlerStructs, err := parseDir(handlersDir, false)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing handler files: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Parse strava Go files (external API types)
-	stravaStructs, err := parseDir(stravaDir, false)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing strava files: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Combine all structs - services first so they take precedence over storage row types
-	allStructs := append(wasmStructs, servicesStructs...)
-	allStructs = append(allStructs, storageStructs...)
-	allStructs = append(allStructs, handlerStructs...)
-	allStructs = append(allStructs, stravaStructs...)
-
-	// Sort and deduplicate
+	// Sort by (Name, Package) with services preferred over storage for deterministic deduplication.
+	// When types exist in both services and storage, we prefer services (the API layer).
 	sort.Slice(allStructs, func(i, j int) bool {
-		return allStructs[i].Name < allStructs[j].Name
+		if allStructs[i].Name != allStructs[j].Name {
+			return allStructs[i].Name < allStructs[j].Name
+		}
+		// Prefer services over storage
+		iIsServices := allStructs[i].Package == "services"
+		jIsServices := allStructs[j].Package == "services"
+		if iIsServices != jIsServices {
+			return iIsServices // services comes first
+		}
+		return allStructs[i].Package < allStructs[j].Package
 	})
 
+	// Detect collisions but only fail for non-services/storage pairs
+	collisions := detectCollisions(allStructs)
+	realCollisions := make(map[string][]string)
+	for name, packages := range collisions {
+		// Allow services/storage collisions (services takes precedence)
+		if len(packages) == 2 {
+			isServiceStorageCollision := (packages[0] == "services" && packages[1] == "storage") ||
+				(packages[0] == "storage" && packages[1] == "services")
+			if isServiceStorageCollision {
+				continue // This is expected - services wraps storage types
+			}
+		}
+		realCollisions[name] = packages
+	}
+	if len(realCollisions) > 0 {
+		fmt.Fprintln(os.Stderr, "ERROR: Name collisions detected - types with same name in different packages:")
+		for name, packages := range realCollisions {
+			fmt.Fprintf(os.Stderr, "  %s: %v\n", name, packages)
+		}
+		fmt.Fprintln(os.Stderr, "\nFix by renaming types to be unique, or exclude a directory from generation.")
+		os.Exit(1)
+	}
+
+	// Deduplicate - first occurrence wins (deterministic due to sorting)
 	seen := make(map[string]bool)
 	var unique []GoStruct
 	for _, s := range allStructs {
@@ -126,15 +204,62 @@ func main() {
 
 	// Populate knownStructs for cross-referencing types
 	for _, s := range unique {
-		knownStructs[s.Name] = true
+		ctx.knownStructs[s.Name] = true
 	}
 
-	// Generate TypeScript code
-	if err := generateTypeScript(unique, tsOutput); err != nil {
+	if err := generateTypeScript(unique, tsOutput, ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating TypeScript: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Fail build if any malformed struct tags were encountered during parsing
+	if len(ctx.malformedTags) > 0 {
+		fmt.Fprintln(os.Stderr, "ERROR: Malformed struct tags encountered during parsing:")
+		for _, tag := range ctx.malformedTags {
+			fmt.Fprintf(os.Stderr, "  %s\n", tag)
+		}
+		fmt.Fprintln(os.Stderr, "\nFix the struct tag syntax in the source file.")
+		os.Exit(1)
+	}
+
+	// Fail build if any unknown types were encountered
+	if len(ctx.unknownTypes) > 0 {
+		fmt.Fprintln(os.Stderr, "ERROR: Unknown types encountered (would generate 'unknown' in TypeScript):")
+		for goType, usages := range ctx.unknownTypes {
+			fmt.Fprintf(os.Stderr, "  %s (referenced by: %v)\n", goType, usages)
+		}
+		fmt.Fprintln(os.Stderr, "\nFix by adding the type's source directory to dirs, or marking the field as json:\"-\".")
+		os.Exit(1)
+	}
+
 	fmt.Printf("Generated: %s (%d types)\n", tsOutput, len(unique))
+}
+
+// detectCollisions finds struct names that appear in multiple packages
+func detectCollisions(structs []GoStruct) map[string][]string {
+	nameToPackages := make(map[string][]string)
+	for _, s := range structs {
+		nameToPackages[s.Name] = append(nameToPackages[s.Name], s.Package)
+	}
+
+	collisions := make(map[string][]string)
+	for name, packages := range nameToPackages {
+		if len(packages) > 1 {
+			// Deduplicate package list
+			seen := make(map[string]bool)
+			var unique []string
+			for _, pkg := range packages {
+				if !seen[pkg] {
+					seen[pkg] = true
+					unique = append(unique, pkg)
+				}
+			}
+			if len(unique) > 1 {
+				collisions[name] = unique
+			}
+		}
+	}
+	return collisions
 }
 
 func findProjectRoot() (string, error) {
@@ -155,193 +280,329 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-// parseDir parses Go files in a directory.
-// If anonOnly is true, only anonymous structs (var x struct{}) are parsed.
-// If false, named structs (type X struct{}) are also parsed.
-func parseDir(dir string, anonOnly bool) ([]GoStruct, error) {
+// collectTypeAliases scans a directory for type aliases without parsing structs
+func collectTypeAliases(dir string, ctx *ParserContext) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("reading directory: %w", err)
+	}
+
+	// Sort entries for deterministic processing
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		if strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+
+		path := filepath.Join(dir, entry.Name())
+		if err := collectTypeAliasesFromFile(path, ctx); err != nil {
+			return fmt.Errorf("collecting aliases from %s: %w", entry.Name(), err)
+		}
+	}
+
+	return nil
+}
+
+func collectTypeAliasesFromFile(path string, ctx *ParserContext) error {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		return fmt.Errorf("parsing file: %w", err)
+	}
+
+	for _, decl := range node.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			// Check for type alias to basic type (e.g., type WidgetWidth int)
+			if ident, ok := typeSpec.Type.(*ast.Ident); ok {
+				if isBasicType(ident.Name) {
+					ctx.typeAliases[typeSpec.Name.Name] = ident.Name
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func parseDir(dir string, anonOnly bool, ctx *ParserContext) ([]GoStruct, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading directory: %w", err)
 	}
+
+	// Sort entries for deterministic output
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
 
 	var allStructs []GoStruct
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 			continue
 		}
-		// Skip test files
 		if strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
 
 		path := filepath.Join(dir, entry.Name())
-		structs, err := parseGoFile(path, anonOnly)
+		structs, err := parseGoFile(path, anonOnly, ctx)
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", entry.Name(), err)
 		}
-
 		allStructs = append(allStructs, structs...)
 	}
 
 	return allStructs, nil
 }
 
-var (
-	// Match anonymous struct: var req struct { ... }
-	anonStructRe = regexp.MustCompile(`var\s+(\w+)\s+struct\s*\{`)
-	// Match named struct: type StructName struct { ... }
-	namedStructRe = regexp.MustCompile(`^type\s+(\w+)\s+struct\s*\{`)
-	// Match type alias: type TypeName BaseType
-	typeAliasRe = regexp.MustCompile(`^type\s+(\w+)\s+(int|int8|int16|int32|int64|uint|uint8|uint16|uint32|uint64|float32|float64|string|bool)\s*$`)
-	// Match field with JSON tag: FieldName Type `json:"json_name"`
-	fieldRe = regexp.MustCompile(`^\s*(\w+)\s+(\S+)\s+` + "`" + `json:"([^"]+)"` + "`")
-	// Match function definition: func funcName(...)
-	funcRe = regexp.MustCompile(`^func\s+(\w+)\s*\(`)
-	// Match comment before function/struct
-	commentRe = regexp.MustCompile(`^//\s*(.*)$`)
-)
-
-// typeAliases maps Go type aliases to their base types (e.g., WidgetWidth -> int).
-// This is a process-global variable populated during parsing and used during
-// type conversion. It is NOT concurrency-safe and is intended for single-threaded
-// CLI execution only. If parsing is ever parallelized, this would need synchronization.
-var typeAliases = make(map[string]string)
-
-func parseGoFile(path string, anonOnly bool) ([]GoStruct, error) {
-	file, err := os.Open(path) //nolint:gosec
+func parseGoFile(path string, anonOnly bool, ctx *ParserContext) ([]GoStruct, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parsing file: %w", err)
 	}
-	defer func() { _ = file.Close() }()
 
+	fileName := filepath.Base(path)
+	packageName := node.Name.Name
 	var structs []GoStruct
-	var current *GoStruct
-	var lastComment string
-	var currentFunc string
-	inStruct := false
-	braceDepth := 0
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
+	// Collect structs (aliases already collected in Phase 1)
+	ast.Inspect(node, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.GenDecl:
+			// Handle type declarations: type StructName struct { ... }
+			if x.Tok == token.TYPE && !anonOnly {
+				for _, spec := range x.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok {
+						continue
+					}
 
-		// Track comments
-		if matches := commentRe.FindStringSubmatch(line); matches != nil {
-			lastComment = matches[1]
-			continue
-		}
+					structType, ok := typeSpec.Type.(*ast.StructType)
+					if !ok {
+						continue
+					}
 
-		// Track current function
-		if matches := funcRe.FindStringSubmatch(line); matches != nil {
-			currentFunc = matches[1]
-			lastComment = ""
-			continue
-		}
+					name := typeSpec.Name.Name
+					// Skip unexported types
+					if !ast.IsExported(name) {
+						continue
+					}
+					// Skip utility types using the extracted function
+					if shouldSkipType(name) {
+						continue
+					}
 
-		// Track type aliases (e.g., type WidgetWidth int)
-		if matches := typeAliasRe.FindStringSubmatch(line); matches != nil {
-			typeAliases[matches[1]] = matches[2]
-			lastComment = ""
-			continue
-		}
-
-		// Check for anonymous struct start
-		if matches := anonStructRe.FindStringSubmatch(line); matches != nil {
-			structName := deriveTypeName(matches[1], currentFunc, lastComment)
-			current = &GoStruct{
-				Name:     structName,
-				FileName: filepath.Base(path),
-				Comment:  lastComment,
-			}
-			inStruct = true
-			braceDepth = 1
-			lastComment = ""
-			continue
-		}
-
-		// Check for named struct start (only if not anonOnly)
-		if !anonOnly {
-			if matches := namedStructRe.FindStringSubmatch(line); matches != nil {
-				structName := matches[1]
-				// Skip non-exported types (lowercase first letter)
-				if len(structName) > 0 && structName[0] >= 'a' && structName[0] <= 'z' {
-					lastComment = ""
-					continue
+					fields := extractFields(structType, ctx)
+					if len(fields) > 0 {
+						comment := extractComment(x.Doc)
+						structs = append(structs, GoStruct{
+							Name:     name,
+							Fields:   fields,
+							FileName: fileName,
+							Package:  packageName,
+							Comment:  comment,
+						})
+					}
 				}
-				// Skip repository/handler types (they're not data types)
-				if strings.HasSuffix(structName, "Repository") ||
-					strings.HasSuffix(structName, "Handler") ||
-					strings.HasSuffix(structName, "Router") {
-					lastComment = ""
-					continue
-				}
-				current = &GoStruct{
-					Name:     structName,
-					FileName: filepath.Base(path),
-					Comment:  lastComment,
-				}
-				inStruct = true
-				braceDepth = 1
-				lastComment = ""
-				continue
-			}
-		}
-
-		// Inside struct, parse fields
-		if inStruct && current != nil {
-			// Count braces
-			braceDepth += strings.Count(line, "{")
-			braceDepth -= strings.Count(line, "}")
-
-			// Check for end of struct
-			if braceDepth <= 0 {
-				if len(current.Fields) > 0 {
-					structs = append(structs, *current)
-				}
-				current = nil
-				inStruct = false
-				continue
 			}
 
-			// Parse field
-			if matches := fieldRe.FindStringSubmatch(line); matches != nil {
-				jsonName := parseJSONTag(matches[3])
-				// Skip ignored fields (json:"-")
-				if isIgnoredField(jsonName) {
-					continue
+			// Handle anonymous structs: var req struct { ... }
+			if x.Tok == token.VAR {
+				for _, spec := range x.Specs {
+					valueSpec, ok := spec.(*ast.ValueSpec)
+					if !ok || len(valueSpec.Names) == 0 {
+						continue
+					}
+
+					structType, ok := valueSpec.Type.(*ast.StructType)
+					if !ok {
+						continue
+					}
+
+					varName := valueSpec.Names[0].Name
+					fields := extractFields(structType, ctx)
+					if len(fields) > 0 {
+						// Derive type name from context
+						typeName := deriveTypeName(varName, findEnclosingFunc(node, fset, x.Pos()))
+						structs = append(structs, GoStruct{
+							Name:     typeName,
+							Fields:   fields,
+							FileName: fileName,
+							Package:  packageName,
+						})
+					}
 				}
-				field := GoField{
-					GoName:   matches[1],
-					GoType:   matches[2],
-					JSONName: jsonName,
-					Optional: isOptionalType(matches[2]) || hasOmitempty(matches[3]),
-				}
-				current.Fields = append(current.Fields, field)
 			}
-		}
 
-		// Reset comment if non-comment line
-		if !strings.HasPrefix(strings.TrimSpace(line), "//") {
-			lastComment = ""
 		}
-	}
+		return true
+	})
 
-	return structs, scanner.Err()
+	return structs, nil
 }
 
-// deriveTypeName creates a TypeScript type name from the variable name and function context
-func deriveTypeName(varName, funcName, comment string) string {
-	// Use the function name as the primary source for type naming
-	if funcName != "" {
-		// Convert function name to type name
-		// e.g., "saveActivity" -> "SaveActivityInput"
-		// e.g., "getActivities" -> "GetActivitiesRequest"
-		name := toPascalCase(funcName)
+func extractFields(structType *ast.StructType, ctx *ParserContext) []GoField {
+	var fields []GoField
 
-		// Determine suffix based on the variable name
+	if structType.Fields == nil {
+		return fields
+	}
+
+	for _, field := range structType.Fields.List {
+		// Get JSON tag, tracking any malformed tags
+		jsonName, hasOmitempty := parseJSONTag(field.Tag, ctx)
+		if jsonName == "" || jsonName == "-" {
+			continue
+		}
+
+		// Get type string
+		goType := typeToString(field.Type)
+		isPointer := strings.HasPrefix(goType, "*")
+
+		// Get field name (handle embedded fields)
+		var fieldName string
+		if len(field.Names) > 0 {
+			fieldName = field.Names[0].Name
+		} else {
+			// Embedded field - use type name
+			fieldName = goType
+			if idx := strings.LastIndex(fieldName, "."); idx >= 0 {
+				fieldName = fieldName[idx+1:]
+			}
+			fieldName = strings.TrimPrefix(fieldName, "*")
+		}
+
+		fields = append(fields, GoField{
+			GoName:   fieldName,
+			GoType:   goType,
+			JSONName: jsonName,
+			Optional: isPointer || hasOmitempty,
+		})
+	}
+
+	return fields
+}
+
+func parseJSONTag(tag *ast.BasicLit, ctx *ParserContext) (jsonName string, hasOmitempty bool) {
+	if tag == nil {
+		return "", false
+	}
+
+	// Recover from malformed struct tags and track them for error reporting
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.malformedTags = append(ctx.malformedTags, tag.Value)
+			jsonName = ""
+			hasOmitempty = false
+		}
+	}()
+
+	// Remove backticks
+	tagValue := strings.Trim(tag.Value, "`")
+
+	// Parse struct tag
+	structTag := reflect.StructTag(tagValue)
+	jsonTag := structTag.Get("json")
+	if jsonTag == "" {
+		return "", false
+	}
+
+	// Split on comma for options
+	parts := strings.Split(jsonTag, ",")
+	name := parts[0]
+	for _, part := range parts[1:] {
+		if part == "omitempty" {
+			hasOmitempty = true
+		}
+	}
+
+	return name, hasOmitempty
+}
+
+func typeToString(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.StarExpr:
+		return "*" + typeToString(t.X)
+	case *ast.ArrayType:
+		if t.Len == nil {
+			// Slice
+			return "[]" + typeToString(t.Elt)
+		}
+		// Array - treat as slice for TS purposes
+		return "[]" + typeToString(t.Elt)
+	case *ast.MapType:
+		return fmt.Sprintf("map[%s]%s", typeToString(t.Key), typeToString(t.Value))
+	case *ast.SelectorExpr:
+		// Package.Type (e.g., time.Time, storage.Activity)
+		return typeToString(t.X) + "." + t.Sel.Name
+	case *ast.InterfaceType:
+		return "interface{}"
+	case *ast.StructType:
+		// Inline struct - cannot be modeled in TS
+		return "struct{}"
+	default:
+		return "unknown"
+	}
+}
+
+func isBasicType(name string) bool {
+	switch name {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64", "string", "bool", "byte", "rune":
+		return true
+	}
+	return false
+}
+
+func extractComment(doc *ast.CommentGroup) string {
+	if doc == nil || len(doc.List) == 0 {
+		return ""
+	}
+	// Get first line of comment
+	text := doc.List[0].Text
+	text = strings.TrimPrefix(text, "//")
+	text = strings.TrimPrefix(text, "/*")
+	text = strings.TrimSuffix(text, "*/")
+	return strings.TrimSpace(text)
+}
+
+func findEnclosingFunc(file *ast.File, fset *token.FileSet, pos token.Pos) string {
+	var funcName string
+	ast.Inspect(file, func(n ast.Node) bool {
+		if fn, ok := n.(*ast.FuncDecl); ok {
+			if fn.Pos() < pos && pos < fn.End() {
+				funcName = fn.Name.Name
+			}
+		}
+		return true
+	})
+	return funcName
+}
+
+func deriveTypeName(varName, funcName string) string {
+	if funcName != "" {
+		name := toPascalCase(funcName)
 		if varName == "req" {
-			// For "save*" functions, use "Input"
-			// For "get*" functions, use "Request"
 			if strings.HasPrefix(strings.ToLower(funcName), "save") ||
 				strings.HasPrefix(strings.ToLower(funcName), "create") ||
 				strings.HasPrefix(strings.ToLower(funcName), "update") ||
@@ -353,7 +614,6 @@ func deriveTypeName(varName, funcName, comment string) string {
 		return name + toPascalCase(varName)
 	}
 
-	// Fallback: use PascalCase of variable name
 	name := toPascalCase(varName)
 	if name == "Req" {
 		return "RequestInput"
@@ -361,147 +621,21 @@ func deriveTypeName(varName, funcName, comment string) string {
 	return name + "Input"
 }
 
-// parseJSONTag extracts the field name from a JSON tag
-func parseJSONTag(tag string) string {
-	// Handle "name,omitempty" format
-	parts := strings.Split(tag, ",")
-	return parts[0]
-}
-
-// isIgnoredField checks if a field should be skipped (json:"-")
-func isIgnoredField(jsonName string) bool {
-	return jsonName == "-"
-}
-
-// needsQuoting checks if a field name needs to be quoted in TypeScript
-func needsQuoting(name string) bool {
-	// Field names with dots, dashes, or other special chars need quoting
-	for _, r := range name {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') || r == '_') {
-			return true
-		}
-	}
-	return false
-}
-
-// hasOmitempty checks if JSON tag has omitempty
-func hasOmitempty(tag string) bool {
-	return strings.Contains(tag, "omitempty")
-}
-
-// isOptionalType checks if a Go type is a pointer (optional)
-func isOptionalType(goType string) bool {
-	return strings.HasPrefix(goType, "*")
-}
-
-// knownStructs holds all parsed struct names for cross-referencing during
-// type conversion. When a field references another struct (e.g., storage.BestEffort),
-// this map is checked to determine if the type should be rendered as a known
-// interface name or as "unknown".
-//
-// This is a process-global variable populated in main() after parsing is complete.
-// It is NOT concurrency-safe and is intended for single-threaded CLI execution only.
-// If parsing is ever parallelized, this would need synchronization.
-var knownStructs = make(map[string]bool)
-
-// goTypeToTS converts a Go type to TypeScript
-func goTypeToTS(goType string) string {
-	// Handle pointer types (including double pointers like **float64)
-	isPointer := strings.HasPrefix(goType, "*")
-	baseType := strings.TrimLeft(goType, "*")
-
-	// Resolve type aliases (e.g., WidgetWidth -> int -> number)
-	if aliasBase, ok := typeAliases[baseType]; ok {
-		baseType = aliasBase
-	}
-
-	var tsType string
-	switch baseType {
-	case "int", "int8", "int16", "int32", "int64",
-		"uint", "uint8", "uint16", "uint32", "uint64",
-		"float32", "float64":
-		tsType = "number"
-	case "string":
-		tsType = "string"
-	case "bool":
-		tsType = "boolean"
-	case "time.Time", "SQLiteTime", "FlexTime":
-		// time.Time and time wrappers serialize to ISO 8601 string in JSON
-		tsType = "string"
-	case "interface{}", "any":
-		tsType = "unknown"
-	case "json.RawMessage":
-		tsType = "unknown"
-	default:
-		// Check for slice types
-		if strings.HasPrefix(baseType, "[]") {
-			elemType := strings.TrimPrefix(baseType, "[]")
-			return goTypeToTS(elemType) + "[]"
-		}
-		// Check for map types: map[K]V -> Record<K, V>
-		if strings.HasPrefix(baseType, "map[") {
-			// Find the closing bracket for the key type
-			closeBracket := strings.Index(baseType, "]")
-			if closeBracket > 4 { // "map[" is 4 chars
-				keyType := baseType[4:closeBracket]
-				valueType := baseType[closeBracket+1:]
-
-				// Convert Go key type to TS
-				var tsKeyType string
-				switch keyType {
-				case "string":
-					tsKeyType = "string"
-				case "int", "int8", "int16", "int32", "int64",
-					"uint", "uint8", "uint16", "uint32", "uint64":
-					tsKeyType = "number"
-				default:
-					tsKeyType = "string" // Fallback for unknown key types
-				}
-
-				return fmt.Sprintf("Record<%s, %s>", tsKeyType, goTypeToTS(valueType))
-			}
-		}
-		// Strip package prefix (e.g., "storage.DailyTrainingLoadPoint" -> "DailyTrainingLoadPoint")
-		typeName := baseType
-		if idx := strings.LastIndex(baseType, "."); idx >= 0 {
-			typeName = baseType[idx+1:]
-		}
-		// Check if it's a known struct type
-		if knownStructs[typeName] {
-			tsType = typeName
-		} else {
-			// Unknown type - log warning for visibility
-			log.Printf("WARNING: unknown Go type %q (base: %q) - falling back to 'unknown'", goType, typeName)
-			tsType = "unknown"
-		}
-	}
-
-	if isPointer {
-		return tsType + " | null"
-	}
-	return tsType
-}
-
 func toPascalCase(s string) string {
-	// First handle snake_case by splitting on underscore
 	parts := strings.Split(s, "_")
-
 	var result []string
+
 	for _, p := range parts {
 		if len(p) == 0 {
 			continue
 		}
 
-		// Handle common abbreviations
 		upper := strings.ToUpper(p)
 		if upper == "ID" || upper == "URL" || upper == "API" || upper == "HR" {
 			result = append(result, upper)
 			continue
 		}
 
-		// Handle camelCase by finding uppercase letters
-		// e.g., "saveActivity" -> ["save", "Activity"]
 		var words []string
 		var currentWord strings.Builder
 		for i, r := range p {
@@ -517,7 +651,6 @@ func toPascalCase(s string) string {
 			words = append(words, currentWord.String())
 		}
 
-		// Capitalize each word
 		for _, word := range words {
 			if len(word) > 0 {
 				upperWord := strings.ToUpper(word)
@@ -532,10 +665,89 @@ func toPascalCase(s string) string {
 	return strings.Join(result, "")
 }
 
-func generateTypeScript(structs []GoStruct, output string) error {
+func goTypeToTS(goType string, ctx *ParserContext) string {
+	isPointer := strings.HasPrefix(goType, "*")
+	baseType := strings.TrimLeft(goType, "*")
+
+	// Resolve type aliases
+	if aliasBase, ok := ctx.typeAliases[baseType]; ok {
+		baseType = aliasBase
+	}
+
+	var tsType string
+	switch baseType {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64", "byte", "rune":
+		tsType = "number"
+	case "string":
+		tsType = "string"
+	case "bool":
+		tsType = "boolean"
+	case "time.Time", "SQLiteTime", "FlexTime":
+		tsType = "string"
+	case "interface{}", "any", "struct{}":
+		tsType = "unknown"
+	case "json.RawMessage":
+		tsType = "unknown"
+	default:
+		if strings.HasPrefix(baseType, "[]") {
+			elemType := strings.TrimPrefix(baseType, "[]")
+			return goTypeToTS(elemType, ctx) + "[]"
+		}
+		if strings.HasPrefix(baseType, "map[") {
+			closeBracket := strings.Index(baseType, "]")
+			if closeBracket > 4 {
+				keyType := baseType[4:closeBracket]
+				valueType := baseType[closeBracket+1:]
+
+				var tsKeyType string
+				switch keyType {
+				case "string":
+					tsKeyType = "string"
+				case "int", "int8", "int16", "int32", "int64",
+					"uint", "uint8", "uint16", "uint32", "uint64":
+					tsKeyType = "number"
+				default:
+					tsKeyType = "string"
+				}
+				return fmt.Sprintf("Record<%s, %s>", tsKeyType, goTypeToTS(valueType, ctx))
+			}
+		}
+
+		typeName := baseType
+		if idx := strings.LastIndex(baseType, "."); idx >= 0 {
+			typeName = baseType[idx+1:]
+		}
+		if ctx.knownStructs[typeName] {
+			tsType = typeName
+		} else {
+			// Track unknown types for error reporting at the end
+			ctx.unknownTypes[goType] = append(ctx.unknownTypes[goType], typeName)
+			tsType = "unknown"
+		}
+	}
+
+	if isPointer {
+		return tsType + " | null"
+	}
+	return tsType
+}
+
+func needsQuoting(name string) bool {
+	for _, r := range name {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_') {
+			return true
+		}
+	}
+	return false
+}
+
+func generateTypeScript(structs []GoStruct, output string, ctx *ParserContext) error {
 	var buf bytes.Buffer
 
-	buf.WriteString(`// Code generated by scripts/generate-ts-types. DO NOT EDIT.
+	buf.WriteString(`// Code generated by scripts/generate-ts-types (AST-based). DO NOT EDIT.
 //
 // This file contains TypeScript interfaces that match the JSON serialization
 // format used by the Go WASM bridge. These types should be used for all
@@ -545,13 +757,12 @@ func generateTypeScript(structs []GoStruct, output string) error {
 
 `)
 
-	// Group structs by source file for better organization
+	// Group by file
 	fileGroups := make(map[string][]GoStruct)
 	for _, s := range structs {
 		fileGroups[s.FileName] = append(fileGroups[s.FileName], s)
 	}
 
-	// Sort file names
 	var fileNames []string
 	for name := range fileGroups {
 		fileNames = append(fileNames, name)
@@ -561,9 +772,9 @@ func generateTypeScript(structs []GoStruct, output string) error {
 	for _, fileName := range fileNames {
 		fileStructs := fileGroups[fileName]
 
-		buf.WriteString(fmt.Sprintf("// ============================================================================\n"))
+		buf.WriteString("// ============================================================================\n")
 		buf.WriteString(fmt.Sprintf("// From %s\n", fileName))
-		buf.WriteString(fmt.Sprintf("// ============================================================================\n\n"))
+		buf.WriteString("// ============================================================================\n\n")
 
 		for _, s := range fileStructs {
 			if s.Comment != "" {
@@ -572,12 +783,11 @@ func generateTypeScript(structs []GoStruct, output string) error {
 			buf.WriteString(fmt.Sprintf("export interface %s {\n", s.Name))
 
 			for _, f := range s.Fields {
-				tsType := goTypeToTS(f.GoType)
+				tsType := goTypeToTS(f.GoType, ctx)
 				optionalMark := ""
 				if f.Optional {
 					optionalMark = "?"
 				}
-				// Quote field names with special characters
 				fieldName := f.JSONName
 				if needsQuoting(fieldName) {
 					fieldName = fmt.Sprintf("'%s'", fieldName)
@@ -589,8 +799,7 @@ func generateTypeScript(structs []GoStruct, output string) error {
 		}
 	}
 
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
