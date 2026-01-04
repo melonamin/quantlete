@@ -70,6 +70,7 @@ dist/
 # ===== Web =====
 web/node_modules/
 web/dist/
+web/dist-demo/
 web/dist-wasm/
 web/.pnp.*
 web/.yarn/*
