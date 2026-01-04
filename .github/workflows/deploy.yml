@@ -129,6 +129,9 @@ jobs:
 
       - name: Build WASM app
         working-directory: web
+        env:
+          VITE_BUILD_MODE: wasm
+          VITE_CF_WORKER_URL: ${{ secrets.VITE_CF_WORKER_URL }}
         run: yarn build:wasm
 
       - name: Deploy to Cloudflare Pages
