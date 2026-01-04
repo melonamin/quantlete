@@ -88,4 +88,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: quantlete-demo
           directory: web/dist-demo
-          branch: production
+          branch: master

@@ -92,4 +92,4 @@ Contributions are welcome! Please see the [contributing guide](https://docs.quan
 
 ## License
 
-MIT
+Quantlete is released under the [O'Saasy License](LICENSE.md).
