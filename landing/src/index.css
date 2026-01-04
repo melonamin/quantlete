@@ -234,3 +234,59 @@
   color: var(--foreground);
   background: var(--muted);
 }
+
+/* Demo button - eye-catching Strava orange with pulse */
+.btn-demo {
+  background: linear-gradient(135deg, var(--strava), oklch(0.68 0.2 40));
+  color: white;
+  border: 1px solid var(--strava);
+  position: relative;
+  overflow: hidden;
+  font-weight: 600;
+}
+
+.btn-demo::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: var(--strava);
+  opacity: 0;
+  filter: blur(12px);
+  z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.btn-demo:hover::before {
+  opacity: 0.5;
+}
+
+.btn-demo:hover {
+  background: linear-gradient(135deg, oklch(0.78 0.18 45), oklch(0.74 0.2 40));
+  border-color: oklch(0.78 0.18 45);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 20px oklch(0.72 0.18 45 / 0.4),
+    0 4px 12px oklch(0 0 0 / 0.3);
+}
+
+/* Subtle pulse animation for demo button */
+@keyframes demoPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 oklch(0.72 0.18 45 / 0.4),
+      0 0 15px oklch(0.72 0.18 45 / 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px oklch(0.72 0.18 45 / 0),
+      0 0 20px oklch(0.72 0.18 45 / 0.3);
+  }
+}
+
+.btn-demo {
+  animation: demoPulse 2.5s ease-in-out infinite;
+}
+
+.btn-demo:hover {
+  animation: none;
+}

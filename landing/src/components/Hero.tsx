@@ -1,4 +1,4 @@
-import { Apple, Globe, Server } from 'lucide-react'
+import { Apple, Globe, Server, Play } from 'lucide-react'
 
 export function Hero() {
   return (
@@ -41,6 +41,13 @@ export function Hero() {
 
         {/* CTA buttons */}
         <div className="animate-fade-in animate-delay-3 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a
+            href="https://demo.quantlete.fit"
+            className="btn btn-demo group"
+          >
+            <Play className="w-4 h-4" />
+            <span>Try Demo</span>
+          </a>
           <a
             href="https://github.com/melonamin/quantlete/releases"
             className="btn btn-primary group"
