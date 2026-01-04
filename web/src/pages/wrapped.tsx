@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useRewind, useRewindYears } from '@/lib/api'
+import { useWrapped, useWrappedYears } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -19,9 +19,9 @@ function pctChange(current: number, baseline: number) {
   return ((current - baseline) / baseline) * 100
 }
 
-export function RewindPage() {
+export function WrappedPage() {
   const nowYear = new Date().getFullYear()
-  const { data: years, isLoading: yearsLoading } = useRewindYears()
+  const { data: years, isLoading: yearsLoading } = useWrappedYears()
   const availableYears = useMemo(() => {
     const ys = years && years.length ? years : [nowYear]
     return [nowYear, ...ys.filter((y) => y !== nowYear)]
@@ -38,8 +38,8 @@ export function RewindPage() {
     return availableYears[0]
   }, [year, availableYears, nowYear])
 
-  const { data: report, isLoading, isFetching, error } = useRewind(effectiveYear)
-  const { data: compare, isLoading: compareLoading } = useRewind(
+  const { data: report, isLoading, error } = useWrapped(effectiveYear)
+  const { data: compare, isLoading: compareLoading } = useWrapped(
     compareYear ?? 0,
     compareYear !== null
   )
@@ -97,7 +97,7 @@ export function RewindPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Rewind</h1>
+          <h1 className="text-2xl font-bold">Wrapped</h1>
           <p className="text-muted-foreground">Year in review</p>
         </div>
 
@@ -140,7 +140,7 @@ export function RewindPage() {
         </div>
       </div>
 
-      {yearsLoading || isLoading || isFetching ? (
+      {(yearsLoading || isLoading) && !report ? (
         <div className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-80 w-full" />

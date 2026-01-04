@@ -217,21 +217,21 @@ type TrainingLoadOutput struct {
 	Summary *DailyTrainingLoadPoint  `json:"summary,omitempty"`
 }
 
-// --- Rewind ---
+// --- Wrapped ---
 
-// GetRewindYearsInput contains parameters for getting available rewind years.
-type GetRewindYearsInput struct {
+// GetWrappedYearsInput contains parameters for getting available wrapped years.
+type GetWrappedYearsInput struct {
 	AthleteID int64 `json:"-" adapter:"context"`
 }
 
-// GetRewindInput contains parameters for getting rewind data.
-type GetRewindInput struct {
+// GetWrappedInput contains parameters for getting wrapped data.
+type GetWrappedInput struct {
 	AthleteID int64 `json:"-" adapter:"context"`
 	Year      int   `json:"year" adapter:"query"` // 0 = all-time
 }
 
-// RewindTotals represents totals for the rewind report.
-type RewindTotals struct {
+// WrappedTotals represents totals for the wrapped report.
+type WrappedTotals struct {
 	Activities    int     `json:"activities"`
 	DistanceM     float64 `json:"distance_m"`
 	ElevationM    float64 `json:"elevation_m"`
@@ -241,8 +241,8 @@ type RewindTotals struct {
 	CarbonSavedKg float64 `json:"carbon_saved_kg"`
 }
 
-// RewindMonth represents monthly statistics for rewind.
-type RewindMonth struct {
+// WrappedMonth represents monthly statistics for wrapped.
+type WrappedMonth struct {
 	Month      string  `json:"month"`
 	Activities int     `json:"activities"`
 	DistanceM  float64 `json:"distance_m"`
@@ -250,27 +250,27 @@ type RewindMonth struct {
 	PRs        int     `json:"prs"`
 }
 
-// RewindSportTime represents moving time by sport type.
-type RewindSportTime struct {
+// WrappedSportTime represents moving time by sport type.
+type WrappedSportTime struct {
 	SportType   string `json:"sport_type"`
 	MovingTimeS int    `json:"moving_time_s"`
 }
 
-// RewindHourCount represents activity count by hour.
-type RewindHourCount struct {
+// WrappedHourCount represents activity count by hour.
+type WrappedHourCount struct {
 	Hour  int `json:"hour"`
 	Count int `json:"count"`
 }
 
-// RewindLocationPoint represents a location bucket.
-type RewindLocationPoint struct {
+// WrappedLocationPoint represents a location bucket.
+type WrappedLocationPoint struct {
 	Lat   float64 `json:"lat"`
 	Lng   float64 `json:"lng"`
 	Count int     `json:"count"`
 }
 
-// RewindBiggestActivity represents the biggest activity for a metric.
-type RewindBiggestActivity struct {
+// WrappedBiggestActivity represents the biggest activity for a metric.
+type WrappedBiggestActivity struct {
 	ActivityID     int64   `json:"activity_id"`
 	Name           string  `json:"name"`
 	SportType      string  `json:"sport_type"`
@@ -278,21 +278,21 @@ type RewindBiggestActivity struct {
 	Value          float64 `json:"value"`
 }
 
-// RewindBiggest contains the biggest activities.
-type RewindBiggest struct {
-	LongestDistance *RewindBiggestActivity `json:"longest_distance,omitempty"`
-	MostElevation   *RewindBiggestActivity `json:"most_elevation,omitempty"`
-	LongestDuration *RewindBiggestActivity `json:"longest_duration,omitempty"`
+// WrappedBiggest contains the biggest activities.
+type WrappedBiggest struct {
+	LongestDistance *WrappedBiggestActivity `json:"longest_distance,omitempty"`
+	MostElevation   *WrappedBiggestActivity `json:"most_elevation,omitempty"`
+	LongestDuration *WrappedBiggestActivity `json:"longest_duration,omitempty"`
 }
 
-// RewindStreaks represents streak data.
-type RewindStreaks struct {
+// WrappedStreaks represents streak data.
+type WrappedStreaks struct {
 	LongestActiveDays int `json:"longest_active_days"`
 	LongestRestDays   int `json:"longest_rest_days"`
 }
 
-// RewindPhoto represents a photo in the rewind.
-type RewindPhoto struct {
+// WrappedPhoto represents a photo in the wrapped.
+type WrappedPhoto struct {
 	ID           string `json:"id"`
 	ActivityID   int64  `json:"activity_id"`
 	URL          string `json:"url"`
@@ -300,22 +300,22 @@ type RewindPhoto struct {
 	Caption      string `json:"caption,omitempty"`
 }
 
-// RewindOutput contains the rewind report.
-type RewindOutput struct {
-	Year              int                   `json:"year"`
-	RangeStart        string                `json:"range_start"`
-	RangeEnd          string                `json:"range_end"`
-	TotalDays         int                   `json:"total_days"`
-	ActiveDays        int                   `json:"active_days"`
-	RestDays          int                   `json:"rest_days"`
-	Totals            RewindTotals          `json:"totals"`
-	Months            []RewindMonth         `json:"months,omitempty"`
-	MovingTimeBySport []RewindSportTime     `json:"moving_time_by_sport"`
-	StartTimesByHour  []RewindHourCount     `json:"start_times_by_hour"`
-	Locations         []RewindLocationPoint `json:"locations"`
-	Streaks           RewindStreaks         `json:"streaks"`
-	RandomPhoto       *RewindPhoto          `json:"random_photo,omitempty"`
-	Biggest           RewindBiggest         `json:"biggest"`
+// WrappedOutput contains the wrapped report.
+type WrappedOutput struct {
+	Year              int                    `json:"year"`
+	RangeStart        string                 `json:"range_start"`
+	RangeEnd          string                 `json:"range_end"`
+	TotalDays         int                    `json:"total_days"`
+	ActiveDays        int                    `json:"active_days"`
+	RestDays          int                    `json:"rest_days"`
+	Totals            WrappedTotals          `json:"totals"`
+	Months            []WrappedMonth         `json:"months,omitempty"`
+	MovingTimeBySport []WrappedSportTime     `json:"moving_time_by_sport"`
+	StartTimesByHour  []WrappedHourCount     `json:"start_times_by_hour"`
+	Locations         []WrappedLocationPoint `json:"locations"`
+	Streaks           WrappedStreaks         `json:"streaks"`
+	RandomPhoto       *WrappedPhoto          `json:"random_photo,omitempty"`
+	Biggest           WrappedBiggest         `json:"biggest"`
 }
 
 // --- Best Efforts Write ---
@@ -653,14 +653,14 @@ func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadIn
 	}, nil
 }
 
-// GetRewindYears returns the list of years with activity data.
+// GetWrappedYears returns the list of years with activity data.
 //
-//adapter:wasm getRewindYears category=Stats
-//adapter:http GET /api/v1/stats/rewind/years
-func (s *StatsService) GetRewindYears(ctx context.Context, in GetRewindYearsInput) ([]int, error) {
-	years, err := s.stats.ListRewindYears(ctx, in.AthleteID)
+//adapter:wasm getWrappedYears category=Stats
+//adapter:http GET /api/v1/stats/wrapped/years
+func (s *StatsService) GetWrappedYears(ctx context.Context, in GetWrappedYearsInput) ([]int, error) {
+	years, err := s.stats.ListWrappedYears(ctx, in.AthleteID)
 	if err != nil {
-		return nil, Wrapf(ErrInternal, "failed to load rewind years: %v", err)
+		return nil, Wrapf(ErrInternal, "failed to load wrapped years: %v", err)
 	}
 	if years == nil {
 		return []int{}, nil
@@ -668,20 +668,20 @@ func (s *StatsService) GetRewindYears(ctx context.Context, in GetRewindYearsInpu
 	return years, nil
 }
 
-// GetRewind returns the rewind report for a given year (or all-time if year is 0).
+// GetWrapped returns the wrapped report for a given year (or all-time if year is 0).
 //
-//adapter:wasm getRewind category=Stats
-//adapter:http GET /api/v1/stats/rewind
-func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*RewindOutput, error) {
-	report, err := s.stats.GetRewind(ctx, in.AthleteID, in.Year)
+//adapter:wasm getWrapped category=Stats
+//adapter:http GET /api/v1/stats/wrapped
+func (s *StatsService) GetWrapped(ctx context.Context, in GetWrappedInput) (*WrappedOutput, error) {
+	report, err := s.stats.GetWrapped(ctx, in.AthleteID, in.Year)
 	if err != nil {
-		return nil, Wrapf(ErrInternal, "failed to build rewind: %v", err)
+		return nil, Wrapf(ErrInternal, "failed to build wrapped: %v", err)
 	}
 
 	// Convert storage types to service output types
-	months := make([]RewindMonth, len(report.Months))
+	months := make([]WrappedMonth, len(report.Months))
 	for i, m := range report.Months {
-		months[i] = RewindMonth{
+		months[i] = WrappedMonth{
 			Month:      m.Month,
 			Activities: m.Activities,
 			DistanceM:  m.DistanceM,
@@ -690,34 +690,34 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 		}
 	}
 
-	movingTimeBySport := make([]RewindSportTime, len(report.MovingTimeBySport))
+	movingTimeBySport := make([]WrappedSportTime, len(report.MovingTimeBySport))
 	for i, m := range report.MovingTimeBySport {
-		movingTimeBySport[i] = RewindSportTime{
+		movingTimeBySport[i] = WrappedSportTime{
 			SportType:   m.SportType,
 			MovingTimeS: m.MovingTimeS,
 		}
 	}
 
-	startTimesByHour := make([]RewindHourCount, len(report.StartTimesByHour))
+	startTimesByHour := make([]WrappedHourCount, len(report.StartTimesByHour))
 	for i, h := range report.StartTimesByHour {
-		startTimesByHour[i] = RewindHourCount{
+		startTimesByHour[i] = WrappedHourCount{
 			Hour:  h.Hour,
 			Count: h.Count,
 		}
 	}
 
-	locations := make([]RewindLocationPoint, len(report.Locations))
+	locations := make([]WrappedLocationPoint, len(report.Locations))
 	for i, l := range report.Locations {
-		locations[i] = RewindLocationPoint{
+		locations[i] = WrappedLocationPoint{
 			Lat:   l.Lat,
 			Lng:   l.Lng,
 			Count: l.Count,
 		}
 	}
 
-	var randomPhoto *RewindPhoto
+	var randomPhoto *WrappedPhoto
 	if report.RandomPhoto != nil {
-		randomPhoto = &RewindPhoto{
+		randomPhoto = &WrappedPhoto{
 			ID:           report.RandomPhoto.ID,
 			ActivityID:   report.RandomPhoto.ActivityID,
 			URL:          report.RandomPhoto.URL,
@@ -726,9 +726,9 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 		}
 	}
 
-	var longestDistance, mostElevation, longestDuration *RewindBiggestActivity
+	var longestDistance, mostElevation, longestDuration *WrappedBiggestActivity
 	if report.Biggest.LongestDistance != nil {
-		longestDistance = &RewindBiggestActivity{
+		longestDistance = &WrappedBiggestActivity{
 			ActivityID:     report.Biggest.LongestDistance.ActivityID,
 			Name:           report.Biggest.LongestDistance.Name,
 			SportType:      report.Biggest.LongestDistance.SportType,
@@ -737,7 +737,7 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 		}
 	}
 	if report.Biggest.MostElevation != nil {
-		mostElevation = &RewindBiggestActivity{
+		mostElevation = &WrappedBiggestActivity{
 			ActivityID:     report.Biggest.MostElevation.ActivityID,
 			Name:           report.Biggest.MostElevation.Name,
 			SportType:      report.Biggest.MostElevation.SportType,
@@ -746,7 +746,7 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 		}
 	}
 	if report.Biggest.LongestDuration != nil {
-		longestDuration = &RewindBiggestActivity{
+		longestDuration = &WrappedBiggestActivity{
 			ActivityID:     report.Biggest.LongestDuration.ActivityID,
 			Name:           report.Biggest.LongestDuration.Name,
 			SportType:      report.Biggest.LongestDuration.SportType,
@@ -755,14 +755,14 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 		}
 	}
 
-	return &RewindOutput{
+	return &WrappedOutput{
 		Year:       report.Year,
 		RangeStart: report.RangeStart,
 		RangeEnd:   report.RangeEnd,
 		TotalDays:  report.TotalDays,
 		ActiveDays: report.ActiveDays,
 		RestDays:   report.RestDays,
-		Totals: RewindTotals{
+		Totals: WrappedTotals{
 			Activities:    report.Totals.Activities,
 			DistanceM:     report.Totals.DistanceM,
 			ElevationM:    report.Totals.ElevationM,
@@ -775,12 +775,12 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 		MovingTimeBySport: movingTimeBySport,
 		StartTimesByHour:  startTimesByHour,
 		Locations:         locations,
-		Streaks: RewindStreaks{
+		Streaks: WrappedStreaks{
 			LongestActiveDays: report.Streaks.LongestActiveDays,
 			LongestRestDays:   report.Streaks.LongestRestDays,
 		},
 		RandomPhoto: randomPhoto,
-		Biggest: RewindBiggest{
+		Biggest: WrappedBiggest{
 			LongestDistance: longestDistance,
 			MostElevation:   mostElevation,
 			LongestDuration: longestDuration,

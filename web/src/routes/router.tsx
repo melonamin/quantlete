@@ -1,4 +1,4 @@
-import { createRouter, createRootRoute, createRoute, Outlet } from '@tanstack/react-router'
+import { createRouter, createRootRoute, createRoute, Outlet, redirect } from '@tanstack/react-router'
 import { RootLayout } from '@/components/layout/root-layout'
 import { DashboardPage } from '@/pages/dashboard'
 import { ActivitiesPage } from '@/pages/activities'
@@ -9,7 +9,7 @@ import { SegmentsPage } from '@/pages/segments'
 import { GearPage } from '@/pages/gear'
 import { EddingtonPage } from '@/pages/eddington'
 import { BestEffortsPage } from '@/pages/best-efforts'
-import { RewindPage } from '@/pages/rewind'
+import { WrappedPage } from '@/pages/wrapped'
 import { SettingsPage } from '@/pages/settings'
 import { AthletePage } from '@/pages/athlete'
 import { TrainingLoadPage } from '@/pages/training-load'
@@ -93,11 +93,20 @@ const bestEffortsRoute = createRoute({
   component: BestEffortsPage,
 })
 
-// Rewind
-const rewindRoute = createRoute({
+// Wrapped
+const wrappedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/wrapped',
+  component: WrappedPage,
+})
+
+// Redirect old /rewind to /wrapped for backwards compatibility
+const rewindRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/rewind',
-  component: RewindPage,
+  beforeLoad: () => {
+    throw redirect({ to: '/wrapped' })
+  },
 })
 
 // Settings
@@ -181,7 +190,8 @@ const routeTree = rootRoute.addChildren([
   gearRoute,
   eddingtonRoute,
   bestEffortsRoute,
-  rewindRoute,
+  wrappedRoute,
+  rewindRedirectRoute,
   trainingLoadRoute,
   powerRoute,
   photosRoute,

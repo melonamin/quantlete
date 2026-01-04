@@ -1,23 +1,47 @@
-# Quantlete - Statistics for Strava
+# Quantlete
 
-A self-hosted analytics dashboard for Strava athletes. Get comprehensive statistics, visualizations, and insights into your training data.
+**Self-hosted analytics dashboard for Strava athletes.**
+
+
+Quantlete gives you comprehensive statistics, visualizations, and insights from your Strava data—all running locally or in your browser. No cloud subscription required.
+
+**[Live Demo](https://demo.quantlete.fit)** · **[Documentation](ARCHITECTURE.md)**
+
+<!-- TODO: Add screenshot
+![Quantlete Dashboard](docs/screenshot.png)
+-->
+
+---
 
 ## Features
 
-- Import activities from Strava API
-- Interactive dashboard with customizable widgets
-- Activity maps and heatmaps
-- Detailed charts (ECharts)
-- Segment analysis
-- Gear tracking and maintenance
-- Eddington numbers
-- Best efforts and personal records
-- Year in review (Strava Rewind style)
-- Browser-only mode (WASM) - no server required
+- **Dashboard** — Customizable widgets showing your key metrics
+- **Activity Maps** — Route visualization with interactive heatmaps
+- **Charts & Analytics** — Distance, elevation, pace, power, heart rate trends
+- **Segment Analysis** — Track your segment efforts and PRs
+- **Gear Tracking** — Monitor usage and schedule maintenance
+- **Eddington Numbers** — Calculate your cycling/running Eddington number
+- **Best Efforts** — Personal records across standard distances
+- **Year in Review** — Strava Rewind-style annual summaries
+- **Training Load** — CTL/ATL/TSB fitness and fatigue tracking
 
-## Quick Start
+## Deployment Options
 
-### Using Docker
+### Browser-Only Mode (No Server)
+
+Run entirely in your browser using WebAssembly. Your data stays on your device using browser storage (OPFS).
+
+1. Visit [quantlete.fit](https://quantlete.fit) (or self-host the static files)
+2. Connect your Strava account
+3. Import your activities
+
+No server required—everything runs client-side.
+
+### Self-Hosted Server
+
+Run the Go binary for a traditional server setup with SQLite storage.
+
+#### Docker
 
 ```bash
 docker run -d \
@@ -25,46 +49,35 @@ docker run -d \
   -v quantlete-data:/data \
   -e STRAVA_CLIENT_ID=your_client_id \
   -e STRAVA_CLIENT_SECRET=your_client_secret \
-  ghcr.io/user/quantlete:latest
+  ghcr.io/melonamin/quantlete:latest
 ```
 
-### Using Binary
+#### Binary
 
-Download the latest release for your platform from the [Releases](https://github.com/user/quantlete/releases) page.
+Download from [Releases](https://github.com/melonamin/quantlete/releases), then:
 
 ```bash
-# Start the server
 ./quantlete serve --port 8081
 ```
 
-### From Source
+#### From Source
 
-Requirements:
-- Go 1.23+
-- Node.js 22+
-- just (task runner)
+Requirements: Go 1.23+, Node.js 22+, [just](https://github.com/casey/just)
 
 ```bash
-# Clone the repository
-git clone https://github.com/user/quantlete.git
+git clone https://github.com/melonamin/quantlete.git
 cd quantlete
-
-# Install dependencies
 just setup
-
-# Run development servers
-just dev
-
-# Build for production
 just build
+./bin/quantlete serve
 ```
 
 ## Configuration
 
-Create a `.env` file or set environment variables:
+### Environment Variables
 
 ```bash
-# Required: Strava API credentials
+# Required for self-hosted mode
 STRAVA_CLIENT_ID=your_client_id
 STRAVA_CLIENT_SECRET=your_client_secret
 
@@ -77,29 +90,40 @@ QUANTLETE_DATA_DIR=/path/to/data
 
 1. Go to [Strava API Settings](https://www.strava.com/settings/api)
 2. Create a new application
-3. Set the callback URL to `http://localhost:8081/api/v1/auth/strava/callback`
+3. Set the callback URL:
+   - Self-hosted: `http://localhost:8081/api/v1/auth/strava/callback`
+   - Browser-only: Your domain's callback URL
 4. Copy the Client ID and Client Secret
 
 ## Development
 
 ```bash
-# Run development servers
+# Install dependencies
+just setup
+
+# Run dev servers (Go API + Vite)
 just dev
 
 # Run tests
 just test
 
-# Lint code
+# Lint and format
 just lint
-
-# Format code
 just fmt
+
+# Build for production
+just build
 ```
 
-## Architecture
+See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details on the codebase structure, WASM bridge, and code generation.
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details.
+## Tech Stack
+
+**Backend:** Go, Chi, SQLite (modernc.org/sqlite), Cobra
+
+**Frontend:** React, TypeScript, Tailwind CSS, shadcn/ui, ECharts, Leaflet
+
+**WASM:** Go compiled to WebAssembly, sql.js, OPFS
 
 ## License
 
-MIT

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type RewindTotals struct {
+type WrappedTotals struct {
 	Activities    int     `json:"activities"`
 	DistanceM     float64 `json:"distance_m"`
 	ElevationM    float64 `json:"elevation_m"`
@@ -17,7 +17,7 @@ type RewindTotals struct {
 	CarbonSavedKg float64 `json:"carbon_saved_kg"`
 }
 
-type RewindMonth struct {
+type WrappedMonth struct {
 	Month      string  `json:"month"` // YYYY-MM
 	Activities int     `json:"activities"`
 	DistanceM  float64 `json:"distance_m"`
@@ -25,23 +25,23 @@ type RewindMonth struct {
 	PRs        int     `json:"prs"`
 }
 
-type RewindSportTime struct {
+type WrappedSportTime struct {
 	SportType   string `json:"sport_type"`
 	MovingTimeS int    `json:"moving_time_s"`
 }
 
-type RewindHourCount struct {
+type WrappedHourCount struct {
 	Hour  int `json:"hour"`
 	Count int `json:"count"`
 }
 
-type RewindLocationPoint struct {
+type WrappedLocationPoint struct {
 	Lat   float64 `json:"lat"`
 	Lng   float64 `json:"lng"`
 	Count int     `json:"count"`
 }
 
-type RewindBiggestActivity struct {
+type WrappedBiggestActivity struct {
 	ActivityID     int64   `json:"activity_id"`
 	Name           string  `json:"name"`
 	SportType      string  `json:"sport_type"`
@@ -49,18 +49,18 @@ type RewindBiggestActivity struct {
 	Value          float64 `json:"value"`
 }
 
-type RewindBiggest struct {
-	LongestDistance *RewindBiggestActivity `json:"longest_distance,omitempty"`
-	MostElevation   *RewindBiggestActivity `json:"most_elevation,omitempty"`
-	LongestDuration *RewindBiggestActivity `json:"longest_duration,omitempty"`
+type WrappedBiggest struct {
+	LongestDistance *WrappedBiggestActivity `json:"longest_distance,omitempty"`
+	MostElevation   *WrappedBiggestActivity `json:"most_elevation,omitempty"`
+	LongestDuration *WrappedBiggestActivity `json:"longest_duration,omitempty"`
 }
 
-type RewindStreaks struct {
+type WrappedStreaks struct {
 	LongestActiveDays int `json:"longest_active_days"`
 	LongestRestDays   int `json:"longest_rest_days"`
 }
 
-type RewindPhoto struct {
+type WrappedPhoto struct {
 	ID           string `json:"id"`
 	ActivityID   int64  `json:"activity_id"`
 	URL          string `json:"url"`
@@ -68,24 +68,24 @@ type RewindPhoto struct {
 	Caption      string `json:"caption,omitempty"`
 }
 
-type RewindReport struct {
-	Year              int                   `json:"year"` // 0 = all-time (range from first to last activity)
-	RangeStart        string                `json:"range_start"`
-	RangeEnd          string                `json:"range_end"`
-	TotalDays         int                   `json:"total_days"`
-	ActiveDays        int                   `json:"active_days"`
-	RestDays          int                   `json:"rest_days"`
-	Totals            RewindTotals          `json:"totals"`
-	Months            []RewindMonth         `json:"months,omitempty"` // year-only
-	MovingTimeBySport []RewindSportTime     `json:"moving_time_by_sport"`
-	StartTimesByHour  []RewindHourCount     `json:"start_times_by_hour"`
-	Locations         []RewindLocationPoint `json:"locations"`
-	Streaks           RewindStreaks         `json:"streaks"`
-	RandomPhoto       *RewindPhoto          `json:"random_photo,omitempty"`
-	Biggest           RewindBiggest         `json:"biggest"`
+type WrappedReport struct {
+	Year              int                    `json:"year"` // 0 = all-time (range from first to last activity)
+	RangeStart        string                 `json:"range_start"`
+	RangeEnd          string                 `json:"range_end"`
+	TotalDays         int                    `json:"total_days"`
+	ActiveDays        int                    `json:"active_days"`
+	RestDays          int                    `json:"rest_days"`
+	Totals            WrappedTotals          `json:"totals"`
+	Months            []WrappedMonth         `json:"months,omitempty"` // year-only
+	MovingTimeBySport []WrappedSportTime     `json:"moving_time_by_sport"`
+	StartTimesByHour  []WrappedHourCount     `json:"start_times_by_hour"`
+	Locations         []WrappedLocationPoint `json:"locations"`
+	Streaks           WrappedStreaks         `json:"streaks"`
+	RandomPhoto       *WrappedPhoto          `json:"random_photo,omitempty"`
+	Biggest           WrappedBiggest         `json:"biggest"`
 }
 
-func (r *StatsRepository) ListRewindYears(ctx context.Context, athleteID int64) ([]int, error) {
+func (r *StatsRepository) ListWrappedYears(ctx context.Context, athleteID int64) ([]int, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT DISTINCT CAST(strftime('%Y', start_date_local) AS INTEGER) AS y
 		FROM activities
@@ -108,7 +108,7 @@ func (r *StatsRepository) ListRewindYears(ctx context.Context, athleteID int64) 
 	return years, rows.Err()
 }
 
-func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year int) (*RewindReport, error) {
+func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year int) (*WrappedReport, error) {
 	var start time.Time
 	var end time.Time
 	if year > 0 {
@@ -137,7 +137,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	}
 
 	// Totals.
-	var totals RewindTotals
+	var totals WrappedTotals
 	var dist, elev, commute sql.NullFloat64
 	var moving, kudos sql.NullInt64
 	var activities int
@@ -193,7 +193,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 		restDays = 0
 	}
 
-	report := &RewindReport{
+	report := &WrappedReport{
 		Year:       year,
 		RangeStart: start.Format("2006-01-02"),
 		RangeEnd:   end.AddDate(0, 0, -1).Format("2006-01-02"),
@@ -211,9 +211,9 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 
 	// Months (year-only, with zero-fill).
 	if year > 0 {
-		months := make([]RewindMonth, 12)
+		months := make([]WrappedMonth, 12)
 		for m := 1; m <= 12; m++ {
-			months[m-1] = RewindMonth{ //nolint:gosec // G602: loop bounds ensure valid index 0-11
+			months[m-1] = WrappedMonth{ //nolint:gosec // G602: loop bounds ensure valid index 0-11
 				Month: time.Date(year, time.Month(m), 1, 0, 0, 0, 0, time.UTC).Format("2006-01"),
 			}
 		}
@@ -320,15 +320,15 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 			return nil, err
 		}
 		if secs.Valid {
-			report.MovingTimeBySport = append(report.MovingTimeBySport, RewindSportTime{SportType: st, MovingTimeS: int(secs.Int64)})
+			report.MovingTimeBySport = append(report.MovingTimeBySport, WrappedSportTime{SportType: st, MovingTimeS: int(secs.Int64)})
 		}
 	}
 	_ = mtRows.Close()
 
 	// Start times by hour (0..23).
-	hours := make([]RewindHourCount, 24)
+	hours := make([]WrappedHourCount, 24)
 	for h := 0; h < 24; h++ {
-		hours[h] = RewindHourCount{Hour: h, Count: 0}
+		hours[h] = WrappedHourCount{Hour: h, Count: 0}
 	}
 	hrRows, err := r.db.QueryContext(ctx, `
 		SELECT CAST(strftime('%H', start_date_local) AS INTEGER) AS h, COUNT(*) AS c
@@ -378,23 +378,23 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 			return nil, err
 		}
 		if c > 0 {
-			report.Locations = append(report.Locations, RewindLocationPoint{Lat: lat, Lng: lng, Count: c})
+			report.Locations = append(report.Locations, WrappedLocationPoint{Lat: lat, Lng: lng, Count: c})
 		}
 	}
 	_ = locRows.Close()
 
 	// Streaks.
-	report.Streaks = computeRewindStreaks(ctx, r.db, athleteID, start, end)
+	report.Streaks = computeWrappedStreaks(ctx, r.db, athleteID, start, end)
 
 	// Biggest activities.
-	report.Biggest = RewindBiggest{
+	report.Biggest = WrappedBiggest{
 		LongestDistance: queryBiggest(ctx, r.db, athleteID, start, end, "distance"),
 		MostElevation:   queryBiggest(ctx, r.db, athleteID, start, end, "total_elevation_gain"),
 		LongestDuration: queryBiggest(ctx, r.db, athleteID, start, end, "moving_time"),
 	}
 
 	// Random photo (best-effort; photos may not be imported).
-	var photo RewindPhoto
+	var photo WrappedPhoto
 	err = r.db.QueryRowContext(ctx, `
 		SELECT p.id, p.activity_id, p.url, p.thumbnail_url, p.caption
 		FROM photos p
@@ -410,7 +410,7 @@ func (r *StatsRepository) GetRewind(ctx context.Context, athleteID int64, year i
 	return report, nil
 }
 
-func computeRewindStreaks(ctx context.Context, db *DB, athleteID int64, start, end time.Time) RewindStreaks {
+func computeWrappedStreaks(ctx context.Context, db *DB, athleteID int64, start, end time.Time) WrappedStreaks {
 	rows, err := db.QueryContext(ctx, `
 		SELECT DISTINCT date(start_date_local) AS day
 		FROM activities
@@ -418,7 +418,7 @@ func computeRewindStreaks(ctx context.Context, db *DB, athleteID int64, start, e
 		ORDER BY day ASC
 	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 	if err != nil {
-		return RewindStreaks{}
+		return WrappedStreaks{}
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -453,10 +453,10 @@ func computeRewindStreaks(ctx context.Context, db *DB, athleteID int64, start, e
 		}
 	}
 
-	return RewindStreaks{LongestActiveDays: longestActive, LongestRestDays: longestRest}
+	return WrappedStreaks{LongestActiveDays: longestActive, LongestRestDays: longestRest}
 }
 
-func queryBiggest(ctx context.Context, db *DB, athleteID int64, start, end time.Time, metric string) *RewindBiggestActivity {
+func queryBiggest(ctx context.Context, db *DB, athleteID int64, start, end time.Time, metric string) *WrappedBiggestActivity {
 	orderBy := metric
 	valueField := metric
 	if metric == "moving_time" {
@@ -470,7 +470,7 @@ func queryBiggest(ctx context.Context, db *DB, athleteID int64, start, end time.
 		LIMIT 1
 	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
 
-	var a RewindBiggestActivity
+	var a WrappedBiggestActivity
 	var startLocal SQLiteTime
 	var v sql.NullFloat64
 	if metric == "moving_time" {

@@ -60,8 +60,8 @@ import type {
   // Best efforts
   BestEffortPR,
   BestEffortItem,
-  // Rewind
-  RewindReport,
+  // Wrapped
+  WrappedReport,
   // Photos
   PhotosListResponse,
   PhotosFilters,
@@ -163,10 +163,10 @@ export interface DataProvider {
   getBestEffortsForDistance(distanceType: string, sportType?: string): Promise<BestEffortItem[]>
 
   // ============================================================================
-  // Rewind
+  // Wrapped
   // ============================================================================
-  getRewindYears(): Promise<number[]>
-  getRewind(year: number): Promise<RewindReport>
+  getWrappedYears(): Promise<number[]>
+  getWrapped(year: number): Promise<WrappedReport>
 
   // ============================================================================
   // Gear

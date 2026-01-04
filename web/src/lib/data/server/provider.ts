@@ -59,8 +59,8 @@ import type {
   // Best efforts
   BestEffortPR,
   BestEffortItem,
-  // Rewind
-  RewindReport,
+  // Wrapped
+  WrappedReport,
   // Photos
   PhotosListResponse,
   PhotosFilters,
@@ -301,14 +301,14 @@ export class ServerProvider implements DataProvider {
   }
 
   // ============================================================================
-  // Rewind
+  // Wrapped
   // ============================================================================
-  async getRewindYears(): Promise<number[]> {
-    return get<number[]>('/stats/rewind/years')
+  async getWrappedYears(): Promise<number[]> {
+    return get<number[]>('/stats/wrapped/years')
   }
 
-  async getRewind(year: number): Promise<RewindReport> {
-    return get<RewindReport>(`/stats/rewind?year=${encodeURIComponent(String(year))}`)
+  async getWrapped(year: number): Promise<WrappedReport> {
+    return get<WrappedReport>(`/stats/wrapped?year=${encodeURIComponent(String(year))}`)
   }
 
   // ============================================================================

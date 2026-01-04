@@ -707,6 +707,7 @@ func (i *Importer) waitForRateLimit(ctx context.Context, err error) error {
 	i.progress.WaitingUntil = rle.ResetAt
 	i.progress.WaitingReason = fmt.Sprintf("Rate limit exceeded. Waiting %v for reset.", rle.RetryAfter.Round(time.Second))
 	i.mu.Unlock()
+	i.emitProgress() // Notify UI of rate limit wait
 
 	// Use ticker for periodic cancellation checks instead of blocking time.After
 	deadline := time.Now().Add(rle.RetryAfter)
@@ -721,6 +722,7 @@ func (i *Importer) waitForRateLimit(ctx context.Context, err error) error {
 		case <-ticker.C:
 			if time.Now().After(deadline) {
 				i.clearWaitingState()
+				i.emitProgress() // Notify UI that wait is over
 				return nil
 			}
 			// Update waiting progress periodically
@@ -728,6 +730,7 @@ func (i *Importer) waitForRateLimit(ctx context.Context, err error) error {
 			i.mu.Lock()
 			i.progress.WaitingReason = fmt.Sprintf("Rate limit exceeded. Waiting %v for reset.", remaining)
 			i.mu.Unlock()
+			i.emitProgress() // Send countdown update to UI
 		}
 	}
 }

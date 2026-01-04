@@ -335,11 +335,17 @@ export const getActivities = (filters: ActivityFilters): ActivitiesResult => {
     after: filters.after ? `${filters.after}T00:00:00Z` : undefined,
     before: filters.before ? `${filters.before}T00:00:00Z` : undefined,
   }
-  return callGoStorage<ActivitiesResult>(() => goStorage.getActivities(JSON.stringify(goFilters)), 'getActivities')
+  return callGoStorage<ActivitiesResult>(
+    () => goStorage.getActivities(JSON.stringify(goFilters)),
+    'getActivities'
+  )
 }
 
 export const getActivity = (id: number): Activity =>
-  callGoStorage<Activity>(() => goStorage.getActivity(JSON.stringify({ activity_id: id })), 'getActivity')
+  callGoStorage<Activity>(
+    () => goStorage.getActivity(JSON.stringify({ activity_id: id })),
+    'getActivity'
+  )
 
 export interface ActivityStream {
   stream_type: string
@@ -350,7 +356,10 @@ export interface ActivityStream {
 }
 
 export const getActivityStreams = (activityId: number): ActivityStream[] =>
-  callGoStorageArray<ActivityStream>(() => goStorage.getActivityStreams(JSON.stringify({ activity_id: activityId })), 'getActivityStreams')
+  callGoStorageArray<ActivityStream>(
+    () => goStorage.getActivityStreams(JSON.stringify({ activity_id: activityId })),
+    'getActivityStreams'
+  )
 
 // ============================================================================
 // Dashboard
@@ -371,12 +380,18 @@ export interface DashboardConfig {
 }
 
 export function getDashboardConfig(): DashboardConfig {
-  const cfg = callGoStorage<GenDashboardConfig | undefined>(() => goStorage.getDashboardConfig(), 'getDashboardConfig') ?? { version: 1, widgets: [] }
+  const cfg = callGoStorage<GenDashboardConfig | undefined>(
+    () => goStorage.getDashboardConfig(),
+    'getDashboardConfig'
+  ) ?? { version: 1, widgets: [] }
   return { version: cfg.version, widgets: cfg.widgets ?? [] }
 }
 
 export function updateDashboardConfig(config: DashboardConfig): DashboardConfig {
-  const cfg = callGoStorage<GenDashboardConfig | undefined>(() => goStorage.updateDashboardConfig(JSON.stringify(config)), 'updateDashboardConfig') ?? { version: config.version, widgets: config.widgets }
+  const cfg = callGoStorage<GenDashboardConfig | undefined>(
+    () => goStorage.updateDashboardConfig(JSON.stringify(config)),
+    'updateDashboardConfig'
+  ) ?? { version: config.version, widgets: config.widgets }
   return { version: cfg.version, widgets: cfg.widgets ?? [] }
 }
 
@@ -387,13 +402,19 @@ export const getWeeklyStats = (): WeeklyStat[] =>
   callGoStorageArray<WeeklyStat>(() => goStorage.getWeeklyStats(), 'getWeeklyStats')
 
 export const getRecentActivities = (limit: number): RecentActivity[] =>
-  callGoStorageArray<RecentActivity>(() => goStorage.getRecentActivities(JSON.stringify({ limit })), 'getRecentActivities')
+  callGoStorageArray<RecentActivity>(
+    () => goStorage.getRecentActivities(JSON.stringify({ limit })),
+    'getRecentActivities'
+  )
 
 export const getSportTypeStats = (): SportTypeStat[] =>
   callGoStorageArray<SportTypeStat>(() => goStorage.getSportTypeStats(), 'getSportTypeStats')
 
 export const getMonthlyStats = (year?: number): MonthlyStat[] =>
-  callGoStorageArray<MonthlyStat>(() => goStorage.getMonthlyStats(JSON.stringify({ year })), 'getMonthlyStats')
+  callGoStorageArray<MonthlyStat>(
+    () => goStorage.getMonthlyStats(JSON.stringify({ year })),
+    'getMonthlyStats'
+  )
 
 export const getYearlyStats = (): YearlyStat[] =>
   callGoStorageArray<YearlyStat>(() => goStorage.getYearlyStats(), 'getYearlyStats')
@@ -403,10 +424,16 @@ export const getYearlyStats = (): YearlyStat[] =>
 // ============================================================================
 
 export const getDaytimeDistribution = (): DistributionSlice[] =>
-  callGoStorageArray<DistributionSlice>(() => goStorage.getDaytimeDistribution(), 'getDaytimeDistribution')
+  callGoStorageArray<DistributionSlice>(
+    () => goStorage.getDaytimeDistribution(),
+    'getDaytimeDistribution'
+  )
 
 export const getWeekdayDistribution = (): DistributionSlice[] =>
-  callGoStorageArray<DistributionSlice>(() => goStorage.getWeekdayDistribution(), 'getWeekdayDistribution')
+  callGoStorageArray<DistributionSlice>(
+    () => goStorage.getWeekdayDistribution(),
+    'getWeekdayDistribution'
+  )
 
 export interface ExportStats {
   total_activities: number
@@ -415,7 +442,13 @@ export interface ExportStats {
 }
 
 export function getExportStats(): ExportStats {
-  return callGoStorage<ExportStats | undefined>(() => goStorage.getExportStats(), 'getExportStats') ?? { total_activities: 0, first_activity: null, last_activity: null }
+  return (
+    callGoStorage<ExportStats | undefined>(() => goStorage.getExportStats(), 'getExportStats') ?? {
+      total_activities: 0,
+      first_activity: null,
+      last_activity: null,
+    }
+  )
 }
 
 // ============================================================================
@@ -438,7 +471,12 @@ export interface HeatmapDataResponse {
 }
 
 export function getHeatmapData(filters: HeatmapFilters): HeatmapDataResponse {
-  return callGoStorage<HeatmapDataResponse | undefined>(() => goStorage.getHeatmapData(JSON.stringify(filters)), 'getHeatmapData') ?? { activities: [], countries: [] }
+  return (
+    callGoStorage<HeatmapDataResponse | undefined>(
+      () => goStorage.getHeatmapData(JSON.stringify(filters)),
+      'getHeatmapData'
+    ) ?? { activities: [], countries: [] }
+  )
 }
 
 // ============================================================================
@@ -446,7 +484,12 @@ export function getHeatmapData(filters: HeatmapFilters): HeatmapDataResponse {
 // ============================================================================
 
 export function getCalendarData(year: number): CalendarDay[] {
-  return callGoStorage<CalendarDay[] | undefined>(() => goStorage.getCalendarData(JSON.stringify({ year })), 'getCalendarData') || []
+  return (
+    callGoStorage<CalendarDay[] | undefined>(
+      () => goStorage.getCalendarData(JSON.stringify({ year })),
+      'getCalendarData'
+    ) || []
+  )
 }
 
 // CalendarActivityResult extends CalendarActivity with the same fields
@@ -538,7 +581,10 @@ export const getGear = (filters?: GearFilters): GearResult =>
   callGoStorage<GearResult>(() => goStorage.getGear(JSON.stringify(filters || {})), 'getGear')
 
 export function getGearDetail(id: string): GearItem {
-  return callGoStorage<GearItem>(() => goStorage.getGearDetail(JSON.stringify({ gear_id: id })), 'getGearDetail')
+  return callGoStorage<GearItem>(
+    () => goStorage.getGearDetail(JSON.stringify({ gear_id: id })),
+    'getGearDetail'
+  )
 }
 
 // ============================================================================
@@ -587,7 +633,10 @@ export interface SegmentsResult {
 }
 
 export const getSegments = (filters?: SegmentsFilters): SegmentsResult =>
-  callGoStorage<SegmentsResult>(() => goStorage.getSegments(JSON.stringify(filters || {})), 'getSegments')
+  callGoStorage<SegmentsResult>(
+    () => goStorage.getSegments(JSON.stringify(filters || {})),
+    'getSegments'
+  )
 
 export interface SegmentDetailResult {
   segment: SegmentListItem
@@ -595,7 +644,10 @@ export interface SegmentDetailResult {
 }
 
 export const getSegmentDetail = (id: number): SegmentDetailResult =>
-  callGoStorage<SegmentDetailResult>(() => goStorage.getSegmentDetail(JSON.stringify({ segment_id: id })), 'getSegmentDetail')
+  callGoStorage<SegmentDetailResult>(
+    () => goStorage.getSegmentDetail(JSON.stringify({ segment_id: id })),
+    'getSegmentDetail'
+  )
 
 // ============================================================================
 // Photos - Read
@@ -652,7 +704,12 @@ export interface ActivityPhotoResult {
 }
 
 export function getActivityPhotos(activityId: number): ActivityPhotoResult[] {
-  return callGoStorage<ActivityPhotoResult[] | undefined>(() => goStorage.getActivityPhotos(JSON.stringify({ activity_id: activityId })), 'getActivityPhotos') || []
+  return (
+    callGoStorage<ActivityPhotoResult[] | undefined>(
+      () => goStorage.getActivityPhotos(JSON.stringify({ activity_id: activityId })),
+      'getActivityPhotos'
+    ) || []
+  )
 }
 
 // ============================================================================
@@ -673,7 +730,12 @@ export interface BestEffortPRResult {
 }
 
 export function getBestEffortPRs(sportType?: string): BestEffortPRResult[] {
-  return callGoStorage<BestEffortPRResult[] | undefined>(() => goStorage.getBestEffortPRs(JSON.stringify({ sport_type: sportType })), 'getBestEffortPRs') || []
+  return (
+    callGoStorage<BestEffortPRResult[] | undefined>(
+      () => goStorage.getBestEffortPRs(JSON.stringify({ sport_type: sportType })),
+      'getBestEffortPRs'
+    ) || []
+  )
 }
 
 export interface BestEffortItemResult extends BestEffortPRResult {
@@ -681,8 +743,19 @@ export interface BestEffortItemResult extends BestEffortPRResult {
   end_index?: number
 }
 
-export function getBestEffortsForType(distanceType: string, sportType?: string): BestEffortItemResult[] {
-  return callGoStorage<BestEffortItemResult[] | undefined>(() => goStorage.getBestEffortsForType(JSON.stringify({ distance_type: distanceType, sport_type: sportType })), 'getBestEffortsForType') || []
+export function getBestEffortsForType(
+  distanceType: string,
+  sportType?: string
+): BestEffortItemResult[] {
+  return (
+    callGoStorage<BestEffortItemResult[] | undefined>(
+      () =>
+        goStorage.getBestEffortsForType(
+          JSON.stringify({ distance_type: distanceType, sport_type: sportType })
+        ),
+      'getBestEffortsForType'
+    ) || []
+  )
 }
 
 // ============================================================================
@@ -866,7 +939,10 @@ export interface ComputePowerBestEffortsInput {
 }
 
 export const computePowerBestEfforts = (input: ComputePowerBestEffortsInput): void =>
-  callGoStorageVoid(() => goStorage.computePowerBestEfforts(JSON.stringify(input)), 'computePowerBestEfforts')
+  callGoStorageVoid(
+    () => goStorage.computePowerBestEfforts(JSON.stringify(input)),
+    'computePowerBestEfforts'
+  )
 
 // ============================================================================
 // Sync History
@@ -887,7 +963,10 @@ export interface CreateSyncRunResult {
 }
 
 export function createSyncRun(input: CreateSyncRunInput): number {
-  const result = callGoStorage<CreateSyncRunResult>(() => goStorage.createSyncRun(JSON.stringify(input)), 'createSyncRun')
+  const result = callGoStorage<CreateSyncRunResult>(
+    () => goStorage.createSyncRun(JSON.stringify(input)),
+    'createSyncRun'
+  )
   return (result as unknown as CreateSyncRunResult).id
 }
 
@@ -941,7 +1020,12 @@ export interface SyncHistoryItem {
 }
 
 export function getSyncHistory(limit = 10): SyncHistoryItem[] {
-  return callGoStorage<SyncHistoryItem[] | undefined>(() => goStorage.getSyncHistory(limit), 'getSyncHistory') ?? []
+  return (
+    callGoStorage<SyncHistoryItem[] | undefined>(
+      () => goStorage.getSyncHistory(limit),
+      'getSyncHistory'
+    ) ?? []
+  )
 }
 
 // ============================================================================
@@ -952,13 +1036,19 @@ export const normalizedPower = (watts: number[]): number =>
   callGoStorageValue<number>(() => goStorage.normalizedPower(watts), 'normalizedPower')
 
 export const rollingMaxAverage = (values: number[], windowSeconds: number): number =>
-  callGoStorageValue<number>(() => goStorage.rollingMaxAverage(values, windowSeconds), 'rollingMaxAverage')
+  callGoStorageValue<number>(
+    () => goStorage.rollingMaxAverage(values, windowSeconds),
+    'rollingMaxAverage'
+  )
 
 export const intensityFactor = (np: number, ftp: number): number =>
   callGoStorageValue<number>(() => goStorage.intensityFactor(np, ftp), 'intensityFactor')
 
 export const trainingStressScore = (durationSeconds: number, np: number, ftp: number): number =>
-  callGoStorageValue<number>(() => goStorage.trainingStressScore(durationSeconds, np, ftp), 'trainingStressScore')
+  callGoStorageValue<number>(
+    () => goStorage.trainingStressScore(durationSeconds, np, ftp),
+    'trainingStressScore'
+  )
 
 // ============================================================================
 // Algorithms - Eddington
@@ -968,8 +1058,15 @@ export const eddingtonNumber = (distances: number[]): number =>
   callGoStorageValue<number>(() => goStorage.eddingtonNumber(distances), 'eddingtonNumber')
 
 // Use the generated EddingtonStep type which has { target, rides_needed }
-export function eddingtonNextSteps(distances: number[], currentE: number, stepsToCalculate: number): EddingtonStep[] {
-  return callGoStorage<EddingtonStep[]>(() => goStorage.eddingtonNextSteps(distances, currentE, stepsToCalculate), 'eddingtonNextSteps')
+export function eddingtonNextSteps(
+  distances: number[],
+  currentE: number,
+  stepsToCalculate: number
+): EddingtonStep[] {
+  return callGoStorage<EddingtonStep[]>(
+    () => goStorage.eddingtonNextSteps(distances, currentE, stepsToCalculate),
+    'eddingtonNextSteps'
+  )
 }
 
 export function eddingtonHistory(distances: number[]): number[] {
@@ -986,21 +1083,56 @@ export interface TrainingLoadPoint {
   tsb: number
 }
 
-export function calculateTrainingLoad(dailyTss: number[], ctlTau: number, atlTau: number): TrainingLoadPoint[] {
-  return callGoStorage<TrainingLoadPoint[]>(() => goStorage.calculateTrainingLoad(dailyTss, ctlTau, atlTau), 'calculateTrainingLoad')
+export function calculateTrainingLoad(
+  dailyTss: number[],
+  ctlTau: number,
+  atlTau: number
+): TrainingLoadPoint[] {
+  return callGoStorage<TrainingLoadPoint[]>(
+    () => goStorage.calculateTrainingLoad(dailyTss, ctlTau, atlTau),
+    'calculateTrainingLoad'
+  )
 }
 
-export function calculateTrainingLoadWithInitial(dailyTss: number[], initialCtl: number, initialAtl: number, ctlTau: number, atlTau: number): TrainingLoadPoint[] {
-  return callGoStorage<TrainingLoadPoint[]>(() => goStorage.calculateTrainingLoadWithInitial(dailyTss, initialCtl, initialAtl, ctlTau, atlTau), 'calculateTrainingLoadWithInitial')
+export function calculateTrainingLoadWithInitial(
+  dailyTss: number[],
+  initialCtl: number,
+  initialAtl: number,
+  ctlTau: number,
+  atlTau: number
+): TrainingLoadPoint[] {
+  return callGoStorage<TrainingLoadPoint[]>(
+    () =>
+      goStorage.calculateTrainingLoadWithInitial(dailyTss, initialCtl, initialAtl, ctlTau, atlTau),
+    'calculateTrainingLoadWithInitial'
+  )
 }
 
-export function predictAfterWorkout(currentCtl: number, currentAtl: number, plannedTss: number, ctlTau: number, atlTau: number): TrainingLoadPoint {
-  const result = callGoStorage<TrainingLoadPoint>(() => goStorage.predictAfterWorkout(currentCtl, currentAtl, plannedTss, ctlTau, atlTau), 'predictAfterWorkout')
+export function predictAfterWorkout(
+  currentCtl: number,
+  currentAtl: number,
+  plannedTss: number,
+  ctlTau: number,
+  atlTau: number
+): TrainingLoadPoint {
+  const result = callGoStorage<TrainingLoadPoint>(
+    () => goStorage.predictAfterWorkout(currentCtl, currentAtl, plannedTss, ctlTau, atlTau),
+    'predictAfterWorkout'
+  )
   return { ctl: result.ctl, atl: result.atl, tsb: result.tsb } as TrainingLoadPoint
 }
 
-export const tssForTargetTsb = (currentCtl: number, currentAtl: number, targetTsb: number, ctlTau: number, atlTau: number): number =>
-  callGoStorageValue<number>(() => goStorage.tssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau), 'tssForTargetTsb')
+export const tssForTargetTsb = (
+  currentCtl: number,
+  currentAtl: number,
+  targetTsb: number,
+  ctlTau: number,
+  atlTau: number
+): number =>
+  callGoStorageValue<number>(
+    () => goStorage.tssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau),
+    'tssForTargetTsb'
+  )
 
 // ============================================================================
 // Eddington Data
@@ -1026,7 +1158,10 @@ export interface EddingtonDataResult {
 }
 
 export function getEddingtonData(filters?: EddingtonFilters): EddingtonDataResult {
-  const result = callGoStorage<EddingtonDataResult>(() => goStorage.getEddingtonData(JSON.stringify(filters || {})), 'getEddingtonData')
+  const result = callGoStorage<EddingtonDataResult>(
+    () => goStorage.getEddingtonData(JSON.stringify(filters || {})),
+    'getEddingtonData'
+  )
   return {
     number: result.number,
     history: result.history || [],
@@ -1058,7 +1193,12 @@ export interface GearMonthlyUsage {
 }
 
 export function getGearMonthlyUsage(filters?: GearMonthlyUsageFilters): GearMonthlyUsage[] {
-  return callGoStorage<GearMonthlyUsage[] | undefined>(() => goStorage.getGearMonthlyUsage(JSON.stringify(filters || {})), 'getGearMonthlyUsage') || []
+  return (
+    callGoStorage<GearMonthlyUsage[] | undefined>(
+      () => goStorage.getGearMonthlyUsage(JSON.stringify(filters || {})),
+      'getGearMonthlyUsage'
+    ) || []
+  )
 }
 
 // ============================================================================
@@ -1095,7 +1235,10 @@ export interface CustomGearResult {
 }
 
 export const getCustomGear = (filters?: CustomGearFilters): CustomGearResult =>
-  callGoStorage<CustomGearResult>(() => goStorage.getCustomGear(JSON.stringify(filters || {})), 'getCustomGear')
+  callGoStorage<CustomGearResult>(
+    () => goStorage.getCustomGear(JSON.stringify(filters || {})),
+    'getCustomGear'
+  )
 
 export interface CreateCustomGearInput {
   name: string
@@ -1114,7 +1257,10 @@ export interface CreateCustomGearResult {
 }
 
 export function createCustomGear(input: CreateCustomGearInput): CreateCustomGearResult {
-  return callGoStorage<CreateCustomGearResult>(() => goStorage.createCustomGear(JSON.stringify(input)), 'createCustomGear')
+  return callGoStorage<CreateCustomGearResult>(
+    () => goStorage.createCustomGear(JSON.stringify(input)),
+    'createCustomGear'
+  )
 }
 
 export interface UpdateCustomGearInput {
@@ -1127,7 +1273,10 @@ export interface UpdateCustomGearInput {
 }
 
 export function updateCustomGear(input: UpdateCustomGearInput): CreateCustomGearResult {
-  return callGoStorage<CreateCustomGearResult>(() => goStorage.updateCustomGear(JSON.stringify(input)), 'updateCustomGear')
+  return callGoStorage<CreateCustomGearResult>(
+    () => goStorage.updateCustomGear(JSON.stringify(input)),
+    'updateCustomGear'
+  )
 }
 
 export interface DeleteCustomGearResult {
@@ -1136,7 +1285,9 @@ export interface DeleteCustomGearResult {
 }
 
 export function deleteCustomGear(id: string, force?: boolean): DeleteCustomGearResult {
-  const result = parseGoResult<DeleteCustomGearResult>(goStorage.deleteCustomGear(JSON.stringify({ id, force })))
+  const result = parseGoResult<DeleteCustomGearResult>(
+    goStorage.deleteCustomGear(JSON.stringify({ id, force }))
+  )
   if (!result.ok && !result.has_activities) {
     throw new Error(result.error || 'Failed to delete custom gear')
   }
@@ -1182,7 +1333,10 @@ export interface SegmentEffortsResult {
 }
 
 export const getSegmentEfforts = (filters: SegmentEffortsFilters): SegmentEffortsResult =>
-  callGoStorage<SegmentEffortsResult>(() => goStorage.getSegmentEfforts(JSON.stringify(filters)), 'getSegmentEfforts')
+  callGoStorage<SegmentEffortsResult>(
+    () => goStorage.getSegmentEfforts(JSON.stringify(filters)),
+    'getSegmentEfforts'
+  )
 
 export interface SegmentCountry {
   country: string
@@ -1190,18 +1344,25 @@ export interface SegmentCountry {
 }
 
 export function getSegmentCountries(): SegmentCountry[] {
-  return callGoStorage<SegmentCountry[] | undefined>(() => goStorage.getSegmentCountries(), 'getSegmentCountries') || []
+  return (
+    callGoStorage<SegmentCountry[] | undefined>(
+      () => goStorage.getSegmentCountries(),
+      'getSegmentCountries'
+    ) || []
+  )
 }
 
 // ============================================================================
-// Rewind
+// Wrapped
 // ============================================================================
 
-export function getRewindYears(): number[] {
-  return callGoStorage<number[] | undefined>(() => goStorage.getRewindYears(), 'getRewindYears') || []
+export function getWrappedYears(): number[] {
+  return (
+    callGoStorage<number[] | undefined>(() => goStorage.getWrappedYears(), 'getWrappedYears') || []
+  )
 }
 
-export interface RewindBiggestActivity {
+export interface WrappedBiggestActivity {
   activity_id: number
   name: string
   sport_type: string
@@ -1209,7 +1370,7 @@ export interface RewindBiggestActivity {
   value: number
 }
 
-export interface RewindPhoto {
+export interface WrappedPhoto {
   id: string
   activity_id: number
   url: string
@@ -1217,7 +1378,7 @@ export interface RewindPhoto {
   caption?: string
 }
 
-export interface RewindData {
+export interface WrappedData {
   year: number
   range_start: string
   range_end: string
@@ -1237,20 +1398,29 @@ export interface RewindData {
     longest_active_days: number
     longest_rest_days: number
   }
-  months?: Array<{ month: string; activities: number; distance_m: number; elevation_m: number; prs: number }>
+  months?: Array<{
+    month: string
+    activities: number
+    distance_m: number
+    elevation_m: number
+    prs: number
+  }>
   moving_time_by_sport?: Array<{ sport_type: string; moving_time_s: number }>
   start_times_by_hour?: Array<{ hour: number; count: number }>
   locations?: Array<{ lat: number; lng: number; count: number }>
   biggest?: {
-    longest_distance?: RewindBiggestActivity
-    most_elevation?: RewindBiggestActivity
-    longest_duration?: RewindBiggestActivity
+    longest_distance?: WrappedBiggestActivity
+    most_elevation?: WrappedBiggestActivity
+    longest_duration?: WrappedBiggestActivity
   }
-  random_photo?: RewindPhoto
+  random_photo?: WrappedPhoto
 }
 
-export function getRewind(year?: number): RewindData | null {
-  return callGoStorage<RewindData | null>(() => goStorage.getRewind(JSON.stringify({ year: year || 0 })), 'getRewind')
+export function getWrapped(year?: number): WrappedData | null {
+  return callGoStorage<WrappedData | null>(
+    () => goStorage.getWrapped(JSON.stringify({ year: year || 0 })),
+    'getWrapped'
+  )
 }
 
 // ============================================================================
@@ -1263,25 +1433,43 @@ export interface MetricEntry {
 }
 
 export function getFtpHistory(): MetricEntry[] {
-  return callGoStorage<MetricEntry[] | undefined>(() => goStorage.getFtpHistory(), 'getFtpHistory') || []
+  return (
+    callGoStorage<MetricEntry[] | undefined>(() => goStorage.getFtpHistory(), 'getFtpHistory') || []
+  )
 }
 
 export function getFtpRunningHistory(): MetricEntry[] {
-  return callGoStorage<MetricEntry[] | undefined>(() => goStorage.getFtpRunningHistory(), 'getFtpRunningHistory') || []
+  return (
+    callGoStorage<MetricEntry[] | undefined>(
+      () => goStorage.getFtpRunningHistory(),
+      'getFtpRunningHistory'
+    ) || []
+  )
 }
 
 export function getWeightHistory(): MetricEntry[] {
-  return callGoStorage<MetricEntry[] | undefined>(() => goStorage.getWeightHistory(), 'getWeightHistory') || []
+  return (
+    callGoStorage<MetricEntry[] | undefined>(
+      () => goStorage.getWeightHistory(),
+      'getWeightHistory'
+    ) || []
+  )
 }
 
 export const updateFtpHistory = (entries: MetricEntry[]): void =>
   callGoStorageVoid(() => goStorage.updateFtpHistory(JSON.stringify(entries)), 'updateFtpHistory')
 
 export const updateFtpRunningHistory = (entries: MetricEntry[]): void =>
-  callGoStorageVoid(() => goStorage.updateFtpRunningHistory(JSON.stringify(entries)), 'updateFtpRunningHistory')
+  callGoStorageVoid(
+    () => goStorage.updateFtpRunningHistory(JSON.stringify(entries)),
+    'updateFtpRunningHistory'
+  )
 
 export const updateWeightHistory = (entries: MetricEntry[]): void =>
-  callGoStorageVoid(() => goStorage.updateWeightHistory(JSON.stringify(entries)), 'updateWeightHistory')
+  callGoStorageVoid(
+    () => goStorage.updateWeightHistory(JSON.stringify(entries)),
+    'updateWeightHistory'
+  )
 
 // ============================================================================
 // Training Load (Database)
@@ -1306,7 +1494,10 @@ export interface TrainingLoadResult {
 }
 
 export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResult {
-  const result = callGoStorage<TrainingLoadResult>(() => goStorage.getTrainingLoad(JSON.stringify(filters || {})), 'getTrainingLoad')
+  const result = callGoStorage<TrainingLoadResult>(
+    () => goStorage.getTrainingLoad(JSON.stringify(filters || {})),
+    'getTrainingLoad'
+  )
   return { series: result.series || [], summary: result.summary }
 }
 
@@ -1340,7 +1531,10 @@ export interface PowerStatsResult {
 }
 
 export function getPowerStats(filters?: PowerStatsFilters): PowerStatsResult {
-  const result = callGoStorage<PowerStatsResult>(() => goStorage.getPowerStats(JSON.stringify(filters || {})), 'getPowerStats')
+  const result = callGoStorage<PowerStatsResult>(
+    () => goStorage.getPowerStats(JSON.stringify(filters || {})),
+    'getPowerStats'
+  )
   return { best: result.best || [], history: result.history || [] }
 }
 
@@ -1375,7 +1569,10 @@ export interface ChallengesResult {
 }
 
 export const getChallenges = (filters?: ChallengesFilters): ChallengesResult =>
-  callGoStorage<ChallengesResult>(() => goStorage.getChallenges(JSON.stringify(filters || {})), 'getChallenges')
+  callGoStorage<ChallengesResult>(
+    () => goStorage.getChallenges(JSON.stringify(filters || {})),
+    'getChallenges'
+  )
 
 // ============================================================================
 // Training Goals
@@ -1412,12 +1609,18 @@ export interface TrainingGoalsResult {
 }
 
 export function getTrainingGoals(): TrainingGoalsResult {
-  const result = callGoStorage<TrainingGoalsResult>(() => goStorage.getTrainingGoals(), 'getTrainingGoals')
+  const result = callGoStorage<TrainingGoalsResult>(
+    () => goStorage.getTrainingGoals(),
+    'getTrainingGoals'
+  )
   return { config: result.config, progress: result.progress }
 }
 
 export const updateTrainingGoals = (config: TrainingGoalsConfig): void =>
-  callGoStorageVoid(() => goStorage.updateTrainingGoals(JSON.stringify(config)), 'updateTrainingGoals')
+  callGoStorageVoid(
+    () => goStorage.updateTrainingGoals(JSON.stringify(config)),
+    'updateTrainingGoals'
+  )
 
 // ============================================================================
 // Maintenance
@@ -1456,7 +1659,12 @@ export interface MaintenanceDueItem {
 }
 
 export function getMaintenanceDue(): MaintenanceDueItem[] {
-  return callGoStorage<MaintenanceDueItem[] | undefined>(() => goStorage.getMaintenanceDue(), 'getMaintenanceDue') || []
+  return (
+    callGoStorage<MaintenanceDueItem[] | undefined>(
+      () => goStorage.getMaintenanceDue(),
+      'getMaintenanceDue'
+    ) || []
+  )
 }
 
 export interface GearComponentsFilters {
@@ -1486,7 +1694,10 @@ export interface GearComponentsResult {
 }
 
 export const getGearComponents = (filters: GearComponentsFilters): GearComponentsResult =>
-  callGoStorage<GearComponentsResult>(() => goStorage.getGearComponents(JSON.stringify(filters)), 'getGearComponents')
+  callGoStorage<GearComponentsResult>(
+    () => goStorage.getGearComponents(JSON.stringify(filters)),
+    'getGearComponents'
+  )
 
 export interface CreateComponentRule {
   type: string
@@ -1508,7 +1719,10 @@ export interface CreateComponentResult {
 }
 
 export function createComponent(input: CreateComponentInput): CreateComponentResult {
-  return callGoStorage<CreateComponentResult>(() => goStorage.createComponent(JSON.stringify(input)), 'createComponent')
+  return callGoStorage<CreateComponentResult>(
+    () => goStorage.createComponent(JSON.stringify(input)),
+    'createComponent'
+  )
 }
 
 export interface UpdateComponentInput {
@@ -1520,7 +1734,10 @@ export interface UpdateComponentInput {
 }
 
 export function updateComponent(input: UpdateComponentInput): CreateComponentResult {
-  return callGoStorage<CreateComponentResult>(() => goStorage.updateComponent(JSON.stringify(input)), 'updateComponent')
+  return callGoStorage<CreateComponentResult>(
+    () => goStorage.updateComponent(JSON.stringify(input)),
+    'updateComponent'
+  )
 }
 
 export const deleteComponent = (id: number): void =>
@@ -1547,11 +1764,16 @@ export interface AppSettings {
 }
 
 export function getAppSettings(): AppSettings {
-  return callGoStorage<AppSettings | undefined>(() => goStorage.getAppSettings(), 'getAppSettings') || {}
+  return (
+    callGoStorage<AppSettings | undefined>(() => goStorage.getAppSettings(), 'getAppSettings') || {}
+  )
 }
 
 export const updateAppSettings = (settings: AppSettings): void =>
-  callGoStorageVoid(() => goStorage.updateAppSettings(JSON.stringify(settings)), 'updateAppSettings')
+  callGoStorageVoid(
+    () => goStorage.updateAppSettings(JSON.stringify(settings)),
+    'updateAppSettings'
+  )
 
 // ============================================================================
 // HR Zones
@@ -1565,7 +1787,12 @@ export interface HRZoneDefinition {
 }
 
 export function getHrZoneDefinitions(): HRZoneDefinition[] {
-  return callGoStorage<HRZoneDefinition[] | undefined>(() => goStorage.getHrZoneDefinitions(), 'getHrZoneDefinitions') || []
+  return (
+    callGoStorage<HRZoneDefinition[] | undefined>(
+      () => goStorage.getHrZoneDefinitions(),
+      'getHrZoneDefinitions'
+    ) || []
+  )
 }
 
 export interface UpsertHRZoneInput {
@@ -1576,7 +1803,10 @@ export interface UpsertHRZoneInput {
 }
 
 export const upsertHrZoneDefinition = (input: UpsertHRZoneInput): void =>
-  callGoStorageVoid(() => goStorage.upsertHrZoneDefinition(JSON.stringify(input)), 'upsertHrZoneDefinition')
+  callGoStorageVoid(
+    () => goStorage.upsertHrZoneDefinition(JSON.stringify(input)),
+    'upsertHrZoneDefinition'
+  )
 
 export interface DeleteHRZoneInput {
   sport_type: string
@@ -1584,13 +1814,24 @@ export interface DeleteHRZoneInput {
 }
 
 export const deleteHrZoneDefinition = (input: DeleteHRZoneInput): void =>
-  callGoStorageVoid(() => goStorage.deleteHrZoneDefinition(JSON.stringify(input)), 'deleteHrZoneDefinition')
+  callGoStorageVoid(
+    () => goStorage.deleteHrZoneDefinition(JSON.stringify(input)),
+    'deleteHrZoneDefinition'
+  )
 
 // ============================================================================
 // Import - Control (Bridge to Go WASM Importer)
 // ============================================================================
 
-export type GoImportPhase = 'idle' | 'activities' | 'gear' | 'streams' | 'activity_details' | 'segment_details' | 'photos' | 'completed'
+export type GoImportPhase =
+  | 'idle'
+  | 'activities'
+  | 'gear'
+  | 'streams'
+  | 'activity_details'
+  | 'segment_details'
+  | 'photos'
+  | 'completed'
 export type GoImportStatus = 'idle' | 'running' | 'completed' | 'failed' | 'canceled' | 'paused'
 
 export interface GoImportOptions {
@@ -1665,17 +1906,26 @@ export interface GoAthlete {
 }
 
 export const goStartImport = (options: GoImportOptions, athlete: GoAthlete): void =>
-  callGoStorageVoid(() => goStorage.startImport(JSON.stringify(options), JSON.stringify(athlete)), 'startImport')
+  callGoStorageVoid(
+    () => goStorage.startImport(JSON.stringify(options), JSON.stringify(athlete)),
+    'startImport'
+  )
 
 export const goCancelImport = (): void =>
   callGoStorageVoid(() => goStorage.cancelImport(), 'cancelImport')
 
 export function goGetImportProgress(): GoImportProgress | null {
-  return callGoStorage<GoImportProgress | null>(() => goStorage.getImportProgress(), 'getImportProgress')
+  return callGoStorage<GoImportProgress | null>(
+    () => goStorage.getImportProgress(),
+    'getImportProgress'
+  )
 }
 
 export function goIsImportRunning(): boolean {
-  const result = callGoStorage<{ running: boolean }>(() => goStorage.isImportRunning(), 'isImportRunning')
+  const result = callGoStorage<{ running: boolean }>(
+    () => goStorage.isImportRunning(),
+    'isImportRunning'
+  )
   return result.running ?? false
 }
 
@@ -1699,11 +1949,20 @@ export function getStravaCredentials(): StravaCredentials | null {
   if (!initialized) {
     return null
   }
-  return callGoStorage<StravaCredentials | null>(() => goStorage.getStravaCredentials(), 'getStravaCredentials')
+  return callGoStorage<StravaCredentials | null>(
+    () => goStorage.getStravaCredentials(),
+    'getStravaCredentials'
+  )
 }
 
 export const saveStravaCredentials = (clientId: string, clientSecret: string): void =>
-  callGoStorageVoid(() => goStorage.saveStravaCredentials(JSON.stringify({ client_id: clientId, client_secret: clientSecret })), 'saveStravaCredentials')
+  callGoStorageVoid(
+    () =>
+      goStorage.saveStravaCredentials(
+        JSON.stringify({ client_id: clientId, client_secret: clientSecret })
+      ),
+    'saveStravaCredentials'
+  )
 
 export const deleteStravaCredentials = (): void =>
   callGoStorageVoid(() => goStorage.deleteStravaCredentials(), 'deleteStravaCredentials')
@@ -1712,6 +1971,9 @@ export function hasStravaCredentials(): boolean {
   if (!initialized) {
     return false
   }
-  const result = callGoStorage<{ has_credentials: boolean } | undefined>(() => goStorage.hasStravaCredentials(), 'hasStravaCredentials')
+  const result = callGoStorage<{ has_credentials: boolean } | undefined>(
+    () => goStorage.hasStravaCredentials(),
+    'hasStravaCredentials'
+  )
   return result?.has_credentials ?? false
 }

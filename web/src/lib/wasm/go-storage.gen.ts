@@ -143,12 +143,12 @@ export interface GoStorageInterface {
   getHeatmapData(arg0?: string): string
   /** genGetPowerStats wraps StatsService.GetPowerStats */
   getPowerStats(arg0?: string): string
-  /** genGetRewind wraps StatsService.GetRewind */
-  getRewind(arg0?: string): string
-  /** genGetRewindYears wraps StatsService.GetRewindYears */
-  getRewindYears(): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */
   getTrainingLoad(arg0?: string): string
+  /** genGetWrapped wraps StatsService.GetWrapped */
+  getWrapped(arg0?: string): string
+  /** genGetWrappedYears wraps StatsService.GetWrappedYears */
+  getWrappedYears(): string
 
   // Calendar
   /** Calendar */

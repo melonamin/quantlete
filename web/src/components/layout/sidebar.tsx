@@ -76,7 +76,7 @@ export function Sidebar() {
         items: [
           { name: 'Heatmap', href: '/heatmap', icon: Map },
           { name: 'Photos', href: '/photos', icon: Camera },
-          { name: 'Rewind', href: '/rewind', icon: History },
+          { name: 'Wrapped', href: '/wrapped', icon: History },
         ],
       },
       {

@@ -55,7 +55,7 @@ import type {
   PowerStatsResponse,
   PowerZonesResponse,
   RecentActivity,
-  RewindReport,
+  WrappedReport,
   SegmentCountryStat,
   SegmentDetailResponse,
   SegmentEffort,
@@ -1165,30 +1165,30 @@ export function useBestEffortsForDistance(
 }
 
 // ============================================================================
-// Rewind
+// Wrapped
 // ============================================================================
 
-export function useRewindYears() {
+export function useWrappedYears() {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
-    queryKey: ['data', 'rewind', 'years'],
+    queryKey: ['data', 'wrapped', 'years'],
     queryFn: async (): Promise<number[]> => {
       if (!provider) throw new Error('Provider not ready')
-      return provider.getRewindYears()
+      return provider.getWrappedYears()
     },
     enabled: initialized && !error && !!provider,
   })
 }
 
-export function useRewindReport(year: number, enabled = true) {
+export function useWrappedReport(year: number, enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
-    queryKey: ['data', 'rewind', year],
-    queryFn: async (): Promise<RewindReport> => {
+    queryKey: ['data', 'wrapped', year],
+    queryFn: async (): Promise<WrappedReport> => {
       if (!provider) throw new Error('Provider not ready')
-      return provider.getRewind(year)
+      return provider.getWrapped(year)
     },
     enabled: enabled && initialized && !error && !!provider,
   })

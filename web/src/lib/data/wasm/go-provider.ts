@@ -51,7 +51,7 @@ import type {
   WeightHistoryResponse,
   BestEffortPR,
   BestEffortItem,
-  RewindReport,
+  WrappedReport,
   PhotosListResponse,
   PhotosFilters,
   ActivityPhoto,
@@ -75,11 +75,7 @@ import type {
 } from '../types'
 
 import type { DataEventListener } from '../events'
-import {
-  createSyncProgressEvent,
-  createSyncCompleteEvent,
-  createDataChangedEvent,
-} from '../events'
+import { createSyncProgressEvent, createSyncCompleteEvent, createDataChangedEvent } from '../events'
 import { UnsupportedFeatureError } from '../errors'
 import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
@@ -738,22 +734,22 @@ export class GoWasmProvider implements DataProvider {
   }
 
   // ============================================================================
-  // Rewind
+  // Wrapped
   // ============================================================================
-  async getRewindYears(): Promise<number[]> {
+  async getWrappedYears(): Promise<number[]> {
     this.assertInitialized()
     this.getAthleteId()
 
-    return goStorage.getRewindYears()
+    return goStorage.getWrappedYears()
   }
 
-  async getRewind(year: number): Promise<RewindReport> {
+  async getWrapped(year: number): Promise<WrappedReport> {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getRewind(year)
+    const result = goStorage.getWrapped(year)
     if (!result) {
-      throw new Error(`No rewind data for year ${year}`)
+      throw new Error(`No wrapped data for year ${year}`)
     }
 
     return {
@@ -1737,6 +1733,9 @@ export class GoWasmProvider implements DataProvider {
             photos_done: progress.photos_done,
             photos_total: progress.photos_total,
             estimated_eta: progress.estimated_eta,
+            waiting_for_rate_limit: progress.waiting_for_rate_limit,
+            waiting_until: progress.waiting_until,
+            waiting_reason: progress.waiting_reason,
           })
         )
       } catch {
@@ -1747,9 +1746,7 @@ export class GoWasmProvider implements DataProvider {
     importCompleteCallback = (resultJson: string) => {
       try {
         const result = JSON.parse(resultJson) as { success: boolean; error?: string }
-        listener(
-          createSyncCompleteEvent(result.success ? 'completed' : 'failed', result.error)
-        )
+        listener(createSyncCompleteEvent(result.success ? 'completed' : 'failed', result.error))
         // Also emit data changed event on successful completion
         if (result.success) {
           listener(createDataChangedEvent({ activities: true, all: true }))

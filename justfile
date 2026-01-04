@@ -292,8 +292,9 @@ build-demo: generate generate-demo-db build-go-wasm
     cd web && yarn build:demo
 
 # Deploy demo to Cloudflare Pages (demo.quantlete.fit)
+# Note: omitting --branch deploys to production (uses git branch, defaults to master)
 deploy-demo: build-demo
-    npx wrangler pages deploy web/dist-demo --project-name=quantlete-demo --branch=main --commit-dirty=true
+    npx wrangler pages deploy web/dist-demo --project-name=quantlete-demo --commit-dirty=true
 
 # Preview demo build locally
 preview-demo: build-demo

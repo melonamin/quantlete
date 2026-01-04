@@ -57,6 +57,7 @@ export function BaseMap({
         attribution={tileLayer.attribution}
         url={tileLayer.url}
         maxZoom={tileLayer.maxZoom}
+        crossOrigin="anonymous"
       />
       {bounds && <FitBounds bounds={bounds} />}
       {onMapReady && <MapEvents onMapReady={onMapReady} />}

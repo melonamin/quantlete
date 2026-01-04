@@ -7,17 +7,17 @@ import (
 )
 
 // ============================================================================
-// Rewind Functions
+// Wrapped Functions
 // ============================================================================
 
-//wasm:category Rewind
+//wasm:category Wrapped
 
-// getRewindYears returns years that have activity data for rewind
-// Called from JS: goStorage.getRewindYears()
+// getWrappedYears returns years that have activity data for wrapped
+// Called from JS: goStorage.getWrappedYears()
 //
 //wasm:export
-var getRewindYears = wrapWasmAthlete("getRewindYears", func(wc *WasmContext) interface{} {
-	years, err := wc.Registry.StatsService.GetRewindYears(wc.Ctx, services.GetRewindYearsInput{
+var getWrappedYears = wrapWasmAthlete("getWrappedYears", func(wc *WasmContext) interface{} {
+	years, err := wc.Registry.StatsService.GetWrappedYears(wc.Ctx, services.GetWrappedYearsInput{
 		AthleteID: wc.AthleteID,
 	})
 	if err != nil {
@@ -27,17 +27,17 @@ var getRewindYears = wrapWasmAthlete("getRewindYears", func(wc *WasmContext) int
 	return dataJSON(years)
 })
 
-// getRewind returns the rewind report for a specific year
-// Called from JS: goStorage.getRewind(year)
+// getWrapped returns the wrapped report for a specific year
+// Called from JS: goStorage.getWrapped(year)
 //
 //wasm:export
-var getRewind = wrapWasmAthlete("getRewind", func(wc *WasmContext) interface{} {
+var getWrapped = wrapWasmAthlete("getWrapped", func(wc *WasmContext) interface{} {
 	year := 0 // 0 = all-time
 	if wc.HasArg(0) {
 		year = wc.ArgInt(0)
 	}
 
-	report, err := wc.Registry.StatsService.GetRewind(wc.Ctx, services.GetRewindInput{
+	report, err := wc.Registry.StatsService.GetWrapped(wc.Ctx, services.GetWrappedInput{
 		AthleteID: wc.AthleteID,
 		Year:      year,
 	})

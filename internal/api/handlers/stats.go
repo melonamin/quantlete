@@ -207,54 +207,6 @@ func (h *StatsHandler) GetBestEffortsByDistance(w http.ResponseWriter, r *http.R
 	shared.WriteSuccess(w, items)
 }
 
-// GetRewindYears handles GET /api/v1/stats/rewind/years
-func (h *StatsHandler) GetRewindYears(w http.ResponseWriter, r *http.Request) {
-	athlete := h.strava.GetAthlete()
-	if athlete == nil {
-		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
-		return
-	}
-
-	years, err := h.svc.GetRewindYears(r.Context(), services.GetRewindYearsInput{
-		AthleteID: athlete.ID,
-	})
-	if err != nil {
-		handleServiceError(w, err)
-		return
-	}
-
-	shared.WriteSuccess(w, years)
-}
-
-// GetRewind handles GET /api/v1/stats/rewind?year=YYYY
-func (h *StatsHandler) GetRewind(w http.ResponseWriter, r *http.Request) {
-	athlete := h.strava.GetAthlete()
-	if athlete == nil {
-		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
-		return
-	}
-
-	year := time.Now().Year()
-	if s := strings.TrimSpace(r.URL.Query().Get("year")); s != "" {
-		if s == "all" || s == "0" {
-			year = 0
-		} else if parsed, err := strconv.Atoi(s); err == nil && parsed >= 1900 && parsed <= time.Now().Year()+1 {
-			year = parsed
-		}
-	}
-
-	report, err := h.svc.GetRewind(r.Context(), services.GetRewindInput{
-		AthleteID: athlete.ID,
-		Year:      year,
-	})
-	if err != nil {
-		handleServiceError(w, err)
-		return
-	}
-
-	shared.WriteSuccess(w, report)
-}
-
 // GetPowerStats handles GET /api/v1/stats/power
 func (h *StatsHandler) GetPowerStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()

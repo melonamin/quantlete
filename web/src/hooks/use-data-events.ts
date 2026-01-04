@@ -74,6 +74,9 @@ export function useDataEvents(): void {
             photos_done: event.photosDone,
             photos_total: event.photosTotal,
             estimated_eta: event.estimatedEta,
+            waiting_for_rate_limit: event.waitingForRateLimit,
+            waiting_until: event.waitingUntil,
+            waiting_reason: event.waitingReason,
           }))
           break
 

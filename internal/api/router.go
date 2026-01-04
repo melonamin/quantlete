@@ -318,8 +318,8 @@ func (r *Router) mountRoutes() {
 			router.Get("/eddington/history", handlers.GenStatsServiceGetEddingtonHistory(r.registry.StatsService, r.stravaClient))
 			router.Get("/best-efforts", handlers.GenStatsServiceGetBestEffortPRs(r.registry.StatsService, r.stravaClient))
 			router.Get("/best-efforts/{distanceType}", handlers.GenStatsServiceGetBestEffortsForType(r.registry.StatsService, r.stravaClient))
-			router.Get("/rewind", handlers.GenStatsServiceGetRewind(r.registry.StatsService, r.stravaClient))
-			router.Get("/rewind/years", handlers.GenStatsServiceGetRewindYears(r.registry.StatsService, r.stravaClient))
+			router.Get("/wrapped", handlers.GenStatsServiceGetWrapped(r.registry.StatsService, r.stravaClient))
+			router.Get("/wrapped/years", handlers.GenStatsServiceGetWrappedYears(r.registry.StatsService, r.stravaClient))
 			router.Get("/power", handlers.GenStatsServiceGetPowerStats(r.registry.StatsService, r.stravaClient))
 			router.Get("/power-zones", r.statsHandler.GetPowerZones) // Manual: complex zone calculation
 			router.Get("/hr-zones", r.statsHandler.GetHRZones)       // Manual: complex zone calculation

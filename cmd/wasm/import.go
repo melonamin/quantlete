@@ -105,8 +105,8 @@ var startImport = wrapWasmRaw("startImport", func(this js.Value, args []js.Value
 		for event := range eventCh {
 			switch event.Type {
 			case importer.EventSyncProgress:
-				if progress, ok := event.Data.(*importer.Progress); ok {
-					sendProgressToJS(progress)
+				if progress, ok := event.Data.(importer.Progress); ok {
+					sendProgressToJS(&progress)
 				}
 			case importer.EventSyncComplete:
 				// Completion is handled in the import goroutine

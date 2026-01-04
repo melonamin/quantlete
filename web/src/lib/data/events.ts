@@ -31,6 +31,10 @@ export interface SyncProgressEvent {
   photosDone: number
   photosTotal: number
   estimatedEta?: string
+  // Rate limit waiting state
+  waitingForRateLimit?: boolean
+  waitingUntil?: string
+  waitingReason?: string
 }
 
 /**
@@ -144,6 +148,9 @@ export function createSyncProgressEvent(
     photos_done: number
     photos_total: number
     estimated_eta?: string
+    waiting_for_rate_limit?: boolean
+    waiting_until?: string
+    waiting_reason?: string
   }
 ): SyncProgressEvent {
   return {
@@ -162,6 +169,9 @@ export function createSyncProgressEvent(
     photosDone: progress.photos_done,
     photosTotal: progress.photos_total,
     estimatedEta: progress.estimated_eta,
+    waitingForRateLimit: progress.waiting_for_rate_limit,
+    waitingUntil: progress.waiting_until,
+    waitingReason: progress.waiting_reason,
   }
 }
 

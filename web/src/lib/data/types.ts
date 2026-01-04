@@ -80,8 +80,8 @@ export type { MetricPoint, FTPHistoryResponse, WeightHistoryResponse } from '@/l
 // Best efforts types
 export type { BestEffortPR, BestEffortItem } from '@/lib/api/best-efforts'
 
-// Rewind types
-export type { RewindReport } from '@/lib/api/rewind'
+// Wrapped types
+export type { WrappedReport } from '@/lib/api/wrapped'
 
 // Photo types
 export type {

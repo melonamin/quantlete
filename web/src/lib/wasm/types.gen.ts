@@ -169,15 +169,6 @@ export interface SaveStreamOutput {
 }
 
 // ============================================================================
-// From app_state.go
-// ============================================================================
-
-export interface RequestInput {
-  client_id: string
-  client_secret: string
-}
-
-// ============================================================================
 // From athlete.go
 // ============================================================================
 
@@ -757,6 +748,15 @@ export interface MaintenanceRule {
   threshold_value: number
   created_at: string
   updated_at: string
+}
+
+export interface RequestInput {
+  id: string
+  name?: string | null
+  hashtag?: string | null
+  retired?: boolean | null
+  purchase_price?: number | null
+  purchase_currency?: string | null
 }
 
 /** RuleInput represents a rule in create/update requests. */
@@ -1687,27 +1687,6 @@ export interface GetYearlyStatsRow {
 }
 
 // ============================================================================
-// From rewind.go
-// ============================================================================
-
-export interface RewindReport {
-  year: number
-  range_start: string
-  range_end: string
-  total_days: number
-  active_days: number
-  rest_days: number
-  totals: RewindTotals
-  months?: RewindMonth[]
-  moving_time_by_sport: RewindSportTime[]
-  start_times_by_hour: RewindHourCount[]
-  locations: RewindLocationPoint[]
-  streaks: RewindStreaks
-  random_photo?: RewindPhoto | null
-  biggest: RewindBiggest
-}
-
-// ============================================================================
 // From segments.go
 // ============================================================================
 
@@ -2102,15 +2081,15 @@ export interface GetPowerStatsInput {
   sport_types: string[]
 }
 
-/** GetRewindInput contains parameters for getting rewind data. */
-export interface GetRewindInput {
-  year: number
-}
-
 /** GetTrainingLoadInput contains parameters for getting training load data. */
 export interface GetTrainingLoadInput {
   after?: string | null
   before?: string | null
+}
+
+/** GetWrappedInput contains parameters for getting wrapped data. */
+export interface GetWrappedInput {
+  year: number
 }
 
 export interface HRZonesResponse {
@@ -2197,94 +2176,6 @@ export interface RecentActivity {
   summary_polyline?: string
 }
 
-/** RewindBiggest contains the biggest activities. */
-export interface RewindBiggest {
-  longest_distance?: RewindBiggestActivity | null
-  most_elevation?: RewindBiggestActivity | null
-  longest_duration?: RewindBiggestActivity | null
-}
-
-/** RewindBiggestActivity represents the biggest activity for a metric. */
-export interface RewindBiggestActivity {
-  activity_id: number
-  name: string
-  sport_type: string
-  start_date_local: string
-  value: number
-}
-
-/** RewindHourCount represents activity count by hour. */
-export interface RewindHourCount {
-  hour: number
-  count: number
-}
-
-/** RewindLocationPoint represents a location bucket. */
-export interface RewindLocationPoint {
-  lat: number
-  lng: number
-  count: number
-}
-
-/** RewindMonth represents monthly statistics for rewind. */
-export interface RewindMonth {
-  month: string
-  activities: number
-  distance_m: number
-  elevation_m: number
-  prs: number
-}
-
-/** RewindOutput contains the rewind report. */
-export interface RewindOutput {
-  year: number
-  range_start: string
-  range_end: string
-  total_days: number
-  active_days: number
-  rest_days: number
-  totals: RewindTotals
-  months?: RewindMonth[]
-  moving_time_by_sport: RewindSportTime[]
-  start_times_by_hour: RewindHourCount[]
-  locations: RewindLocationPoint[]
-  streaks: RewindStreaks
-  random_photo?: RewindPhoto | null
-  biggest: RewindBiggest
-}
-
-/** RewindPhoto represents a photo in the rewind. */
-export interface RewindPhoto {
-  id: string
-  activity_id: number
-  url: string
-  thumbnail_url?: string
-  caption?: string
-}
-
-/** RewindSportTime represents moving time by sport type. */
-export interface RewindSportTime {
-  sport_type: string
-  moving_time_s: number
-}
-
-/** RewindStreaks represents streak data. */
-export interface RewindStreaks {
-  longest_active_days: number
-  longest_rest_days: number
-}
-
-/** RewindTotals represents totals for the rewind report. */
-export interface RewindTotals {
-  activities: number
-  distance_m: number
-  elevation_m: number
-  moving_time_s: number
-  kudos: number
-  commute_distance_m: number
-  carbon_saved_kg: number
-}
-
 /** SaveBestEffortsInput contains parameters for saving best efforts for an activity. */
 export interface SaveBestEffortsInput {
   athlete_id: number
@@ -2333,6 +2224,94 @@ export interface WeeklyStat {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** WrappedBiggest contains the biggest activities. */
+export interface WrappedBiggest {
+  longest_distance?: WrappedBiggestActivity | null
+  most_elevation?: WrappedBiggestActivity | null
+  longest_duration?: WrappedBiggestActivity | null
+}
+
+/** WrappedBiggestActivity represents the biggest activity for a metric. */
+export interface WrappedBiggestActivity {
+  activity_id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  value: number
+}
+
+/** WrappedHourCount represents activity count by hour. */
+export interface WrappedHourCount {
+  hour: number
+  count: number
+}
+
+/** WrappedLocationPoint represents a location bucket. */
+export interface WrappedLocationPoint {
+  lat: number
+  lng: number
+  count: number
+}
+
+/** WrappedMonth represents monthly statistics for wrapped. */
+export interface WrappedMonth {
+  month: string
+  activities: number
+  distance_m: number
+  elevation_m: number
+  prs: number
+}
+
+/** WrappedOutput contains the wrapped report. */
+export interface WrappedOutput {
+  year: number
+  range_start: string
+  range_end: string
+  total_days: number
+  active_days: number
+  rest_days: number
+  totals: WrappedTotals
+  months?: WrappedMonth[]
+  moving_time_by_sport: WrappedSportTime[]
+  start_times_by_hour: WrappedHourCount[]
+  locations: WrappedLocationPoint[]
+  streaks: WrappedStreaks
+  random_photo?: WrappedPhoto | null
+  biggest: WrappedBiggest
+}
+
+/** WrappedPhoto represents a photo in the wrapped. */
+export interface WrappedPhoto {
+  id: string
+  activity_id: number
+  url: string
+  thumbnail_url?: string
+  caption?: string
+}
+
+/** WrappedSportTime represents moving time by sport type. */
+export interface WrappedSportTime {
+  sport_type: string
+  moving_time_s: number
+}
+
+/** WrappedStreaks represents streak data. */
+export interface WrappedStreaks {
+  longest_active_days: number
+  longest_rest_days: number
+}
+
+/** WrappedTotals represents totals for the wrapped report. */
+export interface WrappedTotals {
+  activities: number
+  distance_m: number
+  elevation_m: number
+  moving_time_s: number
+  kudos: number
+  commute_distance_m: number
+  carbon_saved_kg: number
 }
 
 /** YearStat represents statistics for a single year. */
@@ -2397,6 +2376,27 @@ export interface StravaWebhookEvent {
 /** StravaWebhookValidationResponse matches Strava's expected response body: */
 export interface StravaWebhookValidationResponse {
   'hub.challenge': string
+}
+
+// ============================================================================
+// From wrapped.go
+// ============================================================================
+
+export interface WrappedReport {
+  year: number
+  range_start: string
+  range_end: string
+  total_days: number
+  active_days: number
+  rest_days: number
+  totals: WrappedTotals
+  months?: WrappedMonth[]
+  moving_time_by_sport: WrappedSportTime[]
+  start_times_by_hour: WrappedHourCount[]
+  locations: WrappedLocationPoint[]
+  streaks: WrappedStreaks
+  random_photo?: WrappedPhoto | null
+  biggest: WrappedBiggest
 }
 
 // ============================================================================

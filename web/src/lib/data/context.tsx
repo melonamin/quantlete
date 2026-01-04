@@ -14,12 +14,14 @@ interface DataProviderState {
   provider: DataProvider | null
   initialized: boolean
   error: string | null
+  loadingMessage: string | null
 }
 
 const DataProviderContext = createContext<DataProviderState>({
   provider: null,
   initialized: false,
   error: null,
+  loadingMessage: null,
 })
 
 /**
@@ -53,6 +55,23 @@ interface DataProviderWrapperProps {
 }
 
 /**
+ * Loading screen for demo mode initialization.
+ */
+function DemoLoadingScreen({ message }: { message: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-6">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-muted border-t-primary" />
+        <div className="text-center">
+          <h2 className="text-lg font-semibold">Loading Demo</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{message}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Wrapper component that initializes the appropriate DataProvider
  * based on the current app mode (server or wasm).
  */
@@ -61,6 +80,7 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
     provider: null,
     initialized: false,
     error: null,
+    loadingMessage: null,
   })
 
   useEffect(() => {
@@ -68,24 +88,26 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
       try {
         if (isDemoMode()) {
           // Demo mode - use GoWasmProvider with bundled database
+          setState((s) => ({ ...s, loadingMessage: 'Downloading demo database...' }))
           const { GoWasmProvider } = await import('./wasm/go-provider')
           const provider = new GoWasmProvider({
             demoMode: true,
             demoDatabaseUrl: getDemoDbUrl(),
           })
+          setState((s) => ({ ...s, loadingMessage: 'Initializing...' }))
           await provider.initialize()
-          setState({ provider, initialized: true, error: null })
+          setState({ provider, initialized: true, error: null, loadingMessage: null })
         } else if (isWasmMode()) {
           // Lazy load Go WASM provider to avoid bundling in server mode
           const { GoWasmProvider } = await import('./wasm/go-provider')
           const provider = new GoWasmProvider()
           await provider.initialize()
-          setState({ provider, initialized: true, error: null })
+          setState({ provider, initialized: true, error: null, loadingMessage: null })
         } else {
           // Server mode - use ServerProvider
           const { ServerProvider } = await import('./server/provider')
           const provider = new ServerProvider()
-          setState({ provider, initialized: true, error: null })
+          setState({ provider, initialized: true, error: null, loadingMessage: null })
         }
       } catch (err) {
         console.error('[DataProvider] Failed to initialize:', err)
@@ -93,12 +115,23 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
           provider: null,
           initialized: false,
           error: err instanceof Error ? err.message : 'Unknown error',
+          loadingMessage: null,
         })
       }
     }
 
     initialize()
   }, [])
+
+  // Show loading screen for demo mode
+  if (isDemoMode() && !state.initialized && !state.error && state.loadingMessage) {
+    return (
+      <>
+        <DemoLoadingScreen message={state.loadingMessage} />
+        <DataProviderContext.Provider value={state}>{children}</DataProviderContext.Provider>
+      </>
+    )
+  }
 
   return <DataProviderContext.Provider value={state}>{children}</DataProviderContext.Provider>
 }
