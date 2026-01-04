@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useMonthlyStats, useSportTypeStats } from '@/lib/api'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import {
   AccordionTable,
   type AccordionTableColumn,
@@ -39,6 +40,7 @@ function formatMonthLabel(month: string): string {
 export function MonthlyStatsPage() {
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(currentYear)
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   const { data: monthlyData, isLoading } = useMonthlyStats(year)
   const { data: _sportTypeData } = useSportTypeStats()
@@ -92,7 +94,7 @@ export function MonthlyStatsPage() {
     {
       key: 'elevation',
       header: 'Elevation',
-      render: (row) => `${row.total_elevation.toLocaleString()}m`,
+      render: (row) => formatElevation(row.total_elevation),
       className: 'text-right',
       headerClassName: 'text-right',
     },
@@ -125,7 +127,7 @@ export function MonthlyStatsPage() {
     {
       key: 'elevation',
       header: 'Elevation',
-      render: (row) => `${row.total_elevation.toLocaleString()}m`,
+      render: (row) => formatElevation(row.total_elevation),
       className: 'text-right',
     },
   ]
@@ -211,7 +213,7 @@ export function MonthlyStatsPage() {
           <div className="rounded-lg border border-border p-4">
             <div className="text-sm text-muted-foreground">Total Elevation</div>
             <div className="text-2xl font-bold">
-              {yearlyTotals.total_elevation.toLocaleString()}m
+              {formatElevation(yearlyTotals.total_elevation)}
             </div>
           </div>
         </div>

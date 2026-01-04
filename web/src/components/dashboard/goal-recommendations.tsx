@@ -3,7 +3,8 @@ import { useMonthlyStats } from '@/lib/api'
 import { useTrainingGoals, useUpdateTrainingGoals } from '@/lib/api/goals'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Target, TrendingUp, Zap, Trophy } from 'lucide-react'
 import { uiColors } from '@/components/charts'
 
@@ -30,6 +31,7 @@ export function GoalRecommendations() {
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyStats()
   const { data: goalsData, isLoading: goalsLoading } = useTrainingGoals()
   const updateGoals = useUpdateTrainingGoals()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   const isLoading = monthlyLoading || goalsLoading
 
@@ -101,7 +103,7 @@ export function GoalRecommendations() {
         target: easyTarget,
         current: avgElevation,
         difficulty: 'easy',
-        reason: `10% above your ${Math.round(avgElevation)}m monthly average`,
+        reason: `10% above your ${formatElevation(avgElevation)} monthly average`,
       })
 
       // Moderate: 25% above average
@@ -150,7 +152,7 @@ export function GoalRecommendations() {
 
     // Limit to top 4 recommendations
     return recs.slice(0, 4)
-  }, [monthlyData, goalsData])
+  }, [monthlyData, goalsData, formatDistance, formatElevation])
 
   const handleAcceptGoal = (rec: GoalRecommendation) => {
     if (!goalsData?.config) return
@@ -189,7 +191,7 @@ export function GoalRecommendations() {
       case 'distance':
         return formatDistance(rec.target)
       case 'elevation':
-        return `${Math.round(rec.target)}m`
+        return formatElevation(rec.target)
       case 'time':
         return formatDuration(rec.target)
     }

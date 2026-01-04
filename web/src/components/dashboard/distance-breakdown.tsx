@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { BarChart } from '@/components/charts'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -36,6 +37,7 @@ type ViewMode = 'chart' | 'table'
 
 export function DistanceBreakdown() {
   const [viewMode, setViewMode] = useState<ViewMode>('chart')
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   // Fetch all activities (we'll process them client-side for simplicity)
   // In a production app, this would be a dedicated backend endpoint
@@ -121,7 +123,7 @@ export function DistanceBreakdown() {
                 <TableCell className="text-right">{formatDistance(zone.totalDistance)}</TableCell>
                 <TableCell className="text-right">{formatDuration(zone.totalTime)}</TableCell>
                 <TableCell className="text-right">
-                  {zone.totalElevation.toLocaleString()}m
+                  {formatElevation(zone.totalElevation)}
                 </TableCell>
               </TableRow>
             ))}

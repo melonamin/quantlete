@@ -9,7 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Bike, Route, Clock, Mountain } from 'lucide-react'
 
 // Known Zwift worlds based on location data
@@ -39,6 +40,7 @@ export function ZwiftStats() {
     sport_type: 'VirtualRide,VirtualRun',
     per_page: 1000,
   })
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   const worldStats = useMemo(() => {
     // Use Array.isArray for defensive check against unexpected data shapes
@@ -117,7 +119,7 @@ export function ZwiftStats() {
               <Route className="h-3.5 w-3.5 text-muted-foreground" />
               <div>
                 <div className="text-xs text-muted-foreground">Distance</div>
-                <div className="font-semibold">{formatDistance(totals.distance / 1000)}</div>
+                <div className="font-semibold">{formatDistance(totals.distance)}</div>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
@@ -125,7 +127,7 @@ export function ZwiftStats() {
               <div>
                 <div className="text-xs text-muted-foreground">Elevation</div>
                 <div className="font-semibold">
-                  {Math.round(totals.elevation).toLocaleString()}m
+                  {formatElevation(totals.elevation)}
                 </div>
               </div>
             </div>
@@ -155,10 +157,10 @@ export function ZwiftStats() {
                     <TableCell>{w.world}</TableCell>
                     <TableCell className="text-right">{w.count}</TableCell>
                     <TableCell className="text-right">
-                      {formatDistance(w.distance / 1000)}
+                      {formatDistance(w.distance)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {Math.round(w.elevation).toLocaleString()}m
+                      {formatElevation(w.elevation)}
                     </TableCell>
                   </TableRow>
                 ))}

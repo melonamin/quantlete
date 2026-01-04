@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import type { Activity } from '@/lib/api'
-import { formatDistance, formatDuration, formatDate, formatElevation } from '@/lib/format'
+import { formatDuration, formatDate } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { SportIcon } from '@/lib/sport-icon'
 import { getSportTextColor, formatSportType } from '@/lib/sport-types'
-import { useSettingsStore } from '@/stores'
 import { Badge } from '@/components/ui/badge'
 import { TableCell, TableRow } from '@/components/ui/table'
 
@@ -12,7 +12,7 @@ interface ActivityRowProps {
 }
 
 export function ActivityRow({ activity }: ActivityRowProps) {
-  const { unitSystem } = useSettingsStore()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
   const sportColor = getSportTextColor(activity.sport_type)
 
   return (
@@ -36,13 +36,13 @@ export function ActivityRow({ activity }: ActivityRowProps) {
         {formatDate(activity.start_date_local)}
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        {formatDistance(activity.distance, unitSystem)}
+        {formatDistance(activity.distance)}
       </TableCell>
       <TableCell className="text-right tabular-nums">
         {formatDuration(activity.moving_time)}
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        {formatElevation(activity.total_elevation_gain, unitSystem)}
+        {formatElevation(activity.total_elevation_gain)}
       </TableCell>
       <TableCell>
         <div className="flex gap-1">

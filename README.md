@@ -41,6 +41,33 @@ docker run -d \
   ghcr.io/melonamin/quantlete:latest
 ```
 
+Or with Docker Compose:
+
+```yaml
+services:
+  quantlete:
+    image: ghcr.io/melonamin/quantlete:latest
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - quantlete-data:/data
+    env_file:
+      - .env
+
+volumes:
+  quantlete-data:
+```
+
+Create a `.env` file with your Strava credentials:
+
+```bash
+STRAVA_CLIENT_ID=your_client_id
+STRAVA_CLIENT_SECRET=your_client_secret
+```
+
+> **Note:** Never commit `.env` files or credentials to version control.
+
 See the **[deployment guide](https://docs.quantlete.fit/deployment)** for binary downloads and building from source.
 
 ## Documentation

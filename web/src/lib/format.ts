@@ -120,3 +120,20 @@ export function formatNumber(value: number, decimals = 0): string {
     maximumFractionDigits: decimals,
   })
 }
+
+// Unit label helpers (for axis labels, tooltips, etc.)
+export function getDistanceUnit(unitSystem: UnitSystem): string {
+  return unitSystem === 'imperial' ? 'mi' : 'km'
+}
+
+export function getElevationUnit(unitSystem: UnitSystem): string {
+  return unitSystem === 'imperial' ? 'ft' : 'm'
+}
+
+export function getSpeedUnit(unitSystem: UnitSystem): string {
+  return unitSystem === 'imperial' ? 'mph' : 'km/h'
+}
+
+export function getPaceUnit(unitSystem: UnitSystem): string {
+  return unitSystem === 'imperial' ? '/mi' : '/km'
+}

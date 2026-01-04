@@ -17,7 +17,7 @@ import {
   type GearMonthlyUsage,
   type UpdateComponentRequest,
 } from '@/lib/api'
-import { formatDistance } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -173,6 +173,7 @@ function GearCard({
   totals?: { movingTime: number; distance: number }
   onEdit?: () => void
 }) {
+  const { formatDistance } = useFormattedMetrics()
   const isBike = gear.id.startsWith('b') || gear.source === 'strava'
   const isCustom = gear.source === 'custom'
   const totalHours = totals ? totals.movingTime / 3600 : 0

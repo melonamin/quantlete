@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { RecentActivity } from '@/lib/api'
-import { formatDistance, formatDuration, formatRelativeDate } from '@/lib/format'
+import { formatDuration, formatRelativeDate } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { SportIcon } from '@/lib/sport-icon'
 import { getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
@@ -13,6 +14,7 @@ interface RecentActivitiesProps {
 }
 
 export function RecentActivities({ activities, isLoading }: RecentActivitiesProps) {
+  const { formatDistance } = useFormattedMetrics()
   if (isLoading) {
     return (
       <WidgetWrapper

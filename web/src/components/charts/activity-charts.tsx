@@ -7,7 +7,7 @@ import {
   defaultGridConfig,
   defaultTooltipConfig,
 } from './chart-constants'
-import { formatDistance } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
 // Monthly activity summary chart
 interface MonthlyData {
@@ -135,6 +135,7 @@ export function SportDistributionChart({
   loading = false,
   className,
 }: SportDistributionChartProps) {
+  const { formatDistance } = useFormattedMetrics()
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 400, height: 250 })
 

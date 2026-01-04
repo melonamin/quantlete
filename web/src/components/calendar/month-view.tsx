@@ -13,7 +13,8 @@ import {
 import type { CalendarActivity } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getSportColor } from '@/lib/sport-types'
-import { formatDistance, formatDuration, formatElevation } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -26,6 +27,7 @@ interface MonthViewProps {
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export function MonthView({ year, month, activities }: MonthViewProps) {
+  const { formatDistance, formatElevation } = useFormattedMetrics()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const { days, activitiesByDate } = useMemo(() => {
@@ -189,6 +191,7 @@ export function MonthView({ year, month, activities }: MonthViewProps) {
 }
 
 function DaySummary({ dateKey, activities }: { dateKey: string; activities: CalendarActivity[] }) {
+  const { formatDistance, formatElevation } = useFormattedMetrics()
   const totals = useMemo(() => {
     let distance = 0
     let moving = 0

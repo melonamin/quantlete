@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useDashboard, useMonthlyStats, useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
-import { formatDistance } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import {
   Lightbulb,
   TrendingUp,
@@ -33,6 +33,7 @@ export function ActivityInsights() {
     order_by: 'start_date',
     order_dir: 'desc',
   })
+  const { formatDistance } = useFormattedMetrics()
 
   const isLoading = dashboardLoading || monthlyLoading || activitiesLoading
 
@@ -233,7 +234,7 @@ export function ActivityInsights() {
     // Limit to 4 insights, prioritize by type
     const priority = { record: 0, achievement: 1, streak: 2, trend: 3, observation: 4 }
     return result.sort((a, b) => priority[a.type] - priority[b.type]).slice(0, 4)
-  }, [dashboard, monthlyData, recentActivities])
+  }, [dashboard, monthlyData, recentActivities, formatDistance])
 
   return (
     <WidgetWrapper title="Insights" isLoading={isLoading}>

@@ -1,5 +1,6 @@
 import type { DashboardStats } from '@/lib/api'
-import { formatDistance, formatDuration, formatElevation } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Card, CardContent, CardHeader, CardTitle, CardValue } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -9,6 +10,7 @@ interface StatsSummaryProps {
 }
 
 export function StatsSummary({ stats, isLoading }: StatsSummaryProps) {
+  const { formatDistance, formatElevation } = useFormattedMetrics()
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

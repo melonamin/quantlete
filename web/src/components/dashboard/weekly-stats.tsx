@@ -1,5 +1,6 @@
 import type { WeeklyStat } from '@/lib/api'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { SportIcon } from '@/lib/sport-icon'
 import { formatSportType, getSportHexColor } from '@/lib/sport-types'
 import { WidgetWrapper } from './widget-wrapper'
@@ -11,6 +12,7 @@ interface WeeklyStatsProps {
 }
 
 export function WeeklyStats({ stats, isLoading }: WeeklyStatsProps) {
+  const { formatDistance } = useFormattedMetrics()
   if (isLoading) {
     return (
       <WidgetWrapper title="This Week">

@@ -2,10 +2,10 @@ import { useRef, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Link } from '@tanstack/react-router'
 import type { Activity } from '@/lib/api'
-import { formatDistance, formatDuration, formatDate, formatElevation } from '@/lib/format'
+import { formatDuration, formatDate } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { SportIcon } from '@/lib/sport-icon'
 import { getSportTextColor, formatSportType } from '@/lib/sport-types'
-import { useSettingsStore } from '@/stores'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,7 @@ export function VirtualizedActivitiesTable({
   height = 600,
 }: VirtualizedActivitiesTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
-  const { unitSystem } = useSettingsStore()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design
   const virtualizer = useVirtualizer({
@@ -72,7 +72,7 @@ export function VirtualizedActivitiesTable({
 
           {/* Distance */}
           <div className="flex-1 min-w-[80px] px-4 py-3 text-right tabular-nums">
-            {formatDistance(activity.distance, unitSystem)}
+            {formatDistance(activity.distance)}
           </div>
 
           {/* Time */}
@@ -82,7 +82,7 @@ export function VirtualizedActivitiesTable({
 
           {/* Elevation */}
           <div className="flex-1 min-w-[80px] px-4 py-3 text-right tabular-nums">
-            {formatElevation(activity.total_elevation_gain, unitSystem)}
+            {formatElevation(activity.total_elevation_gain)}
           </div>
 
           {/* Tags */}
@@ -103,7 +103,7 @@ export function VirtualizedActivitiesTable({
         </>
       )
     },
-    [unitSystem]
+    [formatDistance, formatElevation]
   )
 
   if (isLoading) {

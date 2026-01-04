@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BarChart, DonutChart, LineChart, WorldLocationsChart } from '@/components/charts'
-import { formatDistance, formatDurationLong, formatElevation } from '@/lib/format'
+import { formatDurationLong } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
 function pctChange(current: number, baseline: number) {
   if (!Number.isFinite(current) || !Number.isFinite(baseline) || baseline === 0) return null
@@ -21,6 +22,7 @@ function pctChange(current: number, baseline: number) {
 
 export function WrappedPage() {
   const nowYear = new Date().getFullYear()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
   const { data: years, isLoading: yearsLoading } = useWrappedYears()
   const availableYears = useMemo(() => {
     const ys = years && years.length ? years : [nowYear]
@@ -251,12 +253,12 @@ export function WrappedPage() {
             <BiggestCard
               title="Longest Distance"
               item={report.biggest.longest_distance}
-              format={(v) => formatDistance(v)}
+              format={formatDistance}
             />
             <BiggestCard
               title="Most Elevation"
               item={report.biggest.most_elevation}
-              format={(v) => formatElevation(v)}
+              format={formatElevation}
             />
             <BiggestCard
               title="Longest Duration"

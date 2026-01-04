@@ -2,7 +2,8 @@ import { useMemo, useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useSegmentCountries, useSegmentDetail, useSegments } from '@/lib/api'
 import type { SegmentsFilters } from '@/lib/api/segments'
-import { formatDate, formatDistance, formatDuration } from '@/lib/format'
+import { formatDate, formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -43,6 +44,7 @@ function flagEmoji(iso2?: string) {
 }
 
 export function SegmentsPage() {
+  const { formatDistance } = useFormattedMetrics()
   const [activityType, setActivityType] = useState('')
   const [country, setCountry] = useState('')
   const [starredOnly, setStarredOnly] = useState(false)

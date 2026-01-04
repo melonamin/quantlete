@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useDashboard } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Trophy, Activity, Route, Clock, Mountain, Flame } from 'lucide-react'
 import { iconColors } from '@/components/charts'
 
@@ -13,6 +14,7 @@ interface StatHighlight {
 
 export function IntroText() {
   const { data, isLoading } = useDashboard()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   const highlights = useMemo((): StatHighlight[] => {
     if (!data?.stats) return []
@@ -32,7 +34,7 @@ export function IntroText() {
       items.push({
         icon: Route,
         label: 'Distance',
-        value: formatDistance(stats.total_distance / 1000),
+        value: formatDistance(stats.total_distance),
       })
     }
 
@@ -40,7 +42,7 @@ export function IntroText() {
       items.push({
         icon: Mountain,
         label: 'Elevation',
-        value: `${Math.round(stats.total_elevation_gain).toLocaleString()}m`,
+        value: formatElevation(stats.total_elevation_gain),
       })
     }
 
@@ -53,7 +55,7 @@ export function IntroText() {
     }
 
     return items
-  }, [data])
+  }, [data, formatDistance, formatElevation])
 
   const welcomeMessage = useMemo(() => {
     if (!data?.stats) return 'Welcome to Quantlete!'

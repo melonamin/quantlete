@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 import type { HeatmapActivity } from '@/lib/api'
 import { getSportHexColor, getSportEmoji } from '@/lib/sport-types'
 import { Link } from '@tanstack/react-router'
-import { formatDistance, formatRelativeDate } from '@/lib/format'
+import { formatRelativeDate } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
 interface HeatmapProps {
   activities: HeatmapActivity[]
@@ -97,6 +98,7 @@ const RoutePolyline = memo(function RoutePolyline({
   onHover: () => void
   onLeave: () => void
 }) {
+  const { formatDistance } = useFormattedMetrics()
   const color = colorByActivity ? getSportHexColor(route.sportType) : '#fc4c02'
 
   return (
@@ -120,7 +122,7 @@ const RoutePolyline = memo(function RoutePolyline({
               <span className="truncate max-w-[180px]">{activity.name}</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              {formatRelativeDate(activity.start_date)} • {formatDistance(activity.distance / 1000)}
+              {formatRelativeDate(activity.start_date)} • {formatDistance(activity.distance)}
             </div>
           </div>
         </Tooltip>
@@ -136,6 +138,7 @@ export function Heatmap({
   colorByActivity = true,
   onMapReady,
 }: HeatmapProps) {
+  const { formatDistance } = useFormattedMetrics()
   const [clickedPoint, setClickedPoint] = useState<ClickedPoint | null>(null)
   const [hoveredActivityId, setHoveredActivityId] = useState<number | null>(null)
 
@@ -246,7 +249,7 @@ export function Heatmap({
                           {activity.name || `#${activity.id}`}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatDistance(distance / 1000)} away • {activity.sport_type}
+                          {formatDistance(distance)} away • {activity.sport_type}
                         </div>
                       </div>
                     </Link>

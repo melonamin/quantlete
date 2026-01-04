@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
 const PERIODS: { key: GoalPeriod; label: string }[] = [
   { key: 'week', label: 'Week' },
@@ -27,6 +28,7 @@ function toNumberOrUndefined(v: string) {
 export function TrainingGoals() {
   const { data, isLoading } = useTrainingGoals()
   const update = useUpdateTrainingGoals()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   const sports = useMemo(() => data?.config.sports ?? [], [data?.config.sports])
   const [sportName, setSportName] = useState<string | null>(null)
@@ -100,19 +102,22 @@ export function TrainingGoals() {
                 label="Distance"
                 current={progress?.distance_m ?? 0}
                 target={targets?.distance_m}
-                formatCurrent={(v) => formatDistance(v)}
+                formatCurrent={formatDistance}
+                formatTarget={formatDistance}
               />
               <GoalRow
                 label="Elevation"
                 current={progress?.elevation_m ?? 0}
                 target={targets?.elevation_m}
-                formatCurrent={(v) => `${Math.round(v)} m`}
+                formatCurrent={formatElevation}
+                formatTarget={formatElevation}
               />
               <GoalRow
                 label="Moving Time"
                 current={progress?.moving_time_s ?? 0}
                 target={targets?.moving_time_s}
                 formatCurrent={(v) => formatDuration(v)}
+                formatTarget={(v) => formatDuration(v)}
               />
             </div>
           )}
@@ -144,11 +149,13 @@ function GoalRow({
   current,
   target,
   formatCurrent,
+  formatTarget,
 }: {
   label: string
   current: number
   target: number | undefined
   formatCurrent: (v: number) => string
+  formatTarget: (v: number) => string
 }) {
   if (!target || target <= 0) {
     return (
@@ -166,12 +173,7 @@ function GoalRow({
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium">
-          {formatCurrent(current)} /{' '}
-          {label === 'Distance'
-            ? formatDistance(target)
-            : label === 'Moving Time'
-              ? formatDuration(target)
-              : `${Math.round(target)} m`}
+          {formatCurrent(current)} / {formatTarget(target)}
           <span className="ml-2 text-muted-foreground">({pct}%)</span>
         </span>
       </div>

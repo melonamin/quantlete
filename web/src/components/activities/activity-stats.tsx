@@ -1,13 +1,7 @@
 import type { Activity } from '@/lib/api'
-import {
-  formatDistance,
-  formatDuration,
-  formatElevation,
-  formatSpeed,
-  formatPace,
-} from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { getSportCategory } from '@/lib/sport-types'
-import { useSettingsStore } from '@/stores'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Route,
@@ -52,7 +46,7 @@ function StatCard({ icon: Icon, label, value, subValue }: StatCardProps) {
 }
 
 export function ActivityStats({ activity }: ActivityStatsProps) {
-  const { unitSystem } = useSettingsStore()
+  const { formatDistance, formatElevation, formatSpeed, formatPace } = useFormattedMetrics()
   const category = getSportCategory(activity.sport_type)
   const isRunning = category === 'run' || category === 'walk'
 
@@ -61,7 +55,7 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
       <StatCard
         icon={Route}
         label="Distance"
-        value={formatDistance(activity.distance, unitSystem)}
+        value={formatDistance(activity.distance)}
       />
       <StatCard
         icon={Clock}
@@ -76,10 +70,10 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
       <StatCard
         icon={Mountain}
         label="Elevation"
-        value={formatElevation(activity.total_elevation_gain, unitSystem)}
+        value={formatElevation(activity.total_elevation_gain)}
         subValue={
           activity.elev_high && activity.elev_low
-            ? `${formatElevation(activity.elev_low, unitSystem)} - ${formatElevation(activity.elev_high, unitSystem)}`
+            ? `${formatElevation(activity.elev_low)} - ${formatElevation(activity.elev_high)}`
             : undefined
         }
       />
@@ -88,13 +82,13 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
         label={isRunning ? 'Pace' : 'Speed'}
         value={
           isRunning
-            ? formatPace(activity.average_speed, unitSystem)
-            : formatSpeed(activity.average_speed, unitSystem)
+            ? formatPace(activity.average_speed)
+            : formatSpeed(activity.average_speed)
         }
         subValue={
           isRunning
-            ? `Max ${formatPace(activity.max_speed, unitSystem)}`
-            : `Max ${formatSpeed(activity.max_speed, unitSystem)}`
+            ? `Max ${formatPace(activity.max_speed)}`
+            : `Max ${formatSpeed(activity.max_speed)}`
         }
       />
 

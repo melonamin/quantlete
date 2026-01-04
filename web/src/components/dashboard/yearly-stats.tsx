@@ -8,7 +8,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatDistance, formatDuration } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { uiColors } from '@/components/charts'
@@ -87,6 +88,7 @@ function DeltaIndicator({ value, className }: { value: number | null; className?
 
 export function YearlyStats() {
   const { data, isLoading } = useYearlyStats()
+  const { formatDistance, formatElevation } = useFormattedMetrics()
 
   const statsWithDeltas = data ? calculateDeltas(data) : []
   // Show last 5 years for compact display
@@ -132,7 +134,7 @@ export function YearlyStats() {
                   </TableCell>
                   <TableCell className="py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <span>{stat.total_elevation.toLocaleString()}m</span>
+                      <span>{formatElevation(stat.total_elevation)}</span>
                       <DeltaIndicator value={stat.deltas.elevation} />
                     </div>
                   </TableCell>

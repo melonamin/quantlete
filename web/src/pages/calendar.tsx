@@ -6,9 +6,11 @@ import { MonthView } from '@/components/calendar'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
-import { formatDistance, formatDurationLong, formatNumber, formatElevation } from '@/lib/format'
+import { formatDurationLong, formatNumber } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
 export function CalendarPage() {
+  const { formatDistance, formatElevation } = useFormattedMetrics()
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
