@@ -2,14 +2,9 @@
 
 **Self-hosted analytics dashboard for Strava athletes.**
 
-
 Quantlete gives you comprehensive statistics, visualizations, and insights from your Strava data—all running locally or in your browser. No cloud subscription required.
 
-**[Live Demo](https://demo.quantlete.fit)** · **[Documentation](ARCHITECTURE.md)**
-
-<!-- TODO: Add screenshot
-![Quantlete Dashboard](docs/screenshot.png)
--->
+**[Live Demo](https://demo.quantlete.fit)** · **[Documentation](https://docs.quantlete.fit)**
 
 ---
 
@@ -22,26 +17,20 @@ Quantlete gives you comprehensive statistics, visualizations, and insights from 
 - **Gear Tracking** — Monitor usage and schedule maintenance
 - **Eddington Numbers** — Calculate your cycling/running Eddington number
 - **Best Efforts** — Personal records across standard distances
-- **Year in Review** — Strava Rewind-style annual summaries
+- **Wrapped** — Year in review summaries
 - **Training Load** — CTL/ATL/TSB fitness and fatigue tracking
 
-## Deployment Options
+## Quick Start
 
-### Browser-Only Mode (No Server)
+### Browser-Only (No Server)
 
-Run entirely in your browser using WebAssembly. Your data stays on your device using browser storage (OPFS).
+Run entirely in your browser using WebAssembly. Your data stays on your device.
 
-1. Visit [quantlete.fit](https://quantlete.fit) (or self-host the static files)
+1. Visit **[quantlete.fit](https://quantlete.fit)**
 2. Connect your Strava account
 3. Import your activities
 
-No server required—everything runs client-side.
-
-### Self-Hosted Server
-
-Run the Go binary for a traditional server setup with SQLite storage.
-
-#### Docker
+### Self-Hosted
 
 ```bash
 docker run -d \
@@ -52,78 +41,28 @@ docker run -d \
   ghcr.io/melonamin/quantlete:latest
 ```
 
-#### Binary
+See the **[deployment guide](https://docs.quantlete.fit/deployment)** for binary downloads and building from source.
 
-Download from [Releases](https://github.com/melonamin/quantlete/releases), then:
+## Documentation
 
-```bash
-./quantlete serve --port 8081
-```
+Full documentation is available at **[docs.quantlete.fit](https://docs.quantlete.fit)**:
 
-#### From Source
-
-Requirements: Go 1.23+, Node.js 22+, [just](https://github.com/casey/just)
-
-```bash
-git clone https://github.com/melonamin/quantlete.git
-cd quantlete
-just setup
-just build
-./bin/quantlete serve
-```
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Required for self-hosted mode
-STRAVA_CLIENT_ID=your_client_id
-STRAVA_CLIENT_SECRET=your_client_secret
-
-# Optional
-QUANTLETE_PORT=8081
-QUANTLETE_DATA_DIR=/path/to/data
-```
-
-### Getting Strava API Credentials
-
-1. Go to [Strava API Settings](https://www.strava.com/settings/api)
-2. Create a new application
-3. Set the callback URL:
-   - Self-hosted: `http://localhost:8081/api/v1/auth/strava/callback`
-   - Browser-only: Your domain's callback URL
-4. Copy the Client ID and Client Secret
-
-## Development
-
-```bash
-# Install dependencies
-just setup
-
-# Run dev servers (Go API + Vite)
-just dev
-
-# Run tests
-just test
-
-# Lint and format
-just lint
-just fmt
-
-# Build for production
-just build
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details on the codebase structure, WASM bridge, and code generation.
+- [Getting Started](https://docs.quantlete.fit/getting-started)
+- [Deployment Options](https://docs.quantlete.fit/deployment)
+- [Configuration](https://docs.quantlete.fit/configuration)
+- [Strava API Setup](https://docs.quantlete.fit/strava-setup)
+- [Architecture](https://docs.quantlete.fit/architecture)
 
 ## Tech Stack
 
-**Backend:** Go, Chi, SQLite (modernc.org/sqlite), Cobra
-
+**Backend:** Go, Chi, SQLite, Cobra
 **Frontend:** React, TypeScript, Tailwind CSS, shadcn/ui, ECharts, Leaflet
+**WASM:** Go → WebAssembly, sql.js, OPFS
 
-**WASM:** Go compiled to WebAssembly, sql.js, OPFS
+## Contributing
+
+Contributions are welcome! Please see the [contributing guide](https://docs.quantlete.fit/contributing) for details.
 
 ## License
 
+MIT
