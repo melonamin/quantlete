@@ -125,19 +125,15 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
         />
       )}
 
-      {activity.kudos_count > 0 && (
-        <StatCard
-          icon={ThumbsUp}
-          label="Kudos"
-          value={activity.kudos_count.toString()}
-        />
+      {(activity.kudos_count ?? 0) > 0 && (
+        <StatCard icon={ThumbsUp} label="Kudos" value={(activity.kudos_count ?? 0).toString()} />
       )}
 
-      {activity.comment_count > 0 && (
+      {(activity.comment_count ?? 0) > 0 && (
         <StatCard
           icon={MessageCircle}
           label="Comments"
-          value={activity.comment_count.toString()}
+          value={(activity.comment_count ?? 0).toString()}
         />
       )}
     </div>

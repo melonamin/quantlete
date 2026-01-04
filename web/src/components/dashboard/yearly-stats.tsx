@@ -28,7 +28,13 @@ interface YearlyStatWithDelta {
 }
 
 function calculateDeltas(
-  stats: { year: number; activity_count: number; total_distance: number; total_time: number; total_elevation: number }[]
+  stats: {
+    year: number
+    activity_count: number
+    total_distance: number
+    total_time: number
+    total_elevation: number
+  }[]
 ): YearlyStatWithDelta[] {
   const sorted = [...stats].sort((a, b) => b.year - a.year)
 

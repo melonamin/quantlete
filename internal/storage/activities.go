@@ -79,6 +79,23 @@ type Pagination struct {
 	OrderDir string
 }
 
+// Normalize applies default values and enforces constraints on pagination parameters.
+// Uses constants from the pagination package for consistency.
+func (p *Pagination) Normalize() {
+	if p.Page < 1 {
+		p.Page = 1
+	}
+	if p.Page > 10000 {
+		p.Page = 10000
+	}
+	if p.PerPage < 1 {
+		p.PerPage = 50
+	}
+	if p.PerPage > 200 {
+		p.PerPage = 200
+	}
+}
+
 // ActivityRepository handles activity persistence.
 type ActivityRepository struct {
 	db *DB

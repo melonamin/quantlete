@@ -2,103 +2,93 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/melonamin/quantlete/internal/storage"
+	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
 // DashboardHandler handles dashboard-related endpoints.
 type DashboardHandler struct {
-	stats  *storage.StatsRepository
-	config *storage.DashboardConfigRepository
+	svc    *services.DashboardService
 	strava *strava.Client
 }
 
 // NewDashboardHandler creates a new dashboard handler.
-func NewDashboardHandler(stats *storage.StatsRepository, configRepo *storage.DashboardConfigRepository, stravaClient *strava.Client) *DashboardHandler {
+func NewDashboardHandler(svc *services.DashboardService, stravaClient *strava.Client) *DashboardHandler {
 	return &DashboardHandler{
-		stats:  stats,
-		config: configRepo,
+		svc:    svc,
 		strava: stravaClient,
 	}
 }
 
-// DashboardResponse combines all dashboard data.
-type DashboardResponse struct {
-	Stats            *storage.DashboardStats  `json:"stats"`
-	WeeklyStats      []storage.WeeklyStat     `json:"weekly_stats"`
-	RecentActivities []storage.RecentActivity `json:"recent_activities"`
-	SportTypeStats   []storage.SportTypeStat  `json:"sport_type_stats"`
+// parseYearMonth extracts year and month from query parameters, defaulting to current time.
+func parseYearMonth(r *http.Request) (year, month int) {
+	now := time.Now()
+	year = now.Year()
+	month = int(now.Month())
+
+	if y := r.URL.Query().Get("year"); y != "" {
+		if parsed, err := strconv.Atoi(y); err == nil && parsed > 2000 && parsed < 2100 {
+			year = parsed
+		}
+	}
+
+	if m := r.URL.Query().Get("month"); m != "" {
+		if parsed, err := strconv.Atoi(m); err == nil && parsed >= 1 && parsed <= 12 {
+			month = parsed
+		}
+	}
+
+	return year, month
 }
 
 // GetDashboardConfig handles GET /api/v1/dashboard/config
 func (h *DashboardHandler) GetDashboardConfig(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	cfg, err := h.config.Get(r.Context(), athlete.ID)
+	cfg, err := h.svc.GetConfig(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get dashboard config"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, cfg)
+	shared.WriteSuccess(w, cfg)
 }
 
 // UpdateDashboardConfig handles PUT /api/v1/dashboard/config
 func (h *DashboardHandler) UpdateDashboardConfig(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	var cfg storage.DashboardConfig
+	var cfg services.DashboardConfigOutput
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
-	if err := validateDashboardConfig(cfg); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+	result, err := h.svc.UpdateConfig(r.Context(), services.UpdateDashboardConfigInput{
+		AthleteID: athlete.ID,
+		Config:    cfg,
+	})
+	if err != nil {
+		handleServiceError(w, err)
 		return
 	}
 
-	if err := h.config.Upsert(r.Context(), athlete.ID, cfg); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to save dashboard config"})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, cfg)
-}
-
-func validateDashboardConfig(cfg storage.DashboardConfig) error {
-	seen := make(map[string]bool)
-	for _, w := range cfg.Widgets {
-		if strings.TrimSpace(w.ID) == "" {
-			return fmt.Errorf("widget id is required")
-		}
-		if seen[w.ID] {
-			return fmt.Errorf("duplicate widget id: %s", w.ID)
-		}
-		seen[w.ID] = true
-
-		switch w.Width {
-		case storage.WidgetWidthOneThird, storage.WidgetWidthHalf, storage.WidgetWidthTwoThird, storage.WidgetWidthFull:
-		default:
-			return fmt.Errorf("invalid widget width for %s", w.ID)
-		}
-	}
-	return nil
+	shared.WriteSuccess(w, result)
 }
 
 // GetDashboard handles GET /api/v1/dashboard
@@ -106,90 +96,64 @@ func validateDashboardConfig(cfg storage.DashboardConfig) error {
 func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	ctx := r.Context()
-
-	// Fetch all dashboard data
-	stats, err := h.stats.GetDashboardStats(ctx, athlete.ID)
+	result, err := h.svc.GetDashboard(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		slog.Error("failed to get dashboard stats", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	weeklyStats, err := h.stats.GetWeeklyStats(ctx, athlete.ID)
-	if err != nil {
-		slog.Error("failed to get weekly stats", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get weekly stats"})
-		return
-	}
-
-	recentActivities, err := h.stats.GetRecentActivities(ctx, athlete.ID, 5)
-	if err != nil {
-		slog.Error("failed to get recent activities", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get recent activities"})
-		return
-	}
-
-	sportTypeStats, err := h.stats.GetStatsBySportType(ctx, athlete.ID)
-	if err != nil {
-		slog.Error("failed to get sport type stats", "error", err, "athlete_id", athlete.ID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get sport type stats"})
-		return
-	}
-
-	resp := DashboardResponse{
-		Stats:            stats,
-		WeeklyStats:      weeklyStats,
-		RecentActivities: recentActivities,
-		SportTypeStats:   sportTypeStats,
-	}
-
-	writeJSON(w, http.StatusOK, resp)
+	shared.WriteSuccess(w, result)
 }
 
 // GetStats handles GET /api/v1/dashboard/stats
 func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	stats, err := h.stats.GetDashboardStats(r.Context(), athlete.ID)
+	stats, err := h.svc.GetStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	shared.WriteSuccess(w, stats)
 }
 
 // GetWeeklyStats handles GET /api/v1/dashboard/weekly
 func (h *DashboardHandler) GetWeeklyStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	stats, err := h.stats.GetWeeklyStats(r.Context(), athlete.ID)
+	stats, err := h.svc.GetWeeklyStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get weekly stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	shared.WriteSuccess(w, stats)
 }
 
 // GetRecentActivities handles GET /api/v1/dashboard/recent
 func (h *DashboardHandler) GetRecentActivities(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -200,37 +164,42 @@ func (h *DashboardHandler) GetRecentActivities(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	activities, err := h.stats.GetRecentActivities(r.Context(), athlete.ID, limit)
+	activities, err := h.svc.GetRecentActivities(r.Context(), services.GetRecentActivitiesInput{
+		AthleteID: athlete.ID,
+		Limit:     limit,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get recent activities"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, activities)
+	shared.WriteSuccess(w, activities)
 }
 
 // GetSportTypeStats handles GET /api/v1/dashboard/sports
 func (h *DashboardHandler) GetSportTypeStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	stats, err := h.stats.GetStatsBySportType(r.Context(), athlete.ID)
+	stats, err := h.svc.GetSportTypeStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get sport type stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	shared.WriteSuccess(w, stats)
 }
 
 // GetMonthlyStats handles GET /api/v1/dashboard/monthly
 func (h *DashboardHandler) GetMonthlyStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -241,37 +210,42 @@ func (h *DashboardHandler) GetMonthlyStats(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	stats, err := h.stats.GetMonthlyStats(r.Context(), athlete.ID, year)
+	stats, err := h.svc.GetMonthlyStats(r.Context(), services.GetMonthlyStatsInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get monthly stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	shared.WriteSuccess(w, stats)
 }
 
 // GetYearlyStats handles GET /api/v1/dashboard/yearly
 func (h *DashboardHandler) GetYearlyStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	stats, err := h.stats.GetYearlyStats(r.Context(), athlete.ID)
+	stats, err := h.svc.GetYearlyStats(r.Context(), services.GetDashboardInput{
+		AthleteID: athlete.ID,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get yearly stats"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	shared.WriteSuccess(w, stats)
 }
 
 // GetCalendarData handles GET /api/v1/dashboard/calendar
 func (h *DashboardHandler) GetCalendarData(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -282,13 +256,16 @@ func (h *DashboardHandler) GetCalendarData(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	data, err := h.stats.GetCalendarData(r.Context(), athlete.ID, year)
+	data, err := h.svc.GetCalendarData(r.Context(), services.GetCalendarDataInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar data"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, data)
+	shared.WriteSuccess(w, data)
 }
 
 // Heatmap and Eddington endpoints are handled by StatsHandler.
@@ -297,68 +274,43 @@ func (h *DashboardHandler) GetCalendarData(w http.ResponseWriter, r *http.Reques
 func (h *DashboardHandler) GetCalendarActivities(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	now := time.Now()
-	year := now.Year()
-	month := int(now.Month())
-
-	if y := r.URL.Query().Get("year"); y != "" {
-		if parsed, err := strconv.Atoi(y); err == nil && parsed > 2000 && parsed < 2100 {
-			year = parsed
-		}
-	}
-
-	if m := r.URL.Query().Get("month"); m != "" {
-		if parsed, err := strconv.Atoi(m); err == nil && parsed >= 1 && parsed <= 12 {
-			month = parsed
-		}
-	}
-
-	activities, err := h.stats.GetCalendarActivities(r.Context(), athlete.ID, year, month)
+	year, month := parseYearMonth(r)
+	activities, err := h.svc.GetCalendarActivities(r.Context(), services.GetCalendarActivitiesInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+		Month:     month,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar activities"})
+		handleServiceError(w, err)
 		return
 	}
 
-	if activities == nil {
-		activities = []storage.CalendarActivity{}
-	}
-
-	writeJSON(w, http.StatusOK, activities)
+	// The service already returns an empty slice if nil
+	shared.WriteSuccess(w, activities)
 }
 
 // GetCalendarSummary handles GET /api/v1/dashboard/calendar/summary
 func (h *DashboardHandler) GetCalendarSummary(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
-	now := time.Now()
-	year := now.Year()
-	month := int(now.Month())
-
-	if y := r.URL.Query().Get("year"); y != "" {
-		if parsed, err := strconv.Atoi(y); err == nil && parsed > 2000 && parsed < 2100 {
-			year = parsed
-		}
-	}
-
-	if m := r.URL.Query().Get("month"); m != "" {
-		if parsed, err := strconv.Atoi(m); err == nil && parsed >= 1 && parsed <= 12 {
-			month = parsed
-		}
-	}
-
-	summary, err := h.stats.GetCalendarMonthSummary(r.Context(), athlete.ID, year, month)
+	year, month := parseYearMonth(r)
+	summary, err := h.svc.GetCalendarSummary(r.Context(), services.GetCalendarActivitiesInput{
+		AthleteID: athlete.ID,
+		Year:      year,
+		Month:     month,
+	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get calendar summary"})
+		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, summary)
+	shared.WriteSuccess(w, summary)
 }

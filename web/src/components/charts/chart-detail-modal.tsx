@@ -1,10 +1,5 @@
 import { type ReactNode } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 export interface ChartDetailData {
   title: string
@@ -29,9 +24,7 @@ export function ChartDetailModal({ open, onOpenChange, data }: ChartDetailModalP
           <DialogTitle className="flex items-center justify-between">
             <span>{data.title}</span>
           </DialogTitle>
-          {data.subtitle && (
-            <p className="text-sm text-muted-foreground">{data.subtitle}</p>
-          )}
+          {data.subtitle && <p className="text-sm text-muted-foreground">{data.subtitle}</p>}
         </DialogHeader>
 
         {data.stats && data.stats.length > 0 && (

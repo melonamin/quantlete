@@ -218,9 +218,9 @@ func (r *GearRepository) GetTotalDistance(ctx context.Context, gearID string) (f
 }
 
 // GetActivityCount returns the number of activities for a piece of gear.
-func (r *GearRepository) GetActivityCount(ctx context.Context, gearID string) (int, error) {
+func (r *GearRepository) GetActivityCount(ctx context.Context, athleteID int64, gearID string) (int, error) {
 	q := NewQueries(r.db.Conn())
-	row, err := q.GetGearActivityCount(ctx, gearID)
+	row, err := q.GetGearActivityCount(ctx, gearID, athleteID)
 	if err != nil {
 		return 0, err
 	}

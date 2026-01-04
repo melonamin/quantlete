@@ -57,11 +57,7 @@ export function WeightEditor({ value, onSave, saving }: WeightEditorProps) {
         {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
       </div>
       <div className="grid gap-2 md:grid-cols-3">
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <Input
           inputMode="decimal"
           placeholder="Weight (kg)"

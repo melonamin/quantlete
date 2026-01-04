@@ -195,16 +195,36 @@ func (s *ImportState) RemainingAPICalls() int {
 
 // StateManager handles import state persistence.
 type StateManager struct {
-	appState *storage.AppStateRepository
+	// One of these is set depending on the mode.
+	appState *storage.AppStateRepository // Server mode (legacy)
+	storage  ImportStorage               // Platform-agnostic mode
 }
 
-// NewStateManager creates a new state manager.
+// NewStateManager creates a new state manager (legacy, server mode).
 func NewStateManager(appState *storage.AppStateRepository) *StateManager {
 	return &StateManager{appState: appState}
 }
 
+// NewStateManagerFromStorage creates a new state manager using ImportStorage interface.
+func NewStateManagerFromStorage(importStorage ImportStorage) *StateManager {
+	return &StateManager{storage: importStorage}
+}
+
 // Load loads the import state from storage.
 func (m *StateManager) Load(ctx context.Context) (*ImportState, error) {
+	// Platform-agnostic mode
+	if m.storage != nil {
+		state, err := m.storage.LoadImportState(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if state == nil {
+			return &ImportState{Phase: PhaseIdle}, nil
+		}
+		return state, nil
+	}
+
+	// Legacy server mode
 	if m.appState == nil {
 		return &ImportState{Phase: PhaseIdle}, nil
 	}
@@ -227,6 +247,12 @@ func (m *StateManager) Load(ctx context.Context) (*ImportState, error) {
 
 // Save saves the import state to storage.
 func (m *StateManager) Save(ctx context.Context, state *ImportState) error {
+	// Platform-agnostic mode
+	if m.storage != nil {
+		return m.storage.SaveImportState(ctx, state)
+	}
+
+	// Legacy server mode
 	if m.appState == nil {
 		return nil
 	}
@@ -241,6 +267,12 @@ func (m *StateManager) Save(ctx context.Context, state *ImportState) error {
 
 // Clear clears the import state.
 func (m *StateManager) Clear(ctx context.Context) error {
+	// Platform-agnostic mode
+	if m.storage != nil {
+		return m.storage.ClearImportState(ctx)
+	}
+
+	// Legacy server mode
 	if m.appState == nil {
 		return nil
 	}

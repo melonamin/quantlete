@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 	"github.com/melonamin/quantlete/internal/weather"
@@ -50,14 +50,14 @@ func (h *WeatherHandler) GetActivityWeather(w http.ResponseWriter, r *http.Reque
 
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	activityIDStr := chi.URLParam(r, "id")
 	activityID, err := strconv.ParseInt(activityIDStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid activity ID"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid activity ID"))
 		return
 	}
 
@@ -67,8 +67,7 @@ func (h *WeatherHandler) GetActivityWeather(w http.ResponseWriter, r *http.Reque
 		h.logger.Error("failed to get cached weather", "error", err, "activity_id", activityID)
 	}
 	if cached != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(cached)
+		shared.WriteSuccess(w, cached)
 		return
 	}
 
@@ -76,17 +75,17 @@ func (h *WeatherHandler) GetActivityWeather(w http.ResponseWriter, r *http.Reque
 	activity, err := h.activityRepo.GetByID(ctx, activityID)
 	if err != nil {
 		h.logger.Error("failed to get activity", "error", err, "activity_id", activityID)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch activity"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to fetch activity"))
 		return
 	}
 	if activity == nil {
-		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "activity not found"})
+		shared.WriteJSONResponse(w, http.StatusNotFound, shared.ErrorMessage("activity not found"))
 		return
 	}
 
 	// Verify the activity belongs to the authenticated athlete
 	if activity.AthleteID != athlete.ID {
-		writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "access denied"})
+		shared.WriteJSONResponse(w, http.StatusForbidden, shared.ErrorMessage("access denied"))
 		return
 	}
 
@@ -99,7 +98,7 @@ func (h *WeatherHandler) GetActivityWeather(w http.ResponseWriter, r *http.Reque
 	}
 
 	if weatherData == nil {
-		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "weather data not available"})
+		shared.WriteJSONResponse(w, http.StatusNotFound, shared.ErrorMessage("weather data not available"))
 		return
 	}
 
@@ -109,8 +108,7 @@ func (h *WeatherHandler) GetActivityWeather(w http.ResponseWriter, r *http.Reque
 		h.logger.Error("failed to cache weather", "error", err, "activity_id", activityID)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(weatherData)
+	shared.WriteSuccess(w, weatherData)
 }
 
 func (h *WeatherHandler) tryStravaStream(ctx context.Context, activityID int64) *weather.ActivityWeather {

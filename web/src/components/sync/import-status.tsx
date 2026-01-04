@@ -93,7 +93,11 @@ function PhaseProgressBar({
             <Loader2 className="h-3 w-3 animate-spin text-primary" />
           )}
           {status === 'pending' && <div className="h-3 w-3" />}
-          <span className={status === 'running' ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+          <span
+            className={
+              status === 'running' ? 'font-medium text-foreground' : 'text-muted-foreground'
+            }
+          >
             {PHASE_LABELS[phase]}
           </span>
         </div>
@@ -153,9 +157,7 @@ function RateLimitCountdown({ waitingUntil }: { waitingUntil: string }) {
     return <span className="tabular-nums font-medium text-amber-600">Unknown</span>
   }
 
-  return (
-    <span className="tabular-nums font-medium text-amber-600">{timeRemaining}</span>
-  )
+  return <span className="tabular-nums font-medium text-amber-600">{timeRemaining}</span>
 }
 
 interface ImportStatusProps {
@@ -203,12 +205,7 @@ export function ImportStatus({ progress, compact = false }: ImportStatusProps) {
       {(isRunning || progress.status === 'completed') && (
         <div className="space-y-2">
           {PHASE_ORDER.map((phase) => (
-            <PhaseProgressBar
-              key={phase}
-              phase={phase}
-              progress={progress}
-              isRunning={isRunning}
-            />
+            <PhaseProgressBar key={phase} phase={phase} progress={progress} isRunning={isRunning} />
           ))}
         </div>
       )}

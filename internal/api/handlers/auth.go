@@ -57,12 +57,44 @@ func NewAuthHandler(
 	}
 }
 
+// AthleteInfo contains athlete data for auth status response.
+// This is our API output type, not the raw Strava wire type.
+type AthleteInfo struct {
+	ID            int64  `json:"id"`
+	Username      string `json:"username"`
+	FirstName     string `json:"firstname"`
+	LastName      string `json:"lastname"`
+	City          string `json:"city,omitempty"`
+	State         string `json:"state,omitempty"`
+	Country       string `json:"country,omitempty"`
+	ProfileMedium string `json:"profile_medium,omitempty"`
+	Profile       string `json:"profile,omitempty"`
+}
+
+// AthleteInfoFromStrava converts a Strava athlete to our API type.
+func AthleteInfoFromStrava(a *strava.Athlete) *AthleteInfo {
+	if a == nil {
+		return nil
+	}
+	return &AthleteInfo{
+		ID:            a.ID,
+		Username:      a.Username,
+		FirstName:     a.FirstName,
+		LastName:      a.LastName,
+		City:          a.City,
+		State:         a.State,
+		Country:       a.Country,
+		ProfileMedium: a.ProfileMedium,
+		Profile:       a.Profile,
+	}
+}
+
 // AuthStatusResponse represents the auth status response.
 type AuthStatusResponse struct {
-	Authenticated bool            `json:"authenticated"`
-	DemoMode      bool            `json:"demo_mode,omitempty"`
-	Athlete       *strava.Athlete `json:"athlete,omitempty"`
-	ExpiresAt     int64           `json:"expires_at,omitempty"`
+	Authenticated bool         `json:"authenticated"`
+	DemoMode      bool         `json:"demo_mode,omitempty"`
+	Athlete       *AthleteInfo `json:"athlete,omitempty"`
+	ExpiresAt     int64        `json:"expires_at,omitempty"`
 }
 
 // InitiateOAuth handles GET /api/v1/auth/strava.
@@ -174,7 +206,7 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if athlete != nil {
-		resp.Athlete = athlete
+		resp.Athlete = AthleteInfoFromStrava(athlete)
 		if token != nil {
 			resp.ExpiresAt = token.Expiry.Unix()
 		}
@@ -212,7 +244,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := AuthStatusResponse{
 		Authenticated: true,
-		Athlete:       athlete,
+		Athlete:       AthleteInfoFromStrava(athlete),
 		ExpiresAt:     newToken.Expiry.Unix(),
 	}
 	encodeJSON(w, resp)

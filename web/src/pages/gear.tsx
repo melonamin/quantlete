@@ -51,7 +51,9 @@ export function GearPage() {
 
   const totalsByGear = useMemo(() => {
     const totals = new Map<string, { movingTime: number; distance: number }>()
-    for (const row of monthlyUsage ?? []) {
+    // Use Array.isArray for defensive check against unexpected data shapes
+    const usage = Array.isArray(monthlyUsage) ? monthlyUsage : []
+    for (const row of usage) {
       const prev = totals.get(row.gear_id) ?? { movingTime: 0, distance: 0 }
       prev.movingTime += row.moving_time || 0
       prev.distance += row.distance || 0
@@ -95,8 +97,8 @@ export function GearPage() {
 
       {tab === 'gear' ? (
         <>
-          {monthlyUsage && monthlyUsage.length > 0 && (
-            <GearCharts gear={gear ?? []} usage={monthlyUsage} />
+          {Array.isArray(monthlyUsage) && monthlyUsage.length > 0 && (
+            <GearCharts gear={Array.isArray(gear) ? gear : []} usage={monthlyUsage} />
           )}
 
           {isLoading ? (
@@ -149,7 +151,7 @@ export function GearPage() {
           )}
         </>
       ) : (
-        <MaintenancePanel gear={gear ?? []} />
+        <MaintenancePanel gear={Array.isArray(gear) ? gear : []} />
       )}
     </div>
   )
@@ -174,12 +176,11 @@ function GearCard({
   const isBike = gear.id.startsWith('b') || gear.source === 'strava'
   const isCustom = gear.source === 'custom'
   const totalHours = totals ? totals.movingTime / 3600 : 0
+  const activityCount = gear.activity_count ?? 0
   const costPerHour =
     gear.purchase_price && totalHours > 0 ? gear.purchase_price / totalHours : null
   const costPerActivity =
-    gear.purchase_price && gear.activity_count > 0
-      ? gear.purchase_price / gear.activity_count
-      : null
+    gear.purchase_price && activityCount > 0 ? gear.purchase_price / activityCount : null
 
   return (
     <Card className={gear.retired ? 'opacity-60' : ''}>
@@ -585,11 +586,11 @@ function MaintenancePanel({ gear }: { gear: Gear[] }) {
         <CardContent>
           {dueLoading ? (
             <Skeleton className="h-24 w-full" />
-          ) : (due ?? []).length === 0 ? (
+          ) : !Array.isArray(due) || due.length === 0 ? (
             <div className="text-sm text-muted-foreground">No components configured yet.</div>
           ) : (
             <div className="space-y-3">
-              {(due ?? []).map((c) => (
+              {due.map((c) => (
                 <div key={c.id} className="rounded-md border border-border p-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -678,11 +679,11 @@ function MaintenancePanel({ gear }: { gear: Gear[] }) {
             <div className="text-sm text-muted-foreground">
               Select a gear item to configure components.
             </div>
-          ) : (components ?? []).length === 0 ? (
+          ) : !Array.isArray(components) || components.length === 0 ? (
             <div className="text-sm text-muted-foreground">No components yet.</div>
           ) : (
             <div className="space-y-2">
-              {(components ?? []).map((c) => (
+              {components.map((c) => (
                 <div key={c.id} className="rounded-md border border-border p-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -742,8 +743,8 @@ function MaintenancePanel({ gear }: { gear: Gear[] }) {
           onCreate={(req) =>
             createComponent.mutate(
               { gearId: selectedGearId, body: req },
-                { onSuccess: () => setComponentModal(null) }
-              )
+              { onSuccess: () => setComponentModal(null) }
+            )
           }
           onUpdate={(id, req) =>
             updateComponent.mutate({ id, req }, { onSuccess: () => setComponentModal(null) })
@@ -771,7 +772,7 @@ function ComponentModal({
   const [name, setName] = useState(editing?.name ?? '')
   const [maintenanceHashtag, setMaintenanceHashtag] = useState(editing?.maintenance_hashtag ?? '')
   const [rules, setRules] = useState(() =>
-    (editing?.rules ?? []).map((r) => ({
+    (Array.isArray(editing?.rules) ? editing.rules : []).map((r) => ({
       type: r.type,
       threshold_value: String(r.threshold_value),
     }))
@@ -803,11 +804,7 @@ function ComponentModal({
           <div className="text-xs text-muted-foreground">Gear: {gearId}</div>
           <div>
             <Label className="text-sm text-muted-foreground mb-1">Name</Label>
-            <Input
-              className="h-9"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <Input className="h-9" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
             <Label className="text-sm text-muted-foreground mb-1">Maintenance hashtag</Label>
@@ -836,7 +833,9 @@ function ComponentModal({
                       value={r.type}
                       onValueChange={(v) => {
                         const value = v as 'distance_m' | 'time_s' | 'days'
-                        setRules((prev) => prev.map((x, i) => (i === idx ? { ...x, type: value } : x)))
+                        setRules((prev) =>
+                          prev.map((x, i) => (i === idx ? { ...x, type: value } : x))
+                        )
                       }}
                     >
                       <SelectTrigger size="sm">

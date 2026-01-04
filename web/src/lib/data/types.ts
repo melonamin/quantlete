@@ -56,7 +56,7 @@ export type {
 export type {
   Gear,
   GearFilters,
-  GearResponse,
+  GearListResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
 } from '@/lib/api/gear'
@@ -75,11 +75,7 @@ export type {
 } from '@/lib/api/segments'
 
 // Athlete types
-export type {
-  MetricPoint,
-  FTPHistoryResponse,
-  WeightHistoryResponse,
-} from '@/lib/api/athlete'
+export type { MetricPoint, FTPHistoryResponse, WeightHistoryResponse } from '@/lib/api/athlete'
 
 // Best efforts types
 export type { BestEffortPR, BestEffortItem } from '@/lib/api/best-efforts'
@@ -96,18 +92,10 @@ export type {
 } from '@/lib/api/photos'
 
 // Challenge types
-export type {
-  Challenge,
-  ChallengesFilters,
-  ChallengesResponse,
-} from '@/lib/api/challenges'
+export type { Challenge, ChallengesFilters, ChallengesResponse } from '@/lib/api/challenges'
 
 // Goals types
-export type {
-  GoalPeriod,
-  TrainingGoalsConfig,
-  TrainingGoalsResponse,
-} from '@/lib/api/goals'
+export type { GoalPeriod, TrainingGoalsConfig, TrainingGoalsResponse } from '@/lib/api/goals'
 
 // Maintenance types
 export type {

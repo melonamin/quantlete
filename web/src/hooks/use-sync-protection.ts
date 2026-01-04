@@ -5,10 +5,12 @@
 
 import { useEffect } from 'react'
 import { useImportProgress } from '@/lib/api'
+import { isWasmMode } from '@/lib/mode'
 
 export function useSyncProtection() {
   const { data: progress } = useImportProgress()
-  const isRunning = progress?.status === 'running'
+  // Only show warning in WASM mode - server mode imports continue server-side
+  const isRunning = isWasmMode() && progress?.status === 'running'
 
   useEffect(() => {
     if (!isRunning) return

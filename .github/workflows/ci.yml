@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Install dependencies
@@ -32,6 +32,26 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+
+  go-wasm:
+    name: Go WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build WASM
+        run: |
+          mkdir -p web/public/wasm
+          GOOS=js GOARCH=wasm go build -o web/public/wasm/quantlete.wasm ./cmd/wasm/
+
+      - name: Verify WASM size
+        run: ls -lh web/public/wasm/quantlete.wasm
 
   web:
     name: Web

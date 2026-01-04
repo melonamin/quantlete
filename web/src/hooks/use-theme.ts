@@ -36,4 +36,3 @@ export function useTheme() {
     return () => mql.removeListener(onChange)
   }, [theme])
 }
-

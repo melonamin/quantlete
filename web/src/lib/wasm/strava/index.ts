@@ -21,23 +21,6 @@ export {
 } from './client'
 
 export {
-  startImport,
-  cancelImport,
-  pauseImport,
-  resumeImport,
-  isPausedImport,
-  hasResumableImport,
-  getImportProgress,
-  getSyncHistory,
-  getLatestSync,
-  backfillPowerBests,
-  subscribeToImportEvents,
-  type ImportOptions,
-  type ImportProgress,
-  type SyncRun,
-} from './importer'
-
-export {
   getCredentials,
   saveCredentials,
   hasCredentials,

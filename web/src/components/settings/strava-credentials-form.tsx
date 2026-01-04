@@ -117,9 +117,7 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Strava App Configuration</CardTitle>
-          <CardDescription>
-            Your Strava API credentials for connecting to Strava
-          </CardDescription>
+          <CardDescription>Your Strava API credentials for connecting to Strava</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3">
@@ -128,9 +126,7 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
             </div>
             <div>
               <p className="font-medium">Configured via environment</p>
-              <p className="text-sm text-muted-foreground">
-                Client ID: {credentials.client_id}
-              </p>
+              <p className="text-sm text-muted-foreground">Client ID: {credentials.client_id}</p>
             </div>
           </div>
         </CardContent>
@@ -144,9 +140,7 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Strava App Configuration</CardTitle>
-          <CardDescription>
-            Your Strava API credentials for connecting to Strava
-          </CardDescription>
+          <CardDescription>Your Strava API credentials for connecting to Strava</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -156,9 +150,7 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
               </div>
               <div>
                 <p className="font-medium">Configured</p>
-                <p className="text-sm text-muted-foreground">
-                  Client ID: {credentials.client_id}
-                </p>
+                <p className="text-sm text-muted-foreground">Client ID: {credentials.client_id}</p>
               </div>
             </div>
             <Button variant="outline" onClick={startEditing}>
@@ -176,7 +168,8 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
       <CardHeader>
         <CardTitle>Strava App Configuration</CardTitle>
         <CardDescription>
-          Create your own Strava app to connect to your account. Each user needs their own app due to Strava API restrictions.
+          Create your own Strava app to connect to your account. Each user needs their own app due
+          to Strava API restrictions.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -196,7 +189,10 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
                 </a>
               </li>
               <li>Create a new app (any name/website works)</li>
-              <li>Set Authorization Callback Domain to: <code className="text-xs bg-muted px-1 py-0.5 rounded">{window.location.host}</code></li>
+              <li>
+                Set Authorization Callback Domain to:{' '}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">{window.location.host}</code>
+              </li>
               <li>Copy your Client ID and Client Secret below</li>
             </ol>
           </AlertDescription>

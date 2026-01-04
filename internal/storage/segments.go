@@ -558,10 +558,7 @@ func (r *SegmentRepository) ListCountryStats(ctx context.Context, athleteID int6
 	}
 	out := make([]CountryStat, len(rows))
 	for i, row := range rows {
-		out[i] = CountryStat{
-			Country: row.Country,
-			Count:   row.Count,
-		}
+		out[i] = CountryStat(row)
 	}
 	return out, nil
 }

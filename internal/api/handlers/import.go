@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -67,14 +68,14 @@ func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
 	// Verify authentication
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	var req StartImportRequest
 	if r.Body != nil {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid request body"))
 			return
 		}
 	}
@@ -90,13 +91,11 @@ func (h *ImportHandler) Start(w http.ResponseWriter, r *http.Request) {
 
 	// Use background context since import runs asynchronously after HTTP request completes
 	if err := h.importer.Start(context.Background(), opts); err != nil {
-		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "import already running or failed to start"})
+		shared.WriteJSONResponse(w, http.StatusConflict, shared.ErrorMessage("import already running or failed to start"))
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]string{
-		"message": "import started",
-	})
+	shared.WriteMessage(w, "import started")
 }
 
 // Progress handles GET /api/v1/import/progress
@@ -104,7 +103,7 @@ func (h *ImportHandler) Progress(w http.ResponseWriter, r *http.Request) {
 	// Verify authentication
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -211,14 +210,12 @@ func (h *ImportHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	// Verify authentication
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	h.importer.Cancel()
-	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "import cancellation requested",
-	})
+	shared.WriteMessage(w, "import cancellation requested")
 }
 
 // Pause handles POST /api/v1/import/pause
@@ -226,16 +223,14 @@ func (h *ImportHandler) Pause(w http.ResponseWriter, r *http.Request) {
 	// Verify authentication
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	if h.importer.Pause() {
-		writeJSON(w, http.StatusOK, map[string]string{
-			"message": "import pause requested",
-		})
+		shared.WriteMessage(w, "import pause requested")
 	} else {
-		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "no import running to pause"})
+		shared.WriteJSONResponse(w, http.StatusConflict, shared.ErrorMessage("no import running to pause"))
 	}
 }
 
@@ -244,13 +239,13 @@ func (h *ImportHandler) Resume(w http.ResponseWriter, r *http.Request) {
 	// Verify authentication
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	// Check if there's a resumable state
 	if !h.importer.CanResume(r.Context()) {
-		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "no resumable import state found"})
+		shared.WriteJSONResponse(w, http.StatusConflict, shared.ErrorMessage("no resumable import state found"))
 		return
 	}
 
@@ -262,31 +257,30 @@ func (h *ImportHandler) Resume(w http.ResponseWriter, r *http.Request) {
 	// Use background context since import runs asynchronously after HTTP request completes
 	if err := h.importer.Start(context.Background(), opts); err != nil {
 		slog.Warn("failed to resume import", "error", err)
-		writeJSON(w, http.StatusConflict, ErrorResponse{Error: "failed to resume import"})
+		shared.WriteJSONResponse(w, http.StatusConflict, shared.ErrorMessage("failed to resume import"))
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]string{
-		"message": "import resumed",
-	})
+	shared.WriteMessage(w, "import resumed")
 }
 
 // History handles GET /api/v1/import/history
 func (h *ImportHandler) History(w http.ResponseWriter, r *http.Request) {
 	if h.syncHistory == nil {
-		writeJSON(w, http.StatusOK, []storage.SyncRun{})
+		shared.WriteSuccess(w, []storage.SyncRun{})
 		return
 	}
 
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	runs, err := h.syncHistory.GetLatest(r.Context(), athlete.ID, 20)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		slog.Error("failed to load sync history", "error", err, "athlete_id", athlete.ID)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load sync history"))
 		return
 	}
 
@@ -294,27 +288,28 @@ func (h *ImportHandler) History(w http.ResponseWriter, r *http.Request) {
 		runs = []storage.SyncRun{}
 	}
 
-	writeJSON(w, http.StatusOK, runs)
+	shared.WriteSuccess(w, runs)
 }
 
 // Watermark handles GET /api/v1/import/watermark
 func (h *ImportHandler) Watermark(w http.ResponseWriter, r *http.Request) {
 	if h.syncHistory == nil {
-		writeJSON(w, http.StatusOK, nil)
+		shared.WriteSuccess(w, nil)
 		return
 	}
 
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	wm, err := h.syncHistory.GetWatermark(r.Context(), athlete.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		slog.Error("failed to load watermark", "error", err, "athlete_id", athlete.ID)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load watermark"))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, wm)
+	shared.WriteSuccess(w, wm)
 }

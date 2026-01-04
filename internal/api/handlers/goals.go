@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -24,13 +25,13 @@ func NewGoalsHandler(goals *storage.GoalsRepository, stravaClient *strava.Client
 func (h *GoalsHandler) GetGoals(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	cfg, err := h.goals.GetConfig(r.Context(), athlete.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get goals config"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to get goals config"))
 		return
 	}
 
@@ -40,7 +41,7 @@ func (h *GoalsHandler) GetGoals(w http.ResponseWriter, r *http.Request) {
 		for _, p := range []storage.GoalPeriod{storage.GoalPeriodWeek, storage.GoalPeriodMonth, storage.GoalPeriodYear, storage.GoalPeriodLifetime} {
 			val, err := h.goals.GetProgress(r.Context(), athlete.ID, sport.SportTypes, p)
 			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute goals progress"})
+				shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to compute goals progress"))
 				return
 			}
 			per[p] = val
@@ -48,7 +49,7 @@ func (h *GoalsHandler) GetGoals(w http.ResponseWriter, r *http.Request) {
 		progress[sport.Name] = per
 	}
 
-	writeJSON(w, http.StatusOK, storage.TrainingGoalsResponse{
+	shared.WriteSuccess(w, storage.TrainingGoalsResponse{
 		Config:   *cfg,
 		Progress: progress,
 	})
@@ -58,13 +59,13 @@ func (h *GoalsHandler) GetGoals(w http.ResponseWriter, r *http.Request) {
 func (h *GoalsHandler) UpdateGoals(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	var cfg storage.TrainingGoalsConfig
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
@@ -72,24 +73,24 @@ func (h *GoalsHandler) UpdateGoals(w http.ResponseWriter, r *http.Request) {
 		cfg.Version = 1
 	}
 	if len(cfg.Sports) == 0 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "at least one sport group is required"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("at least one sport group is required"))
 		return
 	}
 	for _, s := range cfg.Sports {
 		if s.Name == "" {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "sport group name is required"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("sport group name is required"))
 			return
 		}
 		if len(s.SportTypes) == 0 {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "sport_types is required"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("sport_types is required"))
 			return
 		}
 	}
 
 	if err := h.goals.UpsertConfig(r.Context(), athlete.ID, cfg); err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to save goals config"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to save goals config"))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, cfg)
+	shared.WriteSuccess(w, cfg)
 }

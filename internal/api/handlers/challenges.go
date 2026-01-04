@@ -12,56 +12,25 @@ import (
 
 	"github.com/melonamin/quantlete/internal/challenges"
 	"github.com/melonamin/quantlete/internal/pagination"
+	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
-type challengesListResponse struct {
-	Data       []challengeResponse `json:"data"`
-	Total      int                 `json:"total"`
-	Page       int                 `json:"page"`
-	PerPage    int                 `json:"per_page"`
-	TotalPages int                 `json:"total_pages"`
-}
-
+// ChallengesHandler handles challenges-related endpoints.
 type ChallengesHandler struct {
-	repo       *storage.ChallengeRepository
+	svc        *services.ChallengesService
 	strava     *strava.Client
 	downloader *challenges.BadgeDownloader
 }
 
-func NewChallengesHandler(repo *storage.ChallengeRepository, stravaClient *strava.Client, dataDir string) *ChallengesHandler {
+// NewChallengesHandler creates a new challenges handler.
+func NewChallengesHandler(svc *services.ChallengesService, stravaClient *strava.Client, dataDir string) *ChallengesHandler {
 	return &ChallengesHandler{
-		repo:       repo,
+		svc:        svc,
 		strava:     stravaClient,
 		downloader: challenges.NewBadgeDownloader(dataDir),
-	}
-}
-
-type challengeResponse struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	Slug           string  `json:"slug,omitempty"`
-	BadgeURL       string  `json:"badge_url,omitempty"`
-	LocalBadgeURL  string  `json:"local_badge_url,omitempty"`
-	CompletionDate *string `json:"completion_date,omitempty"` // YYYY-MM-DD
-	Month          string  `json:"month,omitempty"`
-}
-
-func challengeToResponse(c storage.Challenge) challengeResponse {
-	var completion *string
-	if c.CompletionDate != nil && !c.CompletionDate.IsZero() {
-		v := c.CompletionDate.Format("2006-01-02")
-		completion = &v
-	}
-	return challengeResponse{
-		ID:             c.ID,
-		Name:           c.Name,
-		Slug:           c.Slug,
-		BadgeURL:       c.BadgeURL,
-		LocalBadgeURL:  c.LocalBadgeURL,
-		CompletionDate: completion,
-		Month:          c.Month,
 	}
 }
 
@@ -69,35 +38,27 @@ func challengeToResponse(c storage.Challenge) challengeResponse {
 func (h *ChallengesHandler) List(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	q := r.URL.Query()
-	f := storage.ChallengeFilters{
-		Month:       strings.TrimSpace(q.Get("month")),
-		QueryParams: pagination.ParseQueryParams(q),
-	}
+	params := pagination.ParseQueryParams(q)
 
-	result, err := h.repo.ListPaginated(r.Context(), athlete.ID, f)
+	result, err := h.svc.List(r.Context(), services.ListChallengesInput{
+		AthleteID: athlete.ID,
+		Month:     strings.TrimSpace(q.Get("month")),
+		Page:      params.Page,
+		PerPage:   params.PerPage,
+		OrderBy:   params.OrderBy,
+		OrderDir:  params.OrderDir,
+	})
 	if err != nil {
-		slog.Error("failed to list challenges", "error", err, "athlete_id", athlete.ID, "filters", f)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch challenges"})
+		handleServiceError(w, err)
 		return
 	}
 
-	out := make([]challengeResponse, 0, len(result.Items))
-	for _, c := range result.Items {
-		out = append(out, challengeToResponse(c))
-	}
-
-	writeJSON(w, http.StatusOK, challengesListResponse{
-		Data:       out,
-		Total:      result.Total,
-		Page:       result.Page,
-		PerPage:    result.PerPage,
-		TotalPages: result.TotalPages,
-	})
+	shared.WriteSuccess(w, result)
 }
 
 type importResponse struct {
@@ -109,7 +70,7 @@ type importResponse struct {
 func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -117,18 +78,18 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid multipart form"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid multipart form"))
 			return
 		}
 		file, _, err := r.FormFile("file")
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "missing file field"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("missing file field"))
 			return
 		}
 		defer func() { _ = file.Close() }()
 		b, err := io.ReadAll(io.LimitReader(file, 10<<20))
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to read file"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to read file"))
 			return
 		}
 		htmlBytes = b
@@ -138,7 +99,7 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 			URL  string `json:"url"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 			return
 		}
 		if strings.TrimSpace(body.HTML) != "" {
@@ -146,18 +107,18 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 		} else if strings.TrimSpace(body.URL) != "" {
 			// Validate URL to prevent SSRF attacks
 			if err := ValidateImportURL(body.URL); err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorResponse(err))
 				return
 			}
 			resp, err := http.Get(body.URL) //nolint:gosec // URL validated by ValidateImportURL
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to fetch url"})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to fetch url"))
 				return
 			}
 			defer resp.Body.Close()
 			b, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to read response"})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to read response"))
 				return
 			}
 			htmlBytes = b
@@ -166,13 +127,13 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 	htmlBytes = bytes.TrimSpace(htmlBytes)
 	if len(htmlBytes) == 0 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "no html provided"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("no html provided"))
 		return
 	}
 
 	parsed, err := challenges.ParseTrophyCaseHTML(string(htmlBytes))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to parse html"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to parse html"))
 		return
 	}
 
@@ -211,14 +172,14 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 			Month:          strings.TrimSpace(p.Month),
 			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
 		}
-		if err := h.repo.Upsert(r.Context(), c); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to store challenges"})
+		if err := h.svc.Import(r.Context(), c); err != nil {
+			handleServiceError(w, err)
 			return
 		}
 		imported++
 	}
 
-	writeJSON(w, http.StatusOK, importResponse{Imported: imported})
+	shared.WriteSuccess(w, importResponse{Imported: imported})
 }
 
 // ImportFromProfile handles POST /api/v1/challenges/import-profile
@@ -226,7 +187,7 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -239,7 +200,7 @@ func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Req
 	parsed, err := challenges.FetchPublicProfile(athleteID)
 	if err != nil {
 		slog.Error("failed to fetch public profile", "error", err, "athlete_id", athleteID)
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to fetch public profile: " + err.Error()})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to fetch public profile: "+err.Error()))
 		return
 	}
 
@@ -275,14 +236,14 @@ func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Req
 			Month:          month,
 			CreatedAt:      storage.SQLiteTime{Time: time.Now()},
 		}
-		if err := h.repo.Upsert(r.Context(), c); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to store challenges"})
+		if err := h.svc.Import(r.Context(), c); err != nil {
+			handleServiceError(w, err)
 			return
 		}
 		imported++
 	}
 
-	writeJSON(w, http.StatusOK, importResponse{Imported: imported})
+	shared.WriteSuccess(w, importResponse{Imported: imported})
 }
 
 func ptrSQLiteTime(t *time.Time) *storage.SQLiteTime {

@@ -1,23 +1,48 @@
+// Types for statistics-related data structures.
+//
+// Type Provenance:
+// - Generated types: Re-exported from types.gen.ts (generated from Go structs)
+// - Frontend-only types: Defined here with specific TS requirements or composite types
+
 import { usePowerStats as dataUsePowerStats } from '@/lib/data'
 
-export interface PeakPowerBest {
-  duration_s: number
-  watts: number
-  activity_id: number
-  start_date: string
-}
+// ============================================================================
+// Generated from Go - re-exported from types.gen.ts
+// DO NOT modify these - regenerate with: just generate-ts-types
+// ============================================================================
+export type {
+  PeakPowerBest,
+  PeakPowerHistoryPoint,
+  DailyTrainingLoadPoint,
+  PowerZonesResponse,
+  DistributionSlice,
+} from '@/lib/wasm/types.gen'
 
-export interface PeakPowerHistoryPoint {
-  date: string
-  watts: number
-}
+// ============================================================================
+// Composite response types - not generated from Go
+// These aggregate generated types into API response structures
+// ============================================================================
 
+// PowerStatsResponse - composite type combining best efforts and history
 export interface PowerStatsResponse {
+  best: import('@/lib/wasm/types.gen').PeakPowerBest[]
   durations_s: number[]
-  best: PeakPowerBest[]
-  history: Record<string, PeakPowerHistoryPoint[]>
+  history: Record<string, import('@/lib/wasm/types.gen').PeakPowerHistoryPoint[]>
 }
 
+// TrainingLoadResponse - composite type for training load data
+export interface TrainingLoadResponse {
+  series: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint[]
+  summary?: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint
+}
+
+// ============================================================================
+// Frontend-only types - defined here for specific TS requirements
+// Safe to modify as needed
+// ============================================================================
+
+// HrZonesResponse - manual definition for strongly-typed nested zone structure
+// (generated type has zones: unknown)
 export interface HrZonesResponse {
   method: string
   zones: { bounds: number[]; hr_max?: number }
@@ -25,36 +50,13 @@ export interface HrZonesResponse {
   total_seconds: number
 }
 
-export interface DailyTrainingLoadPoint {
-  day: string
-  tss: number
-  ctl: number
-  atl: number
-  tsb: number
-}
-
-export interface TrainingLoadResponse {
-  series: DailyTrainingLoadPoint[]
-  summary?: DailyTrainingLoadPoint
-}
-
-export interface PowerZonesResponse {
-  ftp_watts?: number
-  seconds_by_zone: number[]
-  total_seconds: number
-  bounds: number[]
-}
-
+// HrZoneDefinition - manual definition for strongly-typed nested zone structure
+// (generated type has zones: unknown)
 export interface HrZoneDefinition {
   sport_type: string
   effective_from: string
   method: string
   zones: { bounds: number[]; hr_max?: number }
-}
-
-export interface DistributionSlice {
-  label: string
-  count: number
 }
 
 export {

@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useAuthStatus, useDashboard, useImportProgress, useCredentialsStatus } from '@/lib/data/hooks'
+import {
+  useAuthStatus,
+  useDashboard,
+  useImportProgress,
+  useCredentialsStatus,
+} from '@/lib/data/hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { isWasmMode } from '@/lib/mode'
 import { shouldShowOnboarding } from '@/components/onboarding/utils'
@@ -111,8 +116,8 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                To get started, you need to configure your Strava API credentials. Go to Settings
-                to enter your Client ID and Client Secret from your Strava API Application.
+                To get started, you need to configure your Strava API credentials. Go to Settings to
+                enter your Client ID and Client Secret from your Strava API Application.
               </p>
               <Button asChild>
                 <Link to="/settings">Go to Settings</Link>
@@ -391,7 +396,7 @@ export function DashboardPage() {
           },
           {
             id: 'kudos_leaders',
-            title: 'Most Kudos\'d',
+            title: "Most Kudos'd",
             defaultWidth: 4,
             defaultHeight: 2,
             defaultHidden: true,

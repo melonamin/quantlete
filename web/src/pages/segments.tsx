@@ -16,7 +16,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SegmentMap } from '@/components/maps'
 import { SegmentPRChart } from '@/components/charts/segment-pr-chart'
@@ -81,8 +88,11 @@ export function SegmentsPage() {
   const { data: segmentsResponse, isLoading, error } = useSegments(apiFilters)
   const { data: countries } = useSegmentCountries()
 
-  // Extract data from response
-  const segments = segmentsResponse?.data ?? []
+  // Extract data from response (use Array.isArray for defensive check)
+  const segments = useMemo(
+    () => (Array.isArray(segmentsResponse?.data) ? segmentsResponse.data : []),
+    [segmentsResponse]
+  )
   const total = segmentsResponse?.total ?? 0
   const totalPages = segmentsResponse?.total_pages ?? 1
   const currentPage = segmentsResponse?.page ?? 1

@@ -77,9 +77,7 @@ const BadgeSVG = forwardRef<SVGSVGElement, BadgeSVGProps>(
         viewBox={`0 0 ${size.width} ${size.height}`}
         xmlns="http://www.w3.org/2000/svg"
       >
-        {bgColor && (
-          <rect width={size.width} height={size.height} fill={bgColor} rx={8} ry={8} />
-        )}
+        {bgColor && <rect width={size.width} height={size.height} fill={bgColor} rx={8} ry={8} />}
         <rect
           x={1}
           y={1}
@@ -142,7 +140,15 @@ interface BadgePreviewProps {
   unitSystem: 'metric' | 'imperial'
 }
 
-export function BadgePreview({ children, filename, svgRef, themeId, sizeId, backgroundId, unitSystem }: BadgePreviewProps) {
+export function BadgePreview({
+  children,
+  filename,
+  svgRef,
+  themeId,
+  sizeId,
+  backgroundId,
+  unitSystem,
+}: BadgePreviewProps) {
   const [copiedType, setCopiedType] = useState<'svg' | 'link' | 'markdown' | null>(null)
 
   // Build URL with query params
@@ -299,9 +305,13 @@ export function BadgeCustomizer({
                 className="h-3 w-3 rounded border border-border"
                 style={{
                   backgroundColor: backgrounds[id].color ?? 'transparent',
-                  backgroundImage: id === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)' : undefined,
+                  backgroundImage:
+                    id === 'transparent'
+                      ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)'
+                      : undefined,
                   backgroundSize: id === 'transparent' ? '6px 6px' : undefined,
-                  backgroundPosition: id === 'transparent' ? '0 0, 0 3px, 3px -3px, -3px 0px' : undefined,
+                  backgroundPosition:
+                    id === 'transparent' ? '0 0, 0 3px, 3px -3px, -3px 0px' : undefined,
                 }}
               />
               {backgrounds[id].name}
@@ -365,7 +375,16 @@ export const StatBadge = forwardRef<SVGSVGElement, StatBadgeProps>(
         break
     }
 
-    return <BadgeSVG ref={ref} title={title} value={formattedValue} theme={theme} size={size} background={background} />
+    return (
+      <BadgeSVG
+        ref={ref}
+        title={title}
+        value={formattedValue}
+        theme={theme}
+        size={size}
+        background={background}
+      />
+    )
   }
 )
 StatBadge.displayName = 'StatBadge'

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/geo"
@@ -220,13 +221,7 @@ func (r *StatsRepository) GetStatsBySportType(ctx context.Context, athleteID int
 	}
 	stats := make([]SportTypeStat, len(rows))
 	for i, row := range rows {
-		stats[i] = SportTypeStat{
-			SportType:      row.SportType,
-			ActivityCount:  row.ActivityCount,
-			TotalDistance:  row.TotalDistance,
-			TotalTime:      row.TotalTime,
-			TotalElevation: row.TotalElevation,
-		}
+		stats[i] = SportTypeStat(row)
 	}
 	return stats, nil
 }
@@ -454,8 +449,10 @@ func (r *StatsRepository) GetYearlyStats(ctx context.Context, athleteID int64) (
 	}
 	yearly := make([]YearStat, len(rows))
 	for i, row := range rows {
-		var year int
-		fmt.Sscanf(row.Year, "%d", &year)
+		year, err := strconv.Atoi(row.Year)
+		if err != nil {
+			return nil, fmt.Errorf("invalid year %q: %w", row.Year, err)
+		}
 		yearly[i] = YearStat{
 			Year:           year,
 			ActivityCount:  row.ActivityCount,

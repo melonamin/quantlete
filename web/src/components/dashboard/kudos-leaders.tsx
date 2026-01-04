@@ -15,7 +15,8 @@ export function KudosLeaders() {
     order_dir: 'desc',
   })
 
-  const activities = data?.data
+  // Use Array.isArray for defensive check against unexpected data shapes
+  const activities = Array.isArray(data?.data) ? data.data : []
 
   if (isLoading) {
     return (
@@ -44,7 +45,7 @@ export function KudosLeaders() {
   }
 
   // Filter to only activities with kudos
-  const activitiesWithKudos = activities?.filter((a) => a.kudos_count > 0) ?? []
+  const activitiesWithKudos = activities.filter((a) => (a.kudos_count ?? 0) > 0)
 
   return (
     <WidgetWrapper
@@ -60,34 +61,34 @@ export function KudosLeaders() {
       ) : (
         <div className="space-y-4">
           {activitiesWithKudos.map((activity) => (
-              <Link
-                key={activity.id}
-                to="/activities/$activityId"
-                params={{ activityId: String(activity.id) }}
-                className="flex items-center gap-3 hover:bg-muted/50 -mx-2 px-2 py-1 rounded-md transition-colors"
+            <Link
+              key={activity.id}
+              to="/activities/$activityId"
+              params={{ activityId: String(activity.id) }}
+              className="flex items-center gap-3 hover:bg-muted/50 -mx-2 px-2 py-1 rounded-md transition-colors"
+            >
+              <div
+                className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
+                style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
               >
-                <div
-                  className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
-                  style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
-                >
-                  <SportIcon
-                    sportType={activity.sport_type}
-                    className="h-5 w-5"
-                    style={{ color: getSportHexColor(activity.sport_type) }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{activity.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelativeDate(activity.start_date)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <ThumbsUp className="h-3.5 w-3.5" />
-                  <span className="font-medium">{activity.kudos_count}</span>
-                </div>
-              </Link>
-            ))}
+                <SportIcon
+                  sportType={activity.sport_type}
+                  className="h-5 w-5"
+                  style={{ color: getSportHexColor(activity.sport_type) }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{activity.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatRelativeDate(activity.start_date)}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <ThumbsUp className="h-3.5 w-3.5" />
+                <span className="font-medium">{activity.kudos_count ?? 0}</span>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </WidgetWrapper>

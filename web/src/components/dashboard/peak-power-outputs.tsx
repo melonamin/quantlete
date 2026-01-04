@@ -18,7 +18,7 @@ export function PeakPowerOutputs() {
   for (const b of data?.best ?? []) bestByDuration.set(b.duration_s, b.watts)
 
   const chartData =
-    data?.durations_s?.map((d) => ({
+    data?.durations_s?.map((d: number) => ({
       label: formatDurationLabel(d),
       value: Math.round(bestByDuration.get(d) ?? 0),
     })) ?? []

@@ -41,7 +41,7 @@ import type {
   FTPHistoryResponse,
   Gear,
   GearFilters,
-  GearResponse,
+  GearListResponse,
   GearMonthlyUsage,
   HeatmapFilters,
   HeatmapResponse,
@@ -820,7 +820,7 @@ export function useGearPaginated(filters?: GearFilters) {
 
   return useQuery({
     queryKey: ['data', 'gear', 'paginated', filters],
-    queryFn: async (): Promise<GearResponse> => {
+    queryFn: async (): Promise<GearListResponse> => {
       if (!provider) throw new Error('Provider not ready')
       return provider.getGear(filters)
     },
@@ -860,7 +860,7 @@ export function useCustomGearPaginated(filters?: GearFilters) {
 
   return useQuery({
     queryKey: ['data', 'gear', 'custom', 'paginated', filters],
-    queryFn: async (): Promise<GearResponse> => {
+    queryFn: async (): Promise<GearListResponse> => {
       if (!provider) throw new Error('Provider not ready')
       return provider.getCustomGear(filters)
     },
@@ -1147,7 +1147,11 @@ export function useBestEffortPRs(sportType?: string) {
   })
 }
 
-export function useBestEffortsForDistance(distanceType: string, sportType?: string, enabled = true) {
+export function useBestEffortsForDistance(
+  distanceType: string,
+  sportType?: string,
+  enabled = true
+) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({

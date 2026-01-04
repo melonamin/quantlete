@@ -58,29 +58,29 @@ export function WeeklyStats({ stats, isLoading }: WeeklyStatsProps) {
           {/* By sport type */}
           <div className="space-y-3">
             {stats.map((stat) => (
-                <div key={stat.sport_type} className="flex items-center gap-3">
-                  <div
-                    className="h-8 w-8 rounded flex items-center justify-center"
-                    style={{ backgroundColor: getSportHexColor(stat.sport_type) + '20' }}
-                  >
-                    <SportIcon
-                      sportType={stat.sport_type}
-                      className="h-4 w-4"
-                      style={{ color: getSportHexColor(stat.sport_type) }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{formatSportType(stat.sport_type)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {stat.activity_count} {stat.activity_count === 1 ? 'activity' : 'activities'}
-                      {' · '}
-                      {formatDistance(stat.total_distance)}
-                      {' · '}
-                      {formatDuration(stat.total_time)}
-                    </p>
-                  </div>
+              <div key={stat.sport_type} className="flex items-center gap-3">
+                <div
+                  className="h-8 w-8 rounded flex items-center justify-center"
+                  style={{ backgroundColor: getSportHexColor(stat.sport_type) + '20' }}
+                >
+                  <SportIcon
+                    sportType={stat.sport_type}
+                    className="h-4 w-4"
+                    style={{ color: getSportHexColor(stat.sport_type) }}
+                  />
                 </div>
-              ))}
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{formatSportType(stat.sport_type)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stat.activity_count} {stat.activity_count === 1 ? 'activity' : 'activities'}
+                    {' · '}
+                    {formatDistance(stat.total_distance)}
+                    {' · '}
+                    {formatDuration(stat.total_time)}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -8,8 +8,19 @@ if (import.meta.env.DEV) {
   const origError = console.error
   console.error = (...args: unknown[]) => {
     const msg = args[0]
+    // Check for TypeError object with disconnect in message
     if (typeof msg === 'object' && msg instanceof TypeError) {
       if (msg.message?.includes('disconnect')) {
+        return
+      }
+    }
+    // Also check for string messages containing the disconnect error
+    if (typeof msg === 'string' && msg.includes('disconnect')) {
+      return
+    }
+    // Check if any arg contains the disconnect error (for stack traces)
+    for (const arg of args) {
+      if (typeof arg === 'string' && arg.includes("reading 'disconnect'")) {
         return
       }
     }

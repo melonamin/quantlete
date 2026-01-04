@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
@@ -493,11 +494,11 @@ func TestShouldEmitProgress(t *testing.T) {
 	imp := &Importer{}
 
 	// Should emit on batch boundary
-	if !imp.shouldEmitProgress(eventBatchSize) {
-		t.Error("should emit at eventBatchSize")
+	if !imp.shouldEmitProgress(shared.ImportEventBatchSize) {
+		t.Error("should emit at ImportEventBatchSize")
 	}
-	if !imp.shouldEmitProgress(eventBatchSize * 2) {
-		t.Error("should emit at 2*eventBatchSize")
+	if !imp.shouldEmitProgress(shared.ImportEventBatchSize * 2) {
+		t.Error("should emit at 2*ImportEventBatchSize")
 	}
 
 	// Should not emit mid-batch (when time hasn't elapsed)
@@ -510,8 +511,9 @@ func TestShouldEmitProgress(t *testing.T) {
 	}
 
 	// Should emit when time threshold exceeded
+	flushInterval := time.Duration(shared.ImportEventFlushIntervalMs) * time.Millisecond
 	imp.eventMu.Lock()
-	imp.lastEventEmitTime = time.Now().Add(-eventFlushInterval - time.Second)
+	imp.lastEventEmitTime = time.Now().Add(-flushInterval - time.Second)
 	imp.eventMu.Unlock()
 
 	if !imp.shouldEmitProgress(1) {

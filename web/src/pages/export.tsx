@@ -58,7 +58,9 @@ export function ExportPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-border pb-3">
                   <span className="text-muted-foreground">Total Activities</span>
-                  <span className="text-xl font-bold">{stats.total_activities.toLocaleString()}</span>
+                  <span className="text-xl font-bold">
+                    {stats.total_activities.toLocaleString()}
+                  </span>
                 </div>
                 {stats.first_activity && (
                   <div className="flex items-center justify-between">
@@ -126,19 +128,11 @@ export function ExportPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">From</label>
-                  <Input
-                    type="date"
-                    value={after}
-                    onChange={(e) => setAfter(e.target.value)}
-                  />
+                  <Input type="date" value={after} onChange={(e) => setAfter(e.target.value)} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">To</label>
-                  <Input
-                    type="date"
-                    value={before}
-                    onChange={(e) => setBefore(e.target.value)}
-                  />
+                  <Input type="date" value={before} onChange={(e) => setBefore(e.target.value)} />
                 </div>
               </div>
             </div>

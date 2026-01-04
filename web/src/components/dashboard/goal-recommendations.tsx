@@ -44,7 +44,8 @@ export function GoalRecommendations() {
     if (recentMonths.length < 2) return []
 
     // Calculate averages
-    const avgDistance = recentMonths.reduce((sum, m) => sum + m.total_distance, 0) / recentMonths.length
+    const avgDistance =
+      recentMonths.reduce((sum, m) => sum + m.total_distance, 0) / recentMonths.length
     const avgElevation =
       recentMonths.reduce((sum, m) => sum + m.total_elevation, 0) / recentMonths.length
     const avgTime = recentMonths.reduce((sum, m) => sum + m.total_time, 0) / recentMonths.length
@@ -242,7 +243,9 @@ export function GoalRecommendations() {
                       <span className="font-medium text-sm">
                         {formatTarget(rec)} / {rec.period}
                       </span>
-                      <span className="text-[10px] uppercase" style={{ color }}>{label}</span>
+                      <span className="text-[10px] uppercase" style={{ color }}>
+                        {label}
+                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{rec.reason}</p>
                     <div className="text-[10px] text-muted-foreground/70">

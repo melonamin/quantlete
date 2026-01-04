@@ -7,12 +7,7 @@ import { useSyncHistory, useImportProgress, useCancelImport } from '@/lib/api'
 import { formatDistance } from 'date-fns'
 import { Clock, Check, X, AlertCircle, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ImportStatus } from './import-status'
 
@@ -71,9 +66,7 @@ export function SyncHistoryModal({ open, onOpenChange }: SyncHistoryModalProps) 
   }
 
   // Filter out the running entry from history when showing live progress
-  const filteredHistory = isRunning
-    ? history?.filter((run) => run.status !== 'running')
-    : history
+  const filteredHistory = isRunning ? history?.filter((run) => run.status !== 'running') : history
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,10 +108,7 @@ export function SyncHistoryModal({ open, onOpenChange }: SyncHistoryModalProps) 
                 </div>
               )}
               {filteredHistory.map((run) => (
-                <div
-                  key={run.id}
-                  className="rounded-lg border border-border overflow-hidden"
-                >
+                <div key={run.id} className="rounded-lg border border-border overflow-hidden">
                   <button
                     type="button"
                     className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
@@ -136,7 +126,9 @@ export function SyncHistoryModal({ open, onOpenChange }: SyncHistoryModalProps) 
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatDistance(new Date(run.started_at), new Date(), { addSuffix: true })}
+                          {formatDistance(new Date(run.started_at), new Date(), {
+                            addSuffix: true,
+                          })}
                           {run.duration_seconds && ` • ${formatDuration(run.duration_seconds)}`}
                         </div>
                       </div>

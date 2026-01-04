@@ -28,7 +28,7 @@ export function TrainingGoals() {
   const { data, isLoading } = useTrainingGoals()
   const update = useUpdateTrainingGoals()
 
-  const sports = data?.config.sports ?? []
+  const sports = useMemo(() => data?.config.sports ?? [], [data?.config.sports])
   const [sportName, setSportName] = useState<string | null>(null)
   const [period, setPeriod] = useState<GoalPeriod>('week')
   const [showEdit, setShowEdit] = useState(false)

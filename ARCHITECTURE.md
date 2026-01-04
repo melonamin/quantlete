@@ -22,45 +22,79 @@ This document describes the technical architecture for implementing the Statisti
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         DEPLOYMENT MODES                                │
-├─────────────────────────────────┬───────────────────────────────────────┤
-│       Self-Hosted Binary        │         Browser-Only (WASM)           │
-├─────────────────────────────────┼───────────────────────────────────────┤
-│  ┌───────────────────────────┐  │  ┌─────────────────────────────────┐  │
-│  │      Go Binary            │  │  │       Static Hosting            │  │
-│  │  ┌─────────┐ ┌─────────┐  │  │  │   (CDN / GitHub Pages)          │  │
-│  │  │   CLI   │ │  HTTP   │  │  │  └─────────────────────────────────┘  │
-│  │  │ (cobra) │ │ Server  │  │  │                 │                     │
-│  │  └────┬────┘ └────┬────┘  │  │                 ▼                     │
-│  │       │           │       │  │  ┌─────────────────────────────────┐  │
-│  │       └─────┬─────┘       │  │  │         React SPA               │  │
-│  │             │             │  │  │  ┌───────────┐ ┌─────────────┐  │  │
-│  │             ▼             │  │  │  │  UI Layer │ │ SQLite-WASM │  │  │
-│  │  ┌─────────────────────┐  │  │  │  └─────┬─────┘ └──────┬──────┘  │  │
-│  │  │   Embedded React    │  │  │  │        │              │         │  │
-│  │  │   (go:embed dist/)  │  │  │  │        └──────┬───────┘         │  │
-│  │  └─────────────────────┘  │  │  │               │                 │  │
-│  │             │             │  │  │               ▼                 │  │
-│  │             ▼             │  │  │  ┌─────────────────────────┐    │  │
-│  │  ┌─────────────────────┐  │  │  │  │   OPFS (Browser FS)     │    │  │
-│  │  │       SQLite        │  │  │  │  │   quantlete.db              │    │  │
-│  │  │  (pure Go driver)   │  │  │  │  └─────────────────────────┘    │  │
-│  │  └─────────────────────┘  │  │  └─────────────────────────────────┘  │
-│  │             │             │  │                 │                     │
-│  │             ▼             │  │                 │                     │
-│  │  ┌─────────────────────┐  │  │                 │                     │
-│  │  │     quantlete.db        │  │  │                 │                     │
-│  │  │   (local file)      │  │  │                 │                     │
-│  │  └─────────────────────┘  │  │                 │                     │
-│  └───────────────────────────┘  │                 │                     │
-│              │                  │                 │                     │
-└──────────────┼──────────────────┴─────────────────┼─────────────────────┘
-               │                                    │
-               ▼                                    ▼
-        ┌─────────────────────────────────────────────────────┐
-        │                   Strava API                        │
-        │  OAuth 2.0 │ Activities │ Streams │ Webhooks        │
-        └─────────────────────────────────────────────────────┘
+├─────────────────────────────────────┬───────────────────────────────────┤
+│       Self-Hosted Binary            │         Browser-Only (WASM)       │
+├─────────────────────────────────────┼───────────────────────────────────┤
+│  ┌───────────────────────────────┐  │  ┌─────────────────────────────┐  │
+│  │        Go Binary              │  │  │     Static Hosting          │  │
+│  │  ┌─────────┐ ┌─────────────┐  │  │  │   (CDN / GitHub Pages)      │  │
+│  │  │   CLI   │ │ HTTP Server │  │  │  └─────────────────────────────┘  │
+│  │  │ (cobra) │ │   (chi)     │  │  │                 │                 │
+│  │  └────┬────┘ └──────┬──────┘  │  │                 ▼                 │
+│  │       │             │         │  │  ┌─────────────────────────────┐  │
+│  │       └──────┬──────┘         │  │  │        React SPA            │  │
+│  │              │                │  │  │  ┌─────────────────────┐    │  │
+│  │              ▼                │  │  │  │   GoWasmProvider    │    │  │
+│  │  ┌─────────────────────────┐  │  │  │  └──────────┬──────────┘    │  │
+│  │  │   Embedded React        │  │  │  │             │               │  │
+│  │  │   (go:embed dist/)      │  │  │  │             ▼               │  │
+│  │  └─────────────────────────┘  │  │  │  ┌─────────────────────┐    │  │
+│  │              │                │  │  │  │    Go WASM          │    │  │
+│  │              ▼                │  │  │  │  (cmd/wasm/main.go) │    │  │
+│  │  ┌─────────────────────────┐  │  │  │  └──────────┬──────────┘    │  │
+│  │  │   internal/storage/*    │  │  │  │             │               │  │
+│  │  │  (shared Go code)       │  │  │  │             ▼               │  │
+│  │  └───────────┬─────────────┘  │  │  │  ┌─────────────────────┐    │  │
+│  │              │                │  │  │  │  internal/storage/* │    │  │
+│  │              ▼                │  │  │  │  (same Go code!)    │    │  │
+│  │  ┌─────────────────────────┐  │  │  │  └──────────┬──────────┘    │  │
+│  │  │   modernc.org/sqlite    │  │  │  │             │               │  │
+│  │  │   (pure Go driver)      │  │  │  │             ▼               │  │
+│  │  └───────────┬─────────────┘  │  │  │  ┌─────────────────────┐    │  │
+│  │              │                │  │  │  │  go-sqlite3-js      │    │  │
+│  │              ▼                │  │  │  │  → sql.js → OPFS    │    │  │
+│  │  ┌─────────────────────────┐  │  │  │  └─────────────────────┘    │  │
+│  │  │     quantlete.db        │  │  │  └─────────────────────────────┘  │
+│  │  │   (local file)          │  │  │                 │                 │
+│  │  └─────────────────────────┘  │  │                 │                 │
+│  └───────────────────────────────┘  │                 │                 │
+│              │                      │                 │                 │
+└──────────────┼──────────────────────┴─────────────────┼─────────────────┘
+               │                                        │
+               ▼                                        ▼
+        ┌──────────────────────┐              ┌─────────────────────┐
+        │     Strava API       │              │  Cloudflare Worker  │
+        │  OAuth │ Activities  │              │   (OAuth proxy)     │
+        │  Streams │ Webhooks  │              └──────────┬──────────┘
+        └──────────────────────┘                         │
+                                                         ▼
+                                              ┌─────────────────────┐
+                                              │     Strava API      │
+                                              └─────────────────────┘
 ```
+
+### 1.3 Code Sharing Between Modes
+
+The storage layer (`internal/storage/*`) is **100% shared** between server and WASM builds:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          SHARED GO CODE                                 │
+│  internal/storage/     → 20+ repositories (activities, stats, gear...) │
+│  algorithms/go/        → Eddington, TSS, CTL/ATL/TSB, power metrics    │
+├────────────────────────────────┬────────────────────────────────────────┤
+│         SERVER-ONLY            │            WASM-ONLY                   │
+│  cmd/quantlete/                │  cmd/wasm/main.go (JS bridge)          │
+│  internal/api/                 │  web/src/lib/wasm/go-storage.ts        │
+│  internal/importer/            │  web/src/lib/data/wasm/go-provider.ts  │
+│  internal/strava/ (API client) │  web/src/lib/wasm/strava/importer.ts   │
+│  driver_server.go              │  driver_wasm.go                        │
+└────────────────────────────────┴────────────────────────────────────────┘
+```
+
+Build tags select the SQLite driver:
+- **Server:** `driver_server.go` → `modernc.org/sqlite` (file-based)
+- **WASM:** `driver_wasm.go` → `go-sqlite3-js` → `sql.js` → OPFS
 
 ---
 
@@ -841,95 +875,132 @@ Error responses:
 
 ## 6. Data Layer Abstraction
 
-The frontend uses a unified interface that works in both Go backend mode and WASM browser mode.
+The frontend uses a unified `DataProvider` interface with two implementations:
+- **ApiProvider** - calls Go HTTP server (server mode)
+- **GoWasmProvider** - calls Go WASM directly (browser-only mode)
 
-### 6.1 Interface Definition
+### 6.1 Provider Interface
 
 ```typescript
-// web/src/lib/db/types.ts
+// web/src/lib/data/provider.ts (simplified)
 
-export interface DataSource {
+export interface DataProvider {
   // Activities
   getActivities(filters: ActivityFilters): Promise<PaginatedResult<Activity>>;
-  getActivity(id: string): Promise<Activity | null>;
-  getActivityStreams(id: string): Promise<ActivityStreams | null>;
+  getActivity(id: number): Promise<Activity | null>;
+  getActivityStreams(id: number): Promise<ActivityStreams | null>;
 
   // Dashboard
-  getDashboardStats(): Promise<DashboardStats>;
-  getWeeklyStats(): Promise<WeeklyStats>;
-  getMonthlyStats(years: number[]): Promise<MonthlyStats[]>;
-  getActivityGrid(year: number): Promise<ActivityGridData>;
-
-  // Segments
-  getSegments(filters: SegmentFilters): Promise<PaginatedResult<Segment>>;
-  getSegment(id: string): Promise<Segment | null>;
-  getSegmentEfforts(segmentId: string): Promise<SegmentEffort[]>;
+  getDashboard(athleteID: number): Promise<DashboardData>;
+  getCalendar(athleteID: number, year: number): Promise<CalendarData>;
 
   // Stats
-  getEddingtonData(sportTypes: string[]): Promise<EddingtonData>;
-  getBestEfforts(sportType: string): Promise<BestEffort[]>;
-  getHeatmapRoutes(filters: HeatmapFilters): Promise<HeatmapRoute[]>;
-  getTrainingLoad(range: DateRange): Promise<TrainingLoadData>;
+  getEddingtonData(athleteID: number, sportTypes: string[]): Promise<EddingtonData>;
+  getTrainingLoad(athleteID: number, days: number): Promise<TrainingLoadData>;
+  getPowerStats(athleteID: number, sportTypes: string[]): Promise<PowerStats>;
+  getBestEfforts(athleteID: number, distanceType: string): Promise<BestEffort[]>;
 
   // Gear
-  getGear(): Promise<Gear[]>;
-  getGearStats(gearId: string): Promise<GearStats>;
+  getGear(athleteID: number): Promise<Gear[]>;
+  getCustomGear(athleteID: number): Promise<CustomGear[]>;
+  createCustomGear(gear: CustomGearInput): Promise<CustomGear>;
+
+  // Maintenance
+  getGearComponents(gearID: string): Promise<GearComponent[]>;
+  logMaintenance(componentID: string, data: MaintenanceInput): Promise<void>;
+
+  // Segments
+  getSegments(athleteID: number, filters: SegmentFilters): Promise<PaginatedResult<Segment>>;
+  getSegmentEfforts(segmentID: number): Promise<SegmentEffort[]>;
 
   // Settings
-  getSettings(): Promise<UserSettings>;
-  updateSettings(settings: Partial<UserSettings>): Promise<void>;
+  getSettings(athleteID: number): Promise<Settings>;
+  updateSettings(athleteID: number, settings: Partial<Settings>): Promise<void>;
 
-  // Import (only available in certain modes)
-  triggerImport?(): Promise<void>;
-  getImportStatus?(): Promise<ImportStatus>;
-}
-
-export interface ActivityFilters {
-  sportTypes?: string[];
-  dateFrom?: Date;
-  dateTo?: Date;
-  country?: string;
-  gearId?: string;
-  device?: string;
-  isCommute?: boolean;
-  workoutType?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  page?: number;
-  perPage?: number;
+  // ... and more methods for all 19 data categories
 }
 ```
 
-### 6.2 Factory
+### 6.2 Provider Factory
 
 ```typescript
-// web/src/lib/db/index.ts
+// web/src/lib/data/context.tsx
 
-import { DataSource } from './types';
-import { ApiDataSource } from './api-client';
-import { WasmDataSource } from './wasm-client';
+import { ApiProvider } from './api/provider';
+import { GoWasmProvider } from './wasm/go-provider';
 
-let instance: DataSource | null = null;
-
-export async function getDataSource(): Promise<DataSource> {
-  if (instance) return instance;
-
-  const mode = import.meta.env.VITE_DATA_MODE || 'api';
+export function createProvider(): DataProvider {
+  const mode = import.meta.env.VITE_DATA_MODE;
 
   if (mode === 'wasm') {
-    const wasm = new WasmDataSource();
-    await wasm.initialize();
-    instance = wasm;
-  } else {
-    instance = new ApiDataSource();
+    return new GoWasmProvider();  // Calls Go WASM via goStorage.*
+  }
+  return new ApiProvider();       // Calls Go HTTP API via fetch
+}
+```
+
+### 6.3 GoWasmProvider Implementation
+
+The `GoWasmProvider` wraps calls to Go WASM functions:
+
+```typescript
+// web/src/lib/data/wasm/go-provider.ts (simplified)
+
+import * as goStorage from '@/lib/wasm/go-storage';
+
+export class GoWasmProvider implements DataProvider {
+  async getActivities(filters: ActivityFilters): Promise<PaginatedResult<Activity>> {
+    // Call Go WASM directly - no HTTP, no network latency
+    return goStorage.getActivities(
+      filters.athleteID,
+      filters.limit,
+      filters.offset,
+      JSON.stringify(filters)
+    );
   }
 
-  return instance;
+  async getDashboard(athleteID: number): Promise<DashboardData> {
+    return goStorage.getDashboard(athleteID);
+  }
+
+  async getEddingtonData(athleteID: number, sportTypes: string[]): Promise<EddingtonData> {
+    return goStorage.getEddingtonData(athleteID, sportTypes);
+  }
+
+  // ... implements all DataProvider methods
+}
+```
+
+### 6.4 go-storage.ts Typed Wrappers
+
+```typescript
+// web/src/lib/wasm/go-storage.ts
+
+declare global {
+  interface Window {
+    goStorage: {
+      getActivities(athleteID: number, limit: number, offset: number, filters: string): string;
+      getDashboard(athleteID: number): string;
+      // ... more methods
+    };
+  }
 }
 
-export function isWasmMode(): boolean {
-  return import.meta.env.VITE_DATA_MODE === 'wasm';
+// Parse Go's JSON string returns into typed objects
+function parseGoResult<T>(jsonString: string): T {
+  const result = JSON.parse(jsonString);
+  if (!result.ok) throw new Error(result.error);
+  return result.data as T;
+}
+
+export function getActivities(
+  athleteID: number, limit: number, offset: number, filters: string
+): PaginatedResult<Activity> {
+  return parseGoResult(window.goStorage.getActivities(athleteID, limit, offset, filters));
+}
+
+export function getDashboard(athleteID: number): DashboardData {
+  return parseGoResult(window.goStorage.getDashboard(athleteID));
 }
 ```
 
@@ -1087,115 +1158,325 @@ CMD ["quantlete", "serve"]
 
 ### 8.1 Architecture
 
-In browser-only mode:
-1. React app is served from static hosting (CDN, GitHub Pages)
-2. User authenticates directly with Strava (implicit OAuth flow)
-3. Browser fetches data from Strava API (CORS is supported)
-4. Data is stored in SQLite-WASM with OPFS persistence
-5. All processing happens client-side
+The WASM mode uses **Go compiled to WebAssembly** with the same storage code as the server:
 
-### 8.2 Strava OAuth in Browser
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    WASM MODE DATA FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  React App (GoWasmProvider)                                             │
+│       │                                                                 │
+│       ▼                                                                 │
+│  go-storage.ts (TypeScript wrappers)                                    │
+│       │                                                                 │
+│       ▼                                                                 │
+│  goStorage.* (JS global)                                                │
+│       │                                                                 │
+│       ▼                                                                 │
+│  cmd/wasm/main.go (syscall/js bridge)                                   │
+│       │                                                                 │
+│       ▼                                                                 │
+│  internal/storage/* (20 Go repositories - same as server!)             │
+│       │                                                                 │
+│       ▼                                                                 │
+│  go-sqlite3-js (database/sql driver for browser)                        │
+│       │                                                                 │
+│       ▼                                                                 │
+│  sql.js (SQLite compiled to WASM)                                       │
+│       │                                                                 │
+│       ▼                                                                 │
+│  OPFS (Origin Private File System) - persistent browser storage         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+Key files:
+- `cmd/wasm/main.go` - Go WASM entry point, exports functions to JS
+- `web/src/lib/wasm/go-storage.ts` - TypeScript wrappers with types
+- `web/src/lib/data/wasm/go-provider.ts` - DataProvider implementation
+- `web/src/lib/wasm/strava/importer.ts` - TypeScript Strava importer
+- `worker/src/index.ts` - Cloudflare Worker for OAuth proxy
+
+### 8.2 OAuth via Cloudflare Worker
+
+Browser can't call Strava OAuth directly (needs `client_secret`). A Cloudflare Worker proxies:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         OAUTH FLOW                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. User clicks "Connect Strava"                                        │
+│     Browser → strava.com/oauth/authorize?client_id=XXX                  │
+│                                                                         │
+│  2. Strava redirects back with code                                     │
+│     yourapp.com/oauth/callback?code=XXXXX                               │
+│                                                                         │
+│  3. Browser exchanges code via Worker                                   │
+│     Browser → CF Worker: POST /oauth/exchange                           │
+│       { code, client_id, client_secret }                                │
+│     CF Worker → Strava: POST /oauth/token                               │
+│     CF Worker → Browser: { access_token, refresh_token, athlete }       │
+│                                                                         │
+│  4. Tokens stored in SQLite (via Go WASM) → OPFS                        │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+User provides their own Strava API credentials (created at strava.com/settings/api).
+The Worker only proxies - it doesn't store credentials.
+
+### 8.3 Go WASM Bridge File Structure
+
+The WASM bridge code is organized into domain-specific files:
+
+```
+cmd/wasm/
+├── main.go         (325 lines)  # Entry point, WasmBridge struct, JS registration
+├── helpers.go      (126 lines)  # JSON helpers, validation, constants
+├── activities.go   (455 lines)  # Activity CRUD, streams, activityToMap
+├── algorithms.go   (293 lines)  # Power, Eddington, training load algorithms
+├── athletes.go     (199 lines)  # saveAthlete, FTP/weight history
+├── challenges.go   (147 lines)  # Challenges, training goals
+├── dashboard.go    (194 lines)  # Dashboard stats, heatmap, calendar
+├── gear.go         (225 lines)  # Gear CRUD, monthly usage
+├── maintenance.go  (683 lines)  # Components, settings, custom gear, HR zones
+├── photos.go       (193 lines)  # Photo CRUD
+├── rewind.go       (175 lines)  # Yearly rewind reports
+├── segments.go     (422 lines)  # Segment/effort CRUD, country stats
+├── stats.go        (408 lines)  # Best efforts, Eddington, power stats
+└── sync.go         (241 lines)  # Sync history management
+```
+
+### 8.4 WASM Bridge API Contract
+
+#### Initialization Sequence
+
+The WASM bridge must be initialized in this order:
 
 ```typescript
-// web/src/lib/strava/oauth.ts
+// 1. Load Go WASM (wasm_exec.js + main.wasm)
+const go = new Go();
+await WebAssembly.instantiate(wasmBytes, go.importObject);
+go.run(instance);
 
-const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
-const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
+// 2. Initialize database
+const result = JSON.parse(window.goStorage.init());
+if (!result.ok) throw new Error(result.error);
 
-export function initiateStravaAuth() {
-  const params = new URLSearchParams({
-    client_id: import.meta.env.VITE_STRAVA_CLIENT_ID,
-    redirect_uri: window.location.origin + '/auth/callback',
-    response_type: 'code',
-    scope: 'read,activity:read_all',
-  });
+// 3. Set athlete ID (required before queries)
+window.goStorage.setAthleteId(athleteID);
 
-  window.location.href = `${STRAVA_AUTH_URL}?${params}`;
+// 4. Now ready to call other functions
+```
+
+#### Response Format
+
+All functions return JSON strings with this structure:
+
+```typescript
+// Success response
+{ "ok": true, "data": <payload> }
+{ "ok": true, "message": "Success message" }
+
+// Success with pagination
+{
+  "ok": true,
+  "data": [...],
+  "total": 1234,
+  "page": 1,
+  "per_page": 50,
+  "total_pages": 25
 }
 
-// Token exchange requires a backend or serverless function
-// because client_secret cannot be exposed in browser
-export async function exchangeCode(code: string): Promise<TokenResponse> {
-  // Option 1: Use a serverless function (Cloudflare Worker, etc.)
-  // Option 2: Use Strava's token endpoint with PKCE (if supported)
-  const response = await fetch('/api/auth/exchange', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  });
-  return response.json();
+// Error response
+{ "ok": false, "error": "Error message" }
+```
+
+#### Exported Functions
+
+Functions registered under `window.goStorage`:
+
+| Category | Function | Description |
+|----------|----------|-------------|
+| **Initialization** | | |
+| | `init()` | Initialize database, run migrations |
+| | `setAthleteId(id)` | Set current athlete ID for queries |
+| | `exportDb()` | Export database as Uint8Array for OPFS |
+| **Activities** | | |
+| | `getAuthStatus()` | Check authentication status |
+| | `getActivities(filtersJSON)` | List activities with filters |
+| | `getActivity(id)` | Get single activity |
+| | `getActivityStreams(id)` | Get activity streams |
+| | `saveActivity(json)` | Save/update activity |
+| | `saveStream(json)` | Save activity stream |
+| **Athletes** | | |
+| | `saveAthlete(json)` | Save athlete data |
+| | `getFtpHistory()` | Get FTP history |
+| | `getWeightHistory()` | Get weight history |
+| | `updateFtpHistory(json)` | Replace FTP history |
+| | `updateWeightHistory(json)` | Replace weight history |
+| **Dashboard** | | |
+| | `getDashboardStats()` | Aggregated dashboard data |
+| | `getWeeklyStats()` | Current week stats |
+| | `getRecentActivities(limit)` | Recent activities |
+| | `getSportTypeStats()` | Stats by sport type |
+| | `getMonthlyStats(year?)` | Monthly breakdown |
+| | `getYearlyStats()` | Yearly breakdown |
+| | `getHeatmapData(filtersJSON)` | Heatmap coordinates |
+| | `getCalendarData(year)` | Calendar grid data |
+| **Gear** | | |
+| | `getGear(filtersJSON)` | List gear |
+| | `getGearDetail(id)` | Single gear detail |
+| | `saveGear(json)` | Save gear |
+| | `getGearMonthlyUsage(filtersJSON)` | Monthly gear usage |
+| **Segments** | | |
+| | `getSegments(filtersJSON)` | List segments |
+| | `getSegmentDetail(id)` | Single segment detail |
+| | `saveSegment(json)` | Save segment |
+| | `saveSegmentEffort(json)` | Save segment effort |
+| | `getSegmentEfforts(filtersJSON)` | List efforts for segment |
+| | `getSegmentCountries()` | Country breakdown |
+| **Stats** | | |
+| | `getBestEffortPRs(sportType?)` | Personal records |
+| | `getBestEffortsForType(type, sport?)` | Efforts by distance type |
+| | `saveBestEfforts(json)` | Save best efforts |
+| | `getEddingtonData(filtersJSON)` | Eddington number + history |
+| | `getTrainingLoad(filtersJSON)` | CTL/ATL/TSB series |
+| | `getPowerStats(filtersJSON)` | Power curve + history |
+| | `computePowerBestEfforts(json)` | Compute power from streams |
+| **Algorithms** | | |
+| | `normalizedPower(watts[])` | Calculate normalized power |
+| | `rollingMaxAverage(values[], window)` | Rolling max average |
+| | `intensityFactor(np, ftp)` | Calculate IF |
+| | `trainingStressScore(dur, np, ftp)` | Calculate TSS |
+| | `eddingtonNumber(distances[])` | Calculate E-number |
+| | `eddingtonNextSteps(dists[], e, n)` | Days to next E |
+| | `eddingtonHistory(distances[])` | Progressive E over time |
+| | `calculateTrainingLoad(tss[], ctl, atl)` | CTL/ATL/TSB series |
+| **Sync** | | |
+| | `createSyncRun(json)` | Start sync run |
+| | `updateSyncRun(json)` | Update sync progress |
+| | `completeSyncRun(json)` | Complete/fail sync |
+| | `getSyncHistory(limit?)` | Get sync history |
+| **Photos** | | |
+| | `getPhotos(filtersJSON)` | List photos |
+| | `getActivityPhotos(activityId)` | Photos for activity |
+| | `savePhoto(json)` | Save photo |
+| **Rewind** | | |
+| | `getRewindYears()` | Available rewind years |
+| | `getRewind(year)` | Yearly summary report |
+| **Challenges** | | |
+| | `getChallenges(filtersJSON)` | List challenges |
+| | `getTrainingGoals(year?)` | Training goals config |
+| | `updateTrainingGoals(json)` | Update goals |
+| **Maintenance** | | |
+| | `getMaintenanceDue()` | Components needing service |
+| | `getGearComponents(filtersJSON)` | Components for gear |
+| | `createComponent(json)` | Create component |
+| | `updateComponent(json)` | Update component |
+| | `deleteComponent(id)` | Delete component |
+| | `logMaintenance(json)` | Log maintenance event |
+| **Settings** | | |
+| | `getAppSettings()` | Get user settings |
+| | `updateAppSettings(json)` | Update settings |
+| | `getCustomGear(filtersJSON)` | List custom gear |
+| | `createCustomGear(json)` | Create custom gear |
+| | `updateCustomGear(json)` | Update custom gear |
+| | `deleteCustomGear(json)` | Delete custom gear |
+| | `getHrZoneDefinitions()` | HR zone configs |
+| | `upsertHrZoneDefinition(json)` | Create/update HR zone |
+| | `deleteHrZoneDefinition(json)` | Delete HR zone |
+
+#### Input Validation
+
+The WASM bridge includes input validation constants:
+
+```go
+const (
+    maxStreamDataSize     = 100000 // Max data points in a stream
+    maxTrainingLoadDays   = 10000  // Max days of training load data
+    maxBestEffortsPerSave = 1000   // Max best efforts per activity
+    maxAlgorithmArraySize = 100000 // Max array size for algorithm functions
+)
+```
+
+### 8.5 TypeScript Wrappers
+
+Go functions are exposed to JavaScript via `syscall/js`:
+
+```go
+// cmd/wasm/main.go (simplified)
+func main() {
+    js.Global().Set("goStorage", map[string]interface{}{
+        "init":          js.FuncOf(initStorage),
+        "getActivities": js.FuncOf(getActivities),
+        "saveActivity":  js.FuncOf(saveActivity),
+        // ... 60+ more methods
+    })
+    select {} // Keep WASM running
 }
 ```
 
-### 8.3 SQLite-WASM Setup
+TypeScript wrappers provide types:
 
 ```typescript
-// web/src/lib/db/wasm-client.ts
-
-import initSqlJs, { Database } from 'sql.js';
-
-export class WasmDataSource implements DataSource {
-  private db: Database | null = null;
-
-  async initialize(): Promise<void> {
-    const SQL = await initSqlJs({
-      locateFile: (file) => `https://sql.js.org/dist/${file}`,
-    });
-
-    // Try to load existing database from OPFS
-    const opfsRoot = await navigator.storage.getDirectory();
-    try {
-      const fileHandle = await opfsRoot.getFileHandle('quantlete.db');
-      const file = await fileHandle.getFile();
-      const buffer = await file.arrayBuffer();
-      this.db = new SQL.Database(new Uint8Array(buffer));
-    } catch {
-      // Create new database if none exists
-      this.db = new SQL.Database();
-    }
-
-    // Run migrations if needed
-    await this.runMigrations();
-  }
-
-  private async runMigrations(): Promise<void> {
-    // Check schema version and apply migrations
-    // Migrations are embedded in the JS bundle
-  }
-
-  async getActivities(filters: ActivityFilters): Promise<PaginatedResult<Activity>> {
-    const { sql, params } = buildActivityQuery(filters);
-    const result = this.db!.exec(sql, params);
-    return {
-      data: result[0]?.values.map(rowToActivity) ?? [],
-      meta: { /* pagination */ }
-    };
-  }
-
-  async persist(): Promise<void> {
-    // Save database to OPFS
-    const data = this.db!.export();
-    const opfsRoot = await navigator.storage.getDirectory();
-    const fileHandle = await opfsRoot.getFileHandle('quantlete.db', { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(data);
-    await writable.close();
-  }
-
-  // ... implement other methods
+// web/src/lib/wasm/go-storage.ts
+export function getActivities(
+    athleteID: number, limit: number, offset: number
+): Activity[] {
+    const result = parseGoResult<Activity[]>(
+        window.goStorage.getActivities(athleteID, limit, offset)
+    );
+    if (!result.ok) throw new Error(result.error);
+    return result.data;
 }
 ```
 
-### 8.4 Limitations in WASM Mode
+### 8.4 Import Process
+
+The TypeScript importer mirrors the Go importer's 6-phase approach:
+
+```
+Phase 1: Activities  ─── Fetch activity metadata (paginated)
+    │
+    ▼
+Phase 2: Gear        ─── Fetch gear details for unique gear_ids
+    │
+    ▼
+Phase 3: Streams     ─── Fetch GPS/HR/power streams per activity
+    │
+    ▼
+Phase 4: Details     ─── Fetch segment efforts + best efforts
+    │
+    ▼
+Phase 5: Segments    ─── Fetch full segment info (polylines, PRs)
+    │
+    ▼
+Phase 6: Photos      ─── Fetch activity photos
+```
+
+Features:
+- Pause/Resume (state persisted to localStorage)
+- Rate limit handling (100/15min, 1000/day)
+- ETA estimation based on remaining API calls
+- Incremental sync (skip already imported activities)
+- Data saved via Go WASM: `goSaveActivity()`, `goSaveStream()`, etc.
+
+### 8.5 Limitations in WASM Mode
 
 | Feature | Go Binary | WASM Browser |
 |---------|-----------|--------------|
 | Webhooks | Yes | No (needs server) |
 | Scheduled imports | Yes | No (must be tab open) |
 | Background sync | Yes | Service Worker possible |
-| Initial import speed | Fast | Slower (rate limits + single thread) |
+| Initial import speed | Fast | Slower (rate limits) |
 | Large datasets | Good | Limited by browser memory |
-| Challenge scraping | Yes | CORS issues |
+| Challenge scraping | Yes | Works via Go WASM |
 | Weather enrichment | Yes | Possible (Open-Meteo has CORS) |
+| Storage code | Go | Same Go (compiled to WASM) |
+| SQL queries | Go | Same Go (compiled to WASM) |
 
 ---
 

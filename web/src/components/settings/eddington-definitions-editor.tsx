@@ -207,10 +207,7 @@ export function EddingtonDefinitionsEditor({
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">Rename</Label>
-                  <Input
-                    value={d.name}
-                    onChange={(e) => update(d.id, { name: e.target.value })}
-                  />
+                  <Input value={d.name} onChange={(e) => update(d.id, { name: e.target.value })} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">Sport types</Label>

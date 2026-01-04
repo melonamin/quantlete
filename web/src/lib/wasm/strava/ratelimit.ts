@@ -270,7 +270,9 @@ export function loadState(): void {
     const db = getDatabase()
     if (!db.isInitialized()) return
 
-    const row = db.queryOne<{ value: string }>(`SELECT value FROM app_state WHERE key = 'strava_rate_limit'`)
+    const row = db.queryOne<{ value: string }>(
+      `SELECT value FROM app_state WHERE key = 'strava_rate_limit'`
+    )
 
     if (row?.value) {
       const saved = JSON.parse(row.value) as RateLimitState

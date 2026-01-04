@@ -44,7 +44,7 @@ import type {
   // Gear
   Gear,
   GearFilters,
-  GearResponse,
+  GearListResponse,
   CustomGearCreateRequest,
   GearMonthlyUsage,
   // Segments
@@ -171,9 +171,9 @@ export interface DataProvider {
   // ============================================================================
   // Gear
   // ============================================================================
-  getGear(filters?: GearFilters): Promise<GearResponse>
+  getGear(filters?: GearFilters): Promise<GearListResponse>
   getGearDetail(id: string): Promise<Gear>
-  getCustomGear(filters?: GearFilters): Promise<GearResponse>
+  getCustomGear(filters?: GearFilters): Promise<GearListResponse>
   createCustomGear(req: CustomGearCreateRequest): Promise<Gear>
   updateCustomGear(id: string, patch: Partial<CustomGearCreateRequest>): Promise<Gear>
   deleteCustomGear(id: string, force?: boolean): Promise<{ deleted: boolean }>

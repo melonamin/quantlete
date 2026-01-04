@@ -1,8 +1,6 @@
 package importer
 
 import (
-	"encoding/json"
-
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -91,28 +89,4 @@ func convertActivity(a *strava.Activity, athleteID int64) *storage.Activity {
 // This is used outside the importer (e.g., webhook updates).
 func ConvertActivity(a *strava.Activity, athleteID int64) *storage.Activity {
 	return convertActivity(a, athleteID)
-}
-
-// convertAthlete converts a Strava athlete to a storage athlete.
-func convertAthlete(a *strava.Athlete) *storage.Athlete {
-	return &storage.Athlete{
-		ID:            a.ID,
-		Username:      a.Username,
-		FirstName:     a.FirstName,
-		LastName:      a.LastName,
-		City:          a.City,
-		State:         a.State,
-		Country:       a.Country,
-		Sex:           a.Sex,
-		Premium:       a.Premium,
-		Summit:        a.Summit,
-		ProfileMedium: a.ProfileMedium,
-		Profile:       a.Profile,
-		Weight:        a.Weight,
-	}
-}
-
-// encodeStreamData encodes stream data as JSON.
-func encodeStreamData(data []any) (json.RawMessage, error) {
-	return json.Marshal(data)
 }

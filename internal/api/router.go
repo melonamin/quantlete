@@ -16,6 +16,7 @@ import (
 	"github.com/melonamin/quantlete/internal/api/handlers"
 	"github.com/melonamin/quantlete/internal/config"
 	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -31,12 +32,14 @@ const badgeRateLimitWindow = time.Minute
 // Router holds the HTTP router and its dependencies.
 type Router struct {
 	*chi.Mux
-	cfg                *config.Config
-	db                 *storage.DB
-	stravaClient       *strava.Client
+	cfg          *config.Config
+	db           *storage.DB
+	stravaClient *strava.Client
+	registry     *services.ServiceRegistry
+
+	// Handlers for routes not yet using generated adapters
 	webhooksHandler    *handlers.StravaWebhookHandler
 	authHandler        *handlers.AuthHandler
-	activitiesHandler  *handlers.ActivitiesHandler
 	importHandler      *handlers.ImportHandler
 	dashboardHandler   *handlers.DashboardHandler
 	goalsHandler       *handlers.GoalsHandler
@@ -45,7 +48,7 @@ type Router struct {
 	zonesHandler       *handlers.ZonesHandler
 	settingsHandler    *handlers.SettingsHandler
 	segmentsHandler    *handlers.SegmentsHandler
-	gearHandler        *handlers.GearHandler
+	gearHandler        *handlers.GearHandler // for custom gear operations
 	maintenanceHandler *handlers.MaintenanceHandler
 	photosHandler      *handlers.PhotosHandler
 	challengesHandler  *handlers.ChallengesHandler
@@ -183,59 +186,44 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	// CSRF protection for state-changing requests
 	r.Use(csrfProtection(allowedOrigins))
 
-	// Create repositories
-	activityRepo := storage.NewActivityRepository(db)
-	athleteRepo := storage.NewAthleteRepository(db)
+	// Create service registry (shared with WASM)
+	registry := services.NewServiceRegistry(db)
+
+	// Server-only repositories (OAuth, weather API)
 	tokenRepo := storage.NewTokenRepository(db)
-	statsRepo := storage.NewStatsRepository(db)
-	gearRepo := storage.NewGearRepository(db)
-	streamRepo := storage.NewStreamRepository(db)
-	dashboardConfigRepo := storage.NewDashboardConfigRepository(db)
-	goalsRepo := storage.NewGoalsRepository(db)
-	metricsRepo := storage.NewAthleteMetricsRepository(db)
-	segmentRepo := storage.NewSegmentRepository(db)
-	zonesRepo := storage.NewZonesRepository(db)
-	powerRepo := storage.NewPowerRepository(db, streamRepo)
-	bestEffortsRepo := storage.NewBestEffortsRepository(db)
-	trainingLoadRepo := storage.NewTrainingLoadRepository(db, streamRepo, metricsRepo, zonesRepo)
-	settingsRepo := storage.NewSettingsRepository(db)
-	maintenanceRepo := storage.NewMaintenanceRepository(db)
-	photoRepo := storage.NewPhotoRepository(db)
-	challengeRepo := storage.NewChallengeRepository(db)
-	appStateRepo := storage.NewAppStateRepository(db)
-	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
 	weatherRepo := storage.NewWeatherRepository(db.Conn())
 
-	// Create handlers
-	webhooksHandler := handlers.NewStravaWebhookHandler(cfg, imp, activityRepo, settingsRepo, stravaClient)
-	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, athleteRepo)
-	activitiesHandler := handlers.NewActivitiesHandler(activityRepo, streamRepo, stravaClient)
-	importHandler := handlers.NewImportHandler(imp, syncHistoryRepo, stravaClient)
+	// Create handlers using registry
+	// Note: Activities and Gear List/GetByID/MonthlyUsage use generated handlers from adapters.gen.go
+	webhooksHandler := handlers.NewStravaWebhookHandler(cfg, imp, registry.Activities(), registry.Settings(), stravaClient)
+	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, registry.Athletes())
+	importHandler := handlers.NewImportHandler(imp, registry.SyncHistory(), stravaClient)
 	importHandler.SetAllowedOrigins(allowedOrigins) // Configure CORS for SSE endpoint
-	dashboardHandler := handlers.NewDashboardHandler(statsRepo, dashboardConfigRepo, stravaClient)
-	goalsHandler := handlers.NewGoalsHandler(goalsRepo, stravaClient)
-	athleteHandler := handlers.NewAthleteHandler(metricsRepo, stravaClient)
-	statsHandler := handlers.NewStatsHandler(db, statsRepo, powerRepo, streamRepo, metricsRepo, zonesRepo, bestEffortsRepo, trainingLoadRepo, stravaClient)
-	zonesHandler := handlers.NewZonesHandler(zonesRepo, stravaClient)
-	settingsHandler := handlers.NewSettingsHandler(settingsRepo, stravaClient)
-	segmentsHandler := handlers.NewSegmentsHandler(segmentRepo, stravaClient)
-	gearHandler := handlers.NewGearHandler(gearRepo, stravaClient)
-	maintenanceHandler := handlers.NewMaintenanceHandler(maintenanceRepo, stravaClient)
-	photosHandler := handlers.NewPhotosHandler(photoRepo, stravaClient)
-	challengesHandler := handlers.NewChallengesHandler(challengeRepo, stravaClient, cfg.Storage.DataDir)
-	exportHandler := handlers.NewExportHandler(activityRepo, stravaClient)
-	weatherHandler := handlers.NewWeatherHandler(weatherRepo, activityRepo, streamRepo, stravaClient, slog.Default())
-	setupHandler := handlers.NewSetupHandler(cfg, appStateRepo, stravaClient)
-	badgesHandler := handlers.NewBadgesHandler(statsRepo, settingsRepo, stravaClient)
+	dashboardHandler := handlers.NewDashboardHandler(registry.DashboardService, stravaClient)
+	goalsHandler := handlers.NewGoalsHandler(registry.Goals(), stravaClient)
+	athleteHandler := handlers.NewAthleteHandler(registry.AthleteMetrics(), stravaClient)
+	statsHandler := handlers.NewStatsHandler(registry.StatsService, db, registry.Streams(), registry.AthleteMetrics(), registry.Zones(), stravaClient)
+	zonesHandler := handlers.NewZonesHandler(registry.Zones(), stravaClient)
+	settingsHandler := handlers.NewSettingsHandler(registry.Settings(), stravaClient)
+	segmentsHandler := handlers.NewSegmentsHandler(registry.SegmentsService, stravaClient)
+	gearHandler := handlers.NewGearHandler(registry.GearService, stravaClient) // for custom gear operations
+	maintenanceHandler := handlers.NewMaintenanceHandler(registry.MaintenanceService, stravaClient)
+	photosHandler := handlers.NewPhotosHandler(registry.PhotosService, stravaClient)
+	challengesHandler := handlers.NewChallengesHandler(registry.ChallengesService, stravaClient, cfg.Storage.DataDir)
+	exportHandler := handlers.NewExportHandler(registry.Activities(), stravaClient)
+	weatherHandler := handlers.NewWeatherHandler(weatherRepo, registry.Activities(), registry.Streams(), stravaClient, slog.Default())
+	setupHandler := handlers.NewSetupHandler(cfg, registry.AppState(), stravaClient)
+	badgesHandler := handlers.NewBadgesHandler(registry.Stats(), registry.Settings(), stravaClient)
 
 	router := &Router{
-		Mux:                r,
-		cfg:                cfg,
-		db:                 db,
-		stravaClient:       stravaClient,
+		Mux:          r,
+		cfg:          cfg,
+		db:           db,
+		stravaClient: stravaClient,
+		registry:     registry,
+
 		webhooksHandler:    webhooksHandler,
 		authHandler:        authHandler,
-		activitiesHandler:  activitiesHandler,
 		importHandler:      importHandler,
 		dashboardHandler:   dashboardHandler,
 		goalsHandler:       goalsHandler,
@@ -286,13 +274,13 @@ func (r *Router) mountRoutes() {
 			router.Put("/credentials", r.setupHandler.UpdateCredentials)
 		})
 
-		// Activities routes
+		// Activities routes (using generated adapters)
 		router.Route("/activities", func(router chi.Router) {
-			router.Get("/", r.activitiesHandler.List)
-			router.Get("/{id}", r.activitiesHandler.GetByID)
-			router.Get("/{id}/streams", r.activitiesHandler.GetStreams)
-			router.Get("/{id}/photos", r.photosHandler.ActivityPhotos)
-			router.Get("/{id}/weather", r.weatherHandler.GetActivityWeather)
+			router.Get("/", handlers.GenActivityServiceList(r.registry.ActivityService, r.stravaClient))
+			router.Get("/{id}", handlers.GenActivityServiceGetByID(r.registry.ActivityService, r.stravaClient))
+			router.Get("/{id}/streams", handlers.GenActivityServiceGetStreams(r.registry.ActivityService, r.stravaClient))
+			router.Get("/{id}/photos", handlers.GenPhotosServiceListByActivity(r.registry.PhotosService, r.stravaClient))
+			router.Get("/{id}/weather", r.weatherHandler.GetActivityWeather) // Manual: weather API integration
 		})
 
 		// Import routes
@@ -307,80 +295,80 @@ func (r *Router) mountRoutes() {
 			router.Get("/watermark", r.importHandler.Watermark)
 		})
 
-		// Dashboard routes
+		// Dashboard routes (using generated adapters)
 		router.Route("/dashboard", func(router chi.Router) {
-			router.Get("/", r.dashboardHandler.GetDashboard)
-			router.Get("/stats", r.dashboardHandler.GetStats)
-			router.Get("/weekly", r.dashboardHandler.GetWeeklyStats)
-			router.Get("/recent", r.dashboardHandler.GetRecentActivities)
-			router.Get("/sports", r.dashboardHandler.GetSportTypeStats)
-			router.Get("/config", r.dashboardHandler.GetDashboardConfig)
-			router.Put("/config", r.dashboardHandler.UpdateDashboardConfig)
-			router.Get("/monthly", r.dashboardHandler.GetMonthlyStats)
-			router.Get("/yearly", r.dashboardHandler.GetYearlyStats)
-			router.Get("/calendar", r.dashboardHandler.GetCalendarData)
-			router.Get("/calendar/summary", r.dashboardHandler.GetCalendarSummary)
-			router.Get("/calendar/activities", r.dashboardHandler.GetCalendarActivities)
+			router.Get("/", handlers.GenDashboardServiceGetDashboard(r.registry.DashboardService, r.stravaClient))
+			router.Get("/stats", handlers.GenDashboardServiceGetStats(r.registry.DashboardService, r.stravaClient))
+			router.Get("/weekly", handlers.GenDashboardServiceGetWeeklyStats(r.registry.DashboardService, r.stravaClient))
+			router.Get("/recent", handlers.GenDashboardServiceGetRecentActivities(r.registry.DashboardService, r.stravaClient))
+			router.Get("/sports", handlers.GenDashboardServiceGetSportTypeStats(r.registry.DashboardService, r.stravaClient))
+			router.Get("/config", handlers.GenDashboardServiceGetConfig(r.registry.DashboardService, r.stravaClient))
+			router.Put("/config", handlers.GenDashboardServiceUpdateConfig(r.registry.DashboardService, r.stravaClient))
+			router.Get("/monthly", handlers.GenDashboardServiceGetMonthlyStats(r.registry.DashboardService, r.stravaClient))
+			router.Get("/yearly", handlers.GenDashboardServiceGetYearlyStats(r.registry.DashboardService, r.stravaClient))
+			router.Get("/calendar", handlers.GenDashboardServiceGetCalendarData(r.registry.DashboardService, r.stravaClient))
+			router.Get("/calendar/summary", handlers.GenDashboardServiceGetCalendarSummary(r.registry.DashboardService, r.stravaClient))
+			router.Get("/calendar/activities", handlers.GenDashboardServiceGetCalendarActivities(r.registry.DashboardService, r.stravaClient))
 		})
 
-		// Stats routes (heatmap, eddington, etc.)
+		// Stats routes (using generated adapters where available)
 		router.Route("/stats", func(router chi.Router) {
-			router.Get("/heatmap", r.statsHandler.GetHeatmapData)
-			router.Get("/eddington", r.statsHandler.GetEddingtonData)
-			router.Get("/eddington/history", r.statsHandler.GetEddingtonHistory)
-			router.Get("/best-efforts", r.statsHandler.GetBestEfforts)
-			router.Get("/best-efforts/{distanceType}", r.statsHandler.GetBestEffortsByDistance)
-			router.Get("/rewind", r.statsHandler.GetRewind)
-			router.Get("/rewind/years", r.statsHandler.GetRewindYears)
-			router.Get("/power", r.statsHandler.GetPowerStats)
-			router.Get("/power-zones", r.statsHandler.GetPowerZones)
-			router.Get("/hr-zones", r.statsHandler.GetHRZones)
-			router.Get("/training-load", r.statsHandler.GetTrainingLoad)
-			router.Get("/daytime", r.statsHandler.GetDaytimeDistribution)
-			router.Get("/weekday", r.statsHandler.GetWeekdayDistribution)
+			router.Get("/heatmap", handlers.GenStatsServiceGetHeatmapData(r.registry.StatsService, r.stravaClient))
+			router.Get("/eddington", handlers.GenStatsServiceGetEddingtonData(r.registry.StatsService, r.stravaClient))
+			router.Get("/eddington/history", handlers.GenStatsServiceGetEddingtonHistory(r.registry.StatsService, r.stravaClient))
+			router.Get("/best-efforts", handlers.GenStatsServiceGetBestEffortPRs(r.registry.StatsService, r.stravaClient))
+			router.Get("/best-efforts/{distanceType}", handlers.GenStatsServiceGetBestEffortsForType(r.registry.StatsService, r.stravaClient))
+			router.Get("/rewind", handlers.GenStatsServiceGetRewind(r.registry.StatsService, r.stravaClient))
+			router.Get("/rewind/years", handlers.GenStatsServiceGetRewindYears(r.registry.StatsService, r.stravaClient))
+			router.Get("/power", handlers.GenStatsServiceGetPowerStats(r.registry.StatsService, r.stravaClient))
+			router.Get("/power-zones", r.statsHandler.GetPowerZones) // Manual: complex zone calculation
+			router.Get("/hr-zones", r.statsHandler.GetHRZones)       // Manual: complex zone calculation
+			router.Get("/training-load", handlers.GenStatsServiceGetTrainingLoad(r.registry.StatsService, r.stravaClient))
+			router.Get("/daytime", handlers.GenDashboardServiceGetDaytimeDistribution(r.registry.DashboardService, r.stravaClient))
+			router.Get("/weekday", handlers.GenDashboardServiceGetWeekdayDistribution(r.registry.DashboardService, r.stravaClient))
 		})
 
-		// Gear routes
+		// Gear routes (using generated adapters where available)
 		router.Route("/gear", func(router chi.Router) {
-			router.Get("/", r.gearHandler.List)
-			router.Get("/custom", r.gearHandler.ListCustom)
-			router.Post("/custom", r.gearHandler.CreateCustom)
-			router.Put("/custom/{id}", r.gearHandler.UpdateCustom)
-			router.Delete("/custom/{id}", r.gearHandler.DeleteCustom)
-			router.Get("/stats/monthly", r.gearHandler.MonthlyUsage)
-			router.Get("/{id}", r.gearHandler.GetByID)
-			router.Get("/{id}/components", r.maintenanceHandler.ListGearComponents)
-			router.Post("/{id}/components", r.maintenanceHandler.CreateGearComponent)
+			router.Get("/", handlers.GenGearServiceList(r.registry.GearService, r.stravaClient))
+			router.Get("/custom", r.gearHandler.ListCustom)           // Manual: custom gear CRUD
+			router.Post("/custom", r.gearHandler.CreateCustom)        // Manual: custom gear CRUD
+			router.Put("/custom/{id}", r.gearHandler.UpdateCustom)    // Manual: custom gear CRUD
+			router.Delete("/custom/{id}", r.gearHandler.DeleteCustom) // Manual: custom gear CRUD
+			router.Get("/stats/monthly", handlers.GenGearServiceMonthlyUsage(r.registry.GearService, r.stravaClient))
+			router.Get("/{id}", handlers.GenGearServiceGetByID(r.registry.GearService, r.stravaClient))
+			router.Get("/{id}/components", handlers.GenMaintenanceServiceListComponents(r.registry.MaintenanceService, r.stravaClient))
+			router.Post("/{id}/components", handlers.GenMaintenanceServiceCreateComponent(r.registry.MaintenanceService, r.stravaClient))
 		})
 
-		// Maintenance routes
+		// Maintenance routes (using generated adapters where available)
 		router.Route("/components", func(router chi.Router) {
-			router.Put("/{id}", r.maintenanceHandler.UpdateComponent)
-			router.Delete("/{id}", r.maintenanceHandler.DeleteComponent)
+			router.Put("/{id}", handlers.GenMaintenanceServiceUpdateComponent(r.registry.MaintenanceService, r.stravaClient))
+			router.Delete("/{id}", r.maintenanceHandler.DeleteComponent) // Manual: needs refactoring
 			router.Post("/{id}/maintenance", r.maintenanceHandler.LogMaintenance)
 		})
 		router.Route("/maintenance", func(router chi.Router) {
-			router.Get("/due", r.maintenanceHandler.Due)
+			router.Get("/due", r.maintenanceHandler.Due) // Manual: needs refactoring
 		})
 
-		// Photos routes
+		// Photos routes (using generated adapters)
 		router.Route("/photos", func(router chi.Router) {
-			router.Get("/", r.photosHandler.List)
+			router.Get("/", handlers.GenPhotosServiceList(r.registry.PhotosService, r.stravaClient))
 		})
 
-		// Challenges routes
+		// Challenges routes (using generated adapters where available)
 		router.Route("/challenges", func(router chi.Router) {
-			router.Get("/", r.challengesHandler.List)
-			router.Post("/import", r.challengesHandler.Import)
-			router.Post("/import-profile", r.challengesHandler.ImportFromProfile)
+			router.Get("/", handlers.GenChallengesServiceList(r.registry.ChallengesService, r.stravaClient))
+			router.Post("/import", r.challengesHandler.Import)                    // Manual: file upload handling
+			router.Post("/import-profile", r.challengesHandler.ImportFromProfile) // Manual: web scraping
 		})
 
-		// Segments routes
+		// Segments routes (using generated adapters where available)
 		router.Route("/segments", func(router chi.Router) {
-			router.Get("/", r.segmentsHandler.List)
-			router.Get("/countries", r.segmentsHandler.Countries)
-			router.Get("/{id}", r.segmentsHandler.GetByID)
-			router.Get("/{id}/efforts", r.segmentsHandler.ListEfforts)
+			router.Get("/", handlers.GenSegmentsServiceList(r.registry.SegmentsService, r.stravaClient))
+			router.Get("/countries", r.segmentsHandler.Countries) // Manual: needs refactoring
+			router.Get("/{id}", handlers.GenSegmentsServiceGetByID(r.registry.SegmentsService, r.stravaClient))
+			router.Get("/{id}/efforts", handlers.GenSegmentsServiceListEfforts(r.registry.SegmentsService, r.stravaClient))
 		})
 
 		// Goals routes
@@ -412,11 +400,11 @@ func (r *Router) mountRoutes() {
 			router.Put("/", r.settingsHandler.Update)
 		})
 
-		// Export routes
+		// Export routes (using generated adapters where available)
 		router.Route("/export", func(router chi.Router) {
-			router.Get("/stats", r.exportHandler.ExportStats)
-			router.Get("/activities/csv", r.exportHandler.ExportActivitiesCSV)
-			router.Get("/activities/json", r.exportHandler.ExportActivitiesJSON)
+			router.Get("/stats", handlers.GenDashboardServiceGetExportStats(r.registry.DashboardService, r.stravaClient))
+			router.Get("/activities/csv", r.exportHandler.ExportActivitiesCSV)   // Manual: binary CSV
+			router.Get("/activities/json", r.exportHandler.ExportActivitiesJSON) // Manual: binary JSON
 		})
 	})
 

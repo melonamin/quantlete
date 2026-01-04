@@ -1,14 +1,12 @@
 /**
- * Strava Credentials Storage - stores client_id and client_secret in the database.
+ * Strava Credentials Storage - stores client_id and client_secret via Go WASM.
  *
  * For WASM mode, each user must create their own Strava app and configure
- * their credentials here. The credentials are stored in the app_state table.
+ * their credentials here. The credentials are stored in the app_state table
+ * through the Go WASM bridge for consistency with native mode.
  */
 
-import { getDatabase } from '../db'
-
-const KEY_CLIENT_ID = 'strava_client_id'
-const KEY_CLIENT_SECRET = 'strava_client_secret'
+import * as goStorage from '../go-storage'
 
 export interface StravaCredentials {
   clientId: string
@@ -27,24 +25,15 @@ export function getCredentials(): StravaCredentials | null {
     return cachedCredentials
   }
 
-  const db = getDatabase()
-  if (!db.isInitialized()) {
+  if (!goStorage.isInitialized()) {
     return null
   }
 
-  const clientIdRow = db.queryOne<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [KEY_CLIENT_ID]
-  )
-  const clientSecretRow = db.queryOne<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [KEY_CLIENT_SECRET]
-  )
-
-  if (clientIdRow && clientSecretRow) {
+  const result = goStorage.getStravaCredentials()
+  if (result) {
     cachedCredentials = {
-      clientId: clientIdRow.value,
-      clientSecret: clientSecretRow.value,
+      clientId: result.client_id,
+      clientSecret: result.client_secret,
     }
     return cachedCredentials
   }
@@ -55,39 +44,15 @@ export function getCredentials(): StravaCredentials | null {
 /**
  * Save Strava credentials to the database.
  */
-export async function saveCredentials(
-  clientId: string,
-  clientSecret: string
-): Promise<void> {
-  const db = getDatabase()
-  if (!db.isInitialized()) {
-    throw new Error('Database not initialized')
+export async function saveCredentials(clientId: string, clientSecret: string): Promise<void> {
+  if (!goStorage.isInitialized()) {
+    throw new Error('Go WASM storage not initialized')
   }
 
-  const now = new Date().toISOString()
+  goStorage.saveStravaCredentials(clientId, clientSecret)
 
-  // Upsert client_id
-  db.exec(
-    `INSERT INTO app_state (key, value, updated_at)
-     VALUES (?, ?, ?)
-     ON CONFLICT (key) DO UPDATE SET
-       value = EXCLUDED.value,
-       updated_at = EXCLUDED.updated_at`,
-    [KEY_CLIENT_ID, clientId, now]
-  )
-
-  // Upsert client_secret
-  db.exec(
-    `INSERT INTO app_state (key, value, updated_at)
-     VALUES (?, ?, ?)
-     ON CONFLICT (key) DO UPDATE SET
-       value = EXCLUDED.value,
-       updated_at = EXCLUDED.updated_at`,
-    [KEY_CLIENT_SECRET, clientSecret, now]
-  )
-
-  // Persist to storage
-  await db.persist()
+  // Persist to OPFS
+  await goStorage.persistDatabase()
 
   // Update cache
   cachedCredentials = { clientId, clientSecret }
@@ -97,7 +62,10 @@ export async function saveCredentials(
  * Check if credentials are configured.
  */
 export function hasCredentials(): boolean {
-  return getCredentials() !== null
+  if (!goStorage.isInitialized()) {
+    return false
+  }
+  return goStorage.hasStravaCredentials()
 }
 
 /**
@@ -111,16 +79,12 @@ export function clearCredentialsCache(): void {
  * Delete stored credentials from the database.
  */
 export async function deleteCredentials(): Promise<void> {
-  const db = getDatabase()
-  if (!db.isInitialized()) {
+  if (!goStorage.isInitialized()) {
     return
   }
 
-  db.exec('DELETE FROM app_state WHERE key IN (?, ?)', [
-    KEY_CLIENT_ID,
-    KEY_CLIENT_SECRET,
-  ])
+  goStorage.deleteStravaCredentials()
 
-  await db.persist()
+  await goStorage.persistDatabase()
   cachedCredentials = null
 }

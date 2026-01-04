@@ -1,10 +1,6 @@
 import { useActivities } from '@/lib/api'
 import { useActivityFiltersStore } from '@/stores'
-import {
-  ActivitiesTable,
-  Pagination,
-  ActivityFiltersPanel,
-} from '@/components/activities'
+import { ActivitiesTable, Pagination, ActivityFiltersPanel } from '@/components/activities'
 
 export function ActivitiesPage() {
   const { filters, setFilters, resetFilters } = useActivityFiltersStore()
@@ -21,11 +17,7 @@ export function ActivitiesPage() {
         <p className="text-muted-foreground">Browse and filter your activities</p>
       </div>
 
-      <ActivityFiltersPanel
-        filters={filters}
-        onFiltersChange={setFilters}
-        onReset={resetFilters}
-      />
+      <ActivityFiltersPanel filters={filters} onFiltersChange={setFilters} onReset={resetFilters} />
 
       {error && (
         <div className="rounded-lg border border-destructive bg-destructive/10 p-4 mb-6">
@@ -33,7 +25,10 @@ export function ActivitiesPage() {
         </div>
       )}
 
-      <ActivitiesTable activities={data?.data ?? []} isLoading={isLoading} />
+      <ActivitiesTable
+        activities={Array.isArray(data?.data) ? data.data : []}
+        isLoading={isLoading}
+      />
 
       {data && data.total > 0 && (
         <Pagination

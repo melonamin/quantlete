@@ -52,7 +52,9 @@ export function OAuthCallbackPage() {
       // Prevent double execution - check before any async work
       if (processedRef.current) return
 
-      setDebugInfo(`initialized=${initialized}, provider=${!!provider}, error=${providerError || 'none'}`)
+      setDebugInfo(
+        `initialized=${initialized}, provider=${!!provider}, error=${providerError || 'none'}`
+      )
 
       // Check for provider initialization error
       if (providerError) {
@@ -159,7 +161,12 @@ export function OAuthCallbackPage() {
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <p className="mt-4 text-lg font-medium">Authentication successful!</p>
@@ -176,7 +183,12 @@ export function OAuthCallbackPage() {
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </div>
             <p className="mt-4 text-lg font-medium">Authentication failed</p>

@@ -19,14 +19,15 @@ async function loadSqlJs(): Promise<
   const initFn = sqljs.default?.default || sqljs.default || sqljs
 
   if (typeof initFn !== 'function') {
-    throw new Error(`sql.js did not export a function. Got: ${typeof initFn}, keys: ${Object.keys(sqljs)}`)
+    throw new Error(
+      `sql.js did not export a function. Got: ${typeof initFn}, keys: ${Object.keys(sqljs)}`
+    )
   }
 
-  return initFn as (
-    config?: { locateFile?: (file: string) => string }
-  ) => Promise<SqlJsStatic>
+  return initFn as (config?: { locateFile?: (file: string) => string }) => Promise<SqlJsStatic>
 }
-import { migrations } from './schema.gen'
+// Note: Migrations are now handled exclusively by Go WASM (storage.RunMigrations)
+// The schema.gen.ts file is kept for reference but not used here
 
 export interface QueryResult<T> {
   columns: string[]
@@ -58,6 +59,10 @@ export class WasmDatabase {
   /**
    * Initialize the database.
    * Loads existing data from storage or creates a new database.
+   *
+   * Note: Migrations are handled by Go WASM (storage.RunMigrations),
+   * not by TypeScript. This method only initializes sql.js and loads
+   * any existing persisted data.
    */
   async initialize(): Promise<void> {
     // Load sql.js
@@ -66,15 +71,14 @@ export class WasmDatabase {
       locateFile: () => this.wasmPath,
     })
 
-    // Try to load existing database
+    // Try to load existing database or create empty one
+    // Migrations are handled by Go WASM after this initialization
     const existingData = await this.storage.load()
 
     if (existingData) {
       this.db = new this.SQL.Database(existingData)
-      await this.checkMigrations()
     } else {
       this.db = new this.SQL.Database()
-      await this.runMigrations()
     }
 
     // Start auto-persist timer
@@ -85,52 +89,6 @@ export class WasmDatabase {
         }
       }, this.autoPersistInterval)
     }
-  }
-
-  /**
-   * Get the current schema version from the database.
-   */
-  private getCurrentVersion(): number {
-    try {
-      const result = this.query<{ version: number }>(
-        'SELECT version FROM schema_version ORDER BY version DESC LIMIT 1'
-      )
-      return result[0]?.version || 0
-    } catch {
-      return 0
-    }
-  }
-
-  /**
-   * Check if migrations need to be run.
-   */
-  private async checkMigrations(): Promise<void> {
-    const currentVersion = this.getCurrentVersion()
-    const latestVersion = migrations[migrations.length - 1]?.version || 0
-
-    if (currentVersion < latestVersion) {
-      await this.runMigrations(currentVersion)
-    }
-  }
-
-  /**
-   * Run database migrations starting from a specific version.
-   */
-  private async runMigrations(fromVersion: number = 0): Promise<void> {
-    for (const migration of migrations) {
-      if (migration.version > fromVersion) {
-        this.runMigrationSql(migration.sql)
-        this.dirty = true
-      }
-    }
-  }
-
-  private runMigrationSql(sql: string): void {
-    if (!this.db) {
-      throw new Error('Database not initialized')
-    }
-    // Use db.exec for multi-statement migration scripts
-    this.db.exec(sql)
   }
 
   /**
@@ -239,10 +197,7 @@ export class WasmDatabase {
     const placeholders = columns.map(() => '?').join(', ')
     const values = Object.values(data)
 
-    this.exec(
-      `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
-      values
-    )
+    this.exec(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`, values)
 
     // Get last inserted rowid
     const result = this.queryOne<{ id: number }>('SELECT last_insert_rowid() as id')
@@ -363,6 +318,22 @@ export class WasmDatabase {
     }
     return this.db.export().byteLength
   }
+
+  /**
+   * Get the internal sql.js Database instance.
+   * Used by Go WASM to share the same database.
+   */
+  getInternalDb(): Database | null {
+    return this.db
+  }
+
+  /**
+   * Get the sql.js SqlJsStatic instance.
+   * Used by Go WASM to share the same sql.js.
+   */
+  getSqlJs(): SqlJsStatic | null {
+    return this.SQL
+  }
 }
 
 // Singleton instance
@@ -381,9 +352,7 @@ export function getDatabase(): WasmDatabase {
 /**
  * Initialize the singleton database instance.
  */
-export async function initializeDatabase(
-  options?: WasmDatabaseOptions
-): Promise<WasmDatabase> {
+export async function initializeDatabase(options?: WasmDatabaseOptions): Promise<WasmDatabase> {
   if (dbInstance?.isInitialized()) {
     return dbInstance
   }

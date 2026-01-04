@@ -18,10 +18,11 @@ coverage.html
 go.work
 go.work.sum
 .gocache/
+.cache/
 
-# Generated code
+# Generated code (Go)
 *.gen.go
-*.gen.ts
+# Note: *.gen.ts files are committed for IDE type support
 
 # IDE
 .idea/
@@ -29,6 +30,12 @@ go.work.sum
 *.swp
 *.swo
 *~
+
+# Xcode
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+xcuserdata/
+*.xcworkspace/
 
 # OS
 .DS_Store
@@ -90,3 +97,4 @@ algorithms/.yarn/*
 
 # ===== Landing =====
 landing/node_modules/
+quantlete

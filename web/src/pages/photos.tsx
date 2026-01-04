@@ -57,8 +57,9 @@ export function PhotosPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const activePhoto = lightboxIndex != null ? displayPhotos[lightboxIndex] : null
 
-  const sportFacet = data?.sport_types ?? []
-  const countryFacet = data?.countries ?? []
+  // Use Array.isArray for defensive check against unexpected data shapes
+  const sportFacet = Array.isArray(data?.sport_types) ? data.sport_types : []
+  const countryFacet = Array.isArray(data?.countries) ? data.countries : []
 
   // Filter change handlers that also reset pagination and photos
   const toggleSport = (t: string) => {
@@ -200,8 +201,7 @@ export function PhotosPage() {
               onClick={() => setShowAdvanced(!showAdvanced)}
               className={cn(
                 'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
-                showAdvanced ||
-                  sportTypes.some((t) => !quickSports.includes(t))
+                showAdvanced || sportTypes.some((t) => !quickSports.includes(t))
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               )}
@@ -307,9 +307,7 @@ export function PhotosPage() {
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                    <div className="truncate text-xs font-medium text-white">
-                      {p.activity_name}
-                    </div>
+                    <div className="truncate text-xs font-medium text-white">{p.activity_name}</div>
                     <div className="text-[11px] text-white/80">
                       {formatDate(p.start_date_local)}
                     </div>

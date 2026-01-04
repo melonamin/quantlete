@@ -326,7 +326,9 @@ describe('ImportSSEClient', () => {
 
       const eventSource = MockEventSource.lastInstance!
       // Simulate sending invalid JSON directly
-      const listeners = (eventSource as unknown as { listeners: Map<string, ((e: MessageEvent) => void)[]> }).listeners
+      const listeners = (
+        eventSource as unknown as { listeners: Map<string, ((e: MessageEvent) => void)[]> }
+      ).listeners
       const progressListeners = listeners.get('sync:progress') ?? []
       progressListeners.forEach((l) => l({ data: 'invalid json{' } as MessageEvent))
 

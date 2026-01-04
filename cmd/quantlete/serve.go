@@ -85,7 +85,7 @@ func runServe(port int, dev bool) error {
 	}
 	if demoMode == "true" {
 		slog.Info("Running in demo mode - Strava API calls disabled")
-		if err := loadDemoAthlete(context.Background(), stravaClient, appStateRepo, storage.NewAthleteRepository(db)); err != nil {
+		if err = loadDemoAthlete(context.Background(), stravaClient, appStateRepo, storage.NewAthleteRepository(db)); err != nil {
 			slog.Warn("failed to load demo athlete", "error", err)
 		}
 	}
@@ -105,12 +105,12 @@ func runServe(port int, dev bool) error {
 	// Only do Strava auth setup if not in demo mode
 	if demoMode != "true" {
 		// Load credentials from database if not set via environment variables
-		if err := handlers.LoadCredentialsFromDB(context.Background(), appStateRepo, cfg, stravaClient); err != nil {
+		if err = handlers.LoadCredentialsFromDB(context.Background(), appStateRepo, cfg, stravaClient); err != nil {
 			slog.Warn("failed to load credentials from database", "error", err)
 		}
 
 		// Restore rate limit state from database
-		if err := restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
+		if err = restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
 			slog.Warn("failed to restore rate limit state", "error", err)
 		}
 
@@ -134,7 +134,7 @@ func runServe(port int, dev bool) error {
 		})
 
 		// Restore tokens from database
-		if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
+		if err = restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
 			slog.Warn("failed to restore auth from database", "error", err)
 		}
 	}
@@ -142,8 +142,26 @@ func runServe(port int, dev bool) error {
 	// Create sync history repository
 	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
 
+	// Create adapters for platform-agnostic importer
+	stravaAdapter := importer.NewServerStravaAdapter(stravaClient)
+	storageAdapter := importer.NewServerStorageAdapter(
+		athleteRepo,
+		activityRepo,
+		streamRepo,
+		gearRepo,
+		segmentRepo,
+		bestEffortsRepo,
+		photoRepo,
+		maintenanceRepo,
+		syncHistoryRepo,
+		appStateRepo,
+	)
+
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo, syncHistoryRepo)
+	imp, err := importer.New(stravaAdapter, storageAdapter)
+	if err != nil {
+		return fmt.Errorf("creating importer: %w", err)
+	}
 
 	// Create scheduler (periodic sync, maintenance checks, etc.)
 	sched := scheduler.New(slog.Default(), stravaClient, settingsRepo, imp)

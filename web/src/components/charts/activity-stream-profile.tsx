@@ -1,10 +1,6 @@
 import type { EChartsOption, YAXisComponentOption } from 'echarts'
 import { EChartsWrapper } from './echarts-wrapper'
-import {
-  chartColors,
-  defaultGridConfig,
-  defaultTooltipConfig,
-} from './chart-constants'
+import { chartColors, defaultGridConfig, defaultTooltipConfig } from './chart-constants'
 
 type StreamMap = Record<string, unknown>
 

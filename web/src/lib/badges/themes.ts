@@ -1,4 +1,11 @@
-import type { BadgeTheme, BadgeSize, BadgeThemeId, BadgeSizeId, BadgeBackgroundId, BadgeBackground } from './types'
+import type {
+  BadgeTheme,
+  BadgeSize,
+  BadgeThemeId,
+  BadgeSizeId,
+  BadgeBackgroundId,
+  BadgeBackground,
+} from './types'
 
 // Themes match the Go backend definitions in internal/badges/themes.go
 export const themes: Record<BadgeThemeId, BadgeTheme> = {
