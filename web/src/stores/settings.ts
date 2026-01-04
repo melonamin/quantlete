@@ -17,7 +17,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       unitSystem: 'metric',
-      theme: 'system',
+      theme: 'dark',
       setUnitSystem: (unitSystem) => set({ unitSystem }),
       setTheme: (theme) => set({ theme }),
     }),
