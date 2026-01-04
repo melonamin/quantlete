@@ -92,12 +92,33 @@ var getFtpHistory = wrapWasmAthlete("getFtpHistory", func(wc *WasmContext) inter
 	return dataJSON(data)
 })
 
+// getFtpRunningHistory returns FTP history for running
+// Called from JS: goStorage.getFtpRunningHistory()
+//
+//wasm:export
+var getFtpRunningHistory = wrapWasmAthlete("getFtpRunningHistory", func(wc *WasmContext) interface{} {
+	points, err := wc.Registry.AthleteMetrics().List(wc.Ctx, wc.AthleteID, "ftp_running_mps")
+	if err != nil {
+		return errorJSON(err)
+	}
+
+	data := make([]map[string]interface{}, len(points))
+	for i, p := range points {
+		data[i] = map[string]interface{}{
+			"recorded_at": p.RecordedAt.Format(time.RFC3339),
+			"value":       p.Value,
+		}
+	}
+
+	return dataJSON(data)
+})
+
 // getWeightHistory returns weight history
 // Called from JS: goStorage.getWeightHistory()
 //
 //wasm:export
 var getWeightHistory = wrapWasmAthlete("getWeightHistory", func(wc *WasmContext) interface{} {
-	points, err := wc.Registry.AthleteMetrics().List(wc.Ctx, wc.AthleteID, "weight")
+	points, err := wc.Registry.AthleteMetrics().List(wc.Ctx, wc.AthleteID, "weight_kg")
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -145,6 +166,38 @@ var updateFtpHistory = wrapWasmAthlete("updateFtpHistory", func(wc *WasmContext)
 	return successJSON(fmt.Sprintf("FTP history updated (%d entries)", len(points)))
 })
 
+// updateFtpRunningHistory replaces running FTP history
+// Called from JS: goStorage.updateFtpRunningHistory(entriesJSON)
+//
+//wasm:export
+var updateFtpRunningHistory = wrapWasmAthlete("updateFtpRunningHistory", func(wc *WasmContext) interface{} {
+	var entries []struct {
+		RecordedAt string  `json:"recorded_at"`
+		Value      float64 `json:"value"`
+	}
+	if err := wc.ArgJSON(0, &entries); err != nil {
+		return errorJSON(fmt.Errorf("parsing entries: %w", err))
+	}
+
+	points := make([]storage.AthleteMetricPoint, len(entries))
+	for i, e := range entries {
+		t, err := time.Parse(time.RFC3339, e.RecordedAt)
+		if err != nil {
+			return errorJSON(fmt.Errorf("parsing date %s: %w", e.RecordedAt, err))
+		}
+		points[i] = storage.AthleteMetricPoint{
+			RecordedAt: storage.SQLiteTime{Time: t},
+			Value:      e.Value,
+		}
+	}
+
+	if err := wc.Registry.AthleteMetrics().Replace(wc.Ctx, wc.AthleteID, "ftp_running_mps", points); err != nil {
+		return errorJSON(err)
+	}
+
+	return successJSON(fmt.Sprintf("Running FTP history updated (%d entries)", len(points)))
+})
+
 // updateWeightHistory replaces weight history
 // Called from JS: goStorage.updateWeightHistory(entriesJSON)
 //
@@ -170,7 +223,7 @@ var updateWeightHistory = wrapWasmAthlete("updateWeightHistory", func(wc *WasmCo
 		}
 	}
 
-	if err := wc.Registry.AthleteMetrics().Replace(wc.Ctx, wc.AthleteID, "weight", points); err != nil {
+	if err := wc.Registry.AthleteMetrics().Replace(wc.Ctx, wc.AthleteID, "weight_kg", points); err != nil {
 		return errorJSON(err)
 	}
 

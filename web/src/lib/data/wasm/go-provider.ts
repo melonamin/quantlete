@@ -227,12 +227,11 @@ export class GoWasmProvider implements DataProvider {
   async getActivityStreams(id: number): Promise<ActivityStream[]> {
     this.assertInitialized()
     const streams = goStorage.getActivityStreams(id)
-    // Adapt to API format
     return streams.map((s) => ({
       activity_id: id,
-      stream_type: s.type,
-      original_size: 0,
-      series_type: 'distance',
+      stream_type: s.stream_type,
+      original_size: s.original_size,
+      series_type: s.series_type,
       resolution: s.resolution,
       data: s.data,
     })) as ActivityStream[]
@@ -1117,15 +1116,17 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getFtpHistory()
-    // Split into cycling and running based on sport_type if available
-    // For now, assume all FTP entries are cycling
+    const cyclingResult = goStorage.getFtpHistory()
+    const runningResult = goStorage.getFtpRunningHistory()
     return {
-      cycling: result.map((e) => ({
+      cycling: cyclingResult.map((e) => ({
         recorded_at: e.recorded_at,
         value: e.value,
       })),
-      running: [],
+      running: runningResult.map((e) => ({
+        recorded_at: e.recorded_at,
+        value: e.value,
+      })),
     }
   }
 
@@ -1133,12 +1134,13 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    // Combine cycling and running entries
-    const entries = [
-      ...body.cycling.map((e) => ({ recorded_at: e.recorded_at, value: e.value })),
-      ...body.running.map((e) => ({ recorded_at: e.recorded_at, value: e.value })),
-    ]
-    goStorage.updateFtpHistory(entries)
+    // Update cycling and running FTP separately
+    goStorage.updateFtpHistory(
+      body.cycling.map((e) => ({ recorded_at: e.recorded_at, value: e.value }))
+    )
+    goStorage.updateFtpRunningHistory(
+      body.running.map((e) => ({ recorded_at: e.recorded_at, value: e.value }))
+    )
     return body
   }
 

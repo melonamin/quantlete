@@ -301,9 +301,11 @@ export const getActivity = (id: number): Activity =>
   callGoStorage<Activity>(() => goStorage.getActivity(JSON.stringify({ id })), 'getActivity')
 
 export interface ActivityStream {
-  type: string
+  stream_type: string
   data: number[]
   resolution: string
+  original_size: number
+  series_type: string
 }
 
 export const getActivityStreams = (activityId: number): ActivityStream[] =>
@@ -1244,6 +1246,11 @@ export function getFtpHistory(): MetricEntry[] {
   return result.data || []
 }
 
+export function getFtpRunningHistory(): MetricEntry[] {
+  const result = callGoStorage<{ data: MetricEntry[] }>(() => goStorage.getFtpRunningHistory(), 'getFtpRunningHistory')
+  return result.data || []
+}
+
 export function getWeightHistory(): MetricEntry[] {
   const result = callGoStorage<{ data: MetricEntry[] }>(() => goStorage.getWeightHistory(), 'getWeightHistory')
   return result.data || []
@@ -1251,6 +1258,9 @@ export function getWeightHistory(): MetricEntry[] {
 
 export const updateFtpHistory = (entries: MetricEntry[]): void =>
   callGoStorageVoid(() => goStorage.updateFtpHistory(JSON.stringify(entries)), 'updateFtpHistory')
+
+export const updateFtpRunningHistory = (entries: MetricEntry[]): void =>
+  callGoStorageVoid(() => goStorage.updateFtpRunningHistory(JSON.stringify(entries)), 'updateFtpRunningHistory')
 
 export const updateWeightHistory = (entries: MetricEntry[]): void =>
   callGoStorageVoid(() => goStorage.updateWeightHistory(JSON.stringify(entries)), 'updateWeightHistory')
@@ -1664,3 +1674,34 @@ export function goGetImportState(): GoImportState | null {
 
 export const goClearImportState = (): void =>
   callGoStorageVoid(() => goStorage.clearImportState(), 'clearImportState')
+
+// ============================================================================
+// Strava Credentials
+// ============================================================================
+
+export interface StravaCredentials {
+  client_id: string
+  client_secret: string
+}
+
+export function getStravaCredentials(): StravaCredentials | null {
+  if (!initialized) {
+    return null
+  }
+  const result = callGoStorage<{ data: StravaCredentials | null }>(() => goStorage.getStravaCredentials(), 'getStravaCredentials')
+  return result.data ?? null
+}
+
+export const saveStravaCredentials = (clientId: string, clientSecret: string): void =>
+  callGoStorageVoid(() => goStorage.saveStravaCredentials(JSON.stringify({ client_id: clientId, client_secret: clientSecret })), 'saveStravaCredentials')
+
+export const deleteStravaCredentials = (): void =>
+  callGoStorageVoid(() => goStorage.deleteStravaCredentials(), 'deleteStravaCredentials')
+
+export function hasStravaCredentials(): boolean {
+  if (!initialized) {
+    return false
+  }
+  const result = callGoStorage<{ data: { has_credentials: boolean } }>(() => goStorage.hasStravaCredentials(), 'hasStravaCredentials')
+  return result.data?.has_credentials ?? false
+}

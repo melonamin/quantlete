@@ -33,18 +33,24 @@ export interface GoStorageInterface {
   deleteCustomGear(deleteJSON: string): string
   /** deleteHrZoneDefinition deletes an HR zone definition */
   deleteHrZoneDefinition(deleteJSON: string): string
+  /** deleteStravaCredentials removes stored Strava API credentials */
+  deleteStravaCredentials(): string
   /** eddingtonHistoryFn calculates progressive Eddington numbers over time */
   eddingtonHistory(distances: number[]): string
   /** eddingtonNextStepsFn calculates days needed for next Eddington numbers */
   eddingtonNextSteps(distances: number[], currentE: number, stepsToCalculate: number): string
   /** exportDatabase exports the database for OPFS persistence */
   exportDb(): Uint8Array
+  /** getFtpRunningHistory returns FTP history for running */
+  getFtpRunningHistory(): string
   /** getImportProgress returns the current import progress. */
   getImportProgress(): string
   /** getImportState loads the saved import state for resume capability. */
   getImportState(): string
   /** getWeightHistory returns weight history */
   getWeightHistory(): string
+  /** hasStravaCredentials checks if credentials are configured */
+  hasStravaCredentials(): string
   /** intensityFactorFn calculates the intensity factor: IF = NP / FTP */
   intensityFactor(np: number, ftp: number): string
   /** isImportRunning returns whether an import is currently running. */
@@ -55,6 +61,8 @@ export interface GoStorageInterface {
   predictAfterWorkout(currentCtl: number, currentAtl: number, plannedTss: number, ctlTau: number, atlTau: number): string
   /** rollingMaxAverageFn finds the maximum rolling average over a given window */
   rollingMaxAverage(values: number[], windowSeconds: number): string
+  /** saveStravaCredentials stores Strava API credentials */
+  saveStravaCredentials(credentialsJSON: string): string
   /** setAthleteID sets the current athlete ID for queries */
   setAthleteId(id: number): string
   /** trainingStressScoreFn calculates TSS */
@@ -67,6 +75,8 @@ export interface GoStorageInterface {
   updateCustomGear(gearJSON: string): string
   /** updateFtpHistory replaces FTP history */
   updateFtpHistory(entriesJSON: string): string
+  /** updateFtpRunningHistory replaces running FTP history */
+  updateFtpRunningHistory(entriesJSON: string): string
   /** updateSyncRun updates a sync history record status (for pause/resume) */
   updateSyncRun(dataJSON: string): string
   /** updateTrainingGoals updates training goals config */
@@ -215,6 +225,10 @@ export interface GoStorageInterface {
   getSegmentEfforts(arg0?: string): string
   /** genGetSegments wraps SegmentsService.List */
   getSegments(arg0?: string): string
+
+  // App State - Credentials
+  /** Strava Credentials */
+  getStravaCredentials(): string
 
   // Sync History - Read
   /** Sync History Read */
