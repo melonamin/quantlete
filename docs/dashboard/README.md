@@ -59,8 +59,8 @@ The sidebar provides quick access to all pages. On mobile, use the hamburger men
 Activity data syncs automatically when:
 
 - You open the dashboard (background sync)
-- Webhooks are configured (real-time)
-- Scheduled sync runs (every hour)
+- Webhooks are configured (manual setup required)
+- Scheduled sync runs on its configured schedule (disabled by default)
 
 For manual sync, use the CLI:
 

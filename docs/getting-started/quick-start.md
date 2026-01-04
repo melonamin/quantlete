@@ -63,7 +63,7 @@ Open the dashboard at http://localhost:8081 to see:
 
 ## Keeping Data in Sync
 
-Quantlete can automatically import new activities via Strava webhooks. See [Configuration](../configuration/README.md) for webhook setup.
+Quantlete can automatically import new activities via Strava webhooks (manual registration required). See [Strava Setup](strava-setup.md) for setup steps.
 
 For manual syncing:
 ```bash

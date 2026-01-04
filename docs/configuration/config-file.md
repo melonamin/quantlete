@@ -31,7 +31,7 @@ strava:
   client_secret: "your_client_secret_here"
   redirect_uri: "http://localhost:8081/api/v1/auth/strava/callback"
   webhook_verify_token: ""    # Optional, min 16 chars if set
-  webhook_subscription_id: 0  # Filled automatically after registration
+  webhook_subscription_id: 0  # Set manually after creating the Strava webhook
 
 # Storage configuration
 storage:
@@ -66,6 +66,7 @@ strava:
   client_secret: "your_client_secret_here"
   redirect_uri: "https://quantlete.example.com/api/v1/auth/strava/callback"
   webhook_verify_token: "a_secure_random_token_here"
+  webhook_subscription_id: 123456
 
 storage:
   data_dir: "/var/lib/quantlete"

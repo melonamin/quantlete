@@ -22,6 +22,7 @@ Quantlete is a personal analytics platform that imports your Strava data and pro
 - [Installation](getting-started/README.md) - Get Quantlete running
 - [Quick Start](getting-started/quick-start.md) - Import your first activities
 - [Configuration](configuration/README.md) - Customize your setup
+- [Calculations](calculations.md) - Formulas and data sources
 - [CLI Reference](cli/README.md) - Command line usage
 
 ## Requirements
@@ -30,7 +31,7 @@ Quantlete is a personal analytics platform that imports your Strava data and pro
 - Strava API credentials ([setup guide](getting-started/strava-setup.md))
 - One of:
   - Docker
-  - Linux/macOS/Windows system for binary
+  - Linux/macOS system for binary
   - Go 1.23+ and Node.js 22+ (building from source)
 
 ## How It Works
@@ -38,7 +39,7 @@ Quantlete is a personal analytics platform that imports your Strava data and pro
 1. **Connect Strava** - Authorize Quantlete to read your activities
 2. **Import Data** - Pull your activity history from Strava
 3. **Explore** - View your stats in the web dashboard
-4. **Stay Synced** - New activities import automatically via webhooks
+4. **Stay Synced** - New activities import automatically via webhooks (manual setup)
 
 ## Privacy
 

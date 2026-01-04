@@ -54,7 +54,7 @@ docker run -d \
 
 ## Webhook Setup (Optional)
 
-For automatic syncing of new activities, configure webhooks:
+For automatic syncing of new activities, configure webhooks. Quantlete does not auto-register Strava webhooks, so you must create the subscription manually and store its ID.
 
 1. Your Quantlete instance must be accessible from the internet
 2. Set the callback domain in Strava to your public URL
@@ -64,9 +64,39 @@ For automatic syncing of new activities, configure webhooks:
 export QUANTLETE_STRAVA_WEBHOOK_VERIFY_TOKEN=your_random_16char_token
 ```
 
+4. Create the Strava webhook subscription:
+
+```bash
+curl -X POST https://www.strava.com/api/v3/push_subscriptions \
+  -F client_id=12345 \
+  -F client_secret=abcdef123456... \
+  -F callback_url=https://your-domain.com/api/v1/webhooks/strava \
+  -F verify_token=your_random_16char_token
+```
+
+5. List subscriptions and copy the `id`:
+
+```bash
+curl -G https://www.strava.com/api/v3/push_subscriptions \
+  -d client_id=12345 \
+  -d client_secret=abcdef123456...
+```
+
+6. Store the subscription ID so Quantlete can validate events:
+
+```bash
+export QUANTLETE_STRAVA_WEBHOOK_SUBSCRIPTION_ID=123456
+```
+
 The webhook endpoint is: `https://your-domain.com/api/v1/webhooks/strava`
 
 ?> **Note:** Webhooks require a publicly accessible URL. For local development, you can use a tunnel service like ngrok.
+
+?> **Note:** Strava allows only one webhook subscription per application. If you need to replace it, delete the old subscription first:
+
+```bash
+curl -X DELETE "https://www.strava.com/api/v3/push_subscriptions/123456?client_id=12345&client_secret=abcdef123456..."
+```
 
 ## Rate Limits
 

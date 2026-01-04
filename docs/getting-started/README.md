@@ -41,6 +41,8 @@ chmod +x quantlete-darwin-amd64
 mv quantlete-darwin-amd64 quantlete
 ```
 
+?> **Note:** Windows binaries are not available at this time.
+
 Run the server:
 
 ```bash

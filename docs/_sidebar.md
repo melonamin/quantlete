@@ -10,6 +10,9 @@
   - [Environment Variables](configuration/environment.md)
   - [Config File](configuration/config-file.md)
 
+- Reference
+  - [Calculations](calculations.md)
+
 - CLI Reference
   - [Overview](cli/README.md)
   - [serve](cli/serve.md)

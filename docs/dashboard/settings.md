@@ -46,6 +46,8 @@ Goals appear on the dashboard with progress indicators.
 
 Configure your athlete data for accurate calculations:
 
+See [Calculations](../calculations.md) for how FTP and HR zones are used.
+
 ### FTP (Functional Threshold Power)
 
 Set your cycling FTP for:

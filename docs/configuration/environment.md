@@ -21,7 +21,7 @@ All configuration options can be set via environment variables with the `QUANTLE
 | `QUANTLETE_STRAVA_CLIENT_SECRET` | Strava OAuth Client Secret | (required) |
 | `QUANTLETE_STRAVA_REDIRECT_URI` | OAuth callback URL | http://localhost:8081/api/v1/auth/strava/callback |
 | `QUANTLETE_STRAVA_WEBHOOK_VERIFY_TOKEN` | Webhook verification token (min 16 chars) | "" |
-| `QUANTLETE_STRAVA_WEBHOOK_SUBSCRIPTION_ID` | Existing webhook subscription ID | 0 |
+| `QUANTLETE_STRAVA_WEBHOOK_SUBSCRIPTION_ID` | Webhook subscription ID (set manually after creating the Strava webhook) | 0 |
 
 ## Storage Configuration
 
@@ -68,6 +68,7 @@ export QUANTLETE_STRAVA_CLIENT_ID=12345
 export QUANTLETE_STRAVA_CLIENT_SECRET=abcdef123456
 export QUANTLETE_STRAVA_REDIRECT_URI=https://quantlete.example.com/api/v1/auth/strava/callback
 export QUANTLETE_STRAVA_WEBHOOK_VERIFY_TOKEN=your_secure_random_token
+export QUANTLETE_STRAVA_WEBHOOK_SUBSCRIPTION_ID=123456
 export QUANTLETE_LOG_LEVEL=info
 export QUANTLETE_LOG_FORMAT=json
 quantlete serve

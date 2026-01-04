@@ -2,6 +2,8 @@
 
 Quantlete provides training analysis tools to track your fitness and performance.
 
+See [Calculations](../calculations.md) for formulas and data sources.
+
 ## Training Load
 
 The training load page (`/training-load`) tracks:
