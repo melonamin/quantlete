@@ -32,7 +32,7 @@ func NewDashboardService(db *storage.DB, stats *storage.StatsRepository, config 
 
 // GetDashboardInput contains parameters for getting the combined dashboard.
 type GetDashboardInput struct {
-	AthleteID int64
+	AthleteID int64 `json:"-" adapter:"context"`
 }
 
 // DashboardStatsOutput represents aggregated statistics for the dashboard.
@@ -92,14 +92,14 @@ type DashboardOutput struct {
 
 // GetRecentActivitiesInput contains parameters for getting recent activities.
 type GetRecentActivitiesInput struct {
-	AthleteID int64
-	Limit     int
+	AthleteID int64 `json:"-" adapter:"context"`
+	Limit     int   `json:"limit" adapter:"query,default=5"`
 }
 
 // GetMonthlyStatsInput contains parameters for getting monthly stats.
 type GetMonthlyStatsInput struct {
-	AthleteID int64
-	Year      int // 0 for all years
+	AthleteID int64 `json:"-" adapter:"context"`
+	Year      int   `json:"year" adapter:"query"` // 0 for all years
 }
 
 // MonthlyStatOutput represents statistics for a single month.
@@ -122,8 +122,8 @@ type YearlyStatOutput struct {
 
 // GetCalendarDataInput contains parameters for getting calendar data.
 type GetCalendarDataInput struct {
-	AthleteID int64
-	Year      int
+	AthleteID int64 `json:"-" adapter:"context"`
+	Year      int   `json:"year" adapter:"query"`
 }
 
 // CalendarDayOutput represents activity data for a single day.
@@ -137,9 +137,9 @@ type CalendarDayOutput struct {
 
 // GetCalendarActivitiesInput contains parameters for getting calendar activities.
 type GetCalendarActivitiesInput struct {
-	AthleteID int64
-	Year      int
-	Month     int
+	AthleteID int64 `json:"-" adapter:"context"`
+	Year      int   `json:"year" adapter:"query"`
+	Month     int   `json:"month" adapter:"query"`
 }
 
 // CalendarActivityOutput represents an activity summary for the calendar view.
@@ -174,8 +174,8 @@ type DistributionSliceOutput struct {
 
 // GetDistributionInput contains parameters for distribution queries.
 type GetDistributionInput struct {
-	AthleteID  int64
-	SportTypes []string
+	AthleteID  int64    `json:"-" adapter:"context"`
+	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
 }
 
 // ExportStatsOutput represents export statistics.
@@ -202,8 +202,8 @@ type DashboardWidgetConfigOutput struct {
 
 // UpdateDashboardConfigInput contains parameters for updating dashboard config.
 type UpdateDashboardConfigInput struct {
-	AthleteID int64
-	Config    DashboardConfigOutput
+	AthleteID int64                 `json:"-" adapter:"context"`
+	Config    DashboardConfigOutput `json:"config"`
 }
 
 // ============================================================================
@@ -211,6 +211,9 @@ type UpdateDashboardConfigInput struct {
 // ============================================================================
 
 // GetDashboard returns the combined dashboard data.
+//
+//adapter:wasm getDashboard category=Dashboard
+//adapter:http GET /api/v1/dashboard
 func (s *DashboardService) GetDashboard(ctx context.Context, in GetDashboardInput) (*DashboardOutput, error) {
 	stats, err := s.GetStats(ctx, in)
 	if err != nil {
@@ -244,6 +247,9 @@ func (s *DashboardService) GetDashboard(ctx context.Context, in GetDashboardInpu
 }
 
 // GetStats returns aggregated dashboard statistics.
+//
+//adapter:wasm getDashboardStats category=Dashboard
+//adapter:http GET /api/v1/dashboard/stats
 func (s *DashboardService) GetStats(ctx context.Context, in GetDashboardInput) (*DashboardStatsOutput, error) {
 	stats, err := s.stats.GetDashboardStats(ctx, in.AthleteID)
 	if err != nil {
@@ -268,6 +274,9 @@ func (s *DashboardService) GetStats(ctx context.Context, in GetDashboardInput) (
 }
 
 // GetWeeklyStats returns statistics grouped by sport type for the current week.
+//
+//adapter:wasm getWeeklyStats category=Dashboard
+//adapter:http GET /api/v1/dashboard/weekly
 func (s *DashboardService) GetWeeklyStats(ctx context.Context, in GetDashboardInput) ([]WeeklyStatOutput, error) {
 	stats, err := s.stats.GetWeeklyStats(ctx, in.AthleteID)
 	if err != nil {
@@ -289,6 +298,9 @@ func (s *DashboardService) GetWeeklyStats(ctx context.Context, in GetDashboardIn
 }
 
 // GetRecentActivities returns the most recent activities.
+//
+//adapter:wasm getRecentActivities category=Dashboard
+//adapter:http GET /api/v1/dashboard/recent
 func (s *DashboardService) GetRecentActivities(ctx context.Context, in GetRecentActivitiesInput) ([]RecentActivityOutput, error) {
 	limit := in.Limit
 	if limit <= 0 {
@@ -321,6 +333,9 @@ func (s *DashboardService) GetRecentActivities(ctx context.Context, in GetRecent
 }
 
 // GetSportTypeStats returns statistics grouped by sport type.
+//
+//adapter:wasm getSportTypeStats category=Dashboard
+//adapter:http GET /api/v1/dashboard/sports
 func (s *DashboardService) GetSportTypeStats(ctx context.Context, in GetDashboardInput) ([]SportTypeStatOutput, error) {
 	stats, err := s.stats.GetStatsBySportType(ctx, in.AthleteID)
 	if err != nil {
@@ -342,6 +357,9 @@ func (s *DashboardService) GetSportTypeStats(ctx context.Context, in GetDashboar
 }
 
 // GetMonthlyStats returns statistics grouped by month.
+//
+//adapter:wasm getMonthlyStats category=Dashboard
+//adapter:http GET /api/v1/dashboard/monthly
 func (s *DashboardService) GetMonthlyStats(ctx context.Context, in GetMonthlyStatsInput) ([]MonthlyStatOutput, error) {
 	stats, err := s.stats.GetMonthlyStats(ctx, in.AthleteID, in.Year)
 	if err != nil {
@@ -363,6 +381,9 @@ func (s *DashboardService) GetMonthlyStats(ctx context.Context, in GetMonthlySta
 }
 
 // GetYearlyStats returns statistics grouped by year.
+//
+//adapter:wasm getYearlyStats category=Dashboard
+//adapter:http GET /api/v1/dashboard/yearly
 func (s *DashboardService) GetYearlyStats(ctx context.Context, in GetDashboardInput) ([]YearlyStatOutput, error) {
 	stats, err := s.stats.GetYearlyStats(ctx, in.AthleteID)
 	if err != nil {
@@ -384,6 +405,9 @@ func (s *DashboardService) GetYearlyStats(ctx context.Context, in GetDashboardIn
 }
 
 // GetCalendarData returns daily activity counts for a given year.
+//
+//adapter:wasm getCalendarData category=Calendar
+//adapter:http GET /api/v1/dashboard/calendar
 func (s *DashboardService) GetCalendarData(ctx context.Context, in GetCalendarDataInput) ([]CalendarDayOutput, error) {
 	year := in.Year
 	if year == 0 {
@@ -410,6 +434,9 @@ func (s *DashboardService) GetCalendarData(ctx context.Context, in GetCalendarDa
 }
 
 // GetCalendarActivities returns activities for a specific month.
+//
+//adapter:wasm getCalendarActivities category=Calendar
+//adapter:http GET /api/v1/dashboard/calendar/activities
 func (s *DashboardService) GetCalendarActivities(ctx context.Context, in GetCalendarActivitiesInput) ([]CalendarActivityOutput, error) {
 	year := in.Year
 	month := in.Month
@@ -444,6 +471,9 @@ func (s *DashboardService) GetCalendarActivities(ctx context.Context, in GetCale
 }
 
 // GetCalendarSummary returns the monthly summary for the calendar.
+//
+//adapter:wasm getCalendarSummary category=Calendar
+//adapter:http GET /api/v1/dashboard/calendar/summary
 func (s *DashboardService) GetCalendarSummary(ctx context.Context, in GetCalendarActivitiesInput) (*CalendarMonthSummaryOutput, error) {
 	year := in.Year
 	month := in.Month
@@ -475,6 +505,10 @@ func (s *DashboardService) GetCalendarSummary(ctx context.Context, in GetCalenda
 }
 
 // GetDaytimeDistribution returns activity counts by time of day.
+//
+//adapter:wasm getDaytimeDistribution category=Distribution
+//adapter:http GET /api/v1/stats/daytime
+//nolint:dupl // Similar query pattern to GetWeekdayDistribution but different SQL and result mapping
 func (s *DashboardService) GetDaytimeDistribution(ctx context.Context, in GetDistributionInput) ([]DistributionSliceOutput, error) {
 	// Build query with optional sport type filter
 	query := `
@@ -529,6 +563,10 @@ func (s *DashboardService) GetDaytimeDistribution(ctx context.Context, in GetDis
 }
 
 // GetWeekdayDistribution returns activity counts by day of week.
+//
+//adapter:wasm getWeekdayDistribution category=Distribution
+//adapter:http GET /api/v1/stats/weekday
+//nolint:dupl // Similar query pattern to GetDaytimeDistribution but different SQL and result mapping
 func (s *DashboardService) GetWeekdayDistribution(ctx context.Context, in GetDistributionInput) ([]DistributionSliceOutput, error) {
 	query := `
 		SELECT CAST(strftime('%w', start_date_local) AS INTEGER) AS weekday, COUNT(*) AS count
@@ -575,6 +613,9 @@ func (s *DashboardService) GetWeekdayDistribution(ctx context.Context, in GetDis
 }
 
 // GetExportStats returns export statistics (total count, date range).
+//
+//adapter:wasm getExportStats category=Export
+//adapter:http GET /api/v1/export/stats
 func (s *DashboardService) GetExportStats(ctx context.Context, in GetDashboardInput) (*ExportStatsOutput, error) {
 	query := `
 		SELECT
@@ -601,6 +642,9 @@ func (s *DashboardService) GetExportStats(ctx context.Context, in GetDashboardIn
 }
 
 // GetConfig returns the dashboard configuration for an athlete.
+//
+//adapter:wasm getDashboardConfig category=DashboardConfig
+//adapter:http GET /api/v1/dashboard/config
 func (s *DashboardService) GetConfig(ctx context.Context, in GetDashboardInput) (*DashboardConfigOutput, error) {
 	if s.config == nil {
 		return nil, Wrapf(ErrInternal, "dashboard config repository not available")
@@ -615,6 +659,9 @@ func (s *DashboardService) GetConfig(ctx context.Context, in GetDashboardInput) 
 }
 
 // UpdateConfig updates the dashboard configuration for an athlete.
+//
+//adapter:wasm updateDashboardConfig category=DashboardConfig
+//adapter:http PUT /api/v1/dashboard/config
 func (s *DashboardService) UpdateConfig(ctx context.Context, in UpdateDashboardConfigInput) (*DashboardConfigOutput, error) {
 	if s.config == nil {
 		return nil, Wrapf(ErrInternal, "dashboard config repository not available")

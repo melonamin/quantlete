@@ -11,12 +11,19 @@ export type {
   CalendarActivity,
   CalendarMonthSummary,
   HeatmapActivity,
-  HeatmapResponse,
+  HeatmapCountryStat,
   EddingtonDay,
   EddingtonStep,
   EddingtonResult,
   EddingtonHistoryPoint,
 } from '@/lib/wasm/types.gen'
+
+// HeatmapResponse - composite response type (not generated from Go)
+export interface HeatmapResponse {
+  activities: import('@/lib/wasm/types.gen').HeatmapActivity[]
+  total: number
+  countries: import('@/lib/wasm/types.gen').HeatmapCountryStat[]
+}
 
 // Widget types with stricter width/height unions (generated uses plain number)
 export type WidgetWidth = 4 | 6 | 8 | 12

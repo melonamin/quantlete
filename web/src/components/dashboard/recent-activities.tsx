@@ -53,36 +53,36 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
       ) : (
         <div className="space-y-4">
           {activities.map((activity) => (
-              <Link
-                key={activity.id}
-                to="/activities/$activityId"
-                params={{ activityId: String(activity.id) }}
-                className="flex items-center gap-3 hover:bg-muted/50 -mx-2 px-2 py-1 rounded-md transition-colors"
+            <Link
+              key={activity.id}
+              to="/activities/$activityId"
+              params={{ activityId: String(activity.id) }}
+              className="flex items-center gap-3 hover:bg-muted/50 -mx-2 px-2 py-1 rounded-md transition-colors"
+            >
+              <div
+                className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
+                style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
               >
-                <div
-                  className="h-10 w-10 rounded-full flex items-center justify-center text-lg"
-                  style={{ backgroundColor: getSportHexColor(activity.sport_type) + '20' }}
-                >
-                  <SportIcon
-                    sportType={activity.sport_type}
-                    className="h-5 w-5"
-                    style={{ color: getSportHexColor(activity.sport_type) }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{activity.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelativeDate(activity.start_date)}
-                  </p>
-                </div>
-                <div className="text-right text-sm">
-                  <p className="font-medium">{formatDistance(activity.distance)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDuration(activity.moving_time)}
-                  </p>
-                </div>
-              </Link>
-            ))}
+                <SportIcon
+                  sportType={activity.sport_type}
+                  className="h-5 w-5"
+                  style={{ color: getSportHexColor(activity.sport_type) }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{activity.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatRelativeDate(activity.start_date)}
+                </p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="font-medium">{formatDistance(activity.distance)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDuration(activity.moving_time)}
+                </p>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </WidgetWrapper>

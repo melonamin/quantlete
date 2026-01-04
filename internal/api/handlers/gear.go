@@ -8,6 +8,7 @@ import (
 
 	"github.com/melonamin/quantlete/internal/pagination"
 	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
@@ -29,7 +30,7 @@ func NewGearHandler(svc *services.GearService, stravaClient *strava.Client) *Gea
 func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -49,14 +50,14 @@ func (h *GearHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // GetByID handles GET /api/v1/gear/{id}
 func (h *GearHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -69,14 +70,14 @@ func (h *GearHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // ListCustom handles GET /api/v1/gear/custom
 func (h *GearHandler) ListCustom(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -96,20 +97,20 @@ func (h *GearHandler) ListCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // CreateCustom handles POST /api/v1/gear/custom
 func (h *GearHandler) CreateCustom(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	var req services.CreateCustomGearInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 	req.AthleteID = athlete.ID
@@ -120,21 +121,21 @@ func (h *GearHandler) CreateCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, result)
+	shared.WriteJSONResponse(w, http.StatusCreated, shared.SuccessResponse(result))
 }
 
 // UpdateCustom handles PUT /api/v1/gear/custom/{id}
 func (h *GearHandler) UpdateCustom(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	// Parse raw JSON to handle optional fields properly
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
@@ -172,7 +173,7 @@ func (h *GearHandler) UpdateCustom(w http.ResponseWriter, r *http.Request) {
 		if string(v) != "null" {
 			var pv float64
 			if err := json.Unmarshal(v, &pv); err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid purchase_price"})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid purchase_price"))
 				return
 			}
 			p = &pv
@@ -186,14 +187,14 @@ func (h *GearHandler) UpdateCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // DeleteCustom handles DELETE /api/v1/gear/custom/{id}
 func (h *GearHandler) DeleteCustom(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -209,14 +210,14 @@ func (h *GearHandler) DeleteCustom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // MonthlyUsage handles GET /api/v1/gear/stats/monthly
 func (h *GearHandler) MonthlyUsage(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -229,5 +230,5 @@ func (h *GearHandler) MonthlyUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }

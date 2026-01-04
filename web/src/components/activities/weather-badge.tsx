@@ -90,9 +90,12 @@ export function WeatherBadge({ activityId }: WeatherBadgeProps) {
   }
 
   const temp = weather.temperature_c ?? weather.temp_avg_c
-  const description = weather.weather_code !== undefined
-    ? getWeatherDescription(weather.weather_code)
-    : weather.source === 'strava' ? 'From sensor' : 'Unknown'
+  const description =
+    weather.weather_code !== undefined
+      ? getWeatherDescription(weather.weather_code)
+      : weather.source === 'strava'
+        ? 'From sensor'
+        : 'Unknown'
 
   return (
     <Card>
@@ -129,27 +132,25 @@ export function WeatherBadge({ activityId }: WeatherBadgeProps) {
                   <Wind className="h-3 w-3" />
                   {formatWindSpeed(weather.wind_speed_mps, 'kmh')}
                   {weather.wind_direction_deg !== undefined && (
-                    <span className="text-xs">
-                      {getWindDirection(weather.wind_direction_deg)}
-                    </span>
+                    <span className="text-xs">{getWindDirection(weather.wind_direction_deg)}</span>
                   )}
                 </span>
               )}
             </div>
             {(weather.temp_min_c !== undefined || weather.temp_max_c !== undefined) &&
-             weather.source === 'strava' && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                {weather.temp_min_c !== undefined && (
-                  <span>Min: {formatTemperature(weather.temp_min_c)}</span>
-                )}
-                {weather.temp_min_c !== undefined && weather.temp_max_c !== undefined && (
-                  <span> / </span>
-                )}
-                {weather.temp_max_c !== undefined && (
-                  <span>Max: {formatTemperature(weather.temp_max_c)}</span>
-                )}
-              </div>
-            )}
+              weather.source === 'strava' && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {weather.temp_min_c !== undefined && (
+                    <span>Min: {formatTemperature(weather.temp_min_c)}</span>
+                  )}
+                  {weather.temp_min_c !== undefined && weather.temp_max_c !== undefined && (
+                    <span> / </span>
+                  )}
+                  {weather.temp_max_c !== undefined && (
+                    <span>Max: {formatTemperature(weather.temp_max_c)}</span>
+                  )}
+                </div>
+              )}
           </div>
         </div>
       </CardContent>

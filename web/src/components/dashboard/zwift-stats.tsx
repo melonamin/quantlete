@@ -1,22 +1,29 @@
 import { useMemo } from 'react'
 import { useActivities } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Bike, Route, Clock, Mountain } from 'lucide-react'
 
 // Known Zwift worlds based on location data
 const ZWIFT_WORLDS: Record<string, string> = {
-  'Watopia': 'Watopia',
-  'London': 'London',
+  Watopia: 'Watopia',
+  London: 'London',
   'New York': 'New York',
-  'Innsbruck': 'Innsbruck',
-  'Richmond': 'Richmond',
-  'Yorkshire': 'Yorkshire',
-  'France': 'France',
-  'Paris': 'Paris',
+  Innsbruck: 'Innsbruck',
+  Richmond: 'Richmond',
+  Yorkshire: 'Yorkshire',
+  France: 'France',
+  Paris: 'Paris',
   'Makuri Islands': 'Makuri',
-  'Scotland': 'Scotland',
+  Scotland: 'Scotland',
 }
 
 interface WorldStats {
@@ -34,11 +41,13 @@ export function ZwiftStats() {
   })
 
   const worldStats = useMemo(() => {
-    if (!data?.data) return []
+    // Use Array.isArray for defensive check against unexpected data shapes
+    const activities = Array.isArray(data?.data) ? data.data : []
+    if (activities.length === 0) return []
 
     const stats: Record<string, WorldStats> = {}
 
-    for (const activity of data.data) {
+    for (const activity of activities) {
       // Try to detect world from location
       let world = 'Unknown'
       const city = activity.location_city || ''
@@ -92,9 +101,7 @@ export function ZwiftStats() {
   return (
     <WidgetWrapper title="Virtual Riding" isLoading={isLoading}>
       {worldStats.length === 0 ? (
-        <div className="text-sm text-muted-foreground">
-          No virtual activities found.
-        </div>
+        <div className="text-sm text-muted-foreground">No virtual activities found.</div>
       ) : (
         <div className="h-full flex flex-col">
           {/* Summary stats */}
@@ -117,7 +124,9 @@ export function ZwiftStats() {
               <Mountain className="h-3.5 w-3.5 text-muted-foreground" />
               <div>
                 <div className="text-xs text-muted-foreground">Elevation</div>
-                <div className="font-semibold">{Math.round(totals.elevation).toLocaleString()}m</div>
+                <div className="font-semibold">
+                  {Math.round(totals.elevation).toLocaleString()}m
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
@@ -145,8 +154,12 @@ export function ZwiftStats() {
                   <TableRow key={w.world}>
                     <TableCell>{w.world}</TableCell>
                     <TableCell className="text-right">{w.count}</TableCell>
-                    <TableCell className="text-right">{formatDistance(w.distance / 1000)}</TableCell>
-                    <TableCell className="text-right">{Math.round(w.elevation).toLocaleString()}m</TableCell>
+                    <TableCell className="text-right">
+                      {formatDistance(w.distance / 1000)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {Math.round(w.elevation).toLocaleString()}m
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

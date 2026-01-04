@@ -63,14 +63,23 @@ func main() {
 	}
 
 	wasmDir := filepath.Join(root, "cmd", "wasm")
+	servicesDir := filepath.Join(root, "internal", "services")
 	storageDir := filepath.Join(root, "internal", "storage")
 	handlersDir := filepath.Join(root, "internal", "api", "handlers")
+	stravaDir := filepath.Join(root, "internal", "strava")
 	tsOutput := filepath.Join(root, "web", "src", "lib", "wasm", "types.gen.ts")
 
 	// Parse WASM Go files (anonymous structs for inputs)
 	wasmStructs, err := parseDir(wasmDir, true)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing WASM files: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Parse services Go files (service layer input/output types)
+	servicesStructs, err := parseDir(servicesDir, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing services files: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -88,9 +97,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Combine all structs
-	allStructs := append(wasmStructs, storageStructs...)
+	// Parse strava Go files (external API types)
+	stravaStructs, err := parseDir(stravaDir, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing strava files: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Combine all structs - services first so they take precedence over storage row types
+	allStructs := append(wasmStructs, servicesStructs...)
+	allStructs = append(allStructs, storageStructs...)
 	allStructs = append(allStructs, handlerStructs...)
+	allStructs = append(allStructs, stravaStructs...)
 
 	// Sort and deduplicate
 	sort.Slice(allStructs, func(i, j int) bool {
@@ -389,9 +407,9 @@ var knownStructs = make(map[string]bool)
 
 // goTypeToTS converts a Go type to TypeScript
 func goTypeToTS(goType string) string {
-	// Handle pointer types
+	// Handle pointer types (including double pointers like **float64)
 	isPointer := strings.HasPrefix(goType, "*")
-	baseType := strings.TrimPrefix(goType, "*")
+	baseType := strings.TrimLeft(goType, "*")
 
 	// Resolve type aliases (e.g., WidgetWidth -> int -> number)
 	if aliasBase, ok := typeAliases[baseType]; ok {
@@ -408,10 +426,10 @@ func goTypeToTS(goType string) string {
 		tsType = "string"
 	case "bool":
 		tsType = "boolean"
-	case "time.Time", "SQLiteTime":
-		// time.Time and SQLiteTime serialize to ISO 8601 string in JSON
+	case "time.Time", "SQLiteTime", "FlexTime":
+		// time.Time and time wrappers serialize to ISO 8601 string in JSON
 		tsType = "string"
-	case "interface{}":
+	case "interface{}", "any":
 		tsType = "unknown"
 	case "json.RawMessage":
 		tsType = "unknown"

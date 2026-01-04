@@ -80,11 +80,7 @@ export function HrZonesEditor({ defs, onSave, onDelete, saving }: HrZonesEditorP
         {method === 'percent_hrmax' && (
           <div className="space-y-1">
             <label className="text-sm text-muted-foreground">HR max (bpm)</label>
-            <Input
-              inputMode="numeric"
-              value={hrMax}
-              onChange={(e) => setHrMax(e.target.value)}
-            />
+            <Input inputMode="numeric" value={hrMax} onChange={(e) => setHrMax(e.target.value)} />
           </div>
         )}
       </div>
@@ -152,7 +148,9 @@ export function HrZonesEditor({ defs, onSave, onDelete, saving }: HrZonesEditorP
                       setEffectiveFrom(d.effective_from)
                       setMethod(d.method)
                       setHrMax(String(d.zones.hr_max ?? 190))
-                      setBounds((d.zones.bounds ?? DEFAULT_DEF.zones.bounds).slice(0, 5).map(String))
+                      setBounds(
+                        (d.zones.bounds ?? DEFAULT_DEF.zones.bounds).slice(0, 5).map(String)
+                      )
                     }}
                   >
                     Edit

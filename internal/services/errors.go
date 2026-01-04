@@ -55,6 +55,11 @@ func BadRequest(msg string) error {
 	return Wrap(ErrBadRequest, msg)
 }
 
+// BadRequestf returns a wrapped ErrBadRequest with formatted context.
+func BadRequestf(format string, args ...interface{}) error {
+	return Wrapf(ErrBadRequest, format, args...)
+}
+
 // Conflict returns a wrapped ErrConflict with context.
 func Conflict(msg string) error {
 	return Wrap(ErrConflict, msg)

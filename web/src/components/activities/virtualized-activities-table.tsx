@@ -27,6 +27,7 @@ export function VirtualizedActivitiesTable({
   const parentRef = useRef<HTMLDivElement>(null)
   const { unitSystem } = useSettingsStore()
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design
   const virtualizer = useVirtualizer({
     count: activities.length,
     getScrollElement: () => parentRef.current,
@@ -56,7 +57,10 @@ export function VirtualizedActivitiesTable({
           {/* Sport Type */}
           <div className="flex-[1.5] min-w-[120px] px-4 py-3">
             <div className="flex items-center gap-2">
-              <SportIcon sportType={activity.sport_type} className={cn('h-4 w-4 shrink-0', sportColor)} />
+              <SportIcon
+                sportType={activity.sport_type}
+                className={cn('h-4 w-4 shrink-0', sportColor)}
+              />
               <span className="text-sm truncate">{formatSportType(activity.sport_type)}</span>
             </div>
           </div>

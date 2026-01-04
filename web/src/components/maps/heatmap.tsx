@@ -20,12 +20,7 @@ interface HeatmapProps {
 }
 
 // Calculate distance between two lat/lng points in meters (Haversine formula)
-function haversineDistance(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000 // Earth radius in meters
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLng = ((lng2 - lng1) * Math.PI) / 180
@@ -198,10 +193,7 @@ export function Heatmap({
   return (
     <div className={cn('rounded-lg overflow-hidden', className)}>
       <BaseMap bounds={bounds} tileLayer={tileLayers.cartoDark} onMapReady={onMapReady}>
-        <MapClickHandler
-          activities={activities}
-          onClickResult={handleClickResult}
-        />
+        <MapClickHandler activities={activities} onClickResult={handleClickResult} />
 
         {decodedRoutes.map((route) => {
           const activity = activityMap.get(route.id)
@@ -237,7 +229,8 @@ export function Heatmap({
             <Popup>
               <div className="min-w-[200px] max-w-[280px]">
                 <div className="mb-2 font-semibold text-sm">
-                  {clickedPoint.nearby.length} activit{clickedPoint.nearby.length === 1 ? 'y' : 'ies'} nearby
+                  {clickedPoint.nearby.length} activit
+                  {clickedPoint.nearby.length === 1 ? 'y' : 'ies'} nearby
                 </div>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
                   {clickedPoint.nearby.map(({ activity, distance }) => (
@@ -269,7 +262,9 @@ export function Heatmap({
 }
 
 // Helper to calculate bounds for a set of activities
-export function getActivitiesBounds(activities: HeatmapActivity[]): [[number, number], [number, number]] | undefined {
+export function getActivitiesBounds(
+  activities: HeatmapActivity[]
+): [[number, number], [number, number]] | undefined {
   const points = activities
     .filter((a) => a.start_lat && a.start_lng)
     .map((a) => [a.start_lat, a.start_lng] as [number, number])

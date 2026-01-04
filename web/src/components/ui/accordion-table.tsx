@@ -130,10 +130,7 @@ export function AccordionTable<T, C>({
                   hasChildRows &&
                   childColumns &&
                   group.children.map((child, idx) => (
-                    <TableRow
-                      key={`${group.id}-child-${idx}`}
-                      className="bg-muted/20"
-                    >
+                    <TableRow key={`${group.id}-child-${idx}`} className="bg-muted/20">
                       {hasChildren && <TableCell />}
                       {childColumns.map((col) => (
                         <TableCell key={col.key} className={cn('pl-4', col.className)}>

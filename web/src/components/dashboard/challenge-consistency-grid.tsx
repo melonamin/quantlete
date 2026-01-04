@@ -115,7 +115,10 @@ export function ChallengeConsistencyGrid() {
             <TableBody>
               {goalStatuses.map((goal, idx) => (
                 <TableRow key={idx} className="border-t border-border/50">
-                  <TableCell className="py-1.5 pr-2 font-medium truncate max-w-[120px]" title={goal.name}>
+                  <TableCell
+                    className="py-1.5 pr-2 font-medium truncate max-w-[120px]"
+                    title={goal.name}
+                  >
                     {goal.name}
                   </TableCell>
                   {months.map((m) => {

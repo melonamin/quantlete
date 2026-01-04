@@ -13,6 +13,7 @@ import (
 	"github.com/melonamin/quantlete/internal/challenges"
 	"github.com/melonamin/quantlete/internal/pagination"
 	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -37,7 +38,7 @@ func NewChallengesHandler(svc *services.ChallengesService, stravaClient *strava.
 func (h *ChallengesHandler) List(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -57,7 +58,7 @@ func (h *ChallengesHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 type importResponse struct {
@@ -69,7 +70,7 @@ type importResponse struct {
 func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -77,18 +78,18 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid multipart form"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid multipart form"))
 			return
 		}
 		file, _, err := r.FormFile("file")
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "missing file field"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("missing file field"))
 			return
 		}
 		defer func() { _ = file.Close() }()
 		b, err := io.ReadAll(io.LimitReader(file, 10<<20))
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to read file"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to read file"))
 			return
 		}
 		htmlBytes = b
@@ -98,7 +99,7 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 			URL  string `json:"url"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 			return
 		}
 		if strings.TrimSpace(body.HTML) != "" {
@@ -106,18 +107,18 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 		} else if strings.TrimSpace(body.URL) != "" {
 			// Validate URL to prevent SSRF attacks
 			if err := ValidateImportURL(body.URL); err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorResponse(err))
 				return
 			}
 			resp, err := http.Get(body.URL) //nolint:gosec // URL validated by ValidateImportURL
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to fetch url"})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to fetch url"))
 				return
 			}
 			defer resp.Body.Close()
 			b, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to read response"})
+				shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to read response"))
 				return
 			}
 			htmlBytes = b
@@ -126,13 +127,13 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 	htmlBytes = bytes.TrimSpace(htmlBytes)
 	if len(htmlBytes) == 0 {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "no html provided"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("no html provided"))
 		return
 	}
 
 	parsed, err := challenges.ParseTrophyCaseHTML(string(htmlBytes))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to parse html"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to parse html"))
 		return
 	}
 
@@ -178,7 +179,7 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 		imported++
 	}
 
-	writeJSON(w, http.StatusOK, importResponse{Imported: imported})
+	shared.WriteSuccess(w, importResponse{Imported: imported})
 }
 
 // ImportFromProfile handles POST /api/v1/challenges/import-profile
@@ -186,7 +187,7 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -199,7 +200,7 @@ func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Req
 	parsed, err := challenges.FetchPublicProfile(athleteID)
 	if err != nil {
 		slog.Error("failed to fetch public profile", "error", err, "athlete_id", athleteID)
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "failed to fetch public profile: " + err.Error()})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("failed to fetch public profile: "+err.Error()))
 		return
 	}
 
@@ -242,7 +243,7 @@ func (h *ChallengesHandler) ImportFromProfile(w http.ResponseWriter, r *http.Req
 		imported++
 	}
 
-	writeJSON(w, http.StatusOK, importResponse{Imported: imported})
+	shared.WriteSuccess(w, importResponse{Imported: imported})
 }
 
 func ptrSQLiteTime(t *time.Time) *storage.SQLiteTime {

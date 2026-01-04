@@ -14,12 +14,48 @@ export class ApiError extends Error {
   }
 }
 
+// API response envelope - matches shared.Response in Go
+interface ApiEnvelope<T> {
+  ok: boolean
+  data?: T
+  error?: string
+  message?: string
+}
+
+// Check if a response is an API envelope
+function isEnvelope<T>(body: unknown): body is ApiEnvelope<T> {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'ok' in body &&
+    typeof (body as ApiEnvelope<T>).ok === 'boolean'
+  )
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
+  const body = await response.json().catch(() => null)
+
+  // Handle HTTP errors first
   if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    throw new ApiError(body?.error || `Request failed: ${response.status}`, response.status, body)
+    // Try to extract error from envelope or plain error response
+    const errorMsg = body?.error || `Request failed: ${response.status}`
+    throw new ApiError(errorMsg, response.status, body)
   }
-  return response.json()
+
+  // Unwrap envelope responses: {ok: true, data: T} -> T
+  if (isEnvelope<T>(body)) {
+    if (!body.ok) {
+      throw new ApiError(body.error || 'Unknown error', response.status, {
+        error: body.error || '',
+      })
+    }
+    // Return data from envelope, or the whole response if data is undefined
+    // Some endpoints return {ok: true, message: "..."} without data
+    return (body.data !== undefined ? body.data : body) as T
+  }
+
+  // Legacy endpoints may return data directly without envelope
+  return body as T
 }
 
 export async function get<T>(

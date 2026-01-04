@@ -46,7 +46,11 @@ export function SportBreakdown({ stats, isLoading }: SportBreakdownProps) {
                   className="h-8 w-8 rounded flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: getSportHexColor(stat.sport_type) + '20' }}
                 >
-                  <SportIcon sportType={stat.sport_type} className="h-4 w-4" style={{ color: getSportHexColor(stat.sport_type) }} />
+                  <SportIcon
+                    sportType={stat.sport_type}
+                    className="h-4 w-4"
+                    style={{ color: getSportHexColor(stat.sport_type) }}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">

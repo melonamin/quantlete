@@ -23,12 +23,12 @@ func NewChallengesService(repo *storage.ChallengeRepository) *ChallengesService 
 
 // ListChallengesInput contains parameters for listing challenges.
 type ListChallengesInput struct {
-	AthleteID int64
-	Month     string
-	Page      int
-	PerPage   int
-	OrderBy   string
-	OrderDir  string
+	AthleteID int64  `json:"-" adapter:"context"`
+	Month     string `json:"month" adapter:"query"`
+	Page      int    `json:"page" adapter:"query,default=1"`
+	PerPage   int    `json:"per_page" adapter:"query,default=50"`
+	OrderBy   string `json:"order_by" adapter:"query,default=completion_date"`
+	OrderDir  string `json:"order_dir" adapter:"query,default=desc"`
 }
 
 // ChallengeItem represents a challenge item in responses.
@@ -64,6 +64,9 @@ func (s *ChallengesService) Import(ctx context.Context, c *storage.Challenge) er
 }
 
 // List returns a paginated list of challenges for an athlete.
+//
+//adapter:wasm getChallenges category=Challenges
+//adapter:http GET /api/v1/challenges
 func (s *ChallengesService) List(ctx context.Context, in ListChallengesInput) (*ListChallengesOutput, error) {
 	f := storage.ChallengeFilters{
 		Month: in.Month,

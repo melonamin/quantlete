@@ -32,10 +32,9 @@ export function getCredentials(): StravaCredentials | null {
     return null
   }
 
-  const clientIdRow = db.queryOne<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [KEY_CLIENT_ID]
-  )
+  const clientIdRow = db.queryOne<{ value: string }>('SELECT value FROM app_state WHERE key = ?', [
+    KEY_CLIENT_ID,
+  ])
   const clientSecretRow = db.queryOne<{ value: string }>(
     'SELECT value FROM app_state WHERE key = ?',
     [KEY_CLIENT_SECRET]
@@ -55,10 +54,7 @@ export function getCredentials(): StravaCredentials | null {
 /**
  * Save Strava credentials to the database.
  */
-export async function saveCredentials(
-  clientId: string,
-  clientSecret: string
-): Promise<void> {
+export async function saveCredentials(clientId: string, clientSecret: string): Promise<void> {
   const db = getDatabase()
   if (!db.isInitialized()) {
     throw new Error('Database not initialized')
@@ -116,10 +112,7 @@ export async function deleteCredentials(): Promise<void> {
     return
   }
 
-  db.exec('DELETE FROM app_state WHERE key IN (?, ?)', [
-    KEY_CLIENT_ID,
-    KEY_CLIENT_SECRET,
-  ])
+  db.exec('DELETE FROM app_state WHERE key IN (?, ?)', [KEY_CLIENT_ID, KEY_CLIENT_SECRET])
 
   await db.persist()
   cachedCredentials = null

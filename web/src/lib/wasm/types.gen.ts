@@ -10,6 +10,59 @@
 // From activities.go
 // ============================================================================
 
+/** ActivityItem represents an activity in responses. */
+export interface ActivityItem {
+  id: number
+  name: string
+  description?: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone?: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  elev_high?: number | null
+  elev_low?: number | null
+  average_speed: number
+  max_speed: number
+  average_heartrate?: number | null
+  max_heartrate?: number | null
+  average_watts?: number | null
+  max_watts?: number | null
+  weighted_average_watts?: number | null
+  kilojoules?: number | null
+  average_cadence?: number | null
+  calories?: number | null
+  kudos_count: number
+  comment_count: number
+  photo_count: number
+  commute: boolean
+  private: boolean
+  trainer: boolean
+  workout_type?: number | null
+  device_name?: string
+  gear_id?: string
+  start_lat?: number | null
+  start_lng?: number | null
+  end_lat?: number | null
+  end_lng?: number | null
+  summary_polyline?: string
+  location_city?: string
+  location_country?: string
+}
+
+/** ActivityStreamItem represents a stream in responses. */
+export interface ActivityStreamItem {
+  activity_id: number
+  stream_type: string
+  original_size: number
+  resolution: string
+  series_type: string
+  data: unknown
+}
+
 /** ActivityTotals represents aggregate statistics. */
 export interface ActivityTotals {
   count: number
@@ -21,66 +74,23 @@ export interface ActivityTotals {
   kilojoules: number
 }
 
-export interface GetActivitiesRequest {
+/** ListActivitiesOutput contains a paginated list of activities. */
+export interface ListActivitiesOutput {
+  data: ActivityItem[]
+  total: number
   page: number
   per_page: number
-  sport_type: string
-  after: string
-  before: string
-  gear_id: string
-  commute?: boolean | null
-  trainer?: boolean | null
-  search: string
-  order_by: string
-  order_dir: string
+  total_pages: number
 }
 
-export interface SaveActivityInput {
-  id: number
-  athlete_id: number
-  name: string
-  sport_type: string
-  start_date: string
-  start_date_local: string
-  timezone: string
-  distance: number
-  moving_time: number
-  elapsed_time: number
-  total_elevation_gain: number
-  average_speed: number
-  max_speed: number
-  average_heartrate?: number | null
-  max_heartrate?: number | null
-  average_watts?: number | null
-  max_watts?: number | null
-  weighted_average_watts?: number | null
-  kilojoules?: number | null
-  average_cadence?: number | null
-  calories?: number | null
-  gear_id: string
-  commute: boolean
-  workout_type?: number | null
-  location_city: string
-  location_state: string
-  location_country: string
-  summary_polyline: string
-  start_lat?: number | null
-  start_lng?: number | null
-  description: string
-  device_name: string
-  trainer: boolean
-  private: boolean
-  kudos_count: number
-  photo_count: number
+/** SaveActivityOutput contains the result of saving an activity. */
+export interface SaveActivityOutput {
+  message: string
 }
 
-export interface SaveStreamInput {
-  activity_id: number
-  stream_type: string
-  data: unknown
-  series_type: string
-  original_size: number
-  resolution: string
+/** SaveStreamOutput contains the result of saving a stream. */
+export interface SaveStreamOutput {
+  message: string
 }
 
 // ============================================================================
@@ -88,21 +98,26 @@ export interface SaveStreamInput {
 // ============================================================================
 
 export interface FTPHistoryResponse {
-  cycling: unknown[]
-  running: unknown[]
+  cycling: MetricPointDTO[]
+  running: MetricPointDTO[]
+}
+
+export interface MetricPointDTO {
+  recorded_at: string
+  value: number
 }
 
 export interface UpdateFTPRequest {
-  cycling: unknown[]
-  running: unknown[]
+  cycling: MetricPointDTO[]
+  running: MetricPointDTO[]
 }
 
 export interface UpdateWeightRequest {
-  points: unknown[]
+  points: MetricPointDTO[]
 }
 
 export interface WeightHistoryResponse {
-  points: unknown[]
+  points: MetricPointDTO[]
 }
 
 // ============================================================================
@@ -115,25 +130,6 @@ export interface AthleteMetricPoint {
 }
 
 // ============================================================================
-// From athletes.go
-// ============================================================================
-
-export interface SaveAthleteInput {
-  id: number
-  username: string
-  firstname: string
-  lastname: string
-  profile_medium: string
-  profile: string
-  city: string
-  state: string
-  country: string
-  sex: string
-  premium: boolean
-  summit: boolean
-}
-
-// ============================================================================
 // From auth.go
 // ============================================================================
 
@@ -141,8 +137,25 @@ export interface SaveAthleteInput {
 export interface AuthStatusResponse {
   authenticated: boolean
   demo_mode?: boolean
-  athlete?: unknown | null
+  athlete?: Athlete | null
   expires_at?: number
+}
+
+// ============================================================================
+// From best_efforts.go
+// ============================================================================
+
+/** BestEffort represents a Strava "best_efforts" item on an activity detail response. */
+export interface BestEffort {
+  name: string
+  elapsed_time: number
+  moving_time: number
+  start_date: string
+  start_date_local: string
+  distance: number
+  start_index?: number | null
+  end_index?: number | null
+  pr_rank?: number | null
 }
 
 // ============================================================================
@@ -161,12 +174,24 @@ export interface Challenge {
   created_at: string
 }
 
-export interface GetChallengesRequest {
-  month: string
+/** ChallengeItem represents a challenge item in responses. */
+export interface ChallengeItem {
+  id: string
+  name: string
+  slug?: string
+  badge_url?: string
+  local_badge_url?: string
+  completion_date?: string | null
+  month?: string
+}
+
+/** ListChallengesOutput contains a paginated list of challenges. */
+export interface ListChallengesOutput {
+  data: ChallengeItem[]
+  total: number
   page: number
   per_page: number
-  order_by: string
-  order_dir: string
+  total_pages: number
 }
 
 export interface NewChallengesHandlerBody {
@@ -178,13 +203,143 @@ export interface NewChallengesHandlerBody {
 // From dashboard.go
 // ============================================================================
 
-export interface GetHeatmapDataRequest {
+/** CalendarActivityOutput represents an activity summary for the calendar view. */
+export interface CalendarActivityOutput {
+  id: number
+  name: string
   sport_type: string
+  start_date: string
+  distance: number
+  moving_time: number
+  total_elevation_gain: number
+}
+
+/** CalendarDayOutput represents activity data for a single day. */
+export interface CalendarDayOutput {
+  date: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_calories: number
+}
+
+/** CalendarMonthSummaryOutput represents a monthly summary for the calendar. */
+export interface CalendarMonthSummaryOutput {
   year: number
-  commute?: boolean | null
-  workout_type?: number | null
-  limit: number
-  offset: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_elevation_gain: number
+  total_moving_time: number
+  total_calories: number
+  workout_count: number
+  challenges_completed: number
+}
+
+/** DashboardConfigOutput represents the dashboard configuration. */
+export interface DashboardConfigOutput {
+  version: number
+  widgets: DashboardWidgetConfigOutput[]
+}
+
+/** DashboardOutput combines all dashboard data. */
+export interface DashboardOutput {
+  stats?: DashboardStatsOutput | null
+  weekly_stats: WeeklyStatOutput[]
+  recent_activities: RecentActivityOutput[]
+  sport_type_stats: SportTypeStatOutput[]
+}
+
+/** DashboardStatsOutput represents aggregated statistics for the dashboard. */
+export interface DashboardStatsOutput {
+  total_activities: number
+  total_distance: number
+  total_moving_time: number
+  total_elevation_gain: number
+  total_calories: number
+  year_activities: number
+  year_distance: number
+  year_moving_time: number
+  year_elevation_gain: number
+  month_activities: number
+  month_distance: number
+  month_moving_time: number
+  month_elevation_gain: number
+}
+
+/** DashboardWidgetConfigOutput represents a widget configuration. */
+export interface DashboardWidgetConfigOutput {
+  id: string
+  width: number
+  height?: number
+  hidden: boolean
+  settings?: Record<string, unknown>
+}
+
+/** DistributionSliceOutput represents a single slice of a distribution. */
+export interface DistributionSliceOutput {
+  label: string
+  count: number
+}
+
+/** ExportStatsOutput represents export statistics. */
+export interface ExportStatsOutput {
+  total_activities: number
+  first_activity?: string | null
+  last_activity?: string | null
+}
+
+/** MonthlyStatOutput represents statistics for a single month. */
+export interface MonthlyStatOutput {
+  month: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** RecentActivityOutput represents a simplified activity for the dashboard. */
+export interface RecentActivityOutput {
+  id: number
+  name: string
+  sport_type: string
+  start_date: string
+  distance: number
+  moving_time: number
+  elevation_gain: number
+  summary_polyline?: string
+}
+
+/** SportTypeStatOutput represents statistics for a single sport type. */
+export interface SportTypeStatOutput {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** UpdateDashboardConfigInput contains parameters for updating dashboard config. */
+export interface UpdateDashboardConfigInput {
+  config: DashboardConfigOutput
+}
+
+/** WeeklyStatOutput represents statistics for a single sport type in the current week. */
+export interface WeeklyStatOutput {
+  sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** YearlyStatOutput represents statistics for a single year. */
+export interface YearlyStatOutput {
+  year: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
 }
 
 // ============================================================================
@@ -205,38 +360,61 @@ export interface DashboardWidgetConfig {
 }
 
 // ============================================================================
-// From eddington_history.go
-// ============================================================================
-
-export interface EddingtonHistoryPoint {
-  date: string
-  number: number
-}
-
-// ============================================================================
 // From gear.go
 // ============================================================================
 
-export interface GetGearMonthlyUsageRequest {
-  include_retired: boolean
+/** CreateCustomGearInput contains parameters for creating custom gear. */
+export interface CreateCustomGearInput {
+  name: string
+  hashtag: string
+  retired: boolean
+  purchase_price?: number | null
+  purchase_currency?: string
 }
 
-export interface GetGearRequest {
-  include_retired: boolean
-  page: number
-  per_page: number
+/** DeleteGearOutput contains the result of a delete operation. */
+export interface DeleteGearOutput {
+  deleted: boolean
 }
 
-export interface SaveGearInput {
+/** GearItem represents a gear item in responses. */
+export interface GearItem {
   id: string
-  athlete_id: number
   name: string
   primary: boolean
   retired: boolean
   distance: number
-  brand_name: string
-  model_name: string
-  description: string
+  brand_name?: string
+  model_name?: string
+  description?: string
+  source: string
+  hashtag?: string
+  purchase_price?: number | null
+  purchase_currency?: string
+  activity_count: number
+}
+
+/** ListGearOutput contains a paginated list of gear. */
+export interface ListGearOutput {
+  data: GearItem[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
+/** SaveGearOutput contains the result of saving gear. */
+export interface SaveGearOutput {
+  message: string
+}
+
+/** UpdateCustomGearInput contains parameters for updating custom gear. */
+export interface UpdateCustomGearInput {
+  name?: string | null
+  hashtag?: string | null
+  retired?: boolean | null
+  purchase_price?: number | null
+  purchase_currency?: string | null
 }
 
 // ============================================================================
@@ -308,6 +486,15 @@ export interface HealthResponse {
 // From import.go
 // ============================================================================
 
+export interface OptsInput {
+  full_sync: boolean
+  resume: boolean
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+}
+
 /** By default, all data types are imported. Use skip_* fields to exclude specific types. */
 export interface StartImportRequest {
   full_sync: boolean
@@ -332,36 +519,22 @@ export interface Component {
   updated_at: string
 }
 
+/** ComponentItem represents a component in responses. */
+export interface ComponentItem {
+  id: number
+  gear_id: string
+  name: string
+  image_url?: string
+  maintenance_hashtag?: string
+  created_at: string
+  updated_at: string
+  last_completed_at?: string | null
+  rules: RuleItem[]
+}
+
 export interface ComponentWithRules {
   rules: MaintenanceRule[]
   last_completed_at?: string | null
-}
-
-export interface CreateComponentInput {
-  gear_id: string
-  name: string
-  image_url: string
-  maintenance_hashtag: string
-  type: string
-  threshold_value: number
-}
-
-export interface CreateCustomGearInput {
-  name: string
-  hashtag: string
-  retired: boolean
-  purchase_price?: number | null
-  purchase_currency: string
-}
-
-export interface DeleteCustomGearRequest {
-  id: string
-  force: boolean
-}
-
-export interface DeleteHRZoneDefinitionRequest {
-  sport_type: string
-  effective_from: string
 }
 
 export interface DueComponent {
@@ -372,24 +545,31 @@ export interface DueComponent {
   is_due: boolean
 }
 
-export interface GetCustomGearRequest {
-  include_retired: boolean
-  page: number
-  per_page: number
-  order_by: string
-  order_dir: string
-}
-
-export interface GetGearComponentsRequest {
+/** DueComponentItem represents a component with maintenance status. */
+export interface DueComponentItem {
+  id: number
   gear_id: string
-  page: number
-  per_page: number
+  name: string
+  image_url?: string
+  maintenance_hashtag?: string
+  created_at: string
+  updated_at: string
+  last_completed_at?: string | null
+  rules: RuleItem[]
+  distance_since: number
+  moving_time_since: number
+  days_since: number
+  progress: RuleProgressItem[]
+  is_due: boolean
 }
 
-export interface LogMaintenanceRequest {
-  component_id: number
-  activity_id?: number | null
-  completed_at: string
+/** ListComponentsOutput contains a paginated list of components. */
+export interface ListComponentsOutput {
+  data: ComponentItem[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
 }
 
 export interface MaintenanceLogEntry {
@@ -407,6 +587,28 @@ export interface MaintenanceRule {
   updated_at: string
 }
 
+export interface RequestInput {
+  include_retired: boolean
+  page: number
+  per_page: number
+  order_by: string
+  order_dir: string
+}
+
+/** RuleInput represents a rule in create/update requests. */
+export interface RuleInput {
+  type: string
+  threshold_value: number
+}
+
+/** RuleItem represents a maintenance rule in responses. */
+export interface RuleItem {
+  id: number
+  component_id: number
+  type: string
+  threshold_value: number
+}
+
 export interface RuleProgress {
   type: string
   threshold_value: number
@@ -415,40 +617,53 @@ export interface RuleProgress {
   due: boolean
 }
 
-export interface UpdateComponentInput {
-  id: number
-  name?: string | null
-  image_url?: string | null
-  maintenance_hashtag?: string | null
+/** RuleProgressItem represents progress for a single rule. */
+export interface RuleProgressItem {
   type: string
   threshold_value: number
-}
-
-export interface UpdateCustomGearInput {
-  id: string
-  name?: string | null
-  hashtag?: string | null
-  retired?: boolean | null
-  purchase_price?: unknown | null
-  purchase_currency?: string | null
-}
-
-export interface UpsertHRZoneDefinitionRequest {
-  sport_type: string
-  effective_from: string
-  method: string
-  zones: unknown
+  current_value: number
+  percent: number
+  due: boolean
 }
 
 // ============================================================================
 // From photos.go
 // ============================================================================
 
-export interface GetPhotosRequest {
+export interface ActivityPhoto {
+  id: number
+  unique_id: string
+  caption: string
+  location: number[]
+  urls: Record<string, string>
+}
+
+/** ActivityPhotoItem represents a photo attached to an activity. */
+export interface ActivityPhotoItem {
+  id: string
+  activity_id: number
+  url: string
+  thumbnail_url?: string
+  caption?: string
+  created_at: string
+}
+
+/** FacetItem represents a facet value with count for filtering. */
+export interface FacetItem {
+  value: string
+  iso2?: string
+  count: number
+}
+
+/** ListPhotosOutput contains a paginated list of photos with facets. */
+export interface ListPhotosOutput {
+  data: PhotoItem[]
+  total: number
   page: number
   per_page: number
-  sport_types: string[]
-  country: string
+  total_pages: number
+  countries: FacetItem[]
+  sport_types: FacetItem[]
 }
 
 export interface Photo {
@@ -467,6 +682,20 @@ export interface PhotoFacetCount {
   count: number
 }
 
+/** PhotoItem represents a photo in responses. */
+export interface PhotoItem {
+  id: string
+  activity_id: number
+  url: string
+  thumbnail_url?: string
+  caption?: string
+  created_at: string
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+  location_country?: string
+}
+
 export interface PhotoListItem {
   activity_name: string
   sport_type: string
@@ -481,27 +710,14 @@ export interface PhotoListResult {
   sport_types: PhotoFacetCount[]
 }
 
-export interface SavePhotoInput {
-  id: string
-  athlete_id: number
-  activity_id: number
-  url: string
-  thumbnail_url: string
-  caption: string
-  location: string
-  created_at: string
+/** SavePhotoOutput contains the result of saving a photo. */
+export interface SavePhotoOutput {
+  message: string
 }
 
 // ============================================================================
 // From power.go
 // ============================================================================
-
-export interface PeakPowerBest {
-  duration_s: number
-  watts: number
-  activity_id: number
-  start_date: string
-}
 
 export interface PeakPowerHistoryPoint {
   date: string
@@ -1290,6 +1506,19 @@ export interface GetYearlyStatsRow {
 }
 
 // ============================================================================
+// From ratelimit.go
+// ============================================================================
+
+/** Status returns the current rate limit status. */
+export interface RateLimitStatus {
+  limit_15min: number
+  usage_15min: number
+  limit_daily: number
+  usage_daily: number
+  last_update: string
+}
+
+// ============================================================================
 // From rewind.go
 // ============================================================================
 
@@ -1307,31 +1536,12 @@ export interface RewindBiggestActivity {
   value: number
 }
 
-export interface RewindHourCount {
-  hour: number
-  count: number
-}
-
-export interface RewindLocationPoint {
-  lat: number
-  lng: number
-  count: number
-}
-
 export interface RewindMonth {
   month: string
   activities: number
   distance_m: number
   elevation_m: number
   prs: number
-}
-
-export interface RewindPhoto {
-  id: string
-  activity_id: number
-  url: string
-  thumbnail_url?: string
-  caption?: string
 }
 
 export interface RewindReport {
@@ -1349,16 +1559,6 @@ export interface RewindReport {
   streaks: RewindStreaks
   random_photo?: RewindPhoto | null
   biggest: RewindBiggest
-}
-
-export interface RewindSportTime {
-  sport_type: string
-  moving_time_s: number
-}
-
-export interface RewindStreaks {
-  longest_active_days: number
-  longest_rest_days: number
 }
 
 export interface RewindTotals {
@@ -1380,44 +1580,68 @@ export interface CountryStat {
   count: number
 }
 
-export interface GetSegmentEffortsRequest {
-  segment_id: number
-  page: number
-  per_page: number
-  order_by: string
-  order_dir: string
-}
-
-export interface GetSegmentsRequest {
-  page: number
-  per_page: number
-  starred?: boolean | null
-  search: string
-  activity_type: string
+/** CountryStats represents segment statistics for a country. */
+export interface CountryStats {
   country: string
-  kom_only: boolean
-  order_by: string
-  order_dir: string
+  iso2?: string
+  count: number
 }
 
-export interface SaveSegmentEffortInput {
+/** ListEffortsOutput contains a paginated list of segment efforts. */
+export interface ListEffortsOutput {
+  data: SegmentEffortItem[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
+/** ListSegmentsOutput contains a paginated list of segments. */
+export interface ListSegmentsOutput {
+  data: SegmentListItem[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
+/** SaveSegmentEffortOutput contains the result of saving a segment effort. */
+export interface SaveSegmentEffortOutput {
+  message: string
+}
+
+/** SaveSegmentOutput contains the result of saving a segment. */
+export interface SaveSegmentOutput {
+  message: string
+}
+
+/** SegmentDetailOutput contains a segment with its effort history. */
+export interface SegmentDetailOutput {
+  segment: SegmentItem
+  efforts: SegmentEffortItem[]
+}
+
+/** SegmentEffortItem represents a segment effort in responses. */
+export interface SegmentEffortItem {
   id: number
   segment_id: number
   activity_id: number
   athlete_id: number
-  name: string
+  name?: string
   elapsed_time: number
   moving_time: number
-  start_date: string
-  start_date_local: string
+  start_date?: string | null
+  start_date_local?: string | null
   distance: number
   average_watts?: number | null
   average_heartrate?: number | null
   max_heartrate?: number | null
   pr_rank?: number | null
+  country?: string
 }
 
-export interface SaveSegmentInput {
+/** SegmentItem represents a segment in responses. */
+export interface SegmentItem {
   id: number
   name: string
   activity_type: string
@@ -1432,13 +1656,14 @@ export interface SaveSegmentInput {
   end_lat?: number | null
   end_lng?: number | null
   starred: boolean
-  polyline: string
+  polyline?: string
   athlete_kom_rank?: number | null
   athlete_effort_count?: number | null
   athlete_pr_elapsed_time?: number | null
-  athlete_pr_date: string
+  athlete_pr_date?: string | null
 }
 
+/** SegmentListItem represents a segment in list responses with effort statistics. */
 export interface SegmentListItem {
   times_completed: number
   last_effort_date?: string | null
@@ -1509,6 +1734,36 @@ export interface UpdateCredentialsRequest {
 // From stats.go
 // ============================================================================
 
+/** BestEffortListItem represents a best effort item in a list. */
+export interface BestEffortListItem {
+  distance_type: string
+  name: string
+  distance_m: number
+  elapsed_time_s: number
+  moving_time_s?: number | null
+  pr_rank?: number | null
+  start_index?: number | null
+  end_index?: number | null
+  activity_id: number
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+}
+
+/** BestEffortPR represents a personal record for a distance type. */
+export interface BestEffortPR {
+  distance_type: string
+  name: string
+  distance_m: number
+  elapsed_time_s: number
+  moving_time_s?: number | null
+  pr_rank?: number | null
+  activity_id: number
+  activity_name: string
+  sport_type: string
+  start_date_local: string
+}
+
 /** CalendarActivity represents an activity summary for the calendar view. */
 export interface CalendarActivity {
   id: number
@@ -1541,9 +1796,13 @@ export interface CalendarMonthSummary {
   challenges_completed: number
 }
 
-export interface ComputePowerBestEffortsInput {
-  activity_id: number
-  athlete_id: number
+/** DailyTrainingLoadPoint represents training load for a single day. */
+export interface DailyTrainingLoadPoint {
+  day: string
+  tss: number
+  ctl: number
+  atl: number
+  tsb: number
 }
 
 /** DashboardStats represents aggregated statistics for the dashboard. */
@@ -1574,6 +1833,19 @@ export interface EddingtonDay {
   distance: number
 }
 
+/** EddingtonHistoryPoint represents a milestone point where the Eddington number increases. */
+export interface EddingtonHistoryPoint {
+  date: string
+  number: number
+}
+
+/** EddingtonOutput contains the Eddington number calculation result. */
+export interface EddingtonOutput {
+  number: number
+  distribution: EddingtonDay[]
+  next_steps: EddingtonStep[]
+}
+
 /** EddingtonResult contains the Eddington number calculation result. */
 export interface EddingtonResult {
   number: number
@@ -1587,21 +1859,6 @@ export interface EddingtonStep {
   rides_needed: number
 }
 
-export interface GetEddingtonDataRequest {
-  sport_types: string[]
-}
-
-export interface GetPowerStatsRequest {
-  after: string
-  before: string
-  sport_types: string[]
-}
-
-export interface GetTrainingLoadRequest {
-  after: string
-  before: string
-}
-
 export interface HRZonesResponse {
   method: string
   zones: HRZoneConfig
@@ -1609,7 +1866,7 @@ export interface HRZonesResponse {
   total_seconds: number
 }
 
-/** When modifying fields, update both the struct and the SQL query together. */
+/** HeatmapActivity represents an activity for the heatmap visualization. */
 export interface HeatmapActivity {
   id: number
   name: string
@@ -1627,6 +1884,15 @@ export interface HeatmapCountryStat {
   count: number
 }
 
+/** HeatmapOutput contains the heatmap data and summary statistics. */
+export interface HeatmapOutput {
+  activities: HeatmapActivity[]
+  total: number
+  limit?: number
+  offset?: number
+  countries?: HeatmapCountryStat[]
+}
+
 /** MonthlyStat represents statistics for a single month. */
 export interface MonthlyStat {
   month: string
@@ -1634,6 +1900,21 @@ export interface MonthlyStat {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** PeakPowerBest represents the best power for a duration. */
+export interface PeakPowerBest {
+  duration_s: number
+  watts: number
+  activity_id: number
+  start_date: string
+}
+
+/** PowerStatsOutput contains power statistics. */
+export interface PowerStatsOutput {
+  durations_s: number[]
+  best: PeakPowerBest[]
+  history: Record<number, PeakPowerHistoryPoint[]>
 }
 
 export interface PowerZonesResponse {
@@ -1655,19 +1936,61 @@ export interface RecentActivity {
   summary_polyline?: string
 }
 
-export interface SaveBestEffortsInput {
-  athlete_id: number
+/** RewindHourCount represents activity count by hour. */
+export interface RewindHourCount {
+  hour: number
+  count: number
+}
+
+/** RewindLocationPoint represents a location bucket. */
+export interface RewindLocationPoint {
+  lat: number
+  lng: number
+  count: number
+}
+
+/** RewindOutput contains the rewind report. */
+export interface RewindOutput {
+  year: number
+  range_start: string
+  range_end: string
+  total_days: number
+  active_days: number
+  rest_days: number
+  totals: RewindTotals
+  months?: RewindMonth[]
+  moving_time_by_sport: RewindSportTime[]
+  start_times_by_hour: RewindHourCount[]
+  locations: RewindLocationPoint[]
+  streaks: RewindStreaks
+  random_photo?: RewindPhoto | null
+  biggest: RewindBiggest
+}
+
+/** RewindPhoto represents a photo in the rewind. */
+export interface RewindPhoto {
+  id: string
   activity_id: number
+  url: string
+  thumbnail_url?: string
+  caption?: string
+}
+
+/** RewindSportTime represents moving time by sport type. */
+export interface RewindSportTime {
   sport_type: string
-  distance_type: string
-  name: string
-  distance_m: number
-  elapsed_time: number
-  moving_time?: number | null
-  start_index?: number | null
-  end_index?: number | null
-  pr_rank?: number | null
-  start_date: string
+  moving_time_s: number
+}
+
+/** RewindStreaks represents streak data. */
+export interface RewindStreaks {
+  longest_active_days: number
+  longest_rest_days: number
+}
+
+/** SaveBestEffortsOutput contains the result of saving best efforts. */
+export interface SaveBestEffortsOutput {
+  message: string
 }
 
 /** SportTypeStat represents statistics for a single sport type. */
@@ -1677,6 +2000,12 @@ export interface SportTypeStat {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** TrainingLoadOutput contains training load data. */
+export interface TrainingLoadOutput {
+  series: DailyTrainingLoadPoint[]
+  summary?: DailyTrainingLoadPoint | null
 }
 
 /** WeeklyStat represents statistics for a single sport type in the current week. */
@@ -1695,44 +2024,6 @@ export interface YearStat {
   total_distance: number
   total_time: number
   total_elevation: number
-}
-
-// ============================================================================
-// From sync.go
-// ============================================================================
-
-export interface CompleteSyncRunRequest {
-  id: number
-  status: string
-  error: string
-  activities_total: number
-  activities_imported: number
-  activities_skipped: number
-  gear_imported: number
-  streams_imported: number
-  segments_imported: number
-  photos_imported: number
-  failed_count: number
-  newest_activity_date: string
-}
-
-export interface CreateSyncRunInput {
-  athlete_id: number
-  full_sync: boolean
-  skip_streams: boolean
-  skip_segments: boolean
-  skip_best_efforts: boolean
-  skip_photos: boolean
-}
-
-export interface UpdateSyncRunInput {
-  id: number
-  status: string
-  activities_total: number
-  activities_imported: number
-  streams_imported: number
-  failed_count: number
-  newest_activity_date: string
 }
 
 // ============================================================================
@@ -1772,15 +2063,177 @@ export interface SyncWatermark {
 }
 
 // ============================================================================
-// From training_load.go
+// From types.go
 // ============================================================================
 
-export interface DailyTrainingLoadPoint {
-  day: string
-  tss: number
-  ctl: number
-  atl: number
-  tsb: number
+/** Activity represents a Strava activity. */
+export interface Activity {
+  id: number
+  name: string
+  description: string
+  sport_type: string
+  start_date: string
+  start_date_local: string
+  timezone: string
+  location_city: string
+  location_state: string
+  location_country: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  elev_high: number
+  elev_low: number
+  average_speed: number
+  max_speed: number
+  average_heartrate: number
+  max_heartrate: number
+  average_watts: number
+  max_watts: number
+  weighted_average_watts: number
+  kilojoules: number
+  average_cadence: number
+  calories: number
+  kudos_count: number
+  comment_count: number
+  total_photo_count: number
+  commute: boolean
+  private: boolean
+  trainer: boolean
+  workout_type: number
+  device_name: string
+  gear_id: string
+  start_latlng: number[]
+  end_latlng: number[]
+  map: ActivityMap
+  segment_efforts?: SegmentEffort[]
+  best_efforts?: BestEffort[]
+  splits_metric?: Split[]
+  laps?: Lap[]
+}
+
+/** ActivityMap contains map data for an activity. */
+export interface ActivityMap {
+  id: string
+  polyline: string
+  summary_polyline: string
+}
+
+/** Athlete represents a Strava athlete. */
+export interface Athlete {
+  id: number
+  username: string
+  firstname: string
+  lastname: string
+  city: string
+  state: string
+  country: string
+  sex: string
+  premium: boolean
+  summit: boolean
+  profile_medium: string
+  profile: string
+  weight: number
+}
+
+/** Gear represents a piece of equipment. */
+export interface Gear {
+  id: string
+  name: string
+  primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+}
+
+/** Lap represents a lap in an activity. */
+export interface Lap {
+  id: number
+  name: string
+  elapsed_time: number
+  moving_time: number
+  distance: number
+  average_speed: number
+  max_speed: number
+  average_watts: number
+  average_heartrate: number
+  max_heartrate: number
+  average_cadence: number
+  lap_index: number
+}
+
+/** Segment represents a Strava segment. */
+export interface Segment {
+  id: number
+  name: string
+  activity_type: string
+  distance: number
+  average_grade: number
+  maximum_grade: number
+  elevation_high: number
+  elevation_low: number
+  climb_category: number
+  start_latlng: number[]
+  end_latlng: number[]
+  starred: boolean
+  polyline: string
+  effort_count: number
+  pr_date?: string | null
+  pr_elapsed_time: number
+  kom_rank?: number | null
+}
+
+/** SegmentEffort represents an effort on a segment. */
+export interface SegmentEffort {
+  id: number
+  name: string
+  elapsed_time: number
+  moving_time: number
+  start_date: string
+  start_date_local: string
+  distance: number
+  average_watts: number
+  average_heartrate: number
+  max_heartrate: number
+  pr_rank?: number | null
+  segment: Segment
+}
+
+/** Split represents a split in an activity. */
+export interface Split {
+  distance: number
+  elapsed_time: number
+  moving_time: number
+  average_speed: number
+  average_heartrate: number
+  pace_zone: number
+  split: number
+}
+
+/** Stream represents a single data stream. */
+export interface Stream {
+  type: string
+  series_type: string
+  original_size: number
+  resolution: string
+  data: unknown[]
+}
+
+/** StreamSet represents a collection of activity streams. */
+export interface StreamSet {
+  time?: Stream | null
+  distance?: Stream | null
+  latlng?: Stream | null
+  altitude?: Stream | null
+  velocity_smooth?: Stream | null
+  heartrate?: Stream | null
+  cadence?: Stream | null
+  watts?: Stream | null
+  temp?: Stream | null
+  moving?: Stream | null
+  grade_smooth?: Stream | null
 }
 
 // ============================================================================

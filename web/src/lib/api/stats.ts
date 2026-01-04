@@ -13,12 +13,28 @@ import { usePowerStats as dataUsePowerStats } from '@/lib/data'
 export type {
   PeakPowerBest,
   PeakPowerHistoryPoint,
-  PowerStatsResponse,
   DailyTrainingLoadPoint,
-  TrainingLoadResponse,
   PowerZonesResponse,
   DistributionSlice,
 } from '@/lib/wasm/types.gen'
+
+// ============================================================================
+// Composite response types - not generated from Go
+// These aggregate generated types into API response structures
+// ============================================================================
+
+// PowerStatsResponse - composite type combining best efforts and history
+export interface PowerStatsResponse {
+  best: import('@/lib/wasm/types.gen').PeakPowerBest[]
+  durations_s: number[]
+  history: Record<string, import('@/lib/wasm/types.gen').PeakPowerHistoryPoint[]>
+}
+
+// TrainingLoadResponse - composite type for training load data
+export interface TrainingLoadResponse {
+  series: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint[]
+  summary?: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint
+}
 
 // ============================================================================
 // Frontend-only types - defined here for specific TS requirements

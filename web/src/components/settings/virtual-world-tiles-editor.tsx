@@ -138,10 +138,7 @@ export function VirtualWorldTilesEditor({
         </div>
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">Max zoom</label>
-          <Input
-            value={maxZoom}
-            onChange={(e) => setMaxZoom(e.target.value)}
-          />
+          <Input value={maxZoom} onChange={(e) => setMaxZoom(e.target.value)} />
         </div>
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm text-muted-foreground">Tile URL template</label>
@@ -153,10 +150,7 @@ export function VirtualWorldTilesEditor({
         </div>
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm text-muted-foreground">Attribution (optional)</label>
-          <Input
-            value={attribution}
-            onChange={(e) => setAttribution(e.target.value)}
-          />
+          <Input value={attribution} onChange={(e) => setAttribution(e.target.value)} />
         </div>
       </div>
       <div className="flex justify-end">

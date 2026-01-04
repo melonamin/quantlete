@@ -221,10 +221,12 @@ export function SortableWidget({
                   )}
                 >
                   <GripVertical className="h-4 w-4" />
-                  <span className={cn(
-                    'text-xs font-medium uppercase tracking-wider',
-                    isCompact && 'truncate max-w-[80px]'
-                  )}>
+                  <span
+                    className={cn(
+                      'text-xs font-medium uppercase tracking-wider',
+                      isCompact && 'truncate max-w-[80px]'
+                    )}
+                  >
                     {title}
                   </span>
                 </button>
@@ -256,57 +258,57 @@ export function SortableWidget({
                     <div className="flex items-center border-r border-border">
                       {WIDTH_OPTIONS.map((opt) => {
                         const Icon = opt.icon
-                      const isActive = width === opt.value
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => onWidthChange(opt.value)}
-                          className={cn(
-                            'flex items-center justify-center w-8 h-8 transition-colors',
-                            isActive
-                              ? 'bg-terminal-green/20 text-terminal-green'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                          )}
-                          title={opt.label}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                        </button>
-                      )
-                    })}
-                  </div>
+                        const isActive = width === opt.value
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => onWidthChange(opt.value)}
+                            className={cn(
+                              'flex items-center justify-center w-8 h-8 transition-colors',
+                              isActive
+                                ? 'bg-terminal-green/20 text-terminal-green'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            )}
+                            title={opt.label}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                          </button>
+                        )
+                      })}
+                    </div>
 
-                  {/* Height Controls */}
-                  <div className="flex items-center border-r border-border">
-                    <ChevronsUpDown className="h-3 w-3 mx-1 text-muted-foreground" />
-                    {HEIGHT_OPTIONS.map((opt) => {
-                      const isActive = height === opt.value
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => onHeightChange(opt.value)}
-                          className={cn(
-                            'flex items-center justify-center w-8 h-8 text-[10px] font-medium transition-colors',
-                            isActive
-                              ? 'bg-terminal-green/20 text-terminal-green'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                          )}
-                          title={opt.label}
-                        >
-                          {opt.value}×
-                        </button>
-                      )
-                    })}
-                  </div>
+                    {/* Height Controls */}
+                    <div className="flex items-center border-r border-border">
+                      <ChevronsUpDown className="h-3 w-3 mx-1 text-muted-foreground" />
+                      {HEIGHT_OPTIONS.map((opt) => {
+                        const isActive = height === opt.value
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => onHeightChange(opt.value)}
+                            className={cn(
+                              'flex items-center justify-center w-8 h-8 text-[10px] font-medium transition-colors',
+                              isActive
+                                ? 'bg-terminal-green/20 text-terminal-green'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            )}
+                            title={opt.label}
+                          >
+                            {opt.value}×
+                          </button>
+                        )
+                      })}
+                    </div>
 
-                  {/* Hide Button */}
-                  <button
-                    onClick={onHide}
-                    className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-destructive transition-colors"
-                    title="Hide widget"
-                  >
-                    <EyeOff className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                    {/* Hide Button */}
+                    <button
+                      onClick={onHide}
+                      className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Hide widget"
+                    >
+                      <EyeOff className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             )}

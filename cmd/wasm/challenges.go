@@ -3,10 +3,7 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"syscall/js"
 
 	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
@@ -20,10 +17,8 @@ import (
 
 // getChallenges returns paginated challenges for the athlete
 // Called from JS: goStorage.getChallenges(filtersJSON)
-//wasm:export
-func getChallenges(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getChallenges")
-
+// NOTE: Replaced by generated adapter genGetChallenges
+var getChallenges = wrapWasmAthlete("getChallenges", func(wc *WasmContext) interface{} {
 	var req struct {
 		Month    string `json:"month"`
 		Page     int    `json:"page"`
@@ -31,15 +26,14 @@ func getChallenges(this js.Value, args []js.Value) interface{} {
 		OrderBy  string `json:"order_by"`
 		OrderDir string `json:"order_dir"`
 	}
-	if len(args) > 0 && args[0].String() != "" {
-		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if wc.HasArg(0) && wc.ArgString(0) != "" {
+		if err := wc.ArgJSON(0, &req); err != nil {
 			return errorJSON(fmt.Errorf("parsing filters: %w", err))
 		}
 	}
 
-	ctx := context.Background()
-	result, err := bridge.challengesService.List(ctx, services.ListChallengesInput{
-		AthleteID: bridge.athleteID,
+	result, err := wc.Registry.ChallengesService.List(wc.Ctx, services.ListChallengesInput{
+		AthleteID: wc.AthleteID,
 		Month:     req.Month,
 		Page:      req.Page,
 		PerPage:   req.PerPage,
@@ -58,7 +52,7 @@ func getChallenges(this js.Value, args []js.Value) interface{} {
 		"per_page":    result.PerPage,
 		"total_pages": result.TotalPages,
 	})
-}
+})
 
 // ============================================================================
 // Training Goals
@@ -68,14 +62,11 @@ func getChallenges(this js.Value, args []js.Value) interface{} {
 
 // getTrainingGoals returns training goals config and progress
 // Called from JS: goStorage.getTrainingGoals(year?)
+//
 //wasm:export
-func getTrainingGoals(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getTrainingGoals")
-
-	ctx := context.Background()
-
+var getTrainingGoals = wrapWasmAthlete("getTrainingGoals", func(wc *WasmContext) interface{} {
 	// Get config
-	cfg, err := bridge.goals.GetConfig(ctx, bridge.athleteID)
+	cfg, err := wc.Registry.Goals().GetConfig(wc.Ctx, wc.AthleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -85,7 +76,7 @@ func getTrainingGoals(this js.Value, args []js.Value) interface{} {
 	for _, sport := range cfg.Sports {
 		sportProgress := make(map[string]interface{})
 		for period := range sport.Targets {
-			p, err := bridge.goals.GetProgress(ctx, bridge.athleteID, sport.SportTypes, period)
+			p, err := wc.Registry.Goals().GetProgress(wc.Ctx, wc.AthleteID, sport.SportTypes, period)
 			if err != nil {
 				continue
 			}
@@ -104,27 +95,21 @@ func getTrainingGoals(this js.Value, args []js.Value) interface{} {
 		"config":   cfg,
 		"progress": progress,
 	})
-}
+})
 
 // updateTrainingGoals updates training goals config
 // Called from JS: goStorage.updateTrainingGoals(configJSON)
+//
 //wasm:export
-func updateTrainingGoals(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateTrainingGoals")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing config"))
-	}
-
+var updateTrainingGoals = wrapWasmAthlete("updateTrainingGoals", func(wc *WasmContext) interface{} {
 	var cfg storage.TrainingGoalsConfig
-	if err := json.Unmarshal([]byte(args[0].String()), &cfg); err != nil {
+	if err := wc.ArgJSON(0, &cfg); err != nil {
 		return errorJSON(fmt.Errorf("parsing config: %w", err))
 	}
 
-	ctx := context.Background()
-	if err := bridge.goals.UpsertConfig(ctx, bridge.athleteID, cfg); err != nil {
+	if err := wc.Registry.Goals().UpsertConfig(wc.Ctx, wc.AthleteID, cfg); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON("Training goals updated")
-}
+})

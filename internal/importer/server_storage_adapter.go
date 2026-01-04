@@ -9,25 +9,26 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
 // ServerStorageAdapter wraps storage repositories to implement ImportStorage.
 type ServerStorageAdapter struct {
-	activities   *storage.ActivityRepository
-	streams      *storage.StreamRepository
-	gear         *storage.GearRepository
-	segments     *storage.SegmentRepository
-	bestEfforts  *storage.BestEffortsRepository
-	photos       *storage.PhotoRepository
-	maintenance  *storage.MaintenanceRepository
-	syncHistory  *storage.SyncHistoryRepository
-	appState     *storage.AppStateRepository
+	athletes    *storage.AthleteRepository
+	activities  *storage.ActivityRepository
+	streams     *storage.StreamRepository
+	gear        *storage.GearRepository
+	segments    *storage.SegmentRepository
+	bestEfforts *storage.BestEffortsRepository
+	photos      *storage.PhotoRepository
+	maintenance *storage.MaintenanceRepository
+	syncHistory *storage.SyncHistoryRepository
+	appState    *storage.AppStateRepository
 }
 
 // NewServerStorageAdapter creates a server-mode storage adapter.
 func NewServerStorageAdapter(
+	athletes *storage.AthleteRepository,
 	activities *storage.ActivityRepository,
 	streams *storage.StreamRepository,
 	gear *storage.GearRepository,
@@ -39,6 +40,7 @@ func NewServerStorageAdapter(
 	appState *storage.AppStateRepository,
 ) *ServerStorageAdapter {
 	return &ServerStorageAdapter{
+		athletes:    athletes,
 		activities:  activities,
 		streams:     streams,
 		gear:        gear,
@@ -52,12 +54,31 @@ func NewServerStorageAdapter(
 }
 
 // ============================================================================
+// Athletes
+// ============================================================================
+
+// SaveAthlete stores an athlete profile.
+func (a *ServerStorageAdapter) SaveAthlete(ctx context.Context, athlete *Athlete) error {
+	if a.athletes == nil {
+		return nil // Optional in some configurations
+	}
+	storageAthlete := &storage.Athlete{
+		ID:            athlete.ID,
+		Username:      athlete.Username,
+		FirstName:     athlete.FirstName,
+		LastName:      athlete.LastName,
+		ProfileMedium: athlete.ProfileMedium,
+	}
+	return a.athletes.Upsert(ctx, storageAthlete)
+}
+
+// ============================================================================
 // Activities
 // ============================================================================
 
 // SaveActivity stores an activity.
 func (a *ServerStorageAdapter) SaveActivity(ctx context.Context, athleteID int64, act *Activity) error {
-	storageAct := convertImporterActivityToStorage(athleteID, act)
+	storageAct := ConvertActivityToStorage(athleteID, act)
 	return a.activities.Upsert(ctx, storageAct)
 }
 
@@ -67,24 +88,13 @@ func (a *ServerStorageAdapter) SaveActivity(ctx context.Context, athleteID int64
 
 // SaveStream stores a stream.
 func (a *ServerStorageAdapter) SaveStream(ctx context.Context, activityID int64, streamType string, s *Stream) error {
-	if s == nil || s.Data == nil {
-		return nil
-	}
-
-	data, err := json.Marshal(s.Data)
+	stream, err := ConvertStreamToStorage(activityID, streamType, s)
 	if err != nil {
 		return err
 	}
-
-	stream := &storage.ActivityStream{
-		ActivityID:   activityID,
-		StreamType:   streamType,
-		OriginalSize: s.OriginalSize,
-		Resolution:   s.Resolution,
-		SeriesType:   s.SeriesType,
-		Data:         data,
+	if stream == nil {
+		return nil
 	}
-
 	return a.streams.Upsert(ctx, stream)
 }
 
@@ -94,17 +104,7 @@ func (a *ServerStorageAdapter) SaveStream(ctx context.Context, activityID int64,
 
 // SaveGear stores gear.
 func (a *ServerStorageAdapter) SaveGear(ctx context.Context, athleteID int64, g *Gear) error {
-	gear := &storage.Gear{
-		ID:          g.ID,
-		AthleteID:   athleteID,
-		Name:        g.Name,
-		Primary:     g.Primary,
-		Retired:     g.Retired,
-		Distance:    g.Distance,
-		BrandName:   g.BrandName,
-		ModelName:   g.ModelName,
-		Description: g.Description,
-	}
+	gear := ConvertGearToStorage(athleteID, g)
 	return a.gear.Upsert(ctx, gear)
 }
 
@@ -114,14 +114,21 @@ func (a *ServerStorageAdapter) SaveGear(ctx context.Context, athleteID int64, g 
 
 // SaveSegment stores a segment.
 func (a *ServerStorageAdapter) SaveSegment(ctx context.Context, s *Segment) error {
-	seg := convertImporterSegmentToStorage(s)
+	seg := ConvertSegmentToStorage(s)
 	return a.segments.UpsertSegment(ctx, seg)
 }
 
 // SaveSegmentEffort stores a segment effort.
-func (a *ServerStorageAdapter) SaveSegmentEffort(ctx context.Context, athleteID int64, activityID int64, e *SegmentEffort, country string) error {
-	effort := convertImporterSegmentEffortToStorage(athleteID, activityID, e, country)
+func (a *ServerStorageAdapter) SaveSegmentEffort(ctx context.Context, athleteID, activityID int64, e *SegmentEffort, country string) error {
+	effort := ConvertSegmentEffortToStorage(athleteID, activityID, e, country)
 	return a.segments.UpsertEffort(ctx, effort)
+}
+
+// SaveSegmentWithEffort atomically saves both segment and effort in a single transaction.
+func (a *ServerStorageAdapter) SaveSegmentWithEffort(ctx context.Context, athleteID, activityID int64, e *SegmentEffort, country string) error {
+	seg := ConvertSegmentToStorage(&e.Segment)
+	effort := ConvertSegmentEffortToStorage(athleteID, activityID, e, country)
+	return a.segments.UpsertSegmentWithEffort(ctx, seg, effort)
 }
 
 // ============================================================================
@@ -133,29 +140,7 @@ func (a *ServerStorageAdapter) SaveBestEfforts(ctx context.Context, athleteID, a
 	if a.bestEfforts == nil {
 		return nil
 	}
-
-	storageEfforts := make([]storage.BestEffort, len(efforts))
-	for i, e := range efforts {
-		dt, canonM := shared.CanonicalBestEffortDistanceType(e.Distance, e.Name)
-		storageEfforts[i] = storage.BestEffort{
-			AthleteID:    athleteID,
-			ActivityID:   activityID,
-			SportType:    sportType,
-			DistanceType: dt,
-			Name:         e.Name,
-			DistanceM:    canonM,
-			ElapsedTimeS: e.ElapsedTime,
-			MovingTimeS:  &e.MovingTime,
-			StartIndex:   e.StartIndex,
-			EndIndex:     e.EndIndex,
-			PRRank:       e.PRRank,
-		}
-		if !e.StartDate.IsZero() {
-			t := storage.SQLiteTime{Time: e.StartDate}
-			storageEfforts[i].StartDate = &t
-		}
-	}
-
+	storageEfforts := ConvertBestEffortsToStorage(athleteID, activityID, sportType, efforts)
 	return a.bestEfforts.ReplaceForActivity(ctx, athleteID, activityID, sportType, storageEfforts)
 }
 
@@ -168,29 +153,10 @@ func (a *ServerStorageAdapter) SavePhoto(ctx context.Context, athleteID, activit
 	if a.photos == nil {
 		return nil
 	}
-
-	url, thumb := bestPhotoURLsFromMap(p.URLs)
-	if url == "" {
+	photo := ConvertPhotoToStorage(athleteID, activityID, p)
+	if photo == nil {
 		return nil
 	}
-
-	var loc json.RawMessage
-	if len(p.Location) > 0 {
-		if b, err := json.Marshal(p.Location); err == nil {
-			loc = b
-		}
-	}
-
-	photo := &storage.Photo{
-		ID:           p.UniqueID,
-		AthleteID:    athleteID,
-		ActivityID:   activityID,
-		URL:          url,
-		ThumbnailURL: thumb,
-		Caption:      p.Caption,
-		Location:     loc,
-	}
-
 	return a.photos.Upsert(ctx, photo)
 }
 
@@ -312,156 +278,4 @@ func (a *ServerStorageAdapter) ClearImportState(ctx context.Context) error {
 		return nil
 	}
 	return a.appState.Delete(ctx, "import_state")
-}
-
-// ============================================================================
-// Conversion Helpers
-// ============================================================================
-
-// convertImporterActivityToStorage converts importer.Activity to storage.Activity.
-func convertImporterActivityToStorage(athleteID int64, a *Activity) *storage.Activity {
-	act := &storage.Activity{
-		ID:                   a.ID,
-		AthleteID:            athleteID,
-		Name:                 a.Name,
-		Description:          a.Description,
-		SportType:            a.SportType,
-		StartDate:            storage.SQLiteTime{Time: a.StartDate},
-		StartDateLocal:       storage.SQLiteTime{Time: a.StartDateLocal},
-		Timezone:             a.Timezone,
-		LocationCity:         a.LocationCity,
-		LocationState:        a.LocationState,
-		LocationCountry:      a.LocationCountry,
-		Distance:             a.Distance,
-		MovingTime:           a.MovingTime,
-		ElapsedTime:          a.ElapsedTime,
-		TotalElevationGain:   a.TotalElevationGain,
-		AverageSpeed:         a.AverageSpeed,
-		MaxSpeed:             a.MaxSpeed,
-		AverageHeartrate:     a.AverageHeartrate,
-		MaxHeartrate:         a.MaxHeartrate,
-		AverageWatts:         a.AverageWatts,
-		MaxWatts:             a.MaxWatts,
-		WeightedAverageWatts: a.WeightedAverageWatts,
-		Kilojoules:           a.Kilojoules,
-		AverageCadence:       a.AverageCadence,
-		Calories:             a.Calories,
-		KudosCount:           a.KudosCount,
-		PhotoCount:           a.PhotoCount,
-		Commute:              a.Commute,
-		Private:              a.Private,
-		Trainer:              a.Trainer,
-		WorkoutType:          a.WorkoutType,
-		DeviceName:           a.DeviceName,
-		GearID:               a.GearID,
-		StartLat:             a.StartLat,
-		StartLng:             a.StartLng,
-		SummaryPolyline:      a.SummaryPolyline,
-	}
-
-	return act
-}
-
-// convertImporterSegmentToStorage converts importer.Segment to storage.Segment.
-func convertImporterSegmentToStorage(s *Segment) *storage.Segment {
-	seg := &storage.Segment{
-		ID:            s.ID,
-		Name:          s.Name,
-		ActivityType:  s.ActivityType,
-		Distance:      s.Distance,
-		AverageGrade:  s.AverageGrade,
-		MaximumGrade:  s.MaximumGrade,
-		ElevationHigh: s.ElevationHigh,
-		ElevationLow:  s.ElevationLow,
-		ClimbCategory: s.ClimbCategory,
-		Starred:       s.Starred,
-		Polyline:      s.Polyline,
-	}
-
-	// Handle latlng arrays
-	if len(s.StartLatlng) >= 2 {
-		seg.StartLat = &s.StartLatlng[0]
-		seg.StartLng = &s.StartLatlng[1]
-	}
-	if len(s.EndLatlng) >= 2 {
-		seg.EndLat = &s.EndLatlng[0]
-		seg.EndLng = &s.EndLatlng[1]
-	}
-
-	// Handle athlete segment stats
-	if s.AthleteSegmentStats.EffortCount > 0 {
-		seg.AthleteEffortCount = &s.AthleteSegmentStats.EffortCount
-	}
-	if s.AthleteSegmentStats.PRElapsedTime > 0 {
-		seg.AthletePRElapsedTime = &s.AthleteSegmentStats.PRElapsedTime
-	}
-	if s.AthleteSegmentStats.PRDate != nil {
-		seg.AthletePRDate = &storage.SQLiteTime{Time: *s.AthleteSegmentStats.PRDate}
-	}
-	seg.AthleteKOMRank = s.AthleteSegmentStats.KOMRank
-
-	return seg
-}
-
-// convertImporterSegmentEffortToStorage converts importer.SegmentEffort to storage.SegmentEffort.
-func convertImporterSegmentEffortToStorage(athleteID, activityID int64, e *SegmentEffort, country string) *storage.SegmentEffort {
-	effort := &storage.SegmentEffort{
-		ID:             e.ID,
-		SegmentID:      e.Segment.ID,
-		ActivityID:     activityID,
-		AthleteID:      athleteID,
-		Name:           e.Name,
-		ElapsedTime:    e.ElapsedTime,
-		MovingTime:     e.MovingTime,
-		Distance:       e.Distance,
-		PRRank:         e.PRRank,
-		Country:        country,
-	}
-
-	if !e.StartDate.IsZero() {
-		effort.StartDate = &storage.SQLiteTime{Time: e.StartDate}
-	}
-	if !e.StartDateLocal.IsZero() {
-		effort.StartDateLocal = &storage.SQLiteTime{Time: e.StartDateLocal}
-	}
-	if e.AverageWatts > 0 {
-		effort.AverageWatts = &e.AverageWatts
-	}
-	if e.AverageHeartrate > 0 {
-		effort.AverageHeartrate = &e.AverageHeartrate
-	}
-	if e.MaxHeartrate > 0 {
-		v := int(e.MaxHeartrate)
-		effort.MaxHeartrate = &v
-	}
-
-	return effort
-}
-
-// bestPhotoURLsFromMap extracts best and thumbnail URLs from a URL map.
-func bestPhotoURLsFromMap(urls map[string]string) (best, thumb string) {
-	if len(urls) == 0 {
-		return "", ""
-	}
-
-	// Prefer larger sizes for best
-	for _, size := range []string{"1000", "600", "200", "100"} {
-		if url, ok := urls[size]; ok && url != "" {
-			if best == "" {
-				best = url
-			}
-			thumb = url // Keep updating thumb to get smallest
-		}
-	}
-
-	// Fallback to any URL
-	if best == "" {
-		for _, url := range urls {
-			if url != "" {
-				return url, url
-			}
-		}
-	}
-
-	return best, thumb
 }

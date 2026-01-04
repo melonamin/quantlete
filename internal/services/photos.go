@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/geo"
@@ -24,11 +26,11 @@ func NewPhotosService(repo *storage.PhotoRepository) *PhotosService {
 
 // ListPhotosInput contains parameters for listing photos.
 type ListPhotosInput struct {
-	AthleteID  int64
-	SportTypes []string
-	Country    string
-	Page       int
-	PerPage    int
+	AthleteID  int64    `json:"-" adapter:"context"`
+	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	Country    string   `json:"country" adapter:"query"`
+	Page       int      `json:"page" adapter:"query,default=1"`
+	PerPage    int      `json:"per_page" adapter:"query,default=60"`
 }
 
 // PhotoItem represents a photo in responses.
@@ -65,8 +67,8 @@ type ListPhotosOutput struct {
 
 // GetActivityPhotosInput contains parameters for getting photos of an activity.
 type GetActivityPhotosInput struct {
-	AthleteID  int64
-	ActivityID int64
+	AthleteID  int64 `json:"-" adapter:"context"`
+	ActivityID int64 `json:"activity_id" adapter:"path,param=id"`
 }
 
 // ActivityPhotoItem represents a photo attached to an activity.
@@ -79,11 +81,31 @@ type ActivityPhotoItem struct {
 	CreatedAt    string `json:"created_at"`
 }
 
+// SavePhotoInput contains parameters for saving a photo.
+type SavePhotoInput struct {
+	ID           string `json:"id" adapter:"body"`
+	AthleteID    int64  `json:"athlete_id" adapter:"body"`
+	ActivityID   int64  `json:"activity_id" adapter:"body"`
+	URL          string `json:"url" adapter:"body"`
+	ThumbnailURL string `json:"thumbnail_url" adapter:"body"`
+	Caption      string `json:"caption" adapter:"body"`
+	Location     string `json:"location" adapter:"body"` // JSON string of location array
+	CreatedAt    string `json:"created_at" adapter:"body"`
+}
+
+// SavePhotoOutput contains the result of saving a photo.
+type SavePhotoOutput struct {
+	Message string `json:"message"`
+}
+
 // ============================================================================
 // Service Methods
 // ============================================================================
 
 // List returns a paginated list of photos for an athlete with facets.
+//
+//adapter:wasm getPhotos category=Photos
+//adapter:http GET /api/v1/photos
 func (s *PhotosService) List(ctx context.Context, in ListPhotosInput) (*ListPhotosOutput, error) {
 	// Apply defaults
 	page := in.Page
@@ -156,6 +178,9 @@ func (s *PhotosService) List(ctx context.Context, in ListPhotosInput) (*ListPhot
 }
 
 // ListByActivity returns photos for a specific activity.
+//
+//adapter:wasm getActivityPhotos category=Photos
+//adapter:http GET /api/v1/activities/{id}/photos
 func (s *PhotosService) ListByActivity(ctx context.Context, in GetActivityPhotosInput) ([]ActivityPhotoItem, error) {
 	if in.ActivityID == 0 {
 		return nil, BadRequest("activity ID required")
@@ -176,6 +201,41 @@ func (s *PhotosService) ListByActivity(ctx context.Context, in GetActivityPhotos
 	}
 
 	return items, nil
+}
+
+// SavePhoto stores a photo in the database.
+//
+//adapter:wasm savePhoto category=Photos-Write
+func (s *PhotosService) SavePhoto(ctx context.Context, in SavePhotoInput) (*SavePhotoOutput, error) {
+	createdAt := time.Now()
+	if in.CreatedAt != "" {
+		if t, err := time.Parse(time.RFC3339, in.CreatedAt); err == nil {
+			createdAt = t
+		}
+	}
+
+	photo := &storage.Photo{
+		ID:           in.ID,
+		AthleteID:    in.AthleteID,
+		ActivityID:   in.ActivityID,
+		URL:          in.URL,
+		ThumbnailURL: in.ThumbnailURL,
+		Caption:      in.Caption,
+		CreatedAt:    storage.SQLiteTime{Time: createdAt},
+	}
+
+	// Handle location JSON
+	if in.Location != "" {
+		photo.Location = json.RawMessage(in.Location)
+	}
+
+	if err := s.repo.Upsert(ctx, photo); err != nil {
+		return nil, Wrapf(ErrInternal, "saving photo: %v", err)
+	}
+
+	return &SavePhotoOutput{
+		Message: fmt.Sprintf("Photo %s saved", in.ID),
+	}, nil
 }
 
 // ============================================================================

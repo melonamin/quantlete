@@ -57,6 +57,7 @@ type InputField struct {
 	QueryName   string // override name for query param
 	SplitChar   string // character to split comma-separated values
 	PathParam   string // path parameter name
+	Default     string // default value for the field
 	IsPointer   bool
 	IsSlice     bool
 	ElementType string // for slices
@@ -313,13 +314,20 @@ func parseAdapterTag(f *InputField) {
 	parts := strings.Split(f.AdapterTag, ",")
 	f.Source = parts[0]
 
-	for _, part := range parts[1:] {
+	for i, part := range parts[1:] {
 		if strings.HasPrefix(part, "name=") {
 			f.QueryName = strings.TrimPrefix(part, "name=")
 		} else if strings.HasPrefix(part, "split=") {
-			f.SplitChar = strings.TrimPrefix(part, "split=")
+			val := strings.TrimPrefix(part, "split=")
+			if val == "" && i+2 < len(parts) && parts[i+2] == "" {
+				// Handle split=, where comma is both delimiter and value
+				val = ","
+			}
+			f.SplitChar = val
 		} else if strings.HasPrefix(part, "param=") {
 			f.PathParam = strings.TrimPrefix(part, "param=")
+		} else if strings.HasPrefix(part, "default=") {
+			f.Default = strings.TrimPrefix(part, "default=")
 		}
 	}
 }
@@ -431,23 +439,15 @@ func generateWasmAdapters(methods []AdapterMethod, inputTypes map[string]InputTy
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"syscall/js"
 
 	"github.com/melonamin/quantlete/internal/services"
-	"github.com/melonamin/quantlete/internal/shared"
 )
 
 // Ensure imports are used
 var (
-	_ = context.Background
-	_ = json.Marshal
 	_ = fmt.Sprintf
-	_ = js.Value{}
 	_ = services.ListActivitiesInput{}
-	_ = shared.SuccessResponse
 )
 
 `)
@@ -468,15 +468,14 @@ var (
 
 func generateWasmMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType) {
 	// Function comment
-	buf.WriteString(fmt.Sprintf("// %s wraps %s.%s\n", m.WasmName, m.ServiceName, m.MethodName))
+	buf.WriteString(fmt.Sprintf("// gen%s wraps %s.%s\n", capitalize(m.WasmName), m.ServiceName, m.MethodName))
 	buf.WriteString(fmt.Sprintf("//wasm:export %s\n", m.WasmName))
 	if m.Category != "" {
 		buf.WriteString(fmt.Sprintf("//wasm:category %s\n", m.Category))
 	}
 
-	// Function signature
-	buf.WriteString(fmt.Sprintf("func gen%s(this js.Value, args []js.Value) interface{} {\n", capitalize(m.WasmName)))
-	buf.WriteString(fmt.Sprintf("\tdefer recoverPanic(%q)\n\n", m.WasmName))
+	// Function signature using wrapper pattern
+	buf.WriteString(fmt.Sprintf("var gen%s = wrapWasmAthlete(%q, func(wc *WasmContext) interface{} {\n", capitalize(m.WasmName), m.WasmName))
 
 	// Initialize input
 	buf.WriteString(fmt.Sprintf("\tvar input services.%s\n", m.InputType))
@@ -492,35 +491,53 @@ func generateWasmMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType)
 
 	// Parse JSON from args if there are non-context fields
 	if hasNonContextFields {
-		buf.WriteString("\n\tif len(args) > 0 && args[0].String() != \"\" {\n")
-		buf.WriteString("\t\tif err := json.Unmarshal([]byte(args[0].String()), &input); err != nil {\n")
+		buf.WriteString("\n\tif wc.HasArg(0) && wc.ArgString(0) != \"\" {\n")
+		buf.WriteString("\t\tif err := wc.ArgJSON(0, &input); err != nil {\n")
 		buf.WriteString("\t\t\treturn errorJSON(fmt.Errorf(\"parsing input: %w\", err))\n")
 		buf.WriteString("\t\t}\n")
 		buf.WriteString("\t}\n")
+	}
+
+	// Apply defaults for fields with zero values after parsing
+	for _, f := range inputType.Fields {
+		if f.Default != "" && f.Source != "context" && !f.IsPointer {
+			switch f.Type {
+			case "int":
+				buf.WriteString(fmt.Sprintf("\tif input.%s == 0 {\n", f.Name))
+				buf.WriteString(fmt.Sprintf("\t\tinput.%s = %s\n", f.Name, f.Default))
+				buf.WriteString("\t}\n")
+			case "string":
+				buf.WriteString(fmt.Sprintf("\tif input.%s == \"\" {\n", f.Name))
+				buf.WriteString(fmt.Sprintf("\t\tinput.%s = %q\n", f.Name, f.Default))
+				buf.WriteString("\t}\n")
+			case "bool":
+				// For bool defaults, only apply if default is "true" (false is zero value)
+				if f.Default == "true" {
+					// We can't distinguish "not set" from "set to false", so skip bool defaults
+					// Users should explicitly pass false if they want false
+				}
+			}
+		}
 	}
 
 	// Set context fields (athleteID) AFTER parsing JSON so it's not overwritten
 	for _, f := range inputType.Fields {
 		if f.Source == "context" {
 			if f.Name == "AthleteID" {
-				buf.WriteString("\tinput.AthleteID = athleteID\n")
+				buf.WriteString("\tinput.AthleteID = wc.AthleteID\n")
 			}
 		}
 	}
 
-	// Call service method
-	buf.WriteString("\n\tctx := context.Background()\n")
-
-	// Determine service variable name
-	svcVar := serviceVarName(m.ServiceName)
-	buf.WriteString(fmt.Sprintf("\tresult, err := %s.%s(ctx, input)\n", svcVar, m.MethodName))
+	// Call service via registry using wrapper context
+	buf.WriteString(fmt.Sprintf("\n\tresult, err := wc.Registry.%s.%s(wc.Ctx, input)\n", m.ServiceName, m.MethodName))
 	buf.WriteString("\tif err != nil {\n")
 	buf.WriteString("\t\treturn errorJSON(err)\n")
 	buf.WriteString("\t}\n\n")
 
 	// Return response
 	buf.WriteString("\treturn dataJSON(result)\n")
-	buf.WriteString("}\n\n")
+	buf.WriteString("})\n\n")
 }
 
 func generateHTTPAdapters(methods []AdapterMethod, inputTypes map[string]InputType, outputPath string) error {
@@ -580,7 +597,7 @@ var (
 }
 
 func generateHTTPMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType) {
-	handlerName := fmt.Sprintf("gen%s%s", m.ServiceName, m.MethodName)
+	handlerName := fmt.Sprintf("Gen%s%s", m.ServiceName, m.MethodName)
 
 	buf.WriteString(fmt.Sprintf("// %s handles %s %s\n", handlerName, m.HTTPMethod, m.HTTPPath))
 	buf.WriteString(fmt.Sprintf("func %s(svc *services.%s, strava *strava.Client) http.HandlerFunc {\n", handlerName, m.ServiceName))
@@ -627,23 +644,18 @@ func generateHTTPMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType)
 
 	// Parse query params or body
 	if m.HTTPMethod == "GET" || m.HTTPMethod == "DELETE" {
-		// Parse query params
-		hasQueryFields := false
+		// Generate query param parsing into temp buffer first
+		var queryBuf bytes.Buffer
 		for _, f := range inputType.Fields {
-			if f.Source == "query" || (f.Source == "" && f.Source != "context" && f.Source != "path") {
-				hasQueryFields = true
-				break
+			if f.Source == "context" || f.Source == "path" {
+				continue
 			}
+			generateQueryParamParsing(&queryBuf, f)
 		}
-
-		if hasQueryFields {
+		// Only declare q if we actually have parsing code that uses it
+		if queryBuf.Len() > 0 {
 			buf.WriteString("\n\t\tq := r.URL.Query()\n")
-			for _, f := range inputType.Fields {
-				if f.Source == "context" || f.Source == "path" {
-					continue
-				}
-				generateQueryParamParsing(buf, f)
-			}
+			buf.Write(queryBuf.Bytes())
 		}
 	} else {
 		// Parse body for POST/PUT/PATCH
@@ -677,8 +689,12 @@ func generateQueryParamParsing(buf *bytes.Buffer, f InputField) {
 
 	switch {
 	case f.Type == "int" || f.Type == "*int":
+		// Apply default first if specified
+		if f.Default != "" && !f.IsPointer {
+			buf.WriteString(fmt.Sprintf("\t\tinput.%s = %s\n", f.Name, f.Default))
+		}
 		buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
-		buf.WriteString(fmt.Sprintf("\t\t\tif parsed, err := strconv.Atoi(v); err == nil {\n"))
+		buf.WriteString("\t\t\tif parsed, err := strconv.Atoi(v); err == nil {\n")
 		if f.IsPointer {
 			buf.WriteString(fmt.Sprintf("\t\t\t\tinput.%s = &parsed\n", f.Name))
 		} else {
@@ -688,6 +704,10 @@ func generateQueryParamParsing(buf *bytes.Buffer, f InputField) {
 		buf.WriteString("\t\t}\n")
 
 	case f.Type == "bool" || f.Type == "*bool":
+		// Apply default first if specified
+		if f.Default != "" && !f.IsPointer {
+			buf.WriteString(fmt.Sprintf("\t\tinput.%s = %s\n", f.Name, f.Default))
+		}
 		buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
 		buf.WriteString("\t\t\tparsed := v == \"true\" || v == \"1\"\n")
 		if f.IsPointer {
@@ -698,7 +718,16 @@ func generateQueryParamParsing(buf *bytes.Buffer, f InputField) {
 		buf.WriteString("\t\t}\n")
 
 	case f.Type == "string":
-		buf.WriteString(fmt.Sprintf("\t\tinput.%s = q.Get(%q)\n", f.Name, queryName))
+		if f.Default != "" {
+			// Use query value if present, otherwise default
+			buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
+			buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = v\n", f.Name))
+			buf.WriteString("\t\t} else {\n")
+			buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = %q\n", f.Name, f.Default))
+			buf.WriteString("\t\t}\n")
+		} else {
+			buf.WriteString(fmt.Sprintf("\t\tinput.%s = q.Get(%q)\n", f.Name, queryName))
+		}
 
 	case f.IsSlice && f.SplitChar != "":
 		buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))

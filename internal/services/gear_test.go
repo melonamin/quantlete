@@ -148,10 +148,10 @@ func TestGearService_GetByID(t *testing.T) {
 	createTestGear(t, db, "g2", otherAthleteID, "Other Gear", false)
 
 	tests := []struct {
-		name      string
-		input     GetGearInput
-		wantErr   error
-		wantName  string
+		name     string
+		input    GetGearInput
+		wantErr  error
+		wantName string
 	}{
 		{
 			name: "found",

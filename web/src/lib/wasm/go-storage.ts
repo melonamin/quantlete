@@ -12,6 +12,60 @@
 
 import { initializeDatabase, getDatabase } from './db'
 import type { GoStorageInterface } from './go-storage.gen'
+import {
+  setInitialized as setWrappersInitialized,
+  parseGoResult,
+  callGoStorage,
+  callGoStorageArray,
+  callGoStorageValue,
+  callGoStorageVoid,
+  type GoStorageResult,
+} from './go-storage-wrappers.gen'
+
+// Import generated types - these are the source of truth
+import type {
+  DashboardStats,
+  WeeklyStat,
+  RecentActivity,
+  SportTypeStat,
+  MonthlyStat,
+  YearlyStatOutput,
+  CalendarDay,
+  CalendarActivity,
+  CalendarMonthSummary,
+  HeatmapActivity,
+  HeatmapCountryStat,
+  DistributionSlice,
+  EddingtonStep,
+  EddingtonResult,
+  EddingtonHistoryPoint,
+  DashboardConfig as GenDashboardConfig,
+} from './types.gen'
+
+// Re-export for consumers
+export type { GoStorageResult }
+export { parseGoResult }
+
+// Type alias for backwards compatibility
+export type YearlyStat = YearlyStatOutput
+
+// Re-export generated types that match the API
+export type {
+  DashboardStats,
+  WeeklyStat,
+  RecentActivity,
+  SportTypeStat,
+  MonthlyStat,
+  CalendarDay,
+  CalendarActivity,
+  CalendarMonthSummary,
+  HeatmapActivity,
+  HeatmapCountryStat,
+  DistributionSlice,
+  EddingtonStep,
+  EddingtonResult,
+  EddingtonHistoryPoint,
+}
 
 // Declare global Go WASM types
 declare global {
@@ -40,84 +94,16 @@ declare global {
   const goStorage: GoStorageInterface
 }
 
-export interface GoStorageResult<T = unknown> {
-  ok: boolean
-  error?: string
-  message?: string
-  data?: T
-}
-
 let initialized = false
-
-/**
- * Require goStorage to be available. Throws if WASM hasn't loaded.
- * Use this to fail fast with a clear error message.
- */
-function requireGoStorage(operation: string): typeof goStorage {
-  if (typeof goStorage === 'undefined' || goStorage === null) {
-    throw new Error(
-      `goStorage is not available for ${operation}. ` +
-        'Ensure WASM has been loaded and initGoStorage() has been called.',
-    )
-  }
-  return goStorage
-}
-
-/**
- * Parse Go WASM result - all Go functions return JSON strings.
- * @param result - JSON string returned by Go WASM function
- * @param operation - Name of the operation for error context
- */
-export function parseGoResult<T>(result: string, operation?: string): GoStorageResult<T> & T {
-  try {
-    return JSON.parse(result)
-  } catch {
-    const ctx = operation ? ` (${operation})` : ''
-    return { ok: false, error: `Failed to parse Go result${ctx}: ${result}` } as GoStorageResult<T> & T
-  }
-}
 
 // ============================================================================
 // WASM Connection Lifecycle
-// ============================================================================
-//
-// The Go WASM storage layer follows this lifecycle:
-//
-// 1. INITIALIZATION (initGoStorage):
-//    a. Load wasm_exec.js (Go WebAssembly runtime)
-//    b. Initialize sql.js for the SQLite engine
-//    c. Load and instantiate quantlete.wasm
-//    d. Run the Go main() which registers goStorage methods
-//    e. Call goStorage.init() to create the database and run migrations
-//    f. Restore database from OPFS if available
-//
-// 2. USAGE:
-//    - All goStorage.* methods are available after initialization
-//    - The database is in-memory (sql.js handles the underlying storage)
-//    - Changes are persisted to OPFS periodically via persistToOpfs()
-//    - Use requireGoStorage(operation) to safely access goStorage
-//
-// 3. PERSISTENCE:
-//    - Call persistToOpfs() to save database state to OPFS
-//    - The database is exported as a binary blob via goStorage.exportDb()
-//    - OPFS storage survives browser restarts
-//
-// 4. TEARDOWN:
-//    - Currently, there is no explicit teardown/close method
-//    - The database is in-memory and will be garbage collected when the page unloads
-//    - Always call persistToOpfs() before page unload to save state
-//    - Consider calling persistToOpfs() in a beforeunload handler
-//
-// NOTE: The Go WASM does not currently expose a db.Close() method.
-// This is intentional as sql.js databases are in-memory and don't require
-// explicit cleanup. If you need to reinitialize, reload the page.
 // ============================================================================
 
 /**
  * Load wasm_exec.js (Go WebAssembly runtime)
  */
 async function loadGoRuntime(): Promise<void> {
-  // Check if Go class already exists (script already loaded)
   if (typeof (window as unknown as { Go?: unknown }).Go !== 'undefined') {
     return
   }
@@ -131,45 +117,37 @@ async function loadGoRuntime(): Promise<void> {
   })
 }
 
-/**
- * Load Go WASM binary
- */
-async function loadGoWasm(): Promise<void> {
-  // First load the Go runtime (wasm_exec.js)
-  await loadGoRuntime()
-
-  const Go = (window as unknown as { Go: new () => GoInstance }).Go
-  const go = new Go()
-  const result = await WebAssembly.instantiateStreaming(
-    fetch('/wasm/quantlete.wasm'),
-    go.importObject,
-  )
-  // Don't await - Go needs to keep running
-  go.run(result.instance)
-}
-
-// Go instance type from wasm_exec.js
 interface GoInstance {
   importObject: WebAssembly.Imports
   run(instance: WebAssembly.Instance): Promise<void>
 }
 
 /**
+ * Load Go WASM binary
+ */
+async function loadGoWasm(): Promise<void> {
+  await loadGoRuntime()
+
+  const Go = (window as unknown as { Go: new () => GoInstance }).Go
+  const go = new Go()
+  const result = await WebAssembly.instantiateStreaming(
+    fetch('/wasm/quantlete.wasm'),
+    go.importObject
+  )
+  go.run(result.instance)
+}
+
+/**
  * Initialize Go WASM storage layer
- *
- * This shares the same database with the existing WasmDatabase,
- * so both TypeScript (importer) and Go WASM (queries) can access the same data.
  */
 export async function initGoStorage(): Promise<void> {
   if (initialized) return
 
   console.log('[go-storage] Initializing...')
 
-  // 1. Initialize the existing WasmDatabase (handles OPFS, migrations)
   const wasmDb = await initializeDatabase()
   console.log('[go-storage] WasmDatabase ready')
 
-  // 2. Get the internal sql.js instances
   const sqlJs = wasmDb.getSqlJs()
   const internalDb = wasmDb.getInternalDb()
 
@@ -177,15 +155,12 @@ export async function initGoStorage(): Promise<void> {
     throw new Error('Failed to get sql.js instances from WasmDatabase')
   }
 
-  // 3. Set up globals for go-sqlite3-js
-  // Wrap Database constructor to handle :memory: correctly
   const OriginalDatabase = sqlJs.Database
   const wrappedSqlJs = {
     ...sqlJs,
     Database: function (data?: Uint8Array | string) {
       if (data === ':memory:' || data === 'file::memory:' || data === '') {
         console.log('[go-storage] Returning shared database for :memory:')
-        // Return the existing database instead of creating a new one
         return internalDb
       }
       return new OriginalDatabase(data as Uint8Array)
@@ -195,63 +170,41 @@ export async function initGoStorage(): Promise<void> {
 
   window._go_sqlite = wrappedSqlJs as SqlJsStatic
   window._go_sqlite_dbs = new Map()
-  // Pre-register the shared database
   window._go_sqlite_dbs.set(':memory:', internalDb as unknown as SqlJsDatabase)
 
   console.log('[go-storage] sql.js globals configured')
 
-  // 4. Load and run Go WASM
   await loadGoWasm()
   console.log('[go-storage] Go WASM loaded')
 
-  // Wait a moment for Go to register functions
   await new Promise((resolve) => setTimeout(resolve, 100))
 
-  // 5. Initialize Go storage (should recognize existing database)
-  const gs = requireGoStorage('init')
-  const result = parseGoResult(gs.init(), 'init')
+  const result = parseGoResult(goStorage.init(), 'init')
   if (!result.ok) {
     throw new Error(`Go storage init failed: ${result.error}`)
   }
 
   initialized = true
+  setWrappersInitialized(true)
   console.log('[go-storage] Initialization complete')
 }
 
-/**
- * Check if storage is initialized
- */
 export function isInitialized(): boolean {
   return initialized
 }
 
-/**
- * Persist the database to OPFS
- */
 export async function persistDatabase(): Promise<void> {
   const db = getDatabase()
   await db.persist()
 }
 
-/**
- * Reset the database
- */
 export async function clearDatabase(): Promise<void> {
   const db = getDatabase()
   await db.reset()
 }
 
-/**
- * Set the current athlete ID for queries
- */
 export function setAthleteId(id: number): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.setAthleteId(id))
-  if (!result.ok) {
-    throw new Error(`Failed to set athlete ID: ${result.error}`)
-  }
+  callGoStorageVoid(() => goStorage.setAthleteId(id), 'setAthleteId')
 }
 
 // ============================================================================
@@ -341,27 +294,11 @@ export interface Activity {
   start_lng?: number
 }
 
-export function getActivities(filters: ActivityFilters): ActivitiesResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<ActivitiesResult>(goStorage.getActivities(JSON.stringify(filters)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get activities')
-  }
-  return result
-}
+export const getActivities = (filters: ActivityFilters): ActivitiesResult =>
+  callGoStorage<ActivitiesResult>(() => goStorage.getActivities(JSON.stringify(filters)), 'getActivities')
 
-export function getActivity(id: number): Activity {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<Activity>(goStorage.getActivity(id))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get activity')
-  }
-  return result
-}
+export const getActivity = (id: number): Activity =>
+  callGoStorage<Activity>(() => goStorage.getActivity(JSON.stringify({ id })), 'getActivity')
 
 export interface ActivityStream {
   type: string
@@ -369,34 +306,14 @@ export interface ActivityStream {
   resolution: string
 }
 
-export function getActivityStreams(activityId: number): ActivityStream[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<ActivityStream[]>(goStorage.getActivityStreams(activityId))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get activity streams')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
-}
+export const getActivityStreams = (activityId: number): ActivityStream[] =>
+  callGoStorageArray<ActivityStream>(() => goStorage.getActivityStreams(JSON.stringify({ activity_id: activityId })), 'getActivityStreams')
 
 // ============================================================================
 // Dashboard
 // ============================================================================
 
-export interface DashboardStats {
-  total_activities: number
-  total_distance: number
-  total_moving_time: number
-  total_elevation_gain: number
-  total_kudos: number
-  total_photos: number
-  first_activity_date?: string
-  last_activity_date?: string
-  sport_types: string[]
-}
-
+// DashboardWidgetConfig with stricter width types for API use
 export interface DashboardWidgetConfig {
   id: string
   width: number
@@ -411,175 +328,44 @@ export interface DashboardConfig {
 }
 
 export function getDashboardConfig(): DashboardConfig {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<DashboardConfig>(goStorage.getDashboardConfig())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get dashboard config')
-  }
+  const result = callGoStorage<{ data?: GenDashboardConfig }>(() => goStorage.getDashboardConfig(), 'getDashboardConfig')
   const cfg = result.data ?? { version: 1, widgets: [] }
   return { version: cfg.version, widgets: cfg.widgets ?? [] }
 }
 
 export function updateDashboardConfig(config: DashboardConfig): DashboardConfig {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<DashboardConfig>(
-    goStorage.updateDashboardConfig(JSON.stringify(config)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update dashboard config')
-  }
+  const result = callGoStorage<{ data?: GenDashboardConfig }>(() => goStorage.updateDashboardConfig(JSON.stringify(config)), 'updateDashboardConfig')
   const cfg = result.data ?? { version: config.version, widgets: config.widgets }
   return { version: cfg.version, widgets: cfg.widgets ?? [] }
 }
 
-export function getDashboardStats(): DashboardStats {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<DashboardStats>(goStorage.getDashboardStats())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get dashboard stats')
-  }
-  return result
-}
+export const getDashboardStats = (): DashboardStats =>
+  callGoStorage<DashboardStats>(() => goStorage.getDashboardStats(), 'getDashboardStats')
 
-export interface WeeklyStat {
-  sport_type: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
+export const getWeeklyStats = (): WeeklyStat[] =>
+  callGoStorageArray<WeeklyStat>(() => goStorage.getWeeklyStats(), 'getWeeklyStats')
 
-export function getWeeklyStats(): WeeklyStat[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<WeeklyStat[]>(goStorage.getWeeklyStats())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get weekly stats')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
-}
+export const getRecentActivities = (limit: number): RecentActivity[] =>
+  callGoStorageArray<RecentActivity>(() => goStorage.getRecentActivities(JSON.stringify({ limit })), 'getRecentActivities')
 
-export interface RecentActivity {
-  id: number
-  name: string
-  sport_type: string
-  start_date: string
-  distance: number
-  moving_time: number
-  elevation_gain: number
-  summary_polyline?: string
-}
+export const getSportTypeStats = (): SportTypeStat[] =>
+  callGoStorageArray<SportTypeStat>(() => goStorage.getSportTypeStats(), 'getSportTypeStats')
 
-export function getRecentActivities(limit: number): RecentActivity[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<RecentActivity[]>(goStorage.getRecentActivities(limit))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get recent activities')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
-}
+export const getMonthlyStats = (year?: number): MonthlyStat[] =>
+  callGoStorageArray<MonthlyStat>(() => goStorage.getMonthlyStats(JSON.stringify({ year })), 'getMonthlyStats')
 
-export interface SportTypeStat {
-  sport_type: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export function getSportTypeStats(): SportTypeStat[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<SportTypeStat[]>(goStorage.getSportTypeStats())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get sport type stats')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
-}
-
-export interface MonthlyStat {
-  month: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export function getMonthlyStats(year?: number): MonthlyStat[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<MonthlyStat[]>(goStorage.getMonthlyStats(year))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get monthly stats')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
-}
-
-export interface YearlyStat {
-  year: number
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_elevation: number
-}
-
-export function getYearlyStats(): YearlyStat[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<YearlyStat[]>(goStorage.getYearlyStats())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get yearly stats')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
-}
+export const getYearlyStats = (): YearlyStat[] =>
+  callGoStorageArray<YearlyStat>(() => goStorage.getYearlyStats(), 'getYearlyStats')
 
 // ============================================================================
 // Distribution Stats
 // ============================================================================
 
-export interface DistributionSlice {
-  label: string
-  count: number
-}
+export const getDaytimeDistribution = (): DistributionSlice[] =>
+  callGoStorageArray<DistributionSlice>(() => goStorage.getDaytimeDistribution(), 'getDaytimeDistribution')
 
-export function getDaytimeDistribution(): DistributionSlice[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<DistributionSlice[]>(goStorage.getDaytimeDistribution())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get daytime distribution')
-  }
-  return result.data ?? []
-}
-
-export function getWeekdayDistribution(): DistributionSlice[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<DistributionSlice[]>(goStorage.getWeekdayDistribution())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get weekday distribution')
-  }
-  return result.data ?? []
-}
+export const getWeekdayDistribution = (): DistributionSlice[] =>
+  callGoStorageArray<DistributionSlice>(() => goStorage.getWeekdayDistribution(), 'getWeekdayDistribution')
 
 export interface ExportStats {
   total_activities: number
@@ -588,13 +374,7 @@ export interface ExportStats {
 }
 
 export function getExportStats(): ExportStats {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<ExportStats>(goStorage.getExportStats())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get export stats')
-  }
+  const result = callGoStorage<{ data?: ExportStats }>(() => goStorage.getExportStats(), 'getExportStats')
   return result.data ?? { total_activities: 0, first_activity: null, last_activity: null }
 }
 
@@ -611,78 +391,36 @@ export interface HeatmapFilters {
   offset?: number
 }
 
-export interface HeatmapActivity {
-  id: number
-  name: string
-  sport_type: string
-  start_date: string
-  distance: number
-  summary_polyline: string
-  start_lat: number
-  start_lng: number
+// Response type for heatmap data that includes both activities and countries
+export interface HeatmapDataResponse {
+  activities: HeatmapActivity[]
+  countries: HeatmapCountryStat[]
 }
 
-export function getHeatmapData(filters: HeatmapFilters): HeatmapActivity[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<HeatmapActivity[]>(goStorage.getHeatmapData(JSON.stringify(filters)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get heatmap data')
-  }
-  // Arrays are wrapped in {ok: true, data: [...]}
-  return result.data ?? []
+export function getHeatmapData(filters: HeatmapFilters): HeatmapDataResponse {
+  const result = callGoStorage<{ data: HeatmapDataResponse }>(() => goStorage.getHeatmapData(JSON.stringify(filters)), 'getHeatmapData')
+  return result.data ?? { activities: [], countries: [] }
 }
 
 // ============================================================================
 // Calendar
 // ============================================================================
 
-export interface CalendarDay {
-  date: string
-  activity_count: number
-  total_distance: number
-  total_time: number
-  total_calories: number
-}
-
 export function getCalendarData(year: number): CalendarDay[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: CalendarDay[] }>(goStorage.getCalendarData(year))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get calendar data')
-  }
+  const result = callGoStorage<{ data: CalendarDay[] }>(() => goStorage.getCalendarData(JSON.stringify({ year })), 'getCalendarData')
   return result.data || []
 }
 
-export interface CalendarActivityResult {
-  id: number
-  name: string
-  sport_type: string
-  start_date: string
-  distance: number
-  moving_time: number
-  total_elevation_gain: number
-}
+// CalendarActivityResult extends CalendarActivity with the same fields
+export type CalendarActivityResult = CalendarActivity
 
 export function getCalendarActivities(year: number, month: number): CalendarActivityResult[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  // Use getActivities with date filters for this month
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const endMonth = month === 12 ? 1 : month + 1
   const endYear = month === 12 ? year + 1 : year
   const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
 
-  const result = getActivities({
-    after: startDate,
-    before: endDate,
-    per_page: 1000,
-  })
-
+  const result = getActivities({ after: startDate, before: endDate, per_page: 1000 })
   return result.data.map((a) => ({
     id: a.id,
     name: a.name,
@@ -707,12 +445,7 @@ export interface CalendarSummaryResult {
 }
 
 export function getCalendarSummary(year: number, month: number): CalendarSummaryResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  // Calculate summary from activities for this month
   const activities = getCalendarActivities(year, month)
-
   return {
     year,
     month,
@@ -720,9 +453,9 @@ export function getCalendarSummary(year: number, month: number): CalendarSummary
     total_distance: activities.reduce((sum, a) => sum + a.distance, 0),
     total_elevation_gain: activities.reduce((sum, a) => sum + a.total_elevation_gain, 0),
     total_moving_time: activities.reduce((sum, a) => sum + a.moving_time, 0),
-    total_calories: 0, // Not available in activity data
-    workout_count: 0, // Would need workout_type filter
-    challenges_completed: 0, // Would need challenges data
+    total_calories: 0,
+    workout_count: 0,
+    challenges_completed: 0,
   }
 }
 
@@ -763,25 +496,11 @@ export interface GearResult {
   total_pages: number
 }
 
-export function getGear(filters?: GearFilters): GearResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<GearResult>(goStorage.getGear(JSON.stringify(filters || {})))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get gear')
-  }
-  return result
-}
+export const getGear = (filters?: GearFilters): GearResult =>
+  callGoStorage<GearResult>(() => goStorage.getGear(JSON.stringify(filters || {})), 'getGear')
 
 export function getGearDetail(id: string): GearItem {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: GearItem }>(goStorage.getGearDetail(id))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get gear detail')
-  }
+  const result = callGoStorage<{ data: GearItem }>(() => goStorage.getGearDetail(JSON.stringify({ id })), 'getGearDetail')
   return result.data as GearItem
 }
 
@@ -830,32 +549,16 @@ export interface SegmentsResult {
   total_pages: number
 }
 
-export function getSegments(filters?: SegmentsFilters): SegmentsResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<SegmentsResult>(goStorage.getSegments(JSON.stringify(filters || {})))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get segments')
-  }
-  return result
-}
+export const getSegments = (filters?: SegmentsFilters): SegmentsResult =>
+  callGoStorage<SegmentsResult>(() => goStorage.getSegments(JSON.stringify(filters || {})), 'getSegments')
 
 export interface SegmentDetailResult {
   segment: SegmentListItem
   efforts: SegmentEffort[]
 }
 
-export function getSegmentDetail(id: number): SegmentDetailResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<SegmentDetailResult>(goStorage.getSegmentDetail(id))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get segment detail')
-  }
-  return result
-}
+export const getSegmentDetail = (id: number): SegmentDetailResult =>
+  callGoStorage<SegmentDetailResult>(() => goStorage.getSegmentDetail(JSON.stringify({ id })), 'getSegmentDetail')
 
 // ============================================================================
 // Photos - Read
@@ -897,16 +600,8 @@ export interface PhotosResult {
   sport_types: PhotosFacet[]
 }
 
-export function getPhotos(filters?: PhotosFilters): PhotosResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<PhotosResult>(goStorage.getPhotos(JSON.stringify(filters || {})))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get photos')
-  }
-  return result
-}
+export const getPhotos = (filters?: PhotosFilters): PhotosResult =>
+  callGoStorage<PhotosResult>(() => goStorage.getPhotos(JSON.stringify(filters || {})), 'getPhotos')
 
 export interface ActivityPhotoResult {
   id: string
@@ -920,13 +615,7 @@ export interface ActivityPhotoResult {
 }
 
 export function getActivityPhotos(activityId: number): ActivityPhotoResult[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: ActivityPhotoResult[] }>(goStorage.getActivityPhotos(activityId))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get activity photos')
-  }
+  const result = callGoStorage<{ data: ActivityPhotoResult[] }>(() => goStorage.getActivityPhotos(JSON.stringify({ activity_id: activityId })), 'getActivityPhotos')
   return result.data || []
 }
 
@@ -948,13 +637,7 @@ export interface BestEffortPRResult {
 }
 
 export function getBestEffortPRs(sportType?: string): BestEffortPRResult[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: BestEffortPRResult[] }>(goStorage.getBestEffortPRs(sportType))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get best effort PRs')
-  }
+  const result = callGoStorage<{ data: BestEffortPRResult[] }>(() => goStorage.getBestEffortPRs(JSON.stringify({ sport_type: sportType })), 'getBestEffortPRs')
   return result.data || []
 }
 
@@ -964,15 +647,7 @@ export interface BestEffortItemResult extends BestEffortPRResult {
 }
 
 export function getBestEffortsForType(distanceType: string, sportType?: string): BestEffortItemResult[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: BestEffortItemResult[] }>(
-    goStorage.getBestEffortsForType(distanceType, sportType),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get best efforts for type')
-  }
+  const result = callGoStorage<{ data: BestEffortItemResult[] }>(() => goStorage.getBestEffortsForType(JSON.stringify({ distance_type: distanceType, sport_type: sportType })), 'getBestEffortsForType')
   return result.data || []
 }
 
@@ -1019,16 +694,8 @@ export interface SaveActivityInput {
   photo_count?: number
 }
 
-export function saveActivity(activity: SaveActivityInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveActivity')
-  const result = parseGoResult(gs.saveActivity(JSON.stringify(activity)), 'saveActivity')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save activity')
-  }
-}
+export const saveActivity = (activity: SaveActivityInput): void =>
+  callGoStorageVoid(() => goStorage.saveActivity(JSON.stringify(activity)), 'saveActivity')
 
 export interface SaveStreamInput {
   activity_id: number
@@ -1039,16 +706,8 @@ export interface SaveStreamInput {
   resolution: string
 }
 
-export function saveStream(stream: SaveStreamInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveStream')
-  const result = parseGoResult(gs.saveStream(JSON.stringify(stream)), 'saveStream')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save stream')
-  }
-}
+export const saveStream = (stream: SaveStreamInput): void =>
+  callGoStorageVoid(() => goStorage.saveStream(JSON.stringify(stream)), 'saveStream')
 
 export interface SaveAthleteInput {
   id: number
@@ -1065,16 +724,8 @@ export interface SaveAthleteInput {
   summit?: boolean
 }
 
-export function saveAthlete(athlete: SaveAthleteInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveAthlete')
-  const result = parseGoResult(gs.saveAthlete(JSON.stringify(athlete)), 'saveAthlete')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save athlete')
-  }
-}
+export const saveAthlete = (athlete: SaveAthleteInput): void =>
+  callGoStorageVoid(() => goStorage.saveAthlete(JSON.stringify(athlete)), 'saveAthlete')
 
 export interface SaveGearInput {
   id: string
@@ -1088,16 +739,8 @@ export interface SaveGearInput {
   description?: string | null
 }
 
-export function saveGear(gear: SaveGearInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveGear')
-  const result = parseGoResult(gs.saveGear(JSON.stringify(gear)), 'saveGear')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save gear')
-  }
-}
+export const saveGear = (gear: SaveGearInput): void =>
+  callGoStorageVoid(() => goStorage.saveGear(JSON.stringify(gear)), 'saveGear')
 
 export interface SaveSegmentInput {
   id: number
@@ -1121,16 +764,8 @@ export interface SaveSegmentInput {
   athlete_pr_date?: string | null
 }
 
-export function saveSegment(segment: SaveSegmentInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveSegment')
-  const result = parseGoResult(gs.saveSegment(JSON.stringify(segment)), 'saveSegment')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save segment')
-  }
-}
+export const saveSegment = (segment: SaveSegmentInput): void =>
+  callGoStorageVoid(() => goStorage.saveSegment(JSON.stringify(segment)), 'saveSegment')
 
 export interface SaveSegmentEffortInput {
   id: number
@@ -1149,16 +784,8 @@ export interface SaveSegmentEffortInput {
   pr_rank?: number | null
 }
 
-export function saveSegmentEffort(effort: SaveSegmentEffortInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveSegmentEffort')
-  const result = parseGoResult(gs.saveSegmentEffort(JSON.stringify(effort)), 'saveSegmentEffort')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save segment effort')
-  }
-}
+export const saveSegmentEffort = (effort: SaveSegmentEffortInput): void =>
+  callGoStorageVoid(() => goStorage.saveSegmentEffort(JSON.stringify(effort)), 'saveSegmentEffort')
 
 export interface BestEffortInput {
   name: string
@@ -1169,7 +796,6 @@ export interface BestEffortInput {
   end_index?: number | null
   pr_rank?: number | null
   start_date?: string
-  // distance_type is computed by Go from name + distance_m
 }
 
 export interface SaveBestEffortsInput {
@@ -1179,16 +805,8 @@ export interface SaveBestEffortsInput {
   efforts: BestEffortInput[]
 }
 
-export function saveBestEfforts(data: SaveBestEffortsInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('saveBestEfforts')
-  const result = parseGoResult(gs.saveBestEfforts(JSON.stringify(data)), 'saveBestEfforts')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save best efforts')
-  }
-}
+export const saveBestEfforts = (data: SaveBestEffortsInput): void =>
+  callGoStorageVoid(() => goStorage.saveBestEfforts(JSON.stringify(data)), 'saveBestEfforts')
 
 export interface SavePhotoInput {
   id: string
@@ -1201,16 +819,8 @@ export interface SavePhotoInput {
   created_at?: string
 }
 
-export function savePhoto(photo: SavePhotoInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('savePhoto')
-  const result = parseGoResult(gs.savePhoto(JSON.stringify(photo)), 'savePhoto')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to save photo')
-  }
-}
+export const savePhoto = (photo: SavePhotoInput): void =>
+  callGoStorageVoid(() => goStorage.savePhoto(JSON.stringify(photo)), 'savePhoto')
 
 // ============================================================================
 // Power Best Efforts
@@ -1221,20 +831,8 @@ export interface ComputePowerBestEffortsInput {
   athlete_id: number
 }
 
-/**
- * Compute and store power best efforts for an activity.
- * Uses the Go storage layer to read the watts stream and compute rolling max averages.
- */
-export function computePowerBestEfforts(input: ComputePowerBestEffortsInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const gs = requireGoStorage('computePowerBestEfforts')
-  const result = parseGoResult(gs.computePowerBestEfforts(JSON.stringify(input)), 'computePowerBestEfforts')
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to compute power best efforts')
-  }
-}
+export const computePowerBestEfforts = (input: ComputePowerBestEffortsInput): void =>
+  callGoStorageVoid(() => goStorage.computePowerBestEfforts(JSON.stringify(input)), 'computePowerBestEfforts')
 
 // ============================================================================
 // Sync History
@@ -1255,13 +853,7 @@ export interface CreateSyncRunResult {
 }
 
 export function createSyncRun(input: CreateSyncRunInput): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<CreateSyncRunResult>(goStorage.createSyncRun(JSON.stringify(input)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to create sync run')
-  }
+  const result = callGoStorage<CreateSyncRunResult>(() => goStorage.createSyncRun(JSON.stringify(input)), 'createSyncRun')
   return (result as unknown as CreateSyncRunResult).id
 }
 
@@ -1275,15 +867,8 @@ export interface UpdateSyncRunInput {
   newest_activity_date?: string | null
 }
 
-export function updateSyncRun(input: UpdateSyncRunInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.updateSyncRun(JSON.stringify(input)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update sync run')
-  }
-}
+export const updateSyncRun = (input: UpdateSyncRunInput): void =>
+  callGoStorageVoid(() => goStorage.updateSyncRun(JSON.stringify(input)), 'updateSyncRun')
 
 export interface CompleteSyncRunInput {
   id: number
@@ -1300,19 +885,8 @@ export interface CompleteSyncRunInput {
   newest_activity_date?: string | null
 }
 
-export function completeSyncRun(input: CompleteSyncRunInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.completeSyncRun(JSON.stringify(input)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to complete sync run')
-  }
-}
-
-// ============================================================================
-// Sync History - Read
-// ============================================================================
+export const completeSyncRun = (input: CompleteSyncRunInput): void =>
+  callGoStorageVoid(() => goStorage.completeSyncRun(JSON.stringify(input)), 'completeSyncRun')
 
 export interface SyncHistoryItem {
   id: number
@@ -1333,13 +907,7 @@ export interface SyncHistoryItem {
 }
 
 export function getSyncHistory(limit = 10): SyncHistoryItem[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: SyncHistoryItem[] }>(goStorage.getSyncHistory(limit))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get sync history')
-  }
+  const result = callGoStorage<{ data: SyncHistoryItem[] }>(() => goStorage.getSyncHistory(limit), 'getSyncHistory')
   return result.data ?? []
 }
 
@@ -1347,123 +915,33 @@ export function getSyncHistory(limit = 10): SyncHistoryItem[] {
 // Algorithms - Power
 // ============================================================================
 
-/**
- * Calculate normalized power from power data.
- * Uses 30-second rolling average, then takes the 4th root of the mean of 4th powers.
- */
-export function normalizedPower(watts: number[]): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ value: number }>(goStorage.normalizedPower(watts))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate normalized power')
-  }
-  return (result as { value: number }).value
-}
+export const normalizedPower = (watts: number[]): number =>
+  callGoStorageValue<number>(() => goStorage.normalizedPower(watts), 'normalizedPower')
 
-/**
- * Find the maximum rolling average over a given window.
- * Used for peak power calculations (e.g., 5s peak, 1min peak, 5min peak).
- */
-export function rollingMaxAverage(values: number[], windowSeconds: number): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ value: number }>(goStorage.rollingMaxAverage(values, windowSeconds))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate rolling max average')
-  }
-  return (result as { value: number }).value
-}
+export const rollingMaxAverage = (values: number[], windowSeconds: number): number =>
+  callGoStorageValue<number>(() => goStorage.rollingMaxAverage(values, windowSeconds), 'rollingMaxAverage')
 
-/**
- * Calculate intensity factor: IF = NP / FTP
- */
-export function intensityFactor(np: number, ftp: number): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ value: number }>(goStorage.intensityFactor(np, ftp))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate intensity factor')
-  }
-  return (result as { value: number }).value
-}
+export const intensityFactor = (np: number, ftp: number): number =>
+  callGoStorageValue<number>(() => goStorage.intensityFactor(np, ftp), 'intensityFactor')
 
-/**
- * Calculate Training Stress Score (TSS)
- */
-export function trainingStressScore(durationSeconds: number, np: number, ftp: number): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ value: number }>(
-    goStorage.trainingStressScore(durationSeconds, np, ftp),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate TSS')
-  }
-  return (result as { value: number }).value
-}
+export const trainingStressScore = (durationSeconds: number, np: number, ftp: number): number =>
+  callGoStorageValue<number>(() => goStorage.trainingStressScore(durationSeconds, np, ftp), 'trainingStressScore')
 
 // ============================================================================
 // Algorithms - Eddington
 // ============================================================================
 
-/**
- * Calculate the Eddington number from daily distances (in km).
- * The Eddington number E is the largest number such that you have cycled
- * at least E km on at least E days.
- */
-export function eddingtonNumber(distances: number[]): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ value: number }>(goStorage.eddingtonNumber(distances))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate Eddington number')
-  }
-  return (result as { value: number }).value
+export const eddingtonNumber = (distances: number[]): number =>
+  callGoStorageValue<number>(() => goStorage.eddingtonNumber(distances), 'eddingtonNumber')
+
+// Use the generated EddingtonStep type which has { target, rides_needed }
+export function eddingtonNextSteps(distances: number[], currentE: number, stepsToCalculate: number): EddingtonStep[] {
+  const result = callGoStorage<{ data: EddingtonStep[] }>(() => goStorage.eddingtonNextSteps(distances, currentE, stepsToCalculate), 'eddingtonNextSteps')
+  return (result as { data: EddingtonStep[] }).data
 }
 
-export interface EddingtonNextStep {
-  target: number
-  days_needed: number
-}
-
-/**
- * Calculate how many more days of riding are needed for each of the next Eddington numbers.
- */
-export function eddingtonNextSteps(
-  distances: number[],
-  currentE: number,
-  stepsToCalculate: number,
-): EddingtonNextStep[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: EddingtonNextStep[] }>(
-    goStorage.eddingtonNextSteps(distances, currentE, stepsToCalculate),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate Eddington next steps')
-  }
-  return (result as { data: EddingtonNextStep[] }).data
-}
-
-/**
- * Calculate progressive Eddington numbers over time.
- * Given distances in chronological order, returns E for each day.
- */
 export function eddingtonHistory(distances: number[]): number[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: number[] }>(goStorage.eddingtonHistory(distances))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate Eddington history')
-  }
+  const result = callGoStorage<{ data: number[] }>(() => goStorage.eddingtonHistory(distances), 'eddingtonHistory')
   return (result as { data: number[] }).data
 }
 
@@ -1477,94 +955,23 @@ export interface TrainingLoadPoint {
   tsb: number
 }
 
-/**
- * Calculate training load metrics from daily TSS values.
- * Uses EWMA: new_value = old_value + (tss - old_value) * (1 / tau)
- * Default tau values: CTL = 42 days, ATL = 7 days
- */
-export function calculateTrainingLoad(
-  dailyTss: number[],
-  ctlTau: number,
-  atlTau: number,
-): TrainingLoadPoint[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: TrainingLoadPoint[] }>(
-    goStorage.calculateTrainingLoad(dailyTss, ctlTau, atlTau),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate training load')
-  }
+export function calculateTrainingLoad(dailyTss: number[], ctlTau: number, atlTau: number): TrainingLoadPoint[] {
+  const result = callGoStorage<{ data: TrainingLoadPoint[] }>(() => goStorage.calculateTrainingLoad(dailyTss, ctlTau, atlTau), 'calculateTrainingLoad')
   return (result as { data: TrainingLoadPoint[] }).data
 }
 
-/**
- * Calculate training load starting from existing CTL/ATL values.
- * Useful for continuing from a known state.
- */
-export function calculateTrainingLoadWithInitial(
-  dailyTss: number[],
-  initialCtl: number,
-  initialAtl: number,
-  ctlTau: number,
-  atlTau: number,
-): TrainingLoadPoint[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: TrainingLoadPoint[] }>(
-    goStorage.calculateTrainingLoadWithInitial(dailyTss, initialCtl, initialAtl, ctlTau, atlTau),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate training load with initial')
-  }
+export function calculateTrainingLoadWithInitial(dailyTss: number[], initialCtl: number, initialAtl: number, ctlTau: number, atlTau: number): TrainingLoadPoint[] {
+  const result = callGoStorage<{ data: TrainingLoadPoint[] }>(() => goStorage.calculateTrainingLoadWithInitial(dailyTss, initialCtl, initialAtl, ctlTau, atlTau), 'calculateTrainingLoadWithInitial')
   return (result as { data: TrainingLoadPoint[] }).data
 }
 
-/**
- * Calculate predicted TSB after a planned workout.
- */
-export function predictAfterWorkout(
-  currentCtl: number,
-  currentAtl: number,
-  plannedTss: number,
-  ctlTau: number,
-  atlTau: number,
-): TrainingLoadPoint {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<TrainingLoadPoint>(
-    goStorage.predictAfterWorkout(currentCtl, currentAtl, plannedTss, ctlTau, atlTau),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to predict after workout')
-  }
+export function predictAfterWorkout(currentCtl: number, currentAtl: number, plannedTss: number, ctlTau: number, atlTau: number): TrainingLoadPoint {
+  const result = callGoStorage<TrainingLoadPoint>(() => goStorage.predictAfterWorkout(currentCtl, currentAtl, plannedTss, ctlTau, atlTau), 'predictAfterWorkout')
   return { ctl: result.ctl, atl: result.atl, tsb: result.tsb } as TrainingLoadPoint
 }
 
-/**
- * Calculate the TSS needed to reach a target TSB.
- */
-export function tssForTargetTsb(
-  currentCtl: number,
-  currentAtl: number,
-  targetTsb: number,
-  ctlTau: number,
-  atlTau: number,
-): number {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ value: number }>(
-    goStorage.tssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to calculate TSS for target TSB')
-  }
-  return (result as { value: number }).value
-}
+export const tssForTargetTsb = (currentCtl: number, currentAtl: number, targetTsb: number, ctlTau: number, atlTau: number): number =>
+  callGoStorageValue<number>(() => goStorage.tssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau), 'tssForTargetTsb')
 
 // ============================================================================
 // Eddington Data
@@ -1574,38 +981,23 @@ export interface EddingtonFilters {
   sport_types?: string[]
 }
 
-export interface EddingtonHistoryPoint {
-  date: string
-  number: number
-}
+// EddingtonHistoryPoint imported from types.gen.ts
 
 export interface EddingtonDistributionDay {
   date: string
   distance: number
 }
 
-export interface EddingtonNextStep {
-  target: number
-  rides_needed: number
-}
-
+// EddingtonDataResult matches EddingtonResult from generated types with additional distribution field
 export interface EddingtonDataResult {
   number: number
   history: EddingtonHistoryPoint[]
   distribution: EddingtonDistributionDay[]
-  next_steps: EddingtonNextStep[]
+  next_steps: EddingtonStep[]
 }
 
 export function getEddingtonData(filters?: EddingtonFilters): EddingtonDataResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<EddingtonDataResult>(
-    goStorage.getEddingtonData(JSON.stringify(filters || {})),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get Eddington data')
-  }
+  const result = callGoStorage<EddingtonDataResult>(() => goStorage.getEddingtonData(JSON.stringify(filters || {})), 'getEddingtonData')
   return {
     number: result.number,
     history: result.history || [],
@@ -1637,15 +1029,7 @@ export interface GearMonthlyUsage {
 }
 
 export function getGearMonthlyUsage(filters?: GearMonthlyUsageFilters): GearMonthlyUsage[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: GearMonthlyUsage[] }>(
-    goStorage.getGearMonthlyUsage(JSON.stringify(filters || {})),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get gear monthly usage')
-  }
+  const result = callGoStorage<{ data: GearMonthlyUsage[] }>(() => goStorage.getGearMonthlyUsage(JSON.stringify(filters || {})), 'getGearMonthlyUsage')
   return result.data || []
 }
 
@@ -1682,18 +1066,8 @@ export interface CustomGearResult {
   total_pages: number
 }
 
-export function getCustomGear(filters?: CustomGearFilters): CustomGearResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<CustomGearResult>(
-    goStorage.getCustomGear(JSON.stringify(filters || {})),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get custom gear')
-  }
-  return result
-}
+export const getCustomGear = (filters?: CustomGearFilters): CustomGearResult =>
+  callGoStorage<CustomGearResult>(() => goStorage.getCustomGear(JSON.stringify(filters || {})), 'getCustomGear')
 
 export interface CreateCustomGearInput {
   name: string
@@ -1712,15 +1086,7 @@ export interface CreateCustomGearResult {
 }
 
 export function createCustomGear(input: CreateCustomGearInput): CreateCustomGearResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: CreateCustomGearResult }>(
-    goStorage.createCustomGear(JSON.stringify(input)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to create custom gear')
-  }
+  const result = callGoStorage<{ data: CreateCustomGearResult }>(() => goStorage.createCustomGear(JSON.stringify(input)), 'createCustomGear')
   return result.data as CreateCustomGearResult
 }
 
@@ -1734,15 +1100,7 @@ export interface UpdateCustomGearInput {
 }
 
 export function updateCustomGear(input: UpdateCustomGearInput): CreateCustomGearResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: CreateCustomGearResult }>(
-    goStorage.updateCustomGear(JSON.stringify(input)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update custom gear')
-  }
+  const result = callGoStorage<{ data: CreateCustomGearResult }>(() => goStorage.updateCustomGear(JSON.stringify(input)), 'updateCustomGear')
   return result.data as CreateCustomGearResult
 }
 
@@ -1752,12 +1110,7 @@ export interface DeleteCustomGearResult {
 }
 
 export function deleteCustomGear(id: string, force?: boolean): DeleteCustomGearResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<DeleteCustomGearResult>(
-    goStorage.deleteCustomGear(JSON.stringify({ id, force })),
-  )
+  const result = parseGoResult<DeleteCustomGearResult>(goStorage.deleteCustomGear(JSON.stringify({ id, force })))
   if (!result.ok && !result.has_activities) {
     throw new Error(result.error || 'Failed to delete custom gear')
   }
@@ -1802,18 +1155,8 @@ export interface SegmentEffortsResult {
   total_pages: number
 }
 
-export function getSegmentEfforts(filters: SegmentEffortsFilters): SegmentEffortsResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<SegmentEffortsResult>(
-    goStorage.getSegmentEfforts(JSON.stringify(filters)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get segment efforts')
-  }
-  return result
-}
+export const getSegmentEfforts = (filters: SegmentEffortsFilters): SegmentEffortsResult =>
+  callGoStorage<SegmentEffortsResult>(() => goStorage.getSegmentEfforts(JSON.stringify(filters)), 'getSegmentEfforts')
 
 export interface SegmentCountry {
   country: string
@@ -1821,13 +1164,7 @@ export interface SegmentCountry {
 }
 
 export function getSegmentCountries(): SegmentCountry[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: SegmentCountry[] }>(goStorage.getSegmentCountries())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get segment countries')
-  }
+  const result = callGoStorage<{ data: SegmentCountry[] }>(() => goStorage.getSegmentCountries(), 'getSegmentCountries')
   return result.data || []
 }
 
@@ -1836,13 +1173,7 @@ export function getSegmentCountries(): SegmentCountry[] {
 // ============================================================================
 
 export function getRewindYears(): number[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: number[] }>(goStorage.getRewindYears())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get rewind years')
-  }
+  const result = callGoStorage<{ data: number[] }>(() => goStorage.getRewindYears(), 'getRewindYears')
   return result.data || []
 }
 
@@ -1882,26 +1213,10 @@ export interface RewindData {
     longest_active_days: number
     longest_rest_days: number
   }
-  months?: Array<{
-    month: string
-    activities: number
-    distance_m: number
-    elevation_m: number
-    prs: number
-  }>
-  moving_time_by_sport?: Array<{
-    sport_type: string
-    moving_time_s: number
-  }>
-  start_times_by_hour?: Array<{
-    hour: number
-    count: number
-  }>
-  locations?: Array<{
-    lat: number
-    lng: number
-    count: number
-  }>
+  months?: Array<{ month: string; activities: number; distance_m: number; elevation_m: number; prs: number }>
+  moving_time_by_sport?: Array<{ sport_type: string; moving_time_s: number }>
+  start_times_by_hour?: Array<{ hour: number; count: number }>
+  locations?: Array<{ lat: number; lng: number; count: number }>
   biggest?: {
     longest_distance?: RewindBiggestActivity
     most_elevation?: RewindBiggestActivity
@@ -1911,13 +1226,7 @@ export interface RewindData {
 }
 
 export function getRewind(year?: number): RewindData | null {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: RewindData | null }>(goStorage.getRewind(year || 0))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get rewind')
-  }
+  const result = callGoStorage<{ data: RewindData | null }>(() => goStorage.getRewind(JSON.stringify({ year: year || 0 })), 'getRewind')
   return result.data || null
 }
 
@@ -1931,46 +1240,20 @@ export interface MetricEntry {
 }
 
 export function getFtpHistory(): MetricEntry[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: MetricEntry[] }>(goStorage.getFtpHistory())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get FTP history')
-  }
+  const result = callGoStorage<{ data: MetricEntry[] }>(() => goStorage.getFtpHistory(), 'getFtpHistory')
   return result.data || []
 }
 
 export function getWeightHistory(): MetricEntry[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: MetricEntry[] }>(goStorage.getWeightHistory())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get weight history')
-  }
+  const result = callGoStorage<{ data: MetricEntry[] }>(() => goStorage.getWeightHistory(), 'getWeightHistory')
   return result.data || []
 }
 
-export function updateFtpHistory(entries: MetricEntry[]): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.updateFtpHistory(JSON.stringify(entries)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update FTP history')
-  }
-}
+export const updateFtpHistory = (entries: MetricEntry[]): void =>
+  callGoStorageVoid(() => goStorage.updateFtpHistory(JSON.stringify(entries)), 'updateFtpHistory')
 
-export function updateWeightHistory(entries: MetricEntry[]): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.updateWeightHistory(JSON.stringify(entries)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update weight history')
-  }
-}
+export const updateWeightHistory = (entries: MetricEntry[]): void =>
+  callGoStorageVoid(() => goStorage.updateWeightHistory(JSON.stringify(entries)), 'updateWeightHistory')
 
 // ============================================================================
 // Training Load (Database)
@@ -1995,15 +1278,7 @@ export interface TrainingLoadResult {
 }
 
 export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<TrainingLoadResult>(
-    goStorage.getTrainingLoad(JSON.stringify(filters || {})),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get training load')
-  }
+  const result = callGoStorage<TrainingLoadResult>(() => goStorage.getTrainingLoad(JSON.stringify(filters || {})), 'getTrainingLoad')
   return { series: result.series || [], summary: result.summary }
 }
 
@@ -2037,15 +1312,7 @@ export interface PowerStatsResult {
 }
 
 export function getPowerStats(filters?: PowerStatsFilters): PowerStatsResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<PowerStatsResult>(
-    goStorage.getPowerStats(JSON.stringify(filters || {})),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get power stats')
-  }
+  const result = callGoStorage<PowerStatsResult>(() => goStorage.getPowerStats(JSON.stringify(filters || {})), 'getPowerStats')
   return { best: result.best || [], history: result.history || [] }
 }
 
@@ -2079,18 +1346,8 @@ export interface ChallengesResult {
   total_pages: number
 }
 
-export function getChallenges(filters?: ChallengesFilters): ChallengesResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<ChallengesResult>(
-    goStorage.getChallenges(JSON.stringify(filters || {})),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get challenges')
-  }
-  return result
-}
+export const getChallenges = (filters?: ChallengesFilters): ChallengesResult =>
+  callGoStorage<ChallengesResult>(() => goStorage.getChallenges(JSON.stringify(filters || {})), 'getChallenges')
 
 // ============================================================================
 // Training Goals
@@ -2127,25 +1384,12 @@ export interface TrainingGoalsResult {
 }
 
 export function getTrainingGoals(): TrainingGoalsResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<TrainingGoalsResult>(goStorage.getTrainingGoals())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get training goals')
-  }
+  const result = callGoStorage<TrainingGoalsResult>(() => goStorage.getTrainingGoals(), 'getTrainingGoals')
   return { config: result.config, progress: result.progress }
 }
 
-export function updateTrainingGoals(config: TrainingGoalsConfig): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.updateTrainingGoals(JSON.stringify(config)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update training goals')
-  }
-}
+export const updateTrainingGoals = (config: TrainingGoalsConfig): void =>
+  callGoStorageVoid(() => goStorage.updateTrainingGoals(JSON.stringify(config)), 'updateTrainingGoals')
 
 // ============================================================================
 // Maintenance
@@ -2184,13 +1428,7 @@ export interface MaintenanceDueItem {
 }
 
 export function getMaintenanceDue(): MaintenanceDueItem[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: MaintenanceDueItem[] }>(goStorage.getMaintenanceDue())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get maintenance due')
-  }
+  const result = callGoStorage<{ data: MaintenanceDueItem[] }>(() => goStorage.getMaintenanceDue(), 'getMaintenanceDue')
   return result.data || []
 }
 
@@ -2220,18 +1458,8 @@ export interface GearComponentsResult {
   total_pages: number
 }
 
-export function getGearComponents(filters: GearComponentsFilters): GearComponentsResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<GearComponentsResult>(
-    goStorage.getGearComponents(JSON.stringify(filters)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get gear components')
-  }
-  return result
-}
+export const getGearComponents = (filters: GearComponentsFilters): GearComponentsResult =>
+  callGoStorage<GearComponentsResult>(() => goStorage.getGearComponents(JSON.stringify(filters)), 'getGearComponents')
 
 export interface CreateComponentRule {
   type: string
@@ -2253,15 +1481,7 @@ export interface CreateComponentResult {
 }
 
 export function createComponent(input: CreateComponentInput): CreateComponentResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: CreateComponentResult }>(
-    goStorage.createComponent(JSON.stringify(input)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to create component')
-  }
+  const result = callGoStorage<{ data: CreateComponentResult }>(() => goStorage.createComponent(JSON.stringify(input)), 'createComponent')
   return result.data as CreateComponentResult
 }
 
@@ -2274,27 +1494,12 @@ export interface UpdateComponentInput {
 }
 
 export function updateComponent(input: UpdateComponentInput): CreateComponentResult {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: CreateComponentResult }>(
-    goStorage.updateComponent(JSON.stringify(input)),
-  )
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update component')
-  }
+  const result = callGoStorage<{ data: CreateComponentResult }>(() => goStorage.updateComponent(JSON.stringify(input)), 'updateComponent')
   return result.data as CreateComponentResult
 }
 
-export function deleteComponent(id: number): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.deleteComponent(id))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to delete component')
-  }
-}
+export const deleteComponent = (id: number): void =>
+  callGoStorageVoid(() => goStorage.deleteComponent(id), 'deleteComponent')
 
 export interface LogMaintenanceInput {
   component_id: number
@@ -2302,15 +1507,8 @@ export interface LogMaintenanceInput {
   completed_at?: string
 }
 
-export function logMaintenance(input: LogMaintenanceInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.logMaintenance(JSON.stringify(input)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to log maintenance')
-  }
-}
+export const logMaintenance = (input: LogMaintenanceInput): void =>
+  callGoStorageVoid(() => goStorage.logMaintenance(JSON.stringify(input)), 'logMaintenance')
 
 // ============================================================================
 // Settings
@@ -2324,25 +1522,12 @@ export interface AppSettings {
 }
 
 export function getAppSettings(): AppSettings {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: AppSettings }>(goStorage.getAppSettings())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get app settings')
-  }
+  const result = callGoStorage<{ data: AppSettings }>(() => goStorage.getAppSettings(), 'getAppSettings')
   return result.data || {}
 }
 
-export function updateAppSettings(settings: AppSettings): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.updateAppSettings(JSON.stringify(settings)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to update app settings')
-  }
-}
+export const updateAppSettings = (settings: AppSettings): void =>
+  callGoStorageVoid(() => goStorage.updateAppSettings(JSON.stringify(settings)), 'updateAppSettings')
 
 // ============================================================================
 // HR Zones
@@ -2356,13 +1541,7 @@ export interface HRZoneDefinition {
 }
 
 export function getHrZoneDefinitions(): HRZoneDefinition[] {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult<{ data: HRZoneDefinition[] }>(goStorage.getHrZoneDefinitions())
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to get HR zone definitions')
-  }
+  const result = callGoStorage<{ data: HRZoneDefinition[] }>(() => goStorage.getHrZoneDefinitions(), 'getHrZoneDefinitions')
   return result.data || []
 }
 
@@ -2373,27 +1552,115 @@ export interface UpsertHRZoneInput {
   zones: unknown
 }
 
-export function upsertHrZoneDefinition(input: UpsertHRZoneInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.upsertHrZoneDefinition(JSON.stringify(input)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to upsert HR zone definition')
-  }
-}
+export const upsertHrZoneDefinition = (input: UpsertHRZoneInput): void =>
+  callGoStorageVoid(() => goStorage.upsertHrZoneDefinition(JSON.stringify(input)), 'upsertHrZoneDefinition')
 
 export interface DeleteHRZoneInput {
   sport_type: string
   effective_from: string
 }
 
-export function deleteHrZoneDefinition(input: DeleteHRZoneInput): void {
-  if (!initialized) {
-    throw new Error('Go storage not initialized')
-  }
-  const result = parseGoResult(goStorage.deleteHrZoneDefinition(JSON.stringify(input)))
-  if (!result.ok) {
-    throw new Error(result.error || 'Failed to delete HR zone definition')
-  }
+export const deleteHrZoneDefinition = (input: DeleteHRZoneInput): void =>
+  callGoStorageVoid(() => goStorage.deleteHrZoneDefinition(JSON.stringify(input)), 'deleteHrZoneDefinition')
+
+// ============================================================================
+// Import - Control (Bridge to Go WASM Importer)
+// ============================================================================
+
+export type GoImportPhase = 'idle' | 'activities' | 'gear' | 'streams' | 'activity_details' | 'segment_details' | 'photos' | 'completed'
+export type GoImportStatus = 'idle' | 'running' | 'completed' | 'failed' | 'canceled' | 'paused'
+
+export interface GoImportOptions {
+  full_sync?: boolean
+  resume?: boolean
+  skip_streams?: boolean
+  skip_segments?: boolean
+  skip_best_efforts?: boolean
+  skip_photos?: boolean
 }
+
+export interface GoImportProgress {
+  status: GoImportStatus
+  phase: GoImportPhase
+  activities_total: number
+  activities_done: number
+  gear_total: number
+  gear_done: number
+  streams_total: number
+  streams_done: number
+  details_total: number
+  details_done: number
+  segments_total: number
+  segments_done: number
+  photos_total: number
+  photos_done: number
+  failed_count: number
+  remaining_api_calls: number
+  estimated_eta?: string
+  rate_limit_used_15min: number
+  rate_limit_limit_15min: number
+  rate_limit_used_daily: number
+  rate_limit_limit_daily: number
+  waiting_for_rate_limit: boolean
+  waiting_until?: string
+  waiting_reason?: string
+  started_at?: string
+  errors?: string[]
+}
+
+export interface GoImportState {
+  phase: GoImportPhase
+  activities_total: number
+  activities_done: number
+  gear_total: number
+  gear_done: number
+  streams_total: number
+  streams_done: number
+  details_total: number
+  details_done: number
+  segments_total: number
+  segments_done: number
+  photos_total: number
+  photos_done: number
+  failed_count: number
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+  started_at?: string
+  after_date?: string
+  newest_activity_date?: string
+  errors?: string[]
+}
+
+export interface GoAthlete {
+  id: number
+  username?: string
+  first_name?: string
+  last_name?: string
+  profile_medium?: string
+}
+
+export const goStartImport = (options: GoImportOptions, athlete: GoAthlete): void =>
+  callGoStorageVoid(() => goStorage.startImport(JSON.stringify(options), JSON.stringify(athlete)), 'startImport')
+
+export const goCancelImport = (): void =>
+  callGoStorageVoid(() => goStorage.cancelImport(), 'cancelImport')
+
+export function goGetImportProgress(): GoImportProgress | null {
+  const result = callGoStorage<{ data: GoImportProgress | null }>(() => goStorage.getImportProgress(), 'getImportProgress')
+  return result.data ?? null
+}
+
+export function goIsImportRunning(): boolean {
+  const result = callGoStorage<{ running: boolean }>(() => goStorage.isImportRunning(), 'isImportRunning')
+  return result.running ?? false
+}
+
+export function goGetImportState(): GoImportState | null {
+  const result = callGoStorage<{ data: GoImportState | null }>(() => goStorage.getImportState(), 'getImportState')
+  return result.data ?? null
+}
+
+export const goClearImportState = (): void =>
+  callGoStorageVoid(() => goStorage.clearImportState(), 'clearImportState')

@@ -8,6 +8,7 @@ import (
 
 	"github.com/melonamin/quantlete/internal/pagination"
 	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
@@ -24,7 +25,7 @@ func NewSegmentsHandler(svc *services.SegmentsService, stravaClient *strava.Clie
 func (h *SegmentsHandler) List(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -52,21 +53,21 @@ func (h *SegmentsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // GetByID handles GET /api/v1/segments/:id
 func (h *SegmentsHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid segment id"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid segment id"))
 		return
 	}
 
@@ -79,21 +80,21 @@ func (h *SegmentsHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // ListEfforts handles GET /api/v1/segments/:id/efforts
 func (h *SegmentsHandler) ListEfforts(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid segment id"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid segment id"))
 		return
 	}
 
@@ -112,14 +113,14 @@ func (h *SegmentsHandler) ListEfforts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // Countries handles GET /api/v1/segments/countries
 func (h *SegmentsHandler) Countries(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -129,5 +130,5 @@ func (h *SegmentsHandler) Countries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }

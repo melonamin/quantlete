@@ -24,12 +24,12 @@ func NewMaintenanceService(repo *storage.MaintenanceRepository) *MaintenanceServ
 
 // ListComponentsInput contains parameters for listing components.
 type ListComponentsInput struct {
-	AthleteID int64
-	GearID    string
-	Page      int
-	PerPage   int
-	OrderBy   string
-	OrderDir  string
+	AthleteID int64  `json:"-" adapter:"context"`
+	GearID    string `json:"gear_id" adapter:"path,param=gear_id"`
+	Page      int    `json:"page" adapter:"query,default=1"`
+	PerPage   int    `json:"per_page" adapter:"query,default=50"`
+	OrderBy   string `json:"order_by" adapter:"query,default=name"`
+	OrderDir  string `json:"order_dir" adapter:"query,default=asc"`
 }
 
 // RuleItem represents a maintenance rule in responses.
@@ -70,30 +70,30 @@ type RuleInput struct {
 
 // CreateComponentInput contains parameters for creating a component.
 type CreateComponentInput struct {
-	AthleteID          int64
-	GearID             string
-	Name               string      `json:"name"`
-	ImageURL           string      `json:"image_url,omitempty"`
-	MaintenanceHashtag string      `json:"maintenance_hashtag,omitempty"`
-	Rules              []RuleInput `json:"rules,omitempty"`
+	AthleteID          int64       `json:"-" adapter:"context"`
+	GearID             string      `json:"gear_id" adapter:"path,param=gear_id"`
+	Name               string      `json:"name" adapter:"body"`
+	ImageURL           string      `json:"image_url,omitempty" adapter:"body"`
+	MaintenanceHashtag string      `json:"maintenance_hashtag,omitempty" adapter:"body"`
+	Rules              []RuleInput `json:"rules,omitempty" adapter:"body"`
 }
 
 // UpdateComponentInput contains parameters for updating a component.
 type UpdateComponentInput struct {
-	AthleteID          int64
-	ComponentID        int64
-	Name               *string      `json:"name,omitempty"`
-	ImageURL           *string      `json:"image_url,omitempty"`
-	MaintenanceHashtag *string      `json:"maintenance_hashtag,omitempty"`
-	Rules              *[]RuleInput `json:"rules,omitempty"`
+	AthleteID          int64        `json:"-" adapter:"context"`
+	ComponentID        int64        `json:"component_id" adapter:"path,param=id"`
+	Name               *string      `json:"name,omitempty" adapter:"body"`
+	ImageURL           *string      `json:"image_url,omitempty" adapter:"body"`
+	MaintenanceHashtag *string      `json:"maintenance_hashtag,omitempty" adapter:"body"`
+	Rules              *[]RuleInput `json:"rules,omitempty" adapter:"body"`
 }
 
 // LogMaintenanceInput contains parameters for logging maintenance.
 type LogMaintenanceInput struct {
-	AthleteID   int64
-	ComponentID int64
-	ActivityID  *int64
-	CompletedAt time.Time
+	AthleteID   int64     `json:"-" adapter:"context"`
+	ComponentID int64     `json:"component_id" adapter:"path,param=id"`
+	ActivityID  *int64    `json:"activity_id,omitempty" adapter:"body"`
+	CompletedAt time.Time `json:"completed_at" adapter:"body"`
 }
 
 // RuleProgressItem represents progress for a single rule.
@@ -128,6 +128,10 @@ type DueComponentItem struct {
 // ============================================================================
 
 // ListComponents returns a paginated list of components for a gear item.
+//
+//adapter:wasm getGearComponents category=Maintenance
+//adapter:http GET /api/v1/gear/{gear_id}/components
+//nolint:dupl // Similar pagination pattern to other list methods but different types
 func (s *MaintenanceService) ListComponents(ctx context.Context, in ListComponentsInput) (*ListComponentsOutput, error) {
 	if in.GearID == "" {
 		return nil, BadRequest("gear ID is required")
@@ -162,6 +166,9 @@ func (s *MaintenanceService) ListComponents(ctx context.Context, in ListComponen
 }
 
 // CreateComponent creates a new component for a gear item.
+//
+//adapter:wasm createComponent category=Maintenance
+//adapter:http POST /api/v1/gear/{gear_id}/components
 func (s *MaintenanceService) CreateComponent(ctx context.Context, in CreateComponentInput) (*ComponentItem, error) {
 	if in.GearID == "" {
 		return nil, BadRequest("gear ID is required")
@@ -193,6 +200,9 @@ func (s *MaintenanceService) CreateComponent(ctx context.Context, in CreateCompo
 }
 
 // UpdateComponent updates an existing component.
+//
+//adapter:wasm updateComponent category=Maintenance
+//adapter:http PUT /api/v1/components/{id}
 func (s *MaintenanceService) UpdateComponent(ctx context.Context, in UpdateComponentInput) (*ComponentItem, error) {
 	if in.ComponentID <= 0 {
 		return nil, BadRequest("component ID is required")
@@ -241,6 +251,9 @@ func (s *MaintenanceService) DeleteComponent(ctx context.Context, athleteID, com
 }
 
 // LogMaintenance logs a maintenance event for a component.
+//
+//adapter:wasm logMaintenance category=Maintenance
+//adapter:http POST /api/v1/components/{id}/maintenance
 func (s *MaintenanceService) LogMaintenance(ctx context.Context, in LogMaintenanceInput) error {
 	if in.ComponentID <= 0 {
 		return BadRequest("component ID is required")

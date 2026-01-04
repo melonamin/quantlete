@@ -3,10 +3,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"syscall/js"
 
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/shared"
 )
 
@@ -99,7 +101,8 @@ func jsArrayToFloat64WithLimit(jsArr js.Value, maxSize int) ([]float64, error) {
 
 // ensureInitialized checks if the database is initialized
 func ensureInitialized() error {
-	if bridge == nil || bridge.db == nil {
+	b := getBridge()
+	if b == nil || b.registry == nil || b.registry.DB() == nil {
 		return fmt.Errorf("storage not initialized - call init() first")
 	}
 	return nil
@@ -107,8 +110,168 @@ func ensureInitialized() error {
 
 // ensureAthleteID checks if athleteID is set
 func ensureAthleteID() error {
-	if bridge == nil || bridge.athleteID == 0 {
+	b := getBridge()
+	if b == nil || b.athleteID == 0 {
 		return fmt.Errorf("athlete ID not set - call setAthleteId() first")
 	}
 	return nil
+}
+
+// ============================================================================
+// WASM Function Wrappers
+// ============================================================================
+//
+// These wrappers reduce boilerplate in WASM functions by handling common
+// concerns: panic recovery, bridge access, initialization checks, and context.
+//
+// Usage:
+//   func myHandler(wc *WasmContext) interface{} {
+//       result, err := wc.Registry.SomeService.DoThing(wc.Ctx, wc.AthleteID)
+//       if err != nil {
+//           return errorJSON(err)
+//       }
+//       return dataJSON(result)
+//   }
+//
+//   var myFunction = wrapWasmAthlete("myFunction", myHandler)
+
+// WasmContext provides context for WASM function execution.
+// It encapsulates the bridge, registry, athlete context, and arguments.
+type WasmContext struct {
+	Bridge    *WasmBridge
+	Registry  *services.ServiceRegistry
+	AthleteID int64
+	Ctx       context.Context
+	Args      []js.Value
+}
+
+// WasmHandler handles a WASM call with context (no athlete required).
+type WasmHandler func(*WasmContext) interface{}
+
+// WasmHandlerAthlete handles a WASM call that requires athlete context.
+type WasmHandlerAthlete func(*WasmContext) interface{}
+
+// wrapWasm creates a wrapper for WASM functions that only need basic initialization.
+// Use for functions that don't require athlete ID.
+func wrapWasm(name string, fn WasmHandler) func(js.Value, []js.Value) interface{} {
+	return func(this js.Value, args []js.Value) interface{} {
+		defer recoverPanic(name)
+
+		b := getBridge()
+		if b == nil || b.registry == nil {
+			return errorJSON(fmt.Errorf("storage not initialized"))
+		}
+
+		if err := ensureInitialized(); err != nil {
+			return errorJSON(err)
+		}
+
+		wc := &WasmContext{
+			Bridge:   b,
+			Registry: b.registry,
+			Ctx:      context.Background(),
+			Args:     args,
+		}
+
+		return fn(wc)
+	}
+}
+
+// wrapWasmAthlete creates a wrapper for WASM functions that require athlete context.
+// This is the most common wrapper - use for functions that need athlete ID.
+func wrapWasmAthlete(name string, fn WasmHandlerAthlete) func(js.Value, []js.Value) interface{} {
+	return func(this js.Value, args []js.Value) interface{} {
+		defer recoverPanic(name)
+
+		b := getBridge()
+		if b == nil || b.registry == nil {
+			return errorJSON(fmt.Errorf("storage not initialized"))
+		}
+
+		if err := ensureInitialized(); err != nil {
+			return errorJSON(err)
+		}
+		if err := ensureAthleteID(); err != nil {
+			return errorJSON(err)
+		}
+
+		wc := &WasmContext{
+			Bridge:    b,
+			Registry:  b.registry,
+			AthleteID: b.athleteID,
+			Ctx:       context.Background(),
+			Args:      args,
+		}
+
+		return fn(wc)
+	}
+}
+
+// wrapWasmRaw creates a wrapper that only handles panic recovery.
+// Use for functions that manage their own initialization (e.g., init, setAthleteId).
+func wrapWasmRaw(name string, fn func(js.Value, []js.Value) interface{}) func(js.Value, []js.Value) interface{} {
+	return func(this js.Value, args []js.Value) interface{} {
+		defer recoverPanic(name)
+		return fn(this, args)
+	}
+}
+
+// ============================================================================
+// Argument Parsing Helpers
+// ============================================================================
+
+// ArgString returns args[index] as string, or empty string if missing.
+func (wc *WasmContext) ArgString(index int) string {
+	if index >= len(wc.Args) {
+		return ""
+	}
+	return wc.Args[index].String()
+}
+
+// ArgInt returns args[index] as int, or 0 if missing/invalid.
+func (wc *WasmContext) ArgInt(index int) int {
+	if index >= len(wc.Args) {
+		return 0
+	}
+	return wc.Args[index].Int()
+}
+
+// ArgInt64 returns args[index] as int64, or 0 if missing/invalid.
+func (wc *WasmContext) ArgInt64(index int) int64 {
+	if index >= len(wc.Args) {
+		return 0
+	}
+	// JS numbers are float64, so we need to convert
+	return int64(wc.Args[index].Float())
+}
+
+// ArgFloat64 returns args[index] as float64, or 0 if missing/invalid.
+func (wc *WasmContext) ArgFloat64(index int) float64 {
+	if index >= len(wc.Args) {
+		return 0
+	}
+	return wc.Args[index].Float()
+}
+
+// ArgBool returns args[index] as bool, or false if missing.
+func (wc *WasmContext) ArgBool(index int) bool {
+	if index >= len(wc.Args) {
+		return false
+	}
+	return wc.Args[index].Bool()
+}
+
+// ArgJSON parses args[index] as JSON into the provided pointer.
+// Returns error if missing or invalid JSON.
+func (wc *WasmContext) ArgJSON(index int, v interface{}) error {
+	if index >= len(wc.Args) {
+		return fmt.Errorf("missing argument at index %d", index)
+	}
+	jsonStr := wc.Args[index].String()
+	return json.Unmarshal([]byte(jsonStr), v)
+}
+
+// HasArg returns true if an argument exists at the given index.
+func (wc *WasmContext) HasArg(index int) bool {
+	return index < len(wc.Args)
 }

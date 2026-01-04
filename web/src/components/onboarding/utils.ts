@@ -26,8 +26,7 @@ export function shouldShowOnboarding(
   if (isAuthenticated) return false
 
   // Don't show on OAuth callback page (let OAuth complete)
-  if (typeof window !== 'undefined' && window.location.pathname === '/oauth/callback')
-    return false
+  if (typeof window !== 'undefined' && window.location.pathname === '/oauth/callback') return false
 
   // Show if credentials not configured (this is the primary condition)
   // If credentialsConfigured is undefined, we're still loading

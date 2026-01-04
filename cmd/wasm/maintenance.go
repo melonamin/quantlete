@@ -3,10 +3,8 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"syscall/js"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/services"
@@ -21,44 +19,31 @@ import (
 
 // getMaintenanceDue returns components with maintenance status
 // Called from JS: goStorage.getMaintenanceDue()
+//
 //wasm:export
-func getMaintenanceDue(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getMaintenanceDue")
-
-	ctx := context.Background()
-	items, err := bridge.maintenanceService.ListDue(ctx, bridge.athleteID)
+var getMaintenanceDue = wrapWasmAthlete("getMaintenanceDue", func(wc *WasmContext) interface{} {
+	items, err := wc.Registry.MaintenanceService.ListDue(wc.Ctx, wc.AthleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
-
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": items,
-	})
-}
+	return dataJSON(items)
+})
 
 // getGearComponents returns components for a specific gear item
 // Called from JS: goStorage.getGearComponents(filtersJSON)
-//wasm:export
-func getGearComponents(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getGearComponents")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing filters"))
-	}
-
+// NOTE: Replaced by generated adapter genGetGearComponents
+var getGearComponents = wrapWasmAthlete("getGearComponents", func(wc *WasmContext) interface{} {
 	var req struct {
 		GearID  string `json:"gear_id"`
 		Page    int    `json:"page"`
 		PerPage int    `json:"per_page"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing filters: %w", err))
 	}
 
-	ctx := context.Background()
-	result, err := bridge.maintenanceService.ListComponents(ctx, services.ListComponentsInput{
-		AthleteID: bridge.athleteID,
+	result, err := wc.Registry.MaintenanceService.ListComponents(wc.Ctx, services.ListComponentsInput{
+		AthleteID: wc.AthleteID,
 		GearID:    req.GearID,
 		Page:      req.Page,
 		PerPage:   req.PerPage,
@@ -75,18 +60,12 @@ func getGearComponents(this js.Value, args []js.Value) interface{} {
 		"per_page":    result.PerPage,
 		"total_pages": result.TotalPages,
 	})
-}
+})
 
 // createComponent creates a new component for a gear item
 // Called from JS: goStorage.createComponent(componentJSON)
-//wasm:export
-func createComponent(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("createComponent")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing component data"))
-	}
-
+// NOTE: Replaced by generated adapter genCreateComponent
+var createComponent = wrapWasmAthlete("createComponent", func(wc *WasmContext) interface{} {
 	var req struct {
 		GearID             string `json:"gear_id"`
 		Name               string `json:"name"`
@@ -97,7 +76,7 @@ func createComponent(this js.Value, args []js.Value) interface{} {
 			ThresholdValue float64 `json:"threshold_value"`
 		} `json:"rules"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing component: %w", err))
 	}
 
@@ -109,9 +88,8 @@ func createComponent(this js.Value, args []js.Value) interface{} {
 		})
 	}
 
-	ctx := context.Background()
-	comp, err := bridge.maintenanceService.CreateComponent(ctx, services.CreateComponentInput{
-		AthleteID:          bridge.athleteID,
+	comp, err := wc.Registry.MaintenanceService.CreateComponent(wc.Ctx, services.CreateComponentInput{
+		AthleteID:          wc.AthleteID,
 		GearID:             req.GearID,
 		Name:               req.Name,
 		ImageURL:           req.ImageURL,
@@ -122,22 +100,13 @@ func createComponent(this js.Value, args []js.Value) interface{} {
 		return errorJSON(err)
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": comp,
-	})
-}
+	return dataJSON(comp)
+})
 
 // updateComponent updates an existing component
 // Called from JS: goStorage.updateComponent(componentJSON)
-//wasm:export
-func updateComponent(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateComponent")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing component data"))
-	}
-
+// NOTE: Replaced by generated adapter genUpdateComponent
+var updateComponent = wrapWasmAthlete("updateComponent", func(wc *WasmContext) interface{} {
 	var req struct {
 		ID                 int64   `json:"id"`
 		Name               *string `json:"name"`
@@ -148,7 +117,7 @@ func updateComponent(this js.Value, args []js.Value) interface{} {
 			ThresholdValue float64 `json:"threshold_value"`
 		} `json:"rules"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing component: %w", err))
 	}
 
@@ -164,9 +133,8 @@ func updateComponent(this js.Value, args []js.Value) interface{} {
 		rules = &r
 	}
 
-	ctx := context.Background()
-	comp, err := bridge.maintenanceService.UpdateComponent(ctx, services.UpdateComponentInput{
-		AthleteID:          bridge.athleteID,
+	comp, err := wc.Registry.MaintenanceService.UpdateComponent(wc.Ctx, services.UpdateComponentInput{
+		AthleteID:          wc.AthleteID,
 		ComponentID:        req.ID,
 		Name:               req.Name,
 		ImageURL:           req.ImageURL,
@@ -177,48 +145,32 @@ func updateComponent(this js.Value, args []js.Value) interface{} {
 		return errorJSON(err)
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": comp,
-	})
-}
+	return dataJSON(comp)
+})
 
 // deleteComponent deletes a component
 // Called from JS: goStorage.deleteComponent(id)
+//
 //wasm:export
-func deleteComponent(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("deleteComponent")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing component ID"))
-	}
-
-	id := int64(args[0].Int())
-	ctx := context.Background()
-
-	if err := bridge.maintenanceService.DeleteComponent(ctx, bridge.athleteID, id); err != nil {
+var deleteComponent = wrapWasmAthlete("deleteComponent", func(wc *WasmContext) interface{} {
+	id := wc.ArgInt64(0)
+	if err := wc.Registry.MaintenanceService.DeleteComponent(wc.Ctx, wc.AthleteID, id); err != nil {
 		return errorJSON(err)
 	}
-
 	return successJSON("Component deleted")
-}
+})
 
 // logMaintenance logs a maintenance event for a component
 // Called from JS: goStorage.logMaintenance(logJSON)
+//
 //wasm:export
-func logMaintenance(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("logMaintenance")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing log data"))
-	}
-
+var logMaintenance = wrapWasmAthlete("logMaintenance", func(wc *WasmContext) interface{} {
 	var req struct {
 		ComponentID int64  `json:"component_id"`
 		ActivityID  *int64 `json:"activity_id"`
 		CompletedAt string `json:"completed_at"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing log: %w", err))
 	}
 
@@ -231,9 +183,8 @@ func logMaintenance(this js.Value, args []js.Value) interface{} {
 		completedAt = t
 	}
 
-	ctx := context.Background()
-	if err := bridge.maintenanceService.LogMaintenance(ctx, services.LogMaintenanceInput{
-		AthleteID:   bridge.athleteID,
+	if err := wc.Registry.MaintenanceService.LogMaintenance(wc.Ctx, services.LogMaintenanceInput{
+		AthleteID:   wc.AthleteID,
 		ComponentID: req.ComponentID,
 		ActivityID:  req.ActivityID,
 		CompletedAt: completedAt,
@@ -242,7 +193,7 @@ func logMaintenance(this js.Value, args []js.Value) interface{} {
 	}
 
 	return successJSON("Maintenance logged")
-}
+})
 
 // ============================================================================
 // Settings
@@ -252,44 +203,32 @@ func logMaintenance(this js.Value, args []js.Value) interface{} {
 
 // getAppSettings returns the athlete's app settings
 // Called from JS: goStorage.getAppSettings()
+//
 //wasm:export
-func getAppSettings(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getAppSettings")
-
-	ctx := context.Background()
-	s, err := bridge.settings.Get(ctx, bridge.athleteID)
+var getAppSettings = wrapWasmAthlete("getAppSettings", func(wc *WasmContext) interface{} {
+	s, err := wc.Registry.Settings().Get(wc.Ctx, wc.AthleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
-
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": s,
-	})
-}
+	return dataJSON(s)
+})
 
 // updateAppSettings updates the athlete's app settings
 // Called from JS: goStorage.updateAppSettings(settingsJSON)
+//
 //wasm:export
-func updateAppSettings(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateAppSettings")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing settings"))
-	}
-
+var updateAppSettings = wrapWasmAthlete("updateAppSettings", func(wc *WasmContext) interface{} {
 	var s storage.AthleteSettings
-	if err := json.Unmarshal([]byte(args[0].String()), &s); err != nil {
+	if err := wc.ArgJSON(0, &s); err != nil {
 		return errorJSON(fmt.Errorf("parsing settings: %w", err))
 	}
 
-	ctx := context.Background()
-	if err := bridge.settings.Upsert(ctx, bridge.athleteID, s); err != nil {
+	if err := wc.Registry.Settings().Upsert(wc.Ctx, wc.AthleteID, s); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON("Settings updated")
-}
+})
 
 // ============================================================================
 // Custom Gear
@@ -299,10 +238,9 @@ func updateAppSettings(this js.Value, args []js.Value) interface{} {
 
 // getCustomGear returns paginated custom gear for the athlete
 // Called from JS: goStorage.getCustomGear(filtersJSON)
+//
 //wasm:export
-func getCustomGear(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getCustomGear")
-
+var getCustomGear = wrapWasmAthlete("getCustomGear", func(wc *WasmContext) interface{} {
 	var req struct {
 		IncludeRetired bool   `json:"include_retired"`
 		Page           int    `json:"page"`
@@ -310,15 +248,14 @@ func getCustomGear(this js.Value, args []js.Value) interface{} {
 		OrderBy        string `json:"order_by"`
 		OrderDir       string `json:"order_dir"`
 	}
-	if len(args) > 0 && args[0].String() != "" {
-		if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if wc.HasArg(0) && wc.ArgString(0) != "" {
+		if err := wc.ArgJSON(0, &req); err != nil {
 			return errorJSON(fmt.Errorf("parsing filters: %w", err))
 		}
 	}
 
-	ctx := context.Background()
-	result, err := bridge.gearService.ListCustom(ctx, services.ListGearInput{
-		AthleteID:      bridge.athleteID,
+	result, err := wc.Registry.GearService.ListCustom(wc.Ctx, services.ListGearInput{
+		AthleteID:      wc.AthleteID,
 		IncludeRetired: req.IncludeRetired,
 		Page:           req.Page,
 		PerPage:        req.PerPage,
@@ -337,18 +274,13 @@ func getCustomGear(this js.Value, args []js.Value) interface{} {
 		"per_page":    result.PerPage,
 		"total_pages": result.TotalPages,
 	})
-}
+})
 
 // createCustomGear creates a new custom gear item
 // Called from JS: goStorage.createCustomGear(gearJSON)
+//
 //wasm:export
-func createCustomGear(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("createCustomGear")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing gear data"))
-	}
-
+var createCustomGear = wrapWasmAthlete("createCustomGear", func(wc *WasmContext) interface{} {
 	var req struct {
 		Name             string   `json:"name"`
 		Hashtag          string   `json:"hashtag"`
@@ -356,13 +288,12 @@ func createCustomGear(this js.Value, args []js.Value) interface{} {
 		PurchasePrice    *float64 `json:"purchase_price"`
 		PurchaseCurrency string   `json:"purchase_currency"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing gear: %w", err))
 	}
 
-	ctx := context.Background()
-	result, err := bridge.gearService.CreateCustom(ctx, services.CreateCustomGearInput{
-		AthleteID:        bridge.athleteID,
+	result, err := wc.Registry.GearService.CreateCustom(wc.Ctx, services.CreateCustomGearInput{
+		AthleteID:        wc.AthleteID,
 		Name:             req.Name,
 		Hashtag:          req.Hashtag,
 		Retired:          req.Retired,
@@ -374,18 +305,13 @@ func createCustomGear(this js.Value, args []js.Value) interface{} {
 	}
 
 	return dataJSON(result)
-}
+})
 
 // updateCustomGear updates an existing custom gear item
 // Called from JS: goStorage.updateCustomGear(gearJSON)
+//
 //wasm:export
-func updateCustomGear(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateCustomGear")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing gear data"))
-	}
-
+var updateCustomGear = wrapWasmAthlete("updateCustomGear", func(wc *WasmContext) interface{} {
 	var req struct {
 		ID               string    `json:"id"`
 		Name             *string   `json:"name"`
@@ -394,13 +320,12 @@ func updateCustomGear(this js.Value, args []js.Value) interface{} {
 		PurchasePrice    **float64 `json:"purchase_price"`
 		PurchaseCurrency *string   `json:"purchase_currency"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing gear: %w", err))
 	}
 
-	ctx := context.Background()
-	result, err := bridge.gearService.UpdateCustom(ctx, services.UpdateCustomGearInput{
-		AthleteID:        bridge.athleteID,
+	result, err := wc.Registry.GearService.UpdateCustom(wc.Ctx, services.UpdateCustomGearInput{
+		AthleteID:        wc.AthleteID,
 		GearID:           req.ID,
 		Name:             req.Name,
 		Hashtag:          req.Hashtag,
@@ -413,29 +338,23 @@ func updateCustomGear(this js.Value, args []js.Value) interface{} {
 	}
 
 	return dataJSON(result)
-}
+})
 
 // deleteCustomGear deletes a custom gear item
 // Called from JS: goStorage.deleteCustomGear(deleteJSON)
+//
 //wasm:export
-func deleteCustomGear(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("deleteCustomGear")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing delete data"))
-	}
-
+var deleteCustomGear = wrapWasmAthlete("deleteCustomGear", func(wc *WasmContext) interface{} {
 	var req struct {
 		ID    string `json:"id"`
 		Force bool   `json:"force"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing request: %w", err))
 	}
 
-	ctx := context.Background()
-	result, err := bridge.gearService.DeleteCustom(ctx, services.DeleteCustomGearInput{
-		AthleteID: bridge.athleteID,
+	result, err := wc.Registry.GearService.DeleteCustom(wc.Ctx, services.DeleteCustomGearInput{
+		AthleteID: wc.AthleteID,
 		GearID:    req.ID,
 		Force:     req.Force,
 	})
@@ -444,7 +363,7 @@ func deleteCustomGear(this js.Value, args []js.Value) interface{} {
 	}
 
 	return dataJSON(result)
-}
+})
 
 // ============================================================================
 // HR Zones
@@ -454,12 +373,10 @@ func deleteCustomGear(this js.Value, args []js.Value) interface{} {
 
 // getHrZoneDefinitions returns HR zone definitions for the athlete
 // Called from JS: goStorage.getHrZoneDefinitions()
+//
 //wasm:export
-func getHrZoneDefinitions(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getHrZoneDefinitions")
-
-	ctx := context.Background()
-	defs, err := bridge.zones.ListHR(ctx, bridge.athleteID)
+var getHrZoneDefinitions = wrapWasmAthlete("getHrZoneDefinitions", func(wc *WasmContext) interface{} {
+	defs, err := wc.Registry.Zones().ListHR(wc.Ctx, wc.AthleteID)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -475,29 +392,21 @@ func getHrZoneDefinitions(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": items,
-	})
-}
+	return dataJSON(items)
+})
 
 // upsertHrZoneDefinition creates or updates an HR zone definition
 // Called from JS: goStorage.upsertHrZoneDefinition(zoneJSON)
+//
 //wasm:export
-func upsertHrZoneDefinition(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("upsertHrZoneDefinition")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing zone data"))
-	}
-
+var upsertHrZoneDefinition = wrapWasmAthlete("upsertHrZoneDefinition", func(wc *WasmContext) interface{} {
 	var req struct {
 		SportType     string          `json:"sport_type"`
 		EffectiveFrom string          `json:"effective_from"`
 		Method        string          `json:"method"`
 		Zones         json.RawMessage `json:"zones"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing zone: %w", err))
 	}
 
@@ -508,36 +417,29 @@ func upsertHrZoneDefinition(this js.Value, args []js.Value) interface{} {
 		Zones:         req.Zones,
 	}
 
-	ctx := context.Background()
-	if err := bridge.zones.UpsertHR(ctx, bridge.athleteID, def); err != nil {
+	if err := wc.Registry.Zones().UpsertHR(wc.Ctx, wc.AthleteID, def); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON("HR zone definition saved")
-}
+})
 
 // deleteHrZoneDefinition deletes an HR zone definition
 // Called from JS: goStorage.deleteHrZoneDefinition(deleteJSON)
+//
 //wasm:export
-func deleteHrZoneDefinition(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("deleteHrZoneDefinition")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing delete data"))
-	}
-
+var deleteHrZoneDefinition = wrapWasmAthlete("deleteHrZoneDefinition", func(wc *WasmContext) interface{} {
 	var req struct {
 		SportType     string `json:"sport_type"`
 		EffectiveFrom string `json:"effective_from"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing request: %w", err))
 	}
 
-	ctx := context.Background()
-	if err := bridge.zones.DeleteHR(ctx, bridge.athleteID, req.SportType, req.EffectiveFrom); err != nil {
+	if err := wc.Registry.Zones().DeleteHR(wc.Ctx, wc.AthleteID, req.SportType, req.EffectiveFrom); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON("HR zone definition deleted")
-}
+})

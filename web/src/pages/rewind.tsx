@@ -44,8 +44,8 @@ export function RewindPage() {
     compareYear !== null
   )
 
-  const months = report?.months ?? []
-  const monthLabels = months.map((m) => m.month.slice(5))
+  const months = useMemo(() => report?.months ?? [], [report?.months])
+  const monthLabels = useMemo(() => months.map((m) => m.month.slice(5)), [months])
   const activitiesData = months.map((m, idx) => ({ label: monthLabels[idx], value: m.activities }))
   const distanceData = months.map((m, idx) => ({
     label: monthLabels[idx],

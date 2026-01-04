@@ -39,10 +39,10 @@ func NewGearService(repo *storage.GearRepository) *GearService {
 type ListGearInput struct {
 	AthleteID      int64  `json:"-" adapter:"context"`
 	IncludeRetired bool   `json:"include_retired" adapter:"query"`
-	Page           int    `json:"page" adapter:"query"`
-	PerPage        int    `json:"per_page" adapter:"query"`
-	OrderBy        string `json:"order_by" adapter:"query"`
-	OrderDir       string `json:"order_dir" adapter:"query"`
+	Page           int    `json:"page" adapter:"query,default=1"`
+	PerPage        int    `json:"per_page" adapter:"query,default=50"`
+	OrderBy        string `json:"order_by" adapter:"query,default=name"`
+	OrderDir       string `json:"order_dir" adapter:"query,default=asc"`
 }
 
 // GearItem represents a gear item in responses.
@@ -116,12 +116,31 @@ type MonthlyUsageInput struct {
 	IncludeRetired bool  `json:"include_retired" adapter:"query"`
 }
 
+// SaveGearInput contains parameters for saving gear from Strava.
+type SaveGearInput struct {
+	ID          string  `json:"id" adapter:"body"`
+	AthleteID   int64   `json:"athlete_id" adapter:"body"`
+	Name        string  `json:"name" adapter:"body"`
+	Primary     bool    `json:"primary" adapter:"body"`
+	Retired     bool    `json:"retired" adapter:"body"`
+	Distance    float64 `json:"distance" adapter:"body"`
+	BrandName   string  `json:"brand_name" adapter:"body"`
+	ModelName   string  `json:"model_name" adapter:"body"`
+	Description string  `json:"description" adapter:"body"`
+}
+
+// SaveGearOutput contains the result of saving gear.
+type SaveGearOutput struct {
+	Message string `json:"message"`
+}
+
 // ============================================================================
 // Service Methods
 // ============================================================================
 
 // List returns a paginated list of gear for an athlete.
-//adapter:wasm getGearList category=Gear
+//
+//adapter:wasm getGear category=Gear
 //adapter:http GET /api/v1/gear
 func (s *GearService) List(ctx context.Context, in ListGearInput) (*ListGearOutput, error) {
 	return s.listCommon(ctx, in, s.repo.ListPaginated)
@@ -177,7 +196,8 @@ func (s *GearService) listCommon(ctx context.Context, in ListGearInput, fetcher 
 }
 
 // GetByID retrieves a single gear item by ID.
-//adapter:wasm getGearById category=Gear
+//
+//adapter:wasm getGearDetail category=Gear
 //adapter:http GET /api/v1/gear/{id}
 func (s *GearService) GetByID(ctx context.Context, in GetGearInput) (*GearItem, error) {
 	if in.GearID == "" {
@@ -319,14 +339,45 @@ func (s *GearService) DeleteCustom(ctx context.Context, in DeleteCustomGearInput
 }
 
 // MonthlyUsage returns monthly usage statistics for gear.
-//adapter:wasm getGearMonthlyStats category=Gear
+//
+//adapter:wasm getGearMonthlyUsage category=Gear
 //adapter:http GET /api/v1/gear/stats/monthly
 func (s *GearService) MonthlyUsage(ctx context.Context, in MonthlyUsageInput) ([]storage.GearMonthlyUsage, error) {
 	stats, err := s.repo.GetMonthlyUsage(ctx, in.AthleteID, in.IncludeRetired)
 	if err != nil {
 		return nil, Wrapf(ErrInternal, "failed to fetch gear stats: %v", err)
 	}
+	// Ensure we return an empty slice instead of nil (nil marshals to null in JSON)
+	if stats == nil {
+		return []storage.GearMonthlyUsage{}, nil
+	}
 	return stats, nil
+}
+
+// SaveGear stores gear from Strava in the database.
+//
+//adapter:wasm saveGear category=Gear-Write
+func (s *GearService) SaveGear(ctx context.Context, in SaveGearInput) (*SaveGearOutput, error) {
+	g := &storage.Gear{
+		ID:          in.ID,
+		AthleteID:   in.AthleteID,
+		Name:        in.Name,
+		Primary:     in.Primary,
+		Retired:     in.Retired,
+		Distance:    in.Distance,
+		BrandName:   in.BrandName,
+		ModelName:   in.ModelName,
+		Description: in.Description,
+		Source:      "strava",
+	}
+
+	if err := s.repo.Upsert(ctx, g); err != nil {
+		return nil, Wrapf(ErrInternal, "saving gear: %v", err)
+	}
+
+	return &SaveGearOutput{
+		Message: fmt.Sprintf("Gear %s saved", in.ID),
+	}, nil
 }
 
 // ============================================================================

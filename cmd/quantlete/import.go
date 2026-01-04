@@ -81,7 +81,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	defer func() { _ = db.Close() }()
 
 	// Run migrations
-	if err := db.Migrate(); err != nil {
+	if err = db.Migrate(); err != nil {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
@@ -101,7 +101,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	stravaClient := strava.NewClient(&cfg.Strava)
 
 	// Restore rate limit state from database
-	if err := restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
+	if err = restoreRateLimitState(context.Background(), stravaClient, appStateRepo); err != nil {
 		slog.Warn("failed to restore rate limit state", "error", err)
 	}
 
@@ -111,7 +111,7 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	})
 
 	// Restore authentication from stored tokens if available
-	if err := restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
+	if err = restoreAuth(context.Background(), stravaClient, tokenRepo, athleteRepo); err != nil {
 		slog.Warn("failed to restore auth from database", "error", err)
 	}
 
@@ -127,8 +127,26 @@ func runImport(fullSync, resume, skipStreams, skipSegments, skipBestEfforts, ski
 	// Create sync history repository
 	syncHistoryRepo := storage.NewSyncHistoryRepository(db, appStateRepo)
 
+	// Create adapters for platform-agnostic importer
+	stravaAdapter := importer.NewServerStravaAdapter(stravaClient)
+	storageAdapter := importer.NewServerStorageAdapter(
+		athleteRepo,
+		activityRepo,
+		streamRepo,
+		gearRepo,
+		segmentRepo,
+		bestEffortsRepo,
+		photoRepo,
+		maintenanceRepo,
+		syncHistoryRepo,
+		appStateRepo,
+	)
+
 	// Create importer
-	imp := importer.New(stravaClient, activityRepo, athleteRepo, tokenRepo, gearRepo, streamRepo, segmentRepo, bestEffortsRepo, maintenanceRepo, photoRepo, appStateRepo, syncHistoryRepo)
+	imp, err := importer.New(stravaAdapter, storageAdapter)
+	if err != nil {
+		return fmt.Errorf("creating importer: %w", err)
+	}
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())

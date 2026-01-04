@@ -60,7 +60,13 @@ export interface SegmentsFilters {
   page?: number
   per_page?: number
   // Sorting
-  order_by?: 'name' | 'distance' | 'maximum_grade' | 'times_completed' | 'last_effort_date' | 'best_elapsed_time'
+  order_by?:
+    | 'name'
+    | 'distance'
+    | 'maximum_grade'
+    | 'times_completed'
+    | 'last_effort_date'
+    | 'best_elapsed_time'
   order_dir?: 'asc' | 'desc'
 }
 
@@ -92,9 +98,4 @@ export interface SegmentEffortsResponse {
   total_pages: number
 }
 
-export {
-  useSegments,
-  useSegmentCountries,
-  useSegmentDetail,
-  useSegmentEfforts,
-} from '@/lib/data'
+export { useSegments, useSegmentCountries, useSegmentDetail, useSegmentEfforts } from '@/lib/data'

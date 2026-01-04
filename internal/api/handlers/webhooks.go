@@ -9,6 +9,7 @@ import (
 
 	"github.com/melonamin/quantlete/internal/config"
 	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -46,15 +47,15 @@ func (h *StravaWebhookHandler) Validate(w http.ResponseWriter, r *http.Request) 
 	challenge := r.URL.Query().Get("hub.challenge")
 
 	if mode != "subscribe" || challenge == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid validation request"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid validation request"))
 		return
 	}
 	if h.cfg.Strava.WebhookVerifyToken == "" {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "webhook verify token not configured"})
+		shared.WriteJSONResponse(w, http.StatusServiceUnavailable, shared.ErrorMessage("webhook verify token not configured"))
 		return
 	}
 	if token != h.cfg.Strava.WebhookVerifyToken {
-		writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "invalid verify token"})
+		shared.WriteJSONResponse(w, http.StatusForbidden, shared.ErrorMessage("invalid verify token"))
 		return
 	}
 
@@ -79,14 +80,14 @@ type StravaWebhookEvent struct {
 func (h *StravaWebhookHandler) Receive(w http.ResponseWriter, r *http.Request) {
 	var e StravaWebhookEvent
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
 	// Validate subscription ID if configured (recommended for production)
 	if h.cfg.Strava.WebhookSubscriptionID != 0 && e.SubscriptionID != h.cfg.Strava.WebhookSubscriptionID {
 		slog.Warn("webhook: subscription ID mismatch", "expected", h.cfg.Strava.WebhookSubscriptionID, "got", e.SubscriptionID)
-		writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "invalid subscription"})
+		shared.WriteJSONResponse(w, http.StatusForbidden, shared.ErrorMessage("invalid subscription"))
 		return
 	}
 

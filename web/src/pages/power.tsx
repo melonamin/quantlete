@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { usePowerStats, usePowerStatsFiltered, usePowerZones } from '@/lib/api'
+import {
+  usePowerStats,
+  usePowerStatsFiltered,
+  usePowerZones,
+  type PeakPowerHistoryPoint,
+} from '@/lib/api'
 import { BarChart, LineChart, PowerZonesChart } from '@/components/charts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,7 +45,7 @@ export function PowerPage() {
   for (const b of data?.best ?? []) bestByDuration.set(b.duration_s, b.watts)
 
   const chartData =
-    data?.durations_s?.map((d) => ({
+    data?.durations_s?.map((d: number) => ({
       label: formatDurationLabel(d),
       value: Math.round(bestByDuration.get(d) ?? 0),
     })) ?? []
@@ -51,7 +56,7 @@ export function PowerPage() {
   const bestCurve = (resp: typeof data) => {
     const best = new Map<number, number>()
     for (const b of resp?.best ?? []) best.set(b.duration_s, b.watts)
-    return (resp?.durations_s ?? []).map((d) => ({
+    return (resp?.durations_s ?? []).map((d: number) => ({
       x: formatDurationLabel(d),
       y: Math.round(best.get(d) ?? 0),
     }))
@@ -90,7 +95,7 @@ export function PowerPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(data?.durations_s ?? []).map((d) => (
+                {(data?.durations_s ?? []).map((d: number) => (
                   <SelectItem key={d} value={String(d)}>
                     {formatDurationLabel(d)}
                   </SelectItem>
@@ -103,7 +108,7 @@ export function PowerPage() {
               series={[
                 {
                   name: 'Best',
-                  data: history.map((p) => ({ x: p.date, y: p.watts })),
+                  data: history.map((p: PeakPowerHistoryPoint) => ({ x: p.date, y: p.watts })),
                 },
               ]}
               height={260}

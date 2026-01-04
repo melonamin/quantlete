@@ -1,6 +1,6 @@
-// Code generation script for go-storage TypeScript declarations.
+// Code generation script for go-storage TypeScript declarations and wrappers.
 // Parses cmd/wasm/*.go files and generates TypeScript type declarations
-// for the goStorage global object.
+// for the goStorage global object, plus wrapper implementations.
 package main
 
 import (
@@ -16,18 +16,21 @@ import (
 
 // WasmFunc represents a WASM function exposed to JavaScript
 type WasmFunc struct {
-	JSName     string   // JavaScript name (e.g., "getActivities")
-	GoName     string   // Go function name (e.g., "getActivities")
-	Comment    string   // Documentation comment
-	Params     []Param  // Parameters from "Called from JS:" comment
-	ReturnType string   // TypeScript return type
-	Category   string   // Category from comment section
+	JSName       string  // JavaScript name (e.g., "getActivities")
+	GoName       string  // Go function name (e.g., "getActivities")
+	Comment      string  // Documentation comment
+	Params       []Param // Parameters from "Called from JS:" comment
+	ReturnType   string  // TypeScript return type
+	Category     string  // Category from comment section
+	ResponseType string  // How the response should be handled (data, value, direct, void)
+	TSReturnType string  // TypeScript return type for the wrapper function
 }
 
 // Param represents a function parameter
 type Param struct {
-	Name string
-	Type string // TypeScript type
+	Name     string
+	Type     string // TypeScript type
+	Optional bool   // Whether the parameter is optional
 }
 
 func main() {
@@ -39,6 +42,7 @@ func main() {
 
 	wasmDir := filepath.Join(root, "cmd", "wasm")
 	tsOutput := filepath.Join(root, "web", "src", "lib", "wasm", "go-storage.gen.ts")
+	wrappersOutput := filepath.Join(root, "web", "src", "lib", "wasm", "go-storage-wrappers.gen.ts")
 
 	// Parse main.go for function registrations
 	funcs, err := parseWasmFunctions(wasmDir)
@@ -47,13 +51,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Generate TypeScript
+	// Generate TypeScript interface
 	if err := generateTypeScript(funcs, tsOutput); err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating TypeScript: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Generated: %s (%d functions)\n", tsOutput, len(funcs))
+
+	// Generate TypeScript wrappers
+	if err := generateWrappers(funcs, wrappersOutput); err != nil {
+		fmt.Fprintf(os.Stderr, "Error generating TypeScript wrappers: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Generated: %s (%d wrappers)\n", wrappersOutput, len(funcs))
 }
 
 func findProjectRoot() (string, error) {
@@ -81,15 +93,33 @@ var (
 	calledFromRe = regexp.MustCompile(`// Called from JS: goStorage\.(\w+)\((.*?)\)`)
 	// Matches: func funcName(this js.Value, args []js.Value) interface{}
 	funcDefRe = regexp.MustCompile(`func (\w+)\(this js\.Value, args \[\]js\.Value\)`)
+	// Matches: var funcName = wrapWasm*("jsName", ...) or wrapWasm*(...)
+	wrapperDefRe = regexp.MustCompile(`var (\w+) = wrap\w+\(`)
 	// Matches category comments: // ============ Category ============
 	categoryRe = regexp.MustCompile(`^// =+\s*([^=]+?)\s*=+\s*$`)
+	// Matches: //wasm:export jsName
+	wasmExportRe = regexp.MustCompile(`//wasm:export\s+(\w+)`)
+	// Matches: //wasm:category CategoryName
+	wasmCategoryRe = regexp.MustCompile(`//wasm:category\s+(.+)`)
+	// Matches: json.Unmarshal([]byte(args[0].String()), &input)
+	jsonInputRe = regexp.MustCompile(`json\.Unmarshal\(\[\]byte\(args\[0\]\.String\(\)\)`)
+	// Matches: args[0].Int() or args[0].Float() for direct numeric params
+	directNumericRe = regexp.MustCompile(`args\[(\d+)\]\.(Int|Float)\(\)`)
+	// Matches: wc.ArgJSON(0, &input) - new wrapper style JSON input
+	wcArgJSONRe = regexp.MustCompile(`wc\.ArgJSON\((\d+),`)
+	// Matches: wc.ArgInt(0) or wc.ArgString(0) - new wrapper style direct input
+	wcArgDirectRe = regexp.MustCompile(`wc\.Arg(Int|String|Float)\((\d+)\)`)
 )
 
 func parseWasmFunctions(wasmDir string) ([]WasmFunc, error) {
-	// First, parse main.go for registrations
-	registrations, err := parseRegistrations(filepath.Join(wasmDir, "main.go"))
+	// First, try registration.gen.go, then fall back to main.go
+	registrations, err := parseRegistrations(filepath.Join(wasmDir, "registration.gen.go"))
 	if err != nil {
-		return nil, fmt.Errorf("parsing registrations: %w", err)
+		// Try main.go as fallback
+		registrations, err = parseRegistrations(filepath.Join(wasmDir, "main.go"))
+		if err != nil {
+			return nil, fmt.Errorf("parsing registrations: %w", err)
+		}
 	}
 
 	// Then parse all .go files for function details
@@ -162,25 +192,39 @@ func parseRegistrations(mainPath string) (map[string]string, error) {
 }
 
 func parseFunctionDetails(filePath string) (map[string]WasmFunc, error) {
-	file, err := os.Open(filePath) //nolint:gosec
+	// Read entire file to allow look-ahead for function body analysis
+	content, err := os.ReadFile(filePath) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
 
+	lines := strings.Split(string(content), "\n")
 	result := make(map[string]WasmFunc)
-	scanner := bufio.NewScanner(file)
 
 	var currentCategory string
 	var commentLines []string
+	var wasmExportName string
+	var wasmCategory string
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
 
-		// Track category headers
+		// Track category headers (old style: // ====== Category ======)
 		if matches := categoryRe.FindStringSubmatch(line); matches != nil {
 			currentCategory = strings.TrimSpace(matches[1])
 			commentLines = nil
+			continue
+		}
+
+		// Track //wasm:category directive
+		if matches := wasmCategoryRe.FindStringSubmatch(line); matches != nil {
+			wasmCategory = strings.TrimSpace(matches[1])
+			continue
+		}
+
+		// Track //wasm:export directive
+		if matches := wasmExportRe.FindStringSubmatch(line); matches != nil {
+			wasmExportName = matches[1]
 			continue
 		}
 
@@ -190,10 +234,15 @@ func parseFunctionDetails(filePath string) (map[string]WasmFunc, error) {
 			continue
 		}
 
-		// Check for function definition
+		// Check for function definition (old style or wrapper style)
+		var goName string
 		if matches := funcDefRe.FindStringSubmatch(line); matches != nil {
-			goName := matches[1]
+			goName = matches[1]
+		} else if matches := wrapperDefRe.FindStringSubmatch(line); matches != nil {
+			goName = matches[1]
+		}
 
+		if goName != "" {
 			// Parse the collected comments
 			var comment string
 			var params []Param
@@ -204,34 +253,161 @@ func parseFunctionDetails(filePath string) (map[string]WasmFunc, error) {
 				cl = strings.TrimPrefix(cl, "//")
 				cl = strings.TrimSpace(cl)
 
-				// Check for "Called from JS:" pattern
+				// Check for "Called from JS:" pattern (old style)
 				if callMatch := calledFromRe.FindStringSubmatch("// " + cl); callMatch != nil {
 					params = parseParamsFromSignature(callMatch[2])
-				} else if !strings.HasPrefix(cl, "=") && comment == "" {
-					// First non-category comment is the description
+				} else if !strings.HasPrefix(cl, "=") && !strings.HasPrefix(cl, "wasm:") && comment == "" {
+					// First non-category, non-directive comment is the description
 					comment = cl
 				}
 			}
 
+			// If no params from "Called from JS:", analyze function body
+			if len(params) == 0 {
+				params = analyzeFunctionBody(lines, i)
+			}
+
 			// Infer return type from function name
 			returnType = inferReturnType(goName)
+
+			// Use wasmCategory if set, otherwise use currentCategory
+			category := currentCategory
+			if wasmCategory != "" {
+				category = wasmCategory
+			}
 
 			result[goName] = WasmFunc{
 				GoName:     goName,
 				Comment:    comment,
 				Params:     params,
 				ReturnType: returnType,
-				Category:   currentCategory,
+				Category:   category,
+			}
+
+			// Also store by wasmExportName if different from goName
+			// This helps when registration uses jsName -> genGoName mapping
+			if wasmExportName != "" && wasmExportName != goName {
+				// Store reference so we can look up by either name
+				result[wasmExportName+"_export"] = result[goName]
 			}
 
 			commentLines = nil
-		} else if !strings.HasPrefix(strings.TrimSpace(line), "//") && strings.TrimSpace(line) != "" {
-			// Non-comment, non-function line - reset comments
+			wasmExportName = ""
+			wasmCategory = ""
+		} else if !strings.HasPrefix(strings.TrimSpace(line), "//") && strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "var ") {
+			// Non-comment, non-function, non-var line - reset comments
 			commentLines = nil
 		}
 	}
 
-	return result, scanner.Err()
+	return result, nil
+}
+
+// analyzeFunctionBody looks at the function body to detect input patterns
+func analyzeFunctionBody(lines []string, funcLineIdx int) []Param {
+	// Look at the next ~30 lines to find the function body patterns
+	braceCount := 0
+	started := false
+
+	for i := funcLineIdx; i < len(lines) && i < funcLineIdx+50; i++ {
+		line := lines[i]
+
+		// Track braces to stay within function
+		braceCount += strings.Count(line, "{") - strings.Count(line, "}")
+		if strings.Contains(line, "{") {
+			started = true
+		}
+		if started && braceCount <= 0 {
+			break
+		}
+
+		// Check for JSON input pattern: json.Unmarshal([]byte(args[0].String())
+		if jsonInputRe.MatchString(line) {
+			// This function accepts a JSON string input
+			return []Param{{
+				Name:     "dataJSON",
+				Type:     "string",
+				Optional: true, // Most functions check for empty string
+			}}
+		}
+
+		// Check for wrapper-style JSON input: wc.ArgJSON(0, &input)
+		if wcArgJSONRe.MatchString(line) {
+			// This function accepts a JSON string input (wrapper style)
+			return []Param{{
+				Name:     "dataJSON",
+				Type:     "string",
+				Optional: true, // Usually checked with wc.HasArg(0)
+			}}
+		}
+
+		// Check for direct numeric args like args[0].Int()
+		if matches := directNumericRe.FindAllStringSubmatch(line, -1); len(matches) > 0 {
+			// Found direct numeric parameter access
+			var params []Param
+			for _, match := range matches {
+				idx := match[1]
+				paramType := "number"
+				paramName := fmt.Sprintf("arg%s", idx)
+
+				// Try to infer better name from context
+				if strings.Contains(line, "limit") {
+					paramName = "limit"
+				} else if strings.Contains(line, "year") {
+					paramName = "year"
+				} else if strings.Contains(line, "month") {
+					paramName = "month"
+				} else if strings.Contains(line, "id") || strings.Contains(line, "Id") || strings.Contains(line, "ID") {
+					paramName = "id"
+				}
+
+				params = append(params, Param{
+					Name:     paramName,
+					Type:     paramType,
+					Optional: true, // Usually checked with len(args) > 0
+				})
+			}
+			if len(params) > 0 {
+				return params
+			}
+		}
+
+		// Check for wrapper-style direct args: wc.ArgInt(0), wc.ArgString(0), wc.ArgFloat(0)
+		if matches := wcArgDirectRe.FindAllStringSubmatch(line, -1); len(matches) > 0 {
+			var params []Param
+			for _, match := range matches {
+				argType := match[1] // Int, String, Float
+				idx := match[2]
+				paramType := "number"
+				if argType == "String" {
+					paramType = "string"
+				}
+				paramName := fmt.Sprintf("arg%s", idx)
+
+				// Try to infer better name from context
+				if strings.Contains(line, "limit") {
+					paramName = "limit"
+				} else if strings.Contains(line, "year") {
+					paramName = "year"
+				} else if strings.Contains(line, "month") {
+					paramName = "month"
+				} else if strings.Contains(line, "id") || strings.Contains(line, "Id") || strings.Contains(line, "ID") {
+					paramName = "id"
+				}
+
+				params = append(params, Param{
+					Name:     paramName,
+					Type:     paramType,
+					Optional: true,
+				})
+			}
+			if len(params) > 0 {
+				return params
+			}
+		}
+	}
+
+	return nil
 }
 
 func parseParamsFromSignature(paramStr string) []Param {
@@ -258,15 +434,10 @@ func parseParamsFromSignature(paramStr string) []Param {
 		// Infer type from parameter name (pass original with ? for type lookup)
 		tsType := inferParamType(part)
 
-		// Add optional marker to name if present
-		paramName := name
-		if optional {
-			paramName += "?"
-		}
-
 		params = append(params, Param{
-			Name: paramName,
-			Type: tsType,
+			Name:     name,
+			Type:     tsType,
+			Optional: optional,
 		})
 	}
 
@@ -383,7 +554,11 @@ export interface GoStorageInterface {
 				if i > 0 {
 					paramStr += ", "
 				}
-				paramStr += fmt.Sprintf("%s: %s", p.Name, p.Type)
+				optMarker := ""
+				if p.Optional {
+					optMarker = "?"
+				}
+				paramStr += fmt.Sprintf("%s%s: %s", p.Name, optMarker, p.Type)
 			}
 
 			buf.WriteString(fmt.Sprintf("  %s(%s): %s\n", f.JSName, paramStr, f.ReturnType))
@@ -399,6 +574,133 @@ export interface GoStorageInterface {
 declare const goStorage: GoStorageInterface
 
 export { goStorage }
+`)
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec
+		return fmt.Errorf("creating directory: %w", err)
+	}
+
+	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec
+}
+
+// generateWrappers creates TypeScript wrapper functions
+func generateWrappers(funcs []WasmFunc, output string) error {
+	var buf bytes.Buffer
+
+	buf.WriteString(`// Code generated by scripts/generate-go-storage. DO NOT EDIT.
+//
+// This file contains TypeScript wrapper utilities and generated functions
+// for the Go WASM storage layer. These handle JSON serialization and error handling.
+//
+// To regenerate: just generate-go-storage
+
+let initialized = false
+
+export interface GoStorageResult<T = unknown> {
+  ok: boolean
+  error?: string
+  message?: string
+  data?: T
+}
+
+/**
+ * Set initialization state (called by go-storage.ts after WASM init)
+ */
+export function setInitialized(value: boolean): void {
+  initialized = value
+}
+
+/**
+ * Check if storage is initialized
+ */
+export function isStorageInitialized(): boolean {
+  return initialized
+}
+
+/**
+ * Parse Go WASM result - all Go functions return JSON strings.
+ */
+export function parseGoResult<T>(result: string, operation?: string): GoStorageResult<T> & T {
+  try {
+    return JSON.parse(result)
+  } catch {
+    const ctx = operation ? ` + "`" + `(${operation})` + "`" + ` : ''
+    return {
+      ok: false,
+      error: ` + "`" + `Failed to parse Go result${ctx}: ${result}` + "`" + `,
+    } as GoStorageResult<T> & T
+  }
+}
+
+/**
+ * Helper for calling Go storage functions that return data directly.
+ * Handles initialization check, parsing, and error handling.
+ */
+export function callGoStorage<T>(
+  fn: () => string,
+  operation: string
+): T {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<T>(fn(), operation)
+  if (!result.ok) {
+    throw new Error(result.error || ` + "`" + `Failed to ${operation}` + "`" + `)
+  }
+  return result as T
+}
+
+/**
+ * Helper for calling Go storage functions that return arrays in .data.
+ */
+export function callGoStorageArray<T>(
+  fn: () => string,
+  operation: string
+): T[] {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<T[]>(fn(), operation)
+  if (!result.ok) {
+    throw new Error(result.error || ` + "`" + `Failed to ${operation}` + "`" + `)
+  }
+  return result.data ?? []
+}
+
+/**
+ * Helper for calling Go storage functions that return a single value.
+ */
+export function callGoStorageValue<T extends number | string | boolean>(
+  fn: () => string,
+  operation: string
+): T {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<{ value: T }>(fn(), operation)
+  if (!result.ok) {
+    throw new Error(result.error || ` + "`" + `Failed to ${operation}` + "`" + `)
+  }
+  return (result as { value: T }).value
+}
+
+/**
+ * Helper for calling Go storage functions that don't return data.
+ */
+export function callGoStorageVoid(
+  fn: () => string,
+  operation: string
+): void {
+  if (!initialized) {
+    throw new Error('Go storage not initialized')
+  }
+  const result = parseGoResult<void>(fn(), operation)
+  if (!result.ok) {
+    throw new Error(result.error || ` + "`" + `Failed to ${operation}` + "`" + `)
+  }
+}
+
 `)
 
 	// Ensure directory exists

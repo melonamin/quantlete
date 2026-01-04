@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/melonamin/quantlete/internal/services"
@@ -30,5 +32,14 @@ func errorToStatus(err error) int {
 		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
+	}
+}
+
+// writeJSON writes a raw JSON response (used by webhooks and import handlers).
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("failed to encode JSON response", "error", err)
 	}
 }

@@ -116,6 +116,10 @@ func generateTS(migrations []Migration, output string) error {
 /**
  * Database migrations for browser WASM mode.
  * These are embedded at build time from schema/migrations/*.sql
+ *
+ * @deprecated Migrations are now handled exclusively by Go WASM (storage.RunMigrations).
+ * This file is generated for reference only and is no longer used at runtime.
+ * The Go WASM layer uses the _migrations table for tracking, not schema_version.
  */
 
 export interface Migration {

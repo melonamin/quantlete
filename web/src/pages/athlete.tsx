@@ -8,11 +8,7 @@ import {
   useUpsertHrZoneDefinition,
   useWeightHistory,
 } from '@/lib/data/hooks'
-import {
-  FtpEditor,
-  HrZonesEditor,
-  WeightEditor,
-} from '@/components/settings'
+import { FtpEditor, HrZonesEditor, WeightEditor } from '@/components/settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { User, MapPin } from 'lucide-react'
 

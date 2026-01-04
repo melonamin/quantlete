@@ -17,10 +17,9 @@ import (
 
 // normalizedPowerFn calculates normalized power from power data
 // Called from JS: goStorage.normalizedPower(watts)
+//
 //wasm:export normalizedPower
-func normalizedPowerFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("normalizedPower")
-
+var normalizedPowerFn = wrapWasmRaw("normalizedPower", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 1 {
 		return errorJSON(fmt.Errorf("missing watts data"))
 	}
@@ -35,14 +34,13 @@ func normalizedPowerFn(this js.Value, args []js.Value) interface{} {
 		"ok":    true,
 		"value": result,
 	})
-}
+})
 
 // rollingMaxAverageFn finds the maximum rolling average over a given window
 // Called from JS: goStorage.rollingMaxAverage(values, windowSeconds)
+//
 //wasm:export rollingMaxAverage
-func rollingMaxAverageFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("rollingMaxAverage")
-
+var rollingMaxAverageFn = wrapWasmRaw("rollingMaxAverage", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 2 {
 		return errorJSON(fmt.Errorf("missing values or window"))
 	}
@@ -58,14 +56,13 @@ func rollingMaxAverageFn(this js.Value, args []js.Value) interface{} {
 		"ok":    true,
 		"value": result,
 	})
-}
+})
 
 // intensityFactorFn calculates the intensity factor: IF = NP / FTP
 // Called from JS: goStorage.intensityFactor(np, ftp)
+//
 //wasm:export intensityFactor
-func intensityFactorFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("intensityFactor")
-
+var intensityFactorFn = wrapWasmRaw("intensityFactor", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 2 {
 		return errorJSON(fmt.Errorf("missing np or ftp"))
 	}
@@ -77,14 +74,13 @@ func intensityFactorFn(this js.Value, args []js.Value) interface{} {
 		"ok":    true,
 		"value": result,
 	})
-}
+})
 
 // trainingStressScoreFn calculates TSS
 // Called from JS: goStorage.trainingStressScore(durationSeconds, np, ftp)
+//
 //wasm:export trainingStressScore
-func trainingStressScoreFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("trainingStressScore")
-
+var trainingStressScoreFn = wrapWasmRaw("trainingStressScore", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 3 {
 		return errorJSON(fmt.Errorf("missing duration, np, or ftp"))
 	}
@@ -97,7 +93,7 @@ func trainingStressScoreFn(this js.Value, args []js.Value) interface{} {
 		"ok":    true,
 		"value": result,
 	})
-}
+})
 
 // ============================================================================
 // Algorithm Functions - Eddington
@@ -107,10 +103,9 @@ func trainingStressScoreFn(this js.Value, args []js.Value) interface{} {
 
 // eddingtonNumberFn calculates the Eddington number from daily distances
 // Called from JS: goStorage.eddingtonNumber(distances)
+//
 //wasm:export eddingtonNumber
-func eddingtonNumberFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("eddingtonNumber")
-
+var eddingtonNumberFn = wrapWasmRaw("eddingtonNumber", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 1 {
 		return errorJSON(fmt.Errorf("missing distances data"))
 	}
@@ -125,14 +120,13 @@ func eddingtonNumberFn(this js.Value, args []js.Value) interface{} {
 		"ok":    true,
 		"value": result,
 	})
-}
+})
 
 // eddingtonNextStepsFn calculates days needed for next Eddington numbers
 // Called from JS: goStorage.eddingtonNextSteps(distances, currentE, stepsToCalculate)
+//
 //wasm:export eddingtonNextSteps
-func eddingtonNextStepsFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("eddingtonNextSteps")
-
+var eddingtonNextStepsFn = wrapWasmRaw("eddingtonNextSteps", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 3 {
 		return errorJSON(fmt.Errorf("missing distances, currentE, or stepsToCalculate"))
 	}
@@ -159,14 +153,13 @@ func eddingtonNextStepsFn(this js.Value, args []js.Value) interface{} {
 		"ok":   true,
 		"data": steps,
 	})
-}
+})
 
 // eddingtonHistoryFn calculates progressive Eddington numbers over time
 // Called from JS: goStorage.eddingtonHistory(distances)
+//
 //wasm:export eddingtonHistory
-func eddingtonHistoryFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("eddingtonHistory")
-
+var eddingtonHistoryFn = wrapWasmRaw("eddingtonHistory", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 1 {
 		return errorJSON(fmt.Errorf("missing distances data"))
 	}
@@ -181,7 +174,7 @@ func eddingtonHistoryFn(this js.Value, args []js.Value) interface{} {
 		"ok":   true,
 		"data": result,
 	})
-}
+})
 
 // ============================================================================
 // Algorithm Functions - Training Load
@@ -191,10 +184,9 @@ func eddingtonHistoryFn(this js.Value, args []js.Value) interface{} {
 
 // calculateTrainingLoadFn calculates training load metrics from daily TSS
 // Called from JS: goStorage.calculateTrainingLoad(dailyTss, ctlTau, atlTau)
+//
 //wasm:export calculateTrainingLoad
-func calculateTrainingLoadFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("calculateTrainingLoad")
-
+var calculateTrainingLoadFn = wrapWasmRaw("calculateTrainingLoad", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 3 {
 		return errorJSON(fmt.Errorf("missing dailyTss, ctlTau, or atlTau"))
 	}
@@ -222,14 +214,13 @@ func calculateTrainingLoadFn(this js.Value, args []js.Value) interface{} {
 		"ok":   true,
 		"data": points,
 	})
-}
+})
 
 // calculateTrainingLoadWithInitialFn calculates training load from existing CTL/ATL
 // Called from JS: goStorage.calculateTrainingLoadWithInitial(dailyTss, initialCtl, initialAtl, ctlTau, atlTau)
+//
 //wasm:export calculateTrainingLoadWithInitial
-func calculateTrainingLoadWithInitialFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("calculateTrainingLoadWithInitial")
-
+var calculateTrainingLoadWithInitialFn = wrapWasmRaw("calculateTrainingLoadWithInitial", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 5 {
 		return errorJSON(fmt.Errorf("missing dailyTss, initialCtl, initialAtl, ctlTau, or atlTau"))
 	}
@@ -259,14 +250,13 @@ func calculateTrainingLoadWithInitialFn(this js.Value, args []js.Value) interfac
 		"ok":   true,
 		"data": points,
 	})
-}
+})
 
 // predictAfterWorkoutFn calculates predicted TSB after a planned workout
 // Called from JS: goStorage.predictAfterWorkout(currentCtl, currentAtl, plannedTss, ctlTau, atlTau)
+//
 //wasm:export predictAfterWorkout
-func predictAfterWorkoutFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("predictAfterWorkout")
-
+var predictAfterWorkoutFn = wrapWasmRaw("predictAfterWorkout", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 5 {
 		return errorJSON(fmt.Errorf("missing currentCtl, currentAtl, plannedTss, ctlTau, or atlTau"))
 	}
@@ -284,14 +274,13 @@ func predictAfterWorkoutFn(this js.Value, args []js.Value) interface{} {
 		"atl": result.ATL,
 		"tsb": result.TSB,
 	})
-}
+})
 
 // tssForTargetTsbFn calculates TSS needed to reach a target TSB
 // Called from JS: goStorage.tssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau)
+//
 //wasm:export tssForTargetTsb
-func tssForTargetTsbFn(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("tssForTargetTsb")
-
+var tssForTargetTsbFn = wrapWasmRaw("tssForTargetTsb", func(this js.Value, args []js.Value) interface{} {
 	if len(args) < 5 {
 		return errorJSON(fmt.Errorf("missing currentCtl, currentAtl, targetTsb, ctlTau, or atlTau"))
 	}
@@ -307,4 +296,4 @@ func tssForTargetTsbFn(this js.Value, args []js.Value) interface{} {
 		"ok":    true,
 		"value": result,
 	})
-}
+})

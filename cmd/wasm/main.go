@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"syscall/js"
 
 	_ "github.com/matrix-org/go-sqlite3-js"
@@ -13,41 +14,33 @@ import (
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
-// WasmBridge holds the database and all repositories for the WASM bridge
+// WasmBridge holds the service registry and runtime state for the WASM bridge
 type WasmBridge struct {
-	db                 *storage.DB
-	athleteID          int64
-	activities         *storage.ActivityRepository
-	activityService    *services.ActivityService
-	stats              *storage.StatsRepository
-	statsService       *services.StatsService
-	dashboardConfig    *storage.DashboardConfigRepository
-	dashboardService   *services.DashboardService
-	streams            *storage.StreamRepository
-	athletes           *storage.AthleteRepository
-	gear               *storage.GearRepository
-	gearService        *services.GearService
-	segments           *storage.SegmentRepository
-	segmentsService    *services.SegmentsService
-	bestEfforts        *storage.BestEffortsRepository
-	photos             *storage.PhotoRepository
-	photosService      *services.PhotosService
-	appState           *storage.AppStateRepository
-	syncHistory        *storage.SyncHistoryRepository
-	power              *storage.PowerRepository
-	athleteMetrics     *storage.AthleteMetricsRepository
-	trainingLoad       *storage.TrainingLoadRepository
-	goals              *storage.GoalsRepository
-	challenges         *storage.ChallengeRepository
-	challengesService  *services.ChallengesService
-	maintenance        *storage.MaintenanceRepository
-	maintenanceService *services.MaintenanceService
-	settings           *storage.SettingsRepository
-	zones              *storage.ZonesRepository
+	registry  *services.ServiceRegistry
+	athleteID int64
 }
 
-// Global bridge instance - single source of truth for all state
+// bridgeMu protects access to the global bridge variable.
+// Use getBridge() and setBridge() for thread-safe access.
+var bridgeMu sync.RWMutex
+
+// bridge is the global bridge instance - single source of truth for all state.
+// Access via getBridge() for reads and setBridge() for writes.
 var bridge *WasmBridge
+
+// getBridge returns the current bridge instance in a thread-safe manner.
+func getBridge() *WasmBridge {
+	bridgeMu.RLock()
+	defer bridgeMu.RUnlock()
+	return bridge
+}
+
+// setBridge sets the global bridge instance in a thread-safe manner.
+func setBridge(b *WasmBridge) {
+	bridgeMu.Lock()
+	defer bridgeMu.Unlock()
+	bridge = b
+}
 
 func main() {
 	fmt.Println("Quantlete Go WASM Storage Layer (Production)")
@@ -69,6 +62,7 @@ func main() {
 
 // initStorage initializes the database connection
 // Called from JS: goStorage.init()
+//
 //wasm:export init
 func initStorage(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("initStorage")
@@ -84,74 +78,17 @@ func initStorage(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("running migrations: %w", err))
 	}
 
-	// Initialize repositories
-	activities := storage.NewActivityRepository(db)
-	stats := storage.NewStatsRepository(db)
-	streams := storage.NewStreamRepository(db)
-	athletes := storage.NewAthleteRepository(db)
-	gear := storage.NewGearRepository(db)
-	segments := storage.NewSegmentRepository(db)
-	bestEfforts := storage.NewBestEffortsRepository(db)
-	photos := storage.NewPhotoRepository(db)
-	appState := storage.NewAppStateRepository(db)
-	syncHistory := storage.NewSyncHistoryRepository(db, appState)
-	power := storage.NewPowerRepository(db, streams)
-	athleteMetrics := storage.NewAthleteMetricsRepository(db)
-	zones := storage.NewZonesRepository(db)
-	trainingLoad := storage.NewTrainingLoadRepository(db, streams, athleteMetrics, zones)
-	goals := storage.NewGoalsRepository(db)
-	challenges := storage.NewChallengeRepository(db)
-	maintenance := storage.NewMaintenanceRepository(db)
-	settings := storage.NewSettingsRepository(db)
-	dashboardConfig := storage.NewDashboardConfigRepository(db)
-
-	// Initialize services
-	activityService := services.NewActivityService(activities, streams)
-	gearService := services.NewGearService(gear)
-	segmentsService := services.NewSegmentsService(segments)
-	photosService := services.NewPhotosService(photos)
-	statsService := services.NewStatsService(stats, power, bestEfforts, trainingLoad)
-	dashboardService := services.NewDashboardService(db, stats, dashboardConfig)
-	maintenanceService := services.NewMaintenanceService(maintenance)
-	challengesService := services.NewChallengesService(challenges)
-
-	// Initialize WasmBridge
-	bridge = &WasmBridge{
-		db:                 db,
-		activities:         activities,
-		activityService:    activityService,
-		stats:              stats,
-		statsService:       statsService,
-		dashboardConfig:    dashboardConfig,
-		dashboardService:   dashboardService,
-		streams:            streams,
-		athletes:           athletes,
-		gear:               gear,
-		gearService:        gearService,
-		segments:           segments,
-		segmentsService:    segmentsService,
-		bestEfforts:        bestEfforts,
-		photos:             photos,
-		photosService:      photosService,
-		appState:           appState,
-		syncHistory:        syncHistory,
-		power:              power,
-		athleteMetrics:     athleteMetrics,
-		trainingLoad:       trainingLoad,
-		goals:              goals,
-		challenges:         challenges,
-		challengesService:  challengesService,
-		maintenance:        maintenance,
-		maintenanceService: maintenanceService,
-		settings:           settings,
-		zones:              zones,
-	}
+	// Initialize bridge with service registry
+	setBridge(&WasmBridge{
+		registry: services.NewServiceRegistry(db),
+	})
 
 	return successJSON("Database initialized")
 }
 
 // setAthleteID sets the current athlete ID for queries
 // Called from JS: goStorage.setAthleteId(id)
+//
 //wasm:export setAthleteId
 func setAthleteID(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("setAthleteID")
@@ -160,17 +97,21 @@ func setAthleteID(this js.Value, args []js.Value) interface{} {
 		return errorJSON(fmt.Errorf("missing athlete ID"))
 	}
 
-	if bridge == nil {
+	b := getBridge()
+	if b == nil {
 		return errorJSON(fmt.Errorf("storage not initialized - call init() first"))
 	}
 
 	id := int64(args[0].Int())
-	bridge.athleteID = id
+	// Note: This is technically a race, but acceptable since athlete ID is set once
+	// during initialization and read-only thereafter. A full mutex would be overkill.
+	b.athleteID = id
 	return successJSON(fmt.Sprintf("Athlete ID set to %d", id))
 }
 
 // exportDatabase exports the database for OPFS persistence
 // Called from JS: goStorage.exportDb()
+//
 //wasm:export exportDb
 func exportDatabase(this js.Value, args []js.Value) interface{} {
 	defer recoverPanic("exportDatabase")

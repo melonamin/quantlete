@@ -1147,7 +1147,11 @@ export function useBestEffortPRs(sportType?: string) {
   })
 }
 
-export function useBestEffortsForDistance(distanceType: string, sportType?: string, enabled = true) {
+export function useBestEffortsForDistance(
+  distanceType: string,
+  sportType?: string,
+  enabled = true
+) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({

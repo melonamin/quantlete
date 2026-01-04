@@ -263,43 +263,43 @@ func (a *WasmStravaAdapter) RateLimitInfo() importer.RateLimitInfo {
 // ============================================================================
 
 type stravaActivityJSON struct {
-	ID                   int64                    `json:"id"`
-	Name                 string                   `json:"name"`
-	SportType            string                   `json:"sport_type"`
-	Type                 string                   `json:"type"`
-	StartDate            string                   `json:"start_date"`
-	StartDateLocal       string                   `json:"start_date_local"`
-	Timezone             string                   `json:"timezone"`
-	Distance             float64                  `json:"distance"`
-	MovingTime           int                      `json:"moving_time"`
-	ElapsedTime          int                      `json:"elapsed_time"`
-	TotalElevationGain   float64                  `json:"total_elevation_gain"`
-	AverageSpeed         float64                  `json:"average_speed"`
-	MaxSpeed             float64                  `json:"max_speed"`
-	AverageHeartrate     *float64                 `json:"average_heartrate,omitempty"`
-	MaxHeartrate         *float64                 `json:"max_heartrate,omitempty"`
-	AverageWatts         *float64                 `json:"average_watts,omitempty"`
-	MaxWatts             *float64                 `json:"max_watts,omitempty"`
-	WeightedAverageWatts *float64                 `json:"weighted_average_watts,omitempty"`
-	Kilojoules           *float64                 `json:"kilojoules,omitempty"`
-	AverageCadence       *float64                 `json:"average_cadence,omitempty"`
-	Calories             *float64                 `json:"calories,omitempty"`
-	GearID               string                   `json:"gear_id,omitempty"`
-	Commute              bool                     `json:"commute"`
-	Trainer              bool                     `json:"trainer"`
-	Private              bool                     `json:"private"`
-	WorkoutType          *int                     `json:"workout_type,omitempty"`
-	LocationCity         string                   `json:"location_city,omitempty"`
-	LocationState        string                   `json:"location_state,omitempty"`
-	LocationCountry      string                   `json:"location_country,omitempty"`
-	Map                  *stravaMapJSON           `json:"map,omitempty"`
-	StartLatlng          []float64                `json:"start_latlng,omitempty"`
-	Description          string                   `json:"description,omitempty"`
-	DeviceName           string                   `json:"device_name,omitempty"`
-	KudosCount           int                      `json:"kudos_count"`
-	PhotoCount           int                      `json:"total_photo_count"`
+	ID                   int64                     `json:"id"`
+	Name                 string                    `json:"name"`
+	SportType            string                    `json:"sport_type"`
+	Type                 string                    `json:"type"`
+	StartDate            string                    `json:"start_date"`
+	StartDateLocal       string                    `json:"start_date_local"`
+	Timezone             string                    `json:"timezone"`
+	Distance             float64                   `json:"distance"`
+	MovingTime           int                       `json:"moving_time"`
+	ElapsedTime          int                       `json:"elapsed_time"`
+	TotalElevationGain   float64                   `json:"total_elevation_gain"`
+	AverageSpeed         float64                   `json:"average_speed"`
+	MaxSpeed             float64                   `json:"max_speed"`
+	AverageHeartrate     *float64                  `json:"average_heartrate,omitempty"`
+	MaxHeartrate         *float64                  `json:"max_heartrate,omitempty"`
+	AverageWatts         *float64                  `json:"average_watts,omitempty"`
+	MaxWatts             *float64                  `json:"max_watts,omitempty"`
+	WeightedAverageWatts *float64                  `json:"weighted_average_watts,omitempty"`
+	Kilojoules           *float64                  `json:"kilojoules,omitempty"`
+	AverageCadence       *float64                  `json:"average_cadence,omitempty"`
+	Calories             *float64                  `json:"calories,omitempty"`
+	GearID               string                    `json:"gear_id,omitempty"`
+	Commute              bool                      `json:"commute"`
+	Trainer              bool                      `json:"trainer"`
+	Private              bool                      `json:"private"`
+	WorkoutType          *int                      `json:"workout_type,omitempty"`
+	LocationCity         string                    `json:"location_city,omitempty"`
+	LocationState        string                    `json:"location_state,omitempty"`
+	LocationCountry      string                    `json:"location_country,omitempty"`
+	Map                  *stravaMapJSON            `json:"map,omitempty"`
+	StartLatlng          []float64                 `json:"start_latlng,omitempty"`
+	Description          string                    `json:"description,omitempty"`
+	DeviceName           string                    `json:"device_name,omitempty"`
+	KudosCount           int                       `json:"kudos_count"`
+	PhotoCount           int                       `json:"total_photo_count"`
 	SegmentEfforts       []stravaSegmentEffortJSON `json:"segment_efforts,omitempty"`
-	BestEfforts          []stravaBestEffortJSON   `json:"best_efforts,omitempty"`
+	BestEfforts          []stravaBestEffortJSON    `json:"best_efforts,omitempty"`
 }
 
 type stravaMapJSON struct {
@@ -309,18 +309,18 @@ type stravaMapJSON struct {
 }
 
 type stravaSegmentEffortJSON struct {
-	ID               int64              `json:"id"`
-	Segment          stravaSegmentJSON  `json:"segment"`
-	Name             string             `json:"name"`
-	ElapsedTime      int                `json:"elapsed_time"`
-	MovingTime       int                `json:"moving_time"`
-	StartDate        string             `json:"start_date"`
-	StartDateLocal   string             `json:"start_date_local"`
-	Distance         float64            `json:"distance"`
-	AverageWatts     float64            `json:"average_watts"`
-	AverageHeartrate float64            `json:"average_heartrate"`
-	MaxHeartrate     float64            `json:"max_heartrate"`
-	PRRank           *int               `json:"pr_rank,omitempty"`
+	ID               int64             `json:"id"`
+	Segment          stravaSegmentJSON `json:"segment"`
+	Name             string            `json:"name"`
+	ElapsedTime      int               `json:"elapsed_time"`
+	MovingTime       int               `json:"moving_time"`
+	StartDate        string            `json:"start_date"`
+	StartDateLocal   string            `json:"start_date_local"`
+	Distance         float64           `json:"distance"`
+	AverageWatts     float64           `json:"average_watts"`
+	AverageHeartrate float64           `json:"average_heartrate"`
+	MaxHeartrate     float64           `json:"max_heartrate"`
+	PRRank           *int              `json:"pr_rank,omitempty"`
 }
 
 type stravaBestEffortJSON struct {
@@ -336,20 +336,20 @@ type stravaBestEffortJSON struct {
 }
 
 type stravaSegmentJSON struct {
-	ID            int64                    `json:"id"`
-	Name          string                   `json:"name"`
-	ActivityType  string                   `json:"activity_type"`
-	Distance      float64                  `json:"distance"`
-	AverageGrade  float64                  `json:"average_grade"`
-	MaximumGrade  float64                  `json:"maximum_grade"`
-	ElevationHigh float64                  `json:"elevation_high"`
-	ElevationLow  float64                  `json:"elevation_low"`
-	ClimbCategory int                      `json:"climb_category"`
-	StartLatlng   []float64                `json:"start_latlng,omitempty"`
-	EndLatlng     []float64                `json:"end_latlng,omitempty"`
-	Starred       bool                     `json:"starred"`
-	Map           *stravaMapJSON           `json:"map,omitempty"`
-	AthleteStats  *stravaSegmentStatsJSON  `json:"athlete_segment_stats,omitempty"`
+	ID            int64                   `json:"id"`
+	Name          string                  `json:"name"`
+	ActivityType  string                  `json:"activity_type"`
+	Distance      float64                 `json:"distance"`
+	AverageGrade  float64                 `json:"average_grade"`
+	MaximumGrade  float64                 `json:"maximum_grade"`
+	ElevationHigh float64                 `json:"elevation_high"`
+	ElevationLow  float64                 `json:"elevation_low"`
+	ClimbCategory int                     `json:"climb_category"`
+	StartLatlng   []float64               `json:"start_latlng,omitempty"`
+	EndLatlng     []float64               `json:"end_latlng,omitempty"`
+	Starred       bool                    `json:"starred"`
+	Map           *stravaMapJSON          `json:"map,omitempty"`
+	AthleteStats  *stravaSegmentStatsJSON `json:"athlete_segment_stats,omitempty"`
 }
 
 type stravaSegmentStatsJSON struct {

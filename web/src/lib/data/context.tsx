@@ -91,7 +91,5 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
     initialize()
   }, [])
 
-  return (
-    <DataProviderContext.Provider value={state}>{children}</DataProviderContext.Provider>
-  )
+  return <DataProviderContext.Provider value={state}>{children}</DataProviderContext.Provider>
 }

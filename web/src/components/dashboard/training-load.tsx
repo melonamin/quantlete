@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useTrainingLoad } from '@/lib/api'
+import { useTrainingLoad, type DailyTrainingLoadPoint } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 import { LineChart } from '@/components/charts'
 import { Button } from '@/components/ui/button'
@@ -10,15 +10,15 @@ export function TrainingLoad() {
   const series = [
     {
       name: 'Fitness (CTL)',
-      data: (data?.series ?? []).map((p) => ({ x: p.day, y: p.ctl })),
+      data: (data?.series ?? []).map((p: DailyTrainingLoadPoint) => ({ x: p.day, y: p.ctl })),
     },
     {
       name: 'Fatigue (ATL)',
-      data: (data?.series ?? []).map((p) => ({ x: p.day, y: p.atl })),
+      data: (data?.series ?? []).map((p: DailyTrainingLoadPoint) => ({ x: p.day, y: p.atl })),
     },
     {
       name: 'Form (TSB)',
-      data: (data?.series ?? []).map((p) => ({ x: p.day, y: p.tsb })),
+      data: (data?.series ?? []).map((p: DailyTrainingLoadPoint) => ({ x: p.day, y: p.tsb })),
       areaStyle: true,
     },
   ]

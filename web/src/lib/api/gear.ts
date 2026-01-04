@@ -4,14 +4,32 @@
 // - Generated types: Re-exported from types.gen.ts (generated from Go structs)
 // - Frontend-only types: Defined here for API-specific requirements or composite types
 
-import type { GearResponse as GeneratedGearItem } from '@/lib/wasm/types.gen'
-
 // ============================================================================
 // Generated from Go - re-exported from types.gen.ts
 // DO NOT modify these - regenerate with: just generate-ts-types
 // ============================================================================
-export type Gear = GeneratedGearItem
 export type { GearMonthlyUsage } from '@/lib/wasm/types.gen'
+
+// Gear - frontend type matching API response shape
+// Uses 'primary' (not 'is_primary') and has optional string fields
+export interface Gear {
+  id: string
+  athlete_id?: number
+  name: string
+  primary: boolean
+  retired: boolean
+  distance: number
+  brand_name?: string
+  model_name?: string
+  description?: string
+  source: string
+  hashtag?: string
+  purchase_price?: number | null
+  purchase_currency?: string
+  activity_count?: number
+  created_at?: string
+  updated_at?: string
+}
 
 // ============================================================================
 // Frontend-only types - defined here for API-specific requirements

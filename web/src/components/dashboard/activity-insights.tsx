@@ -38,7 +38,9 @@ export function ActivityInsights() {
 
   const insights = useMemo((): Insight[] => {
     const result: Insight[] = []
-    const activities = recentActivities?.data ?? []
+    // Use Array.isArray for defensive check - recentActivities?.data could be null/undefined
+    // during WASM initialization or if the query returns unexpected data
+    const activities = Array.isArray(recentActivities?.data) ? recentActivities.data : []
     const stats = dashboard?.stats
 
     if (!stats || activities.length < 5) return result
@@ -105,11 +107,8 @@ export function ActivityInsights() {
 
     // Find longest recent activity
     if (activities.length > 0) {
-      const longestRecent = activities.reduce((max, a) =>
-        a.distance > max.distance ? a : max
-      )
-      const avgDistance =
-        activities.reduce((sum, a) => sum + a.distance, 0) / activities.length
+      const longestRecent = activities.reduce((max, a) => (a.distance > max.distance ? a : max))
+      const avgDistance = activities.reduce((sum, a) => sum + a.distance, 0) / activities.length
 
       if (longestRecent.distance > avgDistance * 2) {
         result.push({
@@ -155,9 +154,7 @@ export function ActivityInsights() {
 
     // Location variety
     const locations = new Set(
-      activities
-        .filter((a) => a.location_country)
-        .map((a) => a.location_country)
+      activities.filter((a) => a.location_country).map((a) => a.location_country)
     )
     if (locations.size > 2) {
       result.push({
@@ -219,10 +216,7 @@ export function ActivityInsights() {
     if (stats.total_activities > 0) {
       const milestones = [1000, 500, 250, 100]
       for (const milestone of milestones) {
-        if (
-          stats.total_activities >= milestone &&
-          stats.total_activities < milestone * 1.05
-        ) {
+        if (stats.total_activities >= milestone && stats.total_activities < milestone * 1.05) {
           result.push({
             id: 'activity-milestone',
             type: 'record',
@@ -260,14 +254,8 @@ export function ActivityInsights() {
             {insights.map((insight) => {
               const Icon = insight.icon
               return (
-                <div
-                  key={insight.id}
-                  className="flex items-start gap-3 p-2 rounded-sm bg-muted/30"
-                >
-                  <Icon
-                    className="h-4 w-4 mt-0.5 shrink-0"
-                    style={{ color: insight.iconColor }}
-                  />
+                <div key={insight.id} className="flex items-start gap-3 p-2 rounded-sm bg-muted/30">
+                  <Icon className="h-4 w-4 mt-0.5 shrink-0" style={{ color: insight.iconColor }} />
                   <div className="min-w-0">
                     <div className="font-medium text-sm">{insight.title}</div>
                     <p className="text-xs text-muted-foreground">{insight.description}</p>

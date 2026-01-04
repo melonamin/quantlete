@@ -61,49 +61,52 @@ export function Sidebar() {
   const showEddington =
     settings?.eddington_definitions?.some((d) => d.show_in_nav !== false) ?? true
 
-  const navigationGroups: NavGroup[] = useMemo(() => [
-    {
-      label: 'Overview',
-      items: [
-        { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-        { name: 'Activities', href: '/activities', icon: Activity },
-        { name: 'Calendar', href: '/calendar', icon: Calendar },
-      ],
-    },
-    {
-      label: 'Explore',
-      items: [
-        { name: 'Heatmap', href: '/heatmap', icon: Map },
-        { name: 'Photos', href: '/photos', icon: Camera },
-        { name: 'Rewind', href: '/rewind', icon: History },
-      ],
-    },
-    {
-      label: 'Performance',
-      items: [
-        { name: 'Training Load', href: '/training-load', icon: HeartPulse },
-        { name: 'Power', href: '/power', icon: Zap },
-        { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
-        { name: 'Monthly Stats', href: '/monthly-stats', icon: BarChart3 },
-      ],
-    },
-    {
-      label: 'Achievements',
-      items: [
-        { name: 'Segments', href: '/segments', icon: Trophy },
-        { name: 'Challenges', href: '/challenges', icon: Award },
-        { name: 'Badges', href: '/badges', icon: Tag },
-        ...(showEddington ? [{ name: 'Eddington', href: '/eddington', icon: TrendingUp }] : []),
-      ],
-    },
-    {
-      label: 'Data',
-      items: [
-        { name: 'Gear', href: '/gear', icon: Bike },
-        { name: 'Export', href: '/export', icon: Download },
-      ],
-    },
-  ], [showEddington])
+  const navigationGroups: NavGroup[] = useMemo(
+    () => [
+      {
+        label: 'Overview',
+        items: [
+          { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+          { name: 'Activities', href: '/activities', icon: Activity },
+          { name: 'Calendar', href: '/calendar', icon: Calendar },
+        ],
+      },
+      {
+        label: 'Explore',
+        items: [
+          { name: 'Heatmap', href: '/heatmap', icon: Map },
+          { name: 'Photos', href: '/photos', icon: Camera },
+          { name: 'Rewind', href: '/rewind', icon: History },
+        ],
+      },
+      {
+        label: 'Performance',
+        items: [
+          { name: 'Training Load', href: '/training-load', icon: HeartPulse },
+          { name: 'Power', href: '/power', icon: Zap },
+          { name: 'Best Efforts', href: '/best-efforts', icon: Timer },
+          { name: 'Monthly Stats', href: '/monthly-stats', icon: BarChart3 },
+        ],
+      },
+      {
+        label: 'Achievements',
+        items: [
+          { name: 'Segments', href: '/segments', icon: Trophy },
+          { name: 'Challenges', href: '/challenges', icon: Award },
+          { name: 'Badges', href: '/badges', icon: Tag },
+          ...(showEddington ? [{ name: 'Eddington', href: '/eddington', icon: TrendingUp }] : []),
+        ],
+      },
+      {
+        label: 'Data',
+        items: [
+          { name: 'Gear', href: '/gear', icon: Bike },
+          { name: 'Export', href: '/export', icon: Download },
+        ],
+      },
+    ],
+    [showEddington]
+  )
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -178,7 +181,10 @@ export function Sidebar() {
           {navigationGroups.map((group, groupIndex) => (
             <div
               key={group.label}
-              className={cn(groupIndex > 0 && (collapsed ? 'mt-2 pt-2 border-t border-sidebar-border/50 mx-2' : 'mt-2'))}
+              className={cn(
+                groupIndex > 0 &&
+                  (collapsed ? 'mt-2 pt-2 border-t border-sidebar-border/50 mx-2' : 'mt-2')
+              )}
             >
               {/* Group label - hidden when collapsed */}
               <div
@@ -243,7 +249,13 @@ export function Sidebar() {
                   ? 'text-amber-600 dark:text-amber-500 hover:bg-amber-100/50 dark:hover:bg-amber-950/30'
                   : 'text-primary hover:bg-sidebar-accent/50'
               )}
-              title={collapsed ? (isWaitingForRateLimit ? 'Waiting for rate limit' : 'Sync in progress') : undefined}
+              title={
+                collapsed
+                  ? isWaitingForRateLimit
+                    ? 'Waiting for rate limit'
+                    : 'Sync in progress'
+                  : undefined
+              }
             >
               {isWaitingForRateLimit ? (
                 <Clock className="h-4 w-4 shrink-0" />

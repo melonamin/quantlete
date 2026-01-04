@@ -29,6 +29,8 @@ import type {
   EddingtonResult,
   EddingtonHistoryPoint,
   DashboardConfig,
+  WidgetWidth,
+  WidgetHeight,
   ActivityStream,
   ActivityWeather,
   PowerStatsResponse,
@@ -76,25 +78,38 @@ import type {
 } from '../types'
 
 import type { DataEventListener } from '../events'
+import {
+  createSyncProgressEvent,
+  createSyncCompleteEvent,
+  createDataChangedEvent,
+} from '../events'
 import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
 import * as goStorage from '@/lib/wasm/go-storage'
-import {
-  loadAuth,
-  isAuthenticated,
-  getAthlete,
-  getAuthUrl,
-  exchangeCode,
-  startImport as stravaStartImport,
-  cancelImport as stravaCancelImport,
-  pauseImport as stravaPauseImport,
-  hasResumableImport as stravaHasResumableImport,
-  getImportProgress as stravaGetImportProgress,
-  getSyncHistory as stravaGetSyncHistory,
-  getLatestSync as stravaGetLatestSync,
-  subscribeToImportEvents,
-} from '@/lib/wasm/strava'
+import { loadAuth, isAuthenticated, getAthlete, getAuthUrl, exchangeCode } from '@/lib/wasm/strava'
 import { getCredentials, saveCredentials, hasCredentials } from '@/lib/wasm/strava/credentials'
+
+// Global callbacks for Go importer events - set up during subscribeToEvents
+let importProgressCallback: ((progressJson: string) => void) | null = null
+let importCompleteCallback: ((resultJson: string) => void) | null = null
+
+// Register global callbacks that Go WASM can call
+if (typeof window !== 'undefined') {
+  ;(window as Window & { onImportProgress?: (json: string) => void }).onImportProgress = (
+    json: string
+  ) => {
+    if (importProgressCallback) {
+      importProgressCallback(json)
+    }
+  }
+  ;(window as Window & { onImportComplete?: (json: string) => void }).onImportComplete = (
+    json: string
+  ) => {
+    if (importCompleteCallback) {
+      importCompleteCallback(json)
+    }
+  }
+}
 
 export class GoWasmProvider implements DataProvider {
   private athleteId: number | null = null
@@ -224,7 +239,8 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async getActivityWeather(_id: number): Promise<ActivityWeather | null> {
-    // TODO: Implement weather lookup
+    // Weather lookup is server-only: requires external API calls (Open-Meteo)
+    // that cannot work in browser WASM mode due to CORS and API key exposure.
     return null
   }
 
@@ -259,15 +275,15 @@ export class GoWasmProvider implements DataProvider {
       total_distance: stats.total_distance,
       total_moving_time: stats.total_moving_time,
       total_elevation_gain: stats.total_elevation_gain,
-      total_calories: 0,
-      year_activities: 0,
-      year_distance: 0,
-      year_moving_time: 0,
-      year_elevation_gain: 0,
-      month_activities: 0,
-      month_distance: 0,
-      month_moving_time: 0,
-      month_elevation_gain: 0,
+      total_calories: stats.total_calories ?? 0,
+      year_activities: stats.year_activities ?? 0,
+      year_distance: stats.year_distance ?? 0,
+      year_moving_time: stats.year_moving_time ?? 0,
+      year_elevation_gain: stats.year_elevation_gain ?? 0,
+      month_activities: stats.month_activities ?? 0,
+      month_distance: stats.month_distance ?? 0,
+      month_moving_time: stats.month_moving_time ?? 0,
+      month_elevation_gain: stats.month_elevation_gain ?? 0,
     }
   }
 
@@ -358,9 +374,9 @@ export class GoWasmProvider implements DataProvider {
       version: result.version,
       widgets: result.widgets.map((w) => ({
         id: w.id,
-        width: w.width,
-        height: w.height,
-        hidden: w.hidden,
+        width: w.width as WidgetWidth,
+        height: w.height as WidgetHeight | undefined,
+        hidden: w.hidden ?? false,
         settings: w.settings,
       })),
     }
@@ -375,9 +391,9 @@ export class GoWasmProvider implements DataProvider {
       version: result.version,
       widgets: result.widgets.map((w) => ({
         id: w.id,
-        width: w.width,
-        height: w.height,
-        hidden: w.hidden,
+        width: w.width as WidgetWidth,
+        height: w.height as WidgetHeight | undefined,
+        hidden: w.hidden ?? false,
         settings: w.settings,
       })),
     }
@@ -390,7 +406,7 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const data = goStorage.getHeatmapData({
+    const result = goStorage.getHeatmapData({
       sport_type: filters.sport_type,
       commute: filters.commute,
       workout_type: filters.workout_type,
@@ -398,8 +414,12 @@ export class GoWasmProvider implements DataProvider {
       offset: filters.offset,
     })
 
+    // Handle both old format (array) and new format (object with activities and countries)
+    const activities = Array.isArray(result) ? result : (result.activities ?? [])
+    const countries = Array.isArray(result) ? [] : (result.countries ?? [])
+
     return {
-      activities: data.map((a) => ({
+      activities: activities.map((a) => ({
         id: a.id,
         name: a.name,
         sport_type: a.sport_type,
@@ -409,8 +429,12 @@ export class GoWasmProvider implements DataProvider {
         start_lat: a.start_lat,
         start_lng: a.start_lng,
       })),
-      total: data.length,
-      countries: [],
+      total: activities.length,
+      countries: countries.map((c: { country: string; iso2?: string; count: number }) => ({
+        country: c.country,
+        iso2: c.iso2,
+        count: c.count,
+      })),
     }
   }
 
@@ -446,9 +470,11 @@ export class GoWasmProvider implements DataProvider {
   // ============================================================================
   // Stats & Training
   // ============================================================================
-  async getPowerStats(
-    filters?: { after?: string; before?: string; sport_type?: string },
-  ): Promise<PowerStatsResponse> {
+  async getPowerStats(filters?: {
+    after?: string
+    before?: string
+    sport_type?: string
+  }): Promise<PowerStatsResponse> {
     this.assertInitialized()
     this.getAthleteId()
 
@@ -489,7 +515,9 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async getPowerZones(): Promise<PowerZonesResponse> {
-    // Power zones require FTP - get from history and calculate zones
+    // Power zone calculation is partially supported: we can compute zone bounds from FTP,
+    // but seconds_by_zone requires processing all activity power streams which is
+    // computationally expensive and server-only. Zone bounds are calculated here.
     this.assertInitialized()
     this.getAthleteId()
 
@@ -498,36 +526,48 @@ export class GoWasmProvider implements DataProvider {
 
     // Standard 7-zone power model based on FTP
     const bounds = latestFtp
-      ? [0, Math.round(latestFtp * 0.55), Math.round(latestFtp * 0.75), Math.round(latestFtp * 0.90),
-         Math.round(latestFtp * 1.05), Math.round(latestFtp * 1.20), Math.round(latestFtp * 1.50)]
+      ? [
+          0,
+          Math.round(latestFtp * 0.55),
+          Math.round(latestFtp * 0.75),
+          Math.round(latestFtp * 0.9),
+          Math.round(latestFtp * 1.05),
+          Math.round(latestFtp * 1.2),
+          Math.round(latestFtp * 1.5),
+        ]
       : [0, 100, 150, 200, 250, 300, 400]
 
     return {
       ftp_watts: latestFtp,
-      seconds_by_zone: [], // Would need activity stream analysis
+      seconds_by_zone: [], // Server-only: requires stream processing
       total_seconds: 0,
       bounds,
     }
   }
 
-  async getHrZones(
-    _filters?: { after?: string; before?: string; sport_type?: string },
-  ): Promise<HrZonesResponse> {
+  async getHrZones(_filters?: {
+    after?: string
+    before?: string
+    sport_type?: string
+  }): Promise<HrZonesResponse> {
+    // HR zone calculation is partially supported: zone bounds are returned,
+    // but seconds_by_zone requires processing all activity HR streams which is
+    // computationally expensive and server-only.
     this.assertInitialized()
     this.getAthleteId()
 
-    // HR zones would need activity stream analysis
     return {
       method: 'percentage',
       zones: { bounds: [0, 60, 70, 80, 90, 100] },
-      seconds_by_zone: [],
+      seconds_by_zone: [], // Server-only: requires stream processing
       total_seconds: 0,
     }
   }
 
-  async getTrainingLoad(
-    filters?: { after?: string; before?: string },
-  ): Promise<TrainingLoadResponse> {
+  async getTrainingLoad(filters?: {
+    after?: string
+    before?: string
+  }): Promise<TrainingLoadResponse> {
     this.assertInitialized()
     this.getAthleteId()
 
@@ -544,13 +584,15 @@ export class GoWasmProvider implements DataProvider {
         atl: s.atl,
         tsb: s.tsb,
       })),
-      summary: result.summary ? {
-        day: result.summary.day,
-        tss: result.summary.tss,
-        ctl: result.summary.ctl,
-        atl: result.summary.atl,
-        tsb: result.summary.tsb,
-      } : undefined,
+      summary: result.summary
+        ? {
+            day: result.summary.day,
+            tss: result.summary.tss,
+            ctl: result.summary.ctl,
+            atl: result.summary.atl,
+            tsb: result.summary.tsb,
+          }
+        : undefined,
     }
   }
 
@@ -582,7 +624,7 @@ export class GoWasmProvider implements DataProvider {
 
   async deleteHrZoneDefinition(
     sportType: string,
-    effectiveFrom: string,
+    effectiveFrom: string
   ): Promise<{ status: string }> {
     this.assertInitialized()
     this.getAthleteId()
@@ -630,7 +672,7 @@ export class GoWasmProvider implements DataProvider {
 
   async getBestEffortsForDistance(
     distanceType: string,
-    sportType?: string,
+    sportType?: string
   ): Promise<BestEffortItem[]> {
     this.assertInitialized()
     this.getAthleteId()
@@ -694,52 +736,63 @@ export class GoWasmProvider implements DataProvider {
         elevation_m: m.elevation_m,
         prs: m.prs,
       })),
-      moving_time_by_sport: result.moving_time_by_sport?.map((s) => ({
-        sport_type: s.sport_type,
-        moving_time_s: s.moving_time_s,
-      })) || [],
-      start_times_by_hour: result.start_times_by_hour?.map((h) => ({
-        hour: h.hour,
-        count: h.count,
-      })) || [],
-      locations: result.locations?.map((l) => ({
-        lat: l.lat,
-        lng: l.lng,
-        count: l.count,
-      })) || [],
+      moving_time_by_sport:
+        result.moving_time_by_sport?.map((s) => ({
+          sport_type: s.sport_type,
+          moving_time_s: s.moving_time_s,
+        })) || [],
+      start_times_by_hour:
+        result.start_times_by_hour?.map((h) => ({
+          hour: h.hour,
+          count: h.count,
+        })) || [],
+      locations:
+        result.locations?.map((l) => ({
+          lat: l.lat,
+          lng: l.lng,
+          count: l.count,
+        })) || [],
       streaks: {
         longest_active_days: result.streaks.longest_active_days,
         longest_rest_days: result.streaks.longest_rest_days,
       },
-      random_photo: result.random_photo ? {
-        id: result.random_photo.id,
-        activity_id: result.random_photo.activity_id,
-        url: result.random_photo.url,
-        thumbnail_url: result.random_photo.thumbnail_url,
-        caption: result.random_photo.caption,
-      } : undefined,
+      random_photo: result.random_photo
+        ? {
+            id: result.random_photo.id,
+            activity_id: result.random_photo.activity_id,
+            url: result.random_photo.url,
+            thumbnail_url: result.random_photo.thumbnail_url,
+            caption: result.random_photo.caption,
+          }
+        : undefined,
       biggest: {
-        longest_distance: result.biggest?.longest_distance ? {
-          activity_id: result.biggest.longest_distance.activity_id,
-          name: result.biggest.longest_distance.name,
-          sport_type: result.biggest.longest_distance.sport_type,
-          start_date_local: result.biggest.longest_distance.start_date_local,
-          value: result.biggest.longest_distance.value,
-        } : undefined,
-        most_elevation: result.biggest?.most_elevation ? {
-          activity_id: result.biggest.most_elevation.activity_id,
-          name: result.biggest.most_elevation.name,
-          sport_type: result.biggest.most_elevation.sport_type,
-          start_date_local: result.biggest.most_elevation.start_date_local,
-          value: result.biggest.most_elevation.value,
-        } : undefined,
-        longest_duration: result.biggest?.longest_duration ? {
-          activity_id: result.biggest.longest_duration.activity_id,
-          name: result.biggest.longest_duration.name,
-          sport_type: result.biggest.longest_duration.sport_type,
-          start_date_local: result.biggest.longest_duration.start_date_local,
-          value: result.biggest.longest_duration.value,
-        } : undefined,
+        longest_distance: result.biggest?.longest_distance
+          ? {
+              activity_id: result.biggest.longest_distance.activity_id,
+              name: result.biggest.longest_distance.name,
+              sport_type: result.biggest.longest_distance.sport_type,
+              start_date_local: result.biggest.longest_distance.start_date_local,
+              value: result.biggest.longest_distance.value,
+            }
+          : undefined,
+        most_elevation: result.biggest?.most_elevation
+          ? {
+              activity_id: result.biggest.most_elevation.activity_id,
+              name: result.biggest.most_elevation.name,
+              sport_type: result.biggest.most_elevation.sport_type,
+              start_date_local: result.biggest.most_elevation.start_date_local,
+              value: result.biggest.most_elevation.value,
+            }
+          : undefined,
+        longest_duration: result.biggest?.longest_duration
+          ? {
+              activity_id: result.biggest.longest_duration.activity_id,
+              name: result.biggest.longest_duration.name,
+              sport_type: result.biggest.longest_duration.sport_type,
+              start_date_local: result.biggest.longest_duration.start_date_local,
+              value: result.biggest.longest_duration.value,
+            }
+          : undefined,
       },
     }
   }
@@ -1019,7 +1072,7 @@ export class GoWasmProvider implements DataProvider {
 
   async getSegmentEfforts(
     id: number,
-    filters?: SegmentEffortsFilters,
+    filters?: SegmentEffortsFilters
   ): Promise<SegmentEffortsResponse> {
     this.assertInitialized()
     this.getAthleteId()
@@ -1106,10 +1159,12 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.updateWeightHistory(body.points.map((e) => ({
-      recorded_at: e.recorded_at,
-      value: e.value,
-    })))
+    goStorage.updateWeightHistory(
+      body.points.map((e) => ({
+        recorded_at: e.recorded_at,
+        value: e.value,
+      }))
+    )
     return body
   }
 
@@ -1227,10 +1282,19 @@ export class GoWasmProvider implements DataProvider {
         sports: result.config.sports.map((s) => ({
           name: s.name,
           sport_types: s.sport_types,
-          targets: s.targets as Record<string, { distance_m?: number; elevation_m?: number; moving_time_s?: number }>,
+          targets: s.targets as Record<
+            string,
+            { distance_m?: number; elevation_m?: number; moving_time_s?: number }
+          >,
         })),
       },
-      progress: result.progress as Record<string, Record<string, { distance_m: number; elevation_m: number; moving_time_s: number; activity_count: number }>>,
+      progress: result.progress as Record<
+        string,
+        Record<
+          string,
+          { distance_m: number; elevation_m: number; moving_time_s: number; activity_count: number }
+        >
+      >,
     }
   }
 
@@ -1289,7 +1353,7 @@ export class GoWasmProvider implements DataProvider {
 
   async getGearComponents(
     gearId: string,
-    filters?: ComponentsFilters,
+    filters?: ComponentsFilters
   ): Promise<ComponentsResponse> {
     this.assertInitialized()
     this.getAthleteId()
@@ -1326,10 +1390,7 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async createComponent(
-    gearId: string,
-    req: CreateComponentRequest,
-  ): Promise<ComponentWithRules> {
+  async createComponent(gearId: string, req: CreateComponentRequest): Promise<ComponentWithRules> {
     this.assertInitialized()
     this.getAthleteId()
 
@@ -1389,7 +1450,7 @@ export class GoWasmProvider implements DataProvider {
 
   async logMaintenance(
     componentId: number,
-    req?: LogMaintenanceRequest,
+    req?: LogMaintenanceRequest
   ): Promise<{ logged: boolean }> {
     this.assertInitialized()
     this.getAthleteId()
@@ -1423,12 +1484,44 @@ export class GoWasmProvider implements DataProvider {
   // Import (delegates to Strava importer)
   // ============================================================================
   async getImportProgress(): Promise<ImportProgress> {
-    const progress = stravaGetImportProgress()
-    // Adapt WASM importer progress to API format
+    this.assertInitialized()
+
+    const progress = goStorage.goGetImportProgress()
+    if (!progress) {
+      // No import running - return idle state
+      return {
+        status: 'idle',
+        phase: 'idle',
+        activities_total: 0,
+        activities_done: 0,
+        gear_total: 0,
+        gear_done: 0,
+        streams_total: 0,
+        streams_done: 0,
+        details_total: 0,
+        details_done: 0,
+        segments_total: 0,
+        segments_done: 0,
+        photos_total: 0,
+        photos_done: 0,
+        total_activities: 0,
+        imported_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        current_page: 0,
+        remaining_api_calls: 0,
+        rate_limit_used_15min: 0,
+        rate_limit_limit_15min: 100,
+        rate_limit_used_daily: 0,
+        rate_limit_limit_daily: 1000,
+        waiting_for_rate_limit: false,
+      }
+    }
+
+    // Adapt Go importer progress to API format
     return {
       status: progress.status,
       phase: progress.phase as ImportProgress['phase'],
-      error: progress.error,
       activities_total: progress.activities_total,
       activities_done: progress.activities_done,
       gear_total: progress.gear_total,
@@ -1449,51 +1542,81 @@ export class GoWasmProvider implements DataProvider {
       current_page: 0,
       remaining_api_calls: progress.remaining_api_calls,
       estimated_eta: progress.estimated_eta,
-      rate_limit_used_15min: 0,
-      rate_limit_limit_15min: 100,
-      rate_limit_used_daily: 0,
-      rate_limit_limit_daily: 1000,
-      waiting_for_rate_limit: false,
+      rate_limit_used_15min: progress.rate_limit_used_15min,
+      rate_limit_limit_15min: progress.rate_limit_limit_15min,
+      rate_limit_used_daily: progress.rate_limit_used_daily,
+      rate_limit_limit_daily: progress.rate_limit_limit_daily,
+      waiting_for_rate_limit: progress.waiting_for_rate_limit,
     }
   }
 
   async startImport(req?: StartImportRequest): Promise<{ message: string }> {
-    await stravaStartImport({ fullSync: req?.full_sync, resume: req?.resume })
+    this.assertInitialized()
+
+    const athlete = getAthlete()
+    if (!athlete) {
+      throw new Error('Not authenticated. Please log in first.')
+    }
+
+    goStorage.goStartImport(
+      {
+        full_sync: req?.full_sync,
+        resume: req?.resume,
+        skip_streams: req?.skip_streams,
+        skip_segments: req?.skip_segments,
+        skip_best_efforts: req?.skip_best_efforts,
+        skip_photos: req?.skip_photos,
+      },
+      {
+        id: athlete.id,
+        username: athlete.username,
+        first_name: athlete.firstname,
+        last_name: athlete.lastname,
+        profile_medium: athlete.profile,
+      }
+    )
     return { message: 'Import started' }
   }
 
   async cancelImport(): Promise<{ message: string }> {
-    stravaCancelImport()
+    this.assertInitialized()
+    goStorage.goCancelImport()
     return { message: 'Import cancelled' }
   }
 
   async pauseImport(): Promise<{ message: string }> {
-    stravaPauseImport()
+    // Go importer uses cancel for pause - state is persisted for resume
+    this.assertInitialized()
+    goStorage.goCancelImport()
     return { message: 'Import paused' }
   }
 
   async resumeImport(): Promise<{ message: string }> {
-    await stravaStartImport({ resume: true })
-    return { message: 'Import resumed' }
+    return this.startImport({ resume: true })
   }
 
   hasResumableImport(): boolean {
-    return stravaHasResumableImport()
+    if (!goStorage.isInitialized()) {
+      return false
+    }
+    const state = goStorage.goGetImportState()
+    return state !== null && state.phase !== 'idle' && state.phase !== 'completed'
   }
 
   async getSyncHistory(limit?: number): Promise<SyncRun[]> {
-    const history = await stravaGetSyncHistory(limit)
-    // Cast to API type - fields are compatible
+    this.assertInitialized()
+    const history = goStorage.getSyncHistory(limit ?? 10)
     return history as unknown as SyncRun[]
   }
 
   async getLatestSync(): Promise<SyncRun | null> {
-    const sync = await stravaGetLatestSync()
-    return sync as unknown as SyncRun | null
+    this.assertInitialized()
+    const history = goStorage.getSyncHistory(1)
+    return history.length > 0 ? (history[0] as unknown as SyncRun) : null
   }
 
   async getSyncWatermark(): Promise<SyncWatermark | null> {
-    // TODO: Implement
+    // Not implemented - would need to track in import state
     return null
   }
 
@@ -1533,7 +1656,52 @@ export class GoWasmProvider implements DataProvider {
   // Events
   // ============================================================================
   subscribeToEvents(listener: DataEventListener): () => void {
-    return subscribeToImportEvents(listener)
+    // Set up callbacks for Go importer events
+    importProgressCallback = (progressJson: string) => {
+      try {
+        const progress = JSON.parse(progressJson) as goStorage.GoImportProgress
+        listener(
+          createSyncProgressEvent(progress.phase, {
+            activities_done: progress.activities_done,
+            activities_total: progress.activities_total,
+            gear_done: progress.gear_done,
+            gear_total: progress.gear_total,
+            streams_done: progress.streams_done,
+            streams_total: progress.streams_total,
+            details_done: progress.details_done,
+            details_total: progress.details_total,
+            segments_done: progress.segments_done,
+            segments_total: progress.segments_total,
+            photos_done: progress.photos_done,
+            photos_total: progress.photos_total,
+            estimated_eta: progress.estimated_eta,
+          })
+        )
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    importCompleteCallback = (resultJson: string) => {
+      try {
+        const result = JSON.parse(resultJson) as { success: boolean; error?: string }
+        listener(
+          createSyncCompleteEvent(result.success ? 'completed' : 'failed', result.error)
+        )
+        // Also emit data changed event on successful completion
+        if (result.success) {
+          listener(createDataChangedEvent({ activities: true, all: true }))
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    // Return unsubscribe function
+    return () => {
+      importProgressCallback = null
+      importCompleteCallback = null
+    }
   }
 
   // ============================================================================

@@ -89,11 +89,7 @@ export function FtpEditor({ value, onSave, saving }: FtpEditorProps) {
 
       <div className="space-y-3">
         <div className="grid gap-2 md:grid-cols-3">
-          <Input
-            type="date"
-            value={cyclingDate}
-            onChange={(e) => setCyclingDate(e.target.value)}
-          />
+          <Input type="date" value={cyclingDate} onChange={(e) => setCyclingDate(e.target.value)} />
           <Input
             inputMode="numeric"
             placeholder="Cycling FTP (W)"
@@ -107,11 +103,7 @@ export function FtpEditor({ value, onSave, saving }: FtpEditorProps) {
 
       <div className="space-y-3">
         <div className="grid gap-2 md:grid-cols-3">
-          <Input
-            type="date"
-            value={runningDate}
-            onChange={(e) => setRunningDate(e.target.value)}
-          />
+          <Input type="date" value={runningDate} onChange={(e) => setRunningDate(e.target.value)} />
           <Input
             inputMode="decimal"
             placeholder="Running FTP (m/s)"

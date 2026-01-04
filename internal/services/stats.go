@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -38,14 +40,14 @@ func NewStatsService(
 
 // GetHeatmapDataInput contains parameters for getting heatmap data.
 type GetHeatmapDataInput struct {
-	AthleteID   int64
-	SportTypes  []string
-	StartAfter  *time.Time
-	StartBefore *time.Time
-	Commute     *bool
-	WorkoutType *int
-	Limit       int
-	Offset      int
+	AthleteID   int64      `json:"-" adapter:"context"`
+	SportTypes  []string   `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	StartAfter  *time.Time `json:"after" adapter:"query"`
+	StartBefore *time.Time `json:"before" adapter:"query"`
+	Commute     *bool      `json:"commute" adapter:"query"`
+	WorkoutType *int       `json:"workout_type" adapter:"query"`
+	Limit       int        `json:"limit" adapter:"query"`
+	Offset      int        `json:"offset" adapter:"query"`
 }
 
 // HeatmapActivity represents an activity for the heatmap visualization.
@@ -80,8 +82,8 @@ type HeatmapOutput struct {
 
 // GetBestEffortPRsInput contains parameters for getting best effort PRs.
 type GetBestEffortPRsInput struct {
-	AthleteID  int64
-	SportTypes []string
+	AthleteID  int64    `json:"-" adapter:"context"`
+	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
 }
 
 // BestEffortPR represents a personal record for a distance type.
@@ -100,9 +102,9 @@ type BestEffortPR struct {
 
 // GetBestEffortsForTypeInput contains parameters for getting best efforts by distance type.
 type GetBestEffortsForTypeInput struct {
-	AthleteID    int64
-	DistanceType string
-	SportTypes   []string
+	AthleteID    int64    `json:"-" adapter:"context"`
+	DistanceType string   `json:"distance_type" adapter:"path,param=distanceType"`
+	SportTypes   []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
 }
 
 // BestEffortListItem represents a best effort item in a list.
@@ -125,8 +127,8 @@ type BestEffortListItem struct {
 
 // GetEddingtonDataInput contains parameters for getting Eddington data.
 type GetEddingtonDataInput struct {
-	AthleteID  int64
-	SportTypes []string
+	AthleteID  int64    `json:"-" adapter:"context"`
+	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
 }
 
 // EddingtonDay represents a day's distance for Eddington calculation.
@@ -150,8 +152,8 @@ type EddingtonOutput struct {
 
 // GetEddingtonHistoryInput contains parameters for getting Eddington history.
 type GetEddingtonHistoryInput struct {
-	AthleteID  int64
-	SportTypes []string
+	AthleteID  int64    `json:"-" adapter:"context"`
+	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
 }
 
 // EddingtonHistoryPoint represents a milestone point where the Eddington number increases.
@@ -164,10 +166,10 @@ type EddingtonHistoryPoint struct {
 
 // GetPowerStatsInput contains parameters for getting power stats.
 type GetPowerStatsInput struct {
-	AthleteID  int64
-	After      *time.Time
-	Before     *time.Time
-	SportTypes []string
+	AthleteID  int64      `json:"-" adapter:"context"`
+	After      *time.Time `json:"after" adapter:"query"`
+	Before     *time.Time `json:"before" adapter:"query"`
+	SportTypes []string   `json:"sport_types" adapter:"query,name=sport_type,split=,"`
 }
 
 // PeakPowerBest represents the best power for a duration.
@@ -186,8 +188,8 @@ type PeakPowerHistoryPoint struct {
 
 // PowerStatsOutput contains power statistics.
 type PowerStatsOutput struct {
-	DurationsS []int                            `json:"durations_s"`
-	Best       []PeakPowerBest                  `json:"best"`
+	DurationsS []int                           `json:"durations_s"`
+	Best       []PeakPowerBest                 `json:"best"`
 	History    map[int][]PeakPowerHistoryPoint `json:"history"`
 }
 
@@ -195,9 +197,9 @@ type PowerStatsOutput struct {
 
 // GetTrainingLoadInput contains parameters for getting training load data.
 type GetTrainingLoadInput struct {
-	AthleteID int64
-	After     *time.Time
-	Before    *time.Time
+	AthleteID int64      `json:"-" adapter:"context"`
+	After     *time.Time `json:"after" adapter:"query"`
+	Before    *time.Time `json:"before" adapter:"query"`
 }
 
 // DailyTrainingLoadPoint represents training load for a single day.
@@ -219,13 +221,13 @@ type TrainingLoadOutput struct {
 
 // GetRewindYearsInput contains parameters for getting available rewind years.
 type GetRewindYearsInput struct {
-	AthleteID int64
+	AthleteID int64 `json:"-" adapter:"context"`
 }
 
 // GetRewindInput contains parameters for getting rewind data.
 type GetRewindInput struct {
-	AthleteID int64
-	Year      int // 0 = all-time
+	AthleteID int64 `json:"-" adapter:"context"`
+	Year      int   `json:"year" adapter:"query"` // 0 = all-time
 }
 
 // RewindTotals represents totals for the rewind report.
@@ -316,6 +318,37 @@ type RewindOutput struct {
 	Biggest           RewindBiggest         `json:"biggest"`
 }
 
+// --- Best Efforts Write ---
+
+// SaveBestEffortsInput contains parameters for saving best efforts for an activity.
+type SaveBestEffortsInput struct {
+	AthleteID  int64                      `json:"athlete_id" adapter:"body"`
+	ActivityID int64                      `json:"activity_id" adapter:"body"`
+	SportType  string                     `json:"sport_type" adapter:"body"`
+	Efforts    []SaveBestEffortsInputItem `json:"efforts" adapter:"body"`
+}
+
+// SaveBestEffortsInputItem represents a single best effort to save.
+type SaveBestEffortsInputItem struct {
+	DistanceType string  `json:"distance_type" adapter:"body"`
+	Name         string  `json:"name" adapter:"body"`
+	DistanceM    float64 `json:"distance_m" adapter:"body"`
+	ElapsedTime  int     `json:"elapsed_time" adapter:"body"`
+	MovingTime   *int    `json:"moving_time" adapter:"body"`
+	StartIndex   *int    `json:"start_index" adapter:"body"`
+	EndIndex     *int    `json:"end_index" adapter:"body"`
+	PRRank       *int    `json:"pr_rank" adapter:"body"`
+	StartDate    string  `json:"start_date" adapter:"body"`
+}
+
+// SaveBestEffortsOutput contains the result of saving best efforts.
+type SaveBestEffortsOutput struct {
+	Message string `json:"message"`
+}
+
+// Maximum number of best efforts that can be saved per activity.
+const maxBestEffortsPerSave = 1000
+
 // ============================================================================
 // Service Methods
 // ============================================================================
@@ -324,6 +357,9 @@ type RewindOutput struct {
 var powerDurations = []int{5, 10, 30, 60, 300, 480, 1200, 3600}
 
 // GetHeatmapData returns activities with polylines for heatmap visualization.
+//
+//adapter:wasm getHeatmapData category=Stats
+//adapter:http GET /api/v1/stats/heatmap
 func (s *StatsService) GetHeatmapData(ctx context.Context, in GetHeatmapDataInput) (*HeatmapOutput, error) {
 	filters := storage.HeatmapFilters{
 		SportTypes:  in.SportTypes,
@@ -359,10 +395,6 @@ func (s *StatsService) GetHeatmapData(ctx context.Context, in GetHeatmapDataInpu
 		}
 	}
 
-	if result == nil {
-		result = []HeatmapActivity{}
-	}
-
 	countries, _ := s.stats.GetHeatmapCountries(ctx, in.AthleteID, filters)
 	countriesOut := make([]HeatmapCountryStat, len(countries))
 	for i, c := range countries {
@@ -383,6 +415,9 @@ func (s *StatsService) GetHeatmapData(ctx context.Context, in GetHeatmapDataInpu
 }
 
 // GetBestEffortPRs returns one all-time PR (fastest elapsed time) per distance_type.
+//
+//adapter:wasm getBestEffortPRs category=Stats
+//adapter:http GET /api/v1/stats/best-efforts
 func (s *StatsService) GetBestEffortPRs(ctx context.Context, in GetBestEffortPRsInput) ([]BestEffortPR, error) {
 	if s.bestEfforts == nil {
 		return []BestEffortPR{}, nil
@@ -412,6 +447,9 @@ func (s *StatsService) GetBestEffortPRs(ctx context.Context, in GetBestEffortPRs
 }
 
 // GetBestEffortsForType returns all best efforts for a specific distance type.
+//
+//adapter:wasm getBestEffortsForType category=Stats
+//adapter:http GET /api/v1/stats/best-efforts/{distanceType}
 func (s *StatsService) GetBestEffortsForType(ctx context.Context, in GetBestEffortsForTypeInput) ([]BestEffortListItem, error) {
 	if s.bestEfforts == nil {
 		return []BestEffortListItem{}, nil
@@ -447,6 +485,9 @@ func (s *StatsService) GetBestEffortsForType(ctx context.Context, in GetBestEffo
 }
 
 // GetEddingtonData returns data for Eddington number calculation.
+//
+//adapter:wasm getEddingtonData category=Stats
+//adapter:http GET /api/v1/stats/eddington
 func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonDataInput) (*EddingtonOutput, error) {
 	result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, in.SportTypes)
 	if err != nil {
@@ -477,6 +518,9 @@ func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonData
 }
 
 // GetEddingtonHistory returns milestone points where the Eddington number increases.
+//
+//adapter:wasm getEddingtonHistory category=Stats
+//adapter:http GET /api/v1/stats/eddington/history
 func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonHistoryInput) ([]EddingtonHistoryPoint, error) {
 	points, err := s.stats.GetEddingtonHistory(ctx, in.AthleteID, in.SportTypes)
 	if err != nil {
@@ -498,6 +542,9 @@ func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonH
 }
 
 // GetPowerStats returns power best efforts and history.
+//
+//adapter:wasm getPowerStats category=Stats
+//adapter:http GET /api/v1/stats/power
 func (s *StatsService) GetPowerStats(ctx context.Context, in GetPowerStatsInput) (*PowerStatsOutput, error) {
 	if s.power == nil {
 		return &PowerStatsOutput{
@@ -550,6 +597,9 @@ func (s *StatsService) GetPowerStats(ctx context.Context, in GetPowerStatsInput)
 }
 
 // GetTrainingLoad returns training load data (daily series + summary).
+//
+//adapter:wasm getTrainingLoad category=Stats
+//adapter:http GET /api/v1/stats/training-load
 func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadInput) (*TrainingLoadOutput, error) {
 	if s.trainingLoad == nil {
 		return &TrainingLoadOutput{
@@ -604,6 +654,9 @@ func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadIn
 }
 
 // GetRewindYears returns the list of years with activity data.
+//
+//adapter:wasm getRewindYears category=Stats
+//adapter:http GET /api/v1/stats/rewind/years
 func (s *StatsService) GetRewindYears(ctx context.Context, in GetRewindYearsInput) ([]int, error) {
 	years, err := s.stats.ListRewindYears(ctx, in.AthleteID)
 	if err != nil {
@@ -616,6 +669,9 @@ func (s *StatsService) GetRewindYears(ctx context.Context, in GetRewindYearsInpu
 }
 
 // GetRewind returns the rewind report for a given year (or all-time if year is 0).
+//
+//adapter:wasm getRewind category=Stats
+//adapter:http GET /api/v1/stats/rewind
 func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*RewindOutput, error) {
 	report, err := s.stats.GetRewind(ctx, in.AthleteID, in.Year)
 	if err != nil {
@@ -729,5 +785,49 @@ func (s *StatsService) GetRewind(ctx context.Context, in GetRewindInput) (*Rewin
 			MostElevation:   mostElevation,
 			LongestDuration: longestDuration,
 		},
+	}, nil
+}
+
+// SaveBestEfforts stores best efforts for an activity (replaces existing).
+//
+//adapter:wasm saveBestEfforts category=BestEfforts-Write
+func (s *StatsService) SaveBestEfforts(ctx context.Context, in SaveBestEffortsInput) (*SaveBestEffortsOutput, error) {
+	// Validate efforts array size
+	if len(in.Efforts) > maxBestEffortsPerSave {
+		return nil, BadRequestf("too many best efforts: %d > %d", len(in.Efforts), maxBestEffortsPerSave)
+	}
+
+	// Convert to storage format with canonicalization
+	efforts := make([]storage.BestEffort, 0, len(in.Efforts))
+	for _, e := range in.Efforts {
+		// Apply canonical distance type mapping
+		distanceType, canonicalM := shared.CanonicalBestEffortDistanceType(e.DistanceM, e.Name)
+		be := storage.BestEffort{
+			AthleteID:    in.AthleteID,
+			ActivityID:   in.ActivityID,
+			SportType:    in.SportType,
+			DistanceType: distanceType,
+			Name:         e.Name,
+			DistanceM:    canonicalM,
+			ElapsedTimeS: e.ElapsedTime,
+			MovingTimeS:  e.MovingTime,
+			StartIndex:   e.StartIndex,
+			EndIndex:     e.EndIndex,
+			PRRank:       e.PRRank,
+		}
+		if e.StartDate != "" {
+			if t, err := time.Parse(time.RFC3339, e.StartDate); err == nil {
+				be.StartDate = &storage.SQLiteTime{Time: t}
+			}
+		}
+		efforts = append(efforts, be)
+	}
+
+	if err := s.bestEfforts.ReplaceForActivity(ctx, in.AthleteID, in.ActivityID, in.SportType, efforts); err != nil {
+		return nil, Wrapf(ErrInternal, "saving best efforts: %v", err)
+	}
+
+	return &SaveBestEffortsOutput{
+		Message: fmt.Sprintf("Best efforts for activity %d saved (%d efforts)", in.ActivityID, len(efforts)),
 	}, nil
 }

@@ -4,12 +4,12 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -37,7 +37,7 @@ func (h *ExportHandler) ExportActivitiesCSV(w http.ResponseWriter, r *http.Reque
 
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *ExportHandler) ExportActivitiesCSV(w http.ResponseWriter, r *http.Reque
 	// Fetch activities with reasonable limit to prevent DoS
 	activities, _, err := h.activityRepo.List(ctx, filters, storage.Pagination{Page: 1, PerPage: MaxExportActivities})
 	if err != nil {
-		http.Error(w, "Failed to fetch activities", http.StatusInternalServerError)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to fetch activities"))
 		return
 	}
 
@@ -176,7 +176,7 @@ func (h *ExportHandler) ExportActivitiesJSON(w http.ResponseWriter, r *http.Requ
 
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -204,7 +204,7 @@ func (h *ExportHandler) ExportActivitiesJSON(w http.ResponseWriter, r *http.Requ
 	// Fetch activities with reasonable limit to prevent DoS
 	activities, _, err := h.activityRepo.List(ctx, filters, storage.Pagination{Page: 1, PerPage: MaxExportActivities})
 	if err != nil {
-		http.Error(w, "Failed to fetch activities", http.StatusInternalServerError)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to fetch activities"))
 		return
 	}
 
@@ -226,7 +226,7 @@ func (h *ExportHandler) ExportStats(w http.ResponseWriter, r *http.Request) {
 
 	athlete := h.stravaClient.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -240,7 +240,7 @@ func (h *ExportHandler) ExportStats(w http.ResponseWriter, r *http.Request) {
 		OrderDir: "DESC",
 	})
 	if err != nil {
-		http.Error(w, "Failed to fetch activities", http.StatusInternalServerError)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to fetch activities"))
 		return
 	}
 
@@ -258,7 +258,7 @@ func (h *ExportHandler) ExportStats(w http.ResponseWriter, r *http.Request) {
 		OrderDir: "ASC",
 	})
 	if err != nil {
-		http.Error(w, "Failed to fetch oldest activity", http.StatusInternalServerError)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to fetch oldest activity"))
 		return
 	}
 
@@ -274,8 +274,5 @@ func (h *ExportHandler) ExportStats(w http.ResponseWriter, r *http.Request) {
 		"last_activity":    lastActivity,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		slog.Error("failed to encode export stats response", "error", err)
-	}
+	shared.WriteSuccess(w, response)
 }

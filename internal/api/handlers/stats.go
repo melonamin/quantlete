@@ -45,7 +45,7 @@ func NewStatsHandler(
 func (h *StatsHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -101,14 +101,14 @@ func (h *StatsHandler) GetHeatmapData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // GetEddingtonData handles GET /api/v1/stats/eddington
 func (h *StatsHandler) GetEddingtonData(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -126,14 +126,14 @@ func (h *StatsHandler) GetEddingtonData(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // GetEddingtonHistory handles GET /api/v1/stats/eddington/history
 func (h *StatsHandler) GetEddingtonHistory(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -151,7 +151,7 @@ func (h *StatsHandler) GetEddingtonHistory(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, points)
+	shared.WriteSuccess(w, points)
 }
 
 // GetBestEfforts handles GET /api/v1/stats/best-efforts
@@ -159,7 +159,7 @@ func (h *StatsHandler) GetEddingtonHistory(w http.ResponseWriter, r *http.Reques
 func (h *StatsHandler) GetBestEfforts(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -177,14 +177,14 @@ func (h *StatsHandler) GetBestEfforts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, prs)
+	shared.WriteSuccess(w, prs)
 }
 
 // GetBestEffortsByDistance handles GET /api/v1/stats/best-efforts/{distanceType}
 func (h *StatsHandler) GetBestEffortsByDistance(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -204,14 +204,14 @@ func (h *StatsHandler) GetBestEffortsByDistance(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	writeJSON(w, http.StatusOK, items)
+	shared.WriteSuccess(w, items)
 }
 
 // GetRewindYears handles GET /api/v1/stats/rewind/years
 func (h *StatsHandler) GetRewindYears(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -223,14 +223,14 @@ func (h *StatsHandler) GetRewindYears(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, years)
+	shared.WriteSuccess(w, years)
 }
 
 // GetRewind handles GET /api/v1/stats/rewind?year=YYYY
 func (h *StatsHandler) GetRewind(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -252,14 +252,14 @@ func (h *StatsHandler) GetRewind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, report)
+	shared.WriteSuccess(w, report)
 }
 
 // GetPowerStats handles GET /api/v1/stats/power
 func (h *StatsHandler) GetPowerStats(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -284,7 +284,7 @@ func (h *StatsHandler) GetPowerStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 type HRZonesResponse struct {
@@ -298,7 +298,7 @@ type HRZonesResponse struct {
 func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -318,7 +318,7 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 
 	defs, err := h.zones.ListHR(r.Context(), athlete.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load zone definitions"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load zone definitions"))
 		return
 	}
 	if len(defs) == 0 {
@@ -360,7 +360,7 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(r.Context(), query, args...)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to query activities"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to query activities"))
 		return
 	}
 
@@ -376,14 +376,14 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 		var a activityInfo
 		if err := rows.Scan(&a.id, &a.sportType, &a.start); err != nil {
 			_ = rows.Close()
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to scan activities"})
+			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to scan activities"))
 			return
 		}
 		activities = append(activities, a)
 	}
 	if err := rows.Err(); err != nil {
 		_ = rows.Close()
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to iterate activities"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to iterate activities"))
 		return
 	}
 	_ = rows.Close()
@@ -400,7 +400,7 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 		group := sportGroup(a.sportType)
 		def, zcfg, err := h.zones.GetApplicableHR(r.Context(), athlete.ID, group, a.start.Time)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load zone definition"})
+			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load zone definition"))
 			return
 		}
 		if def == nil || zcfg == nil || len(zcfg.Bounds) < 5 {
@@ -436,7 +436,7 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, HRZonesResponse{
+	shared.WriteSuccess(w, HRZonesResponse{
 		Method:        method,
 		Zones:         cfg,
 		SecondsByZone: secondsByZone,
@@ -455,7 +455,7 @@ type PowerZonesResponse struct {
 func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -491,7 +491,7 @@ func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(r.Context(), query, args...)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to query activities"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to query activities"))
 		return
 	}
 
@@ -551,7 +551,7 @@ func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, PowerZonesResponse{
+	shared.WriteSuccess(w, PowerZonesResponse{
 		FTPWatts:      ftpUsed,
 		SecondsByZone: secondsByZone,
 		TotalSeconds:  totalSeconds,
@@ -563,7 +563,7 @@ func (h *StatsHandler) GetPowerZones(w http.ResponseWriter, r *http.Request) {
 func (h *StatsHandler) GetTrainingLoad(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -584,7 +584,7 @@ func (h *StatsHandler) GetTrainingLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 func sportGroup(sportType string) string {
@@ -606,7 +606,7 @@ type DistributionSlice struct {
 func (h *StatsHandler) GetDaytimeDistribution(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -640,7 +640,7 @@ func (h *StatsHandler) GetDaytimeDistribution(w http.ResponseWriter, r *http.Req
 
 	rows, err := h.db.QueryContext(r.Context(), query, args...)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to query distribution"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to query distribution"))
 		return
 	}
 	defer func() { _ = rows.Close() }()
@@ -650,7 +650,7 @@ func (h *StatsHandler) GetDaytimeDistribution(w http.ResponseWriter, r *http.Req
 		var bucket string
 		var count int
 		if err := rows.Scan(&bucket, &count); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to scan distribution"})
+			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to scan distribution"))
 			return
 		}
 		counts[bucket] = count
@@ -662,14 +662,14 @@ func (h *StatsHandler) GetDaytimeDistribution(w http.ResponseWriter, r *http.Req
 		out = append(out, DistributionSlice{Label: k, Count: counts[k]})
 	}
 
-	writeJSON(w, http.StatusOK, out)
+	shared.WriteSuccess(w, out)
 }
 
 // GetWeekdayDistribution handles GET /api/v1/stats/weekday
 func (h *StatsHandler) GetWeekdayDistribution(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -696,7 +696,7 @@ func (h *StatsHandler) GetWeekdayDistribution(w http.ResponseWriter, r *http.Req
 
 	rows, err := h.db.QueryContext(r.Context(), query, args...)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to query distribution"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to query distribution"))
 		return
 	}
 	defer func() { _ = rows.Close() }()
@@ -706,7 +706,7 @@ func (h *StatsHandler) GetWeekdayDistribution(w http.ResponseWriter, r *http.Req
 		var weekday int
 		var count int
 		if err := rows.Scan(&weekday, &count); err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to scan distribution"})
+			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to scan distribution"))
 			return
 		}
 		counts[weekday] = count
@@ -718,7 +718,7 @@ func (h *StatsHandler) GetWeekdayDistribution(w http.ResponseWriter, r *http.Req
 		out = append(out, DistributionSlice{Label: n, Count: counts[i]})
 	}
 
-	writeJSON(w, http.StatusOK, out)
+	shared.WriteSuccess(w, out)
 }
 
 type ZonesHandler struct {
@@ -733,51 +733,51 @@ func NewZonesHandler(zones *storage.ZonesRepository, stravaClient *strava.Client
 func (h *ZonesHandler) ListHR(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	defs, err := h.zones.ListHR(r.Context(), athlete.ID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load zone definitions"})
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load zone definitions"))
 		return
 	}
-	writeJSON(w, http.StatusOK, defs)
+	shared.WriteSuccess(w, defs)
 }
 
 func (h *ZonesHandler) UpsertHR(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	var def storage.HRZoneDefinition
 	if err := json.NewDecoder(r.Body).Decode(&def); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
 	if err := h.zones.UpsertHR(r.Context(), athlete.ID, def); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorResponse(err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	shared.WriteMessage(w, "ok")
 }
 
 func (h *ZonesHandler) DeleteHR(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	sportType := r.URL.Query().Get("sport_type")
 	effectiveFrom := r.URL.Query().Get("effective_from")
 	if err := h.zones.DeleteHR(r.Context(), athlete.ID, sportType, effectiveFrom); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorResponse(err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	shared.WriteMessage(w, "ok")
 }

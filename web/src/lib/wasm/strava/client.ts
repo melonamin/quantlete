@@ -15,7 +15,11 @@ import * as rateLimit from './ratelimit'
 import { getCredentials } from './credentials'
 
 // Remove trailing slash from worker URL to prevent double-slash in paths
-const WORKER_URL = (import.meta.env.VITE_CF_WORKER_URL || import.meta.env.VITE_STRAVA_WORKER_URL || '').replace(/\/$/, '')
+const WORKER_URL = (
+  import.meta.env.VITE_CF_WORKER_URL ||
+  import.meta.env.VITE_STRAVA_WORKER_URL ||
+  ''
+).replace(/\/$/, '')
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize'
 
 export interface StravaToken {
@@ -71,10 +75,7 @@ export function getAuthUrl(redirectUri: string): string {
  * Exchange an authorization code for tokens via the worker.
  * Sends credentials to the worker for the token exchange.
  */
-export async function exchangeCode(
-  code: string,
-  redirectUri: string
-): Promise<StravaAuthResponse> {
+export async function exchangeCode(code: string, redirectUri: string): Promise<StravaAuthResponse> {
   const credentials = getCredentials()
   if (!credentials) {
     throw new Error('Strava credentials not configured. Please configure your Strava app first.')
@@ -192,10 +193,7 @@ export function getAthlete(): StravaAthlete | null {
  * Make an authenticated API call to Strava via the worker.
  * Handles rate limiting with automatic waiting and retry.
  */
-export async function stravaFetch<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function stravaFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   // Wait if we're approaching rate limit
   await rateLimit.wait()
 
@@ -382,13 +380,7 @@ async function persistAuth(data: StravaAuthResponse): Promise<void> {
        refresh_token = EXCLUDED.refresh_token,
        token_type = EXCLUDED.token_type,
        expires_at = EXCLUDED.expires_at`,
-    [
-      data.athlete.id,
-      data.access_token,
-      data.refresh_token,
-      data.token_type,
-      data.expires_at,
-    ]
+    [data.athlete.id, data.access_token, data.refresh_token, data.token_type, data.expires_at]
   )
 
   await db.persist()

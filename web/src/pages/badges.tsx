@@ -75,9 +75,7 @@ export function BadgesPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Badges</h1>
-        <p className="text-muted-foreground">
-          Generate SVG badges from your stats
-        </p>
+        <p className="text-muted-foreground">Generate SVG badges from your stats</p>
       </div>
 
       {/* Public Badges Toggle - only shown in server mode (requires backend) */}
@@ -135,7 +133,14 @@ export function BadgesPage() {
               <BadgeGridSkeleton count={4} />
             ) : stats ? (
               <div className="grid gap-6 md:grid-cols-2">
-                <BadgePreview filename="distance" svgRef={distanceRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename="distance"
+                  svgRef={distanceRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <StatBadge
                     ref={distanceRef}
                     statType="distance"
@@ -146,7 +151,14 @@ export function BadgesPage() {
                     unitSystem={unitSystem}
                   />
                 </BadgePreview>
-                <BadgePreview filename="time" svgRef={timeRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename="time"
+                  svgRef={timeRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <StatBadge
                     ref={timeRef}
                     statType="time"
@@ -157,7 +169,14 @@ export function BadgesPage() {
                     unitSystem={unitSystem}
                   />
                 </BadgePreview>
-                <BadgePreview filename="elevation" svgRef={elevationRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename="elevation"
+                  svgRef={elevationRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <StatBadge
                     ref={elevationRef}
                     statType="elevation"
@@ -168,7 +187,14 @@ export function BadgesPage() {
                     unitSystem={unitSystem}
                   />
                 </BadgePreview>
-                <BadgePreview filename="activities" svgRef={activitiesRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename="activities"
+                  svgRef={activitiesRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <StatBadge
                     ref={activitiesRef}
                     statType="activities"
@@ -197,7 +223,14 @@ export function BadgesPage() {
               {eddingtonLoading ? (
                 <BadgeSkeleton />
               ) : eddington ? (
-                <BadgePreview filename="eddington" svgRef={eddingtonRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename="eddington"
+                  svgRef={eddingtonRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <EddingtonBadge
                     ref={eddingtonRef}
                     number={eddington.number}
@@ -213,7 +246,14 @@ export function BadgesPage() {
               {prsLoading ? (
                 <BadgeSkeleton />
               ) : topPR ? (
-                <BadgePreview filename={`pr-${topPR.distance_type}`} svgRef={prRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename={`pr-${topPR.distance_type}`}
+                  svgRef={prRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <PRBadge
                     ref={prRef}
                     distanceType={topPR.name}
@@ -243,7 +283,14 @@ export function BadgesPage() {
               {yearlyLoading ? (
                 <BadgeSkeleton />
               ) : currentYear ? (
-                <BadgePreview filename={`year-${currentYear.year}`} svgRef={yearlyRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename={`year-${currentYear.year}`}
+                  svgRef={yearlyRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <YearlyBadge
                     ref={yearlyRef}
                     year={currentYear.year}
@@ -261,7 +308,14 @@ export function BadgesPage() {
               {monthlyLoading ? (
                 <BadgeSkeleton />
               ) : currentMonth ? (
-                <BadgePreview filename={`month-${currentMonth.month}`} svgRef={monthlyRef} themeId={themeId} sizeId={sizeId} backgroundId={backgroundId} unitSystem={unitSystem}>
+                <BadgePreview
+                  filename={`month-${currentMonth.month}`}
+                  svgRef={monthlyRef}
+                  themeId={themeId}
+                  sizeId={sizeId}
+                  backgroundId={backgroundId}
+                  unitSystem={unitSystem}
+                >
                   <MonthlyBadge
                     ref={monthlyRef}
                     month={currentMonth.month}

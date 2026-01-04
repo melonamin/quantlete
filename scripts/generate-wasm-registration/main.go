@@ -94,6 +94,8 @@ var (
 	categoryRe = regexp.MustCompile(`^//wasm:category\s+(.+)$`)
 	// Matches: func funcName(this js.Value, args []js.Value) interface{}
 	funcDefRe = regexp.MustCompile(`^func (\w+)\(this js\.Value, args \[\]js\.Value\)`)
+	// Matches: var funcName = wrapWasm*("jsName", ...) or var funcName = wrapWasm*(...)
+	wrapperDefRe = regexp.MustCompile(`^var (\w+) = wrap\w+\(`)
 )
 
 func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
@@ -102,15 +104,13 @@ func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
 		return nil, fmt.Errorf("reading directory: %w", err)
 	}
 
-	var funcs []WasmFunc
+	// Use map to deduplicate: generated adapters override manual implementations
+	funcMap := make(map[string]WasmFunc)
 
+	// First pass: parse manual files (non-generated)
 	for _, entry := range entries {
 		name := entry.Name()
-		// Skip directories, non-Go files, and generated files
-		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
-			continue
-		}
-		if strings.HasSuffix(name, ".gen.go") {
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".gen.go") {
 			continue
 		}
 
@@ -118,7 +118,27 @@ func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", name, err)
 		}
-		funcs = append(funcs, fileFuncs...)
+		for _, f := range fileFuncs {
+			funcMap[f.JSName] = f
+		}
+	}
+
+	// Second pass: parse adapters.gen.go (these override manual implementations)
+	adaptersPath := filepath.Join(wasmDir, "adapters.gen.go")
+	if _, err := os.Stat(adaptersPath); err == nil {
+		adapterFuncs, err := parseFile(adaptersPath)
+		if err != nil {
+			return nil, fmt.Errorf("parsing adapters.gen.go: %w", err)
+		}
+		for _, f := range adapterFuncs {
+			funcMap[f.JSName] = f // Override manual implementation
+		}
+	}
+
+	// Convert map to slice
+	funcs := make([]WasmFunc, 0, len(funcMap))
+	for _, f := range funcMap {
+		funcs = append(funcs, f)
 	}
 
 	return funcs, nil
@@ -153,7 +173,7 @@ func parseFile(filePath string) ([]WasmFunc, error) {
 			continue
 		}
 
-		// Check for function definition
+		// Check for function definition (old style: func name(...))
 		if matches := funcDefRe.FindStringSubmatch(line); matches != nil && hasExport {
 			goName := matches[1]
 			jsName := pendingExport
@@ -171,8 +191,26 @@ func parseFile(filePath string) ([]WasmFunc, error) {
 			pendingExport = ""
 		}
 
-		// Reset on non-comment, non-empty lines (except func defs)
-		if !strings.HasPrefix(line, "//") && line != "" && !strings.HasPrefix(line, "func ") {
+		// Check for wrapper definition (new style: var name = wrapWasm*(...))
+		if matches := wrapperDefRe.FindStringSubmatch(line); matches != nil && hasExport {
+			goName := matches[1]
+			jsName := pendingExport
+			if jsName == "" {
+				jsName = goName // Default to Go variable name
+			}
+
+			funcs = append(funcs, WasmFunc{
+				JSName:   jsName,
+				GoName:   goName,
+				Category: currentCategory,
+			})
+
+			hasExport = false
+			pendingExport = ""
+		}
+
+		// Reset on non-comment, non-empty lines (except func/var defs)
+		if !strings.HasPrefix(line, "//") && line != "" && !strings.HasPrefix(line, "func ") && !strings.HasPrefix(line, "var ") {
 			hasExport = false
 			pendingExport = ""
 		}

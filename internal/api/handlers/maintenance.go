@@ -10,6 +10,7 @@ import (
 
 	"github.com/melonamin/quantlete/internal/pagination"
 	"github.com/melonamin/quantlete/internal/services"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/strava"
 )
 
@@ -25,9 +26,9 @@ func NewMaintenanceHandler(svc *services.MaintenanceService, stravaClient *strav
 }
 
 type createComponentRequest struct {
-	Name               string              `json:"name"`
-	ImageURL           string              `json:"image_url,omitempty"`
-	MaintenanceHashtag string              `json:"maintenance_hashtag,omitempty"`
+	Name               string               `json:"name"`
+	ImageURL           string               `json:"image_url,omitempty"`
+	MaintenanceHashtag string               `json:"maintenance_hashtag,omitempty"`
 	Rules              []services.RuleInput `json:"rules,omitempty"`
 }
 
@@ -35,7 +36,7 @@ type createComponentRequest struct {
 func (h *MaintenanceHandler) ListGearComponents(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -56,14 +57,14 @@ func (h *MaintenanceHandler) ListGearComponents(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	shared.WriteSuccess(w, result)
 }
 
 // CreateGearComponent handles POST /api/v1/gear/{id}/components
 func (h *MaintenanceHandler) CreateGearComponent(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -71,7 +72,7 @@ func (h *MaintenanceHandler) CreateGearComponent(w http.ResponseWriter, r *http.
 
 	var req createComponentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
@@ -88,7 +89,7 @@ func (h *MaintenanceHandler) CreateGearComponent(w http.ResponseWriter, r *http.
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, created)
+	shared.WriteJSONResponse(w, http.StatusCreated, shared.SuccessResponse(created))
 }
 
 type updateComponentRequest struct {
@@ -102,20 +103,20 @@ type updateComponentRequest struct {
 func (h *MaintenanceHandler) UpdateComponent(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid component id"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid component id"))
 		return
 	}
 
 	var req updateComponentRequest
 	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 		return
 	}
 
@@ -132,21 +133,21 @@ func (h *MaintenanceHandler) UpdateComponent(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	writeJSON(w, http.StatusOK, updated)
+	shared.WriteSuccess(w, updated)
 }
 
 // DeleteComponent handles DELETE /api/v1/components/{id}
 func (h *MaintenanceHandler) DeleteComponent(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid component id"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid component id"))
 		return
 	}
 
@@ -155,7 +156,7 @@ func (h *MaintenanceHandler) DeleteComponent(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+	shared.WriteSuccess(w, map[string]any{"deleted": true})
 }
 
 type logMaintenanceRequest struct {
@@ -167,21 +168,21 @@ type logMaintenanceRequest struct {
 func (h *MaintenanceHandler) LogMaintenance(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid component id"})
+		shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid component id"))
 		return
 	}
 
 	var req logMaintenanceRequest
 	if r.Body != nil {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid JSON"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid JSON"))
 			return
 		}
 	}
@@ -193,7 +194,7 @@ func (h *MaintenanceHandler) LogMaintenance(w http.ResponseWriter, r *http.Reque
 		} else if t, err := time.Parse("2006-01-02", *req.CompletedAt); err == nil {
 			completed = t
 		} else {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid completed_at"})
+			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid completed_at"))
 			return
 		}
 	}
@@ -208,14 +209,14 @@ func (h *MaintenanceHandler) LogMaintenance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"logged": true})
+	shared.WriteSuccess(w, map[string]any{"logged": true})
 }
 
 // Due handles GET /api/v1/maintenance/due
 func (h *MaintenanceHandler) Due(w http.ResponseWriter, r *http.Request) {
 	athlete := h.strava.GetAthlete()
 	if athlete == nil {
-		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "not authenticated"})
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
 		return
 	}
 
@@ -225,5 +226,5 @@ func (h *MaintenanceHandler) Due(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, items)
+	shared.WriteSuccess(w, items)
 }

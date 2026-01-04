@@ -14,7 +14,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Lock, HardDrive, BarChart3, Clock, ExternalLink, Eye, EyeOff, Loader2, ArrowRight, Key, Server } from 'lucide-react'
+import {
+  Lock,
+  HardDrive,
+  BarChart3,
+  Clock,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Loader2,
+  ArrowRight,
+  Key,
+  Server,
+} from 'lucide-react'
 import { shouldShowOnboarding } from './utils'
 
 type OnboardingStep = 'welcome' | 'credentials' | 'connect'
@@ -65,8 +77,7 @@ export function WelcomeModal() {
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Derive effective step - auto-advance from credentials if they're configured
-  const effectiveStep =
-    credentialsConfigured && step === 'credentials' ? 'connect' : step
+  const effectiveStep = credentialsConfigured && step === 'credentials' ? 'connect' : step
 
   const handleContinue = () => {
     if (credentialsConfigured) {
@@ -221,7 +232,8 @@ export function WelcomeModal() {
                 <AlertDescription className="text-sm ml-2">
                   <p className="font-medium mb-2">Why do I need my own app?</p>
                   <p className="text-muted-foreground">
-                    Strava limits API access to one athlete per app. Your credentials stay private{wasmMode ? ' in your browser' : ' on your server'}.
+                    Strava limits API access to one athlete per app. Your credentials stay private
+                    {wasmMode ? ' in your browser' : ' on your server'}.
                   </p>
                 </AlertDescription>
               </Alert>
@@ -240,7 +252,12 @@ export function WelcomeModal() {
                   </a>
                 </li>
                 <li>Create a new app (any name works)</li>
-                <li>Set callback domain to: <code className="text-xs bg-muted px-1 py-0.5 rounded">{window.location.host}</code></li>
+                <li>
+                  Set callback domain to:{' '}
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                    {window.location.host}
+                  </code>
+                </li>
                 <li>Copy your credentials below</li>
               </ol>
 
@@ -292,7 +309,11 @@ export function WelcomeModal() {
             </div>
 
             <DialogFooter className="flex-col gap-2 sm:flex-col">
-              <Button className="w-full" onClick={handleSaveCredentials} disabled={updateCredentials.isPending}>
+              <Button
+                className="w-full"
+                onClick={handleSaveCredentials}
+                disabled={updateCredentials.isPending}
+              >
                 {updateCredentials.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -316,9 +337,7 @@ export function WelcomeModal() {
           <>
             <DialogHeader>
               <DialogTitle className="text-2xl">Connect to Strava</DialogTitle>
-              <DialogDescription>
-                Authorize Quantlete to access your activities
-              </DialogDescription>
+              <DialogDescription>Authorize Quantlete to access your activities</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
@@ -336,7 +355,8 @@ export function WelcomeModal() {
 
               <div className="rounded-lg border border-border bg-muted/50 p-3">
                 <p className="text-sm text-muted-foreground">
-                  You&apos;ll be redirected to Strava to authorize access. After approval, you&apos;ll return here to start importing your activities.
+                  You&apos;ll be redirected to Strava to authorize access. After approval,
+                  you&apos;ll return here to start importing your activities.
                 </p>
               </div>
             </div>

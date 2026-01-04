@@ -4,7 +4,14 @@ import { WidgetWrapper } from './widget-wrapper'
 import { BarChart } from '@/components/charts'
 import { formatDistance, formatDuration } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface DistanceZone {
   label: string
@@ -42,17 +49,17 @@ export function DistanceBreakdown() {
     totalElevation: 0,
   }))
 
-  if (data?.data) {
-    for (const activity of data.data) {
-      const distance = activity.distance ?? 0
-      for (const zone of zones) {
-        if (distance >= zone.min && distance < zone.max) {
-          zone.count++
-          zone.totalDistance += distance
-          zone.totalTime += activity.moving_time ?? 0
-          zone.totalElevation += activity.total_elevation_gain ?? 0
-          break
-        }
+  // Use Array.isArray for defensive check against unexpected data shapes
+  const activities = Array.isArray(data?.data) ? data.data : []
+  for (const activity of activities) {
+    const distance = activity.distance ?? 0
+    for (const zone of zones) {
+      if (distance >= zone.min && distance < zone.max) {
+        zone.count++
+        zone.totalDistance += distance
+        zone.totalTime += activity.moving_time ?? 0
+        zone.totalElevation += activity.total_elevation_gain ?? 0
+        break
       }
     }
   }
@@ -113,7 +120,9 @@ export function DistanceBreakdown() {
                 <TableCell className="text-right">{zone.count}</TableCell>
                 <TableCell className="text-right">{formatDistance(zone.totalDistance)}</TableCell>
                 <TableCell className="text-right">{formatDuration(zone.totalTime)}</TableCell>
-                <TableCell className="text-right">{zone.totalElevation.toLocaleString()}m</TableCell>
+                <TableCell className="text-right">
+                  {zone.totalElevation.toLocaleString()}m
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

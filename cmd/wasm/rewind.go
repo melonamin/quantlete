@@ -3,9 +3,6 @@
 package main
 
 import (
-	"context"
-	"syscall/js"
-
 	"github.com/melonamin/quantlete/internal/services"
 )
 
@@ -17,38 +14,31 @@ import (
 
 // getRewindYears returns years that have activity data for rewind
 // Called from JS: goStorage.getRewindYears()
+//
 //wasm:export
-func getRewindYears(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getRewindYears")
-
-	ctx := context.Background()
-	years, err := bridge.statsService.GetRewindYears(ctx, services.GetRewindYearsInput{
-		AthleteID: bridge.athleteID,
+var getRewindYears = wrapWasmAthlete("getRewindYears", func(wc *WasmContext) interface{} {
+	years, err := wc.Registry.StatsService.GetRewindYears(wc.Ctx, services.GetRewindYearsInput{
+		AthleteID: wc.AthleteID,
 	})
 	if err != nil {
 		return errorJSON(err)
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": years,
-	})
-}
+	return dataJSON(years)
+})
 
 // getRewind returns the rewind report for a specific year
 // Called from JS: goStorage.getRewind(year)
+//
 //wasm:export
-func getRewind(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getRewind")
-
+var getRewind = wrapWasmAthlete("getRewind", func(wc *WasmContext) interface{} {
 	year := 0 // 0 = all-time
-	if len(args) > 0 && args[0].Type() == js.TypeNumber {
-		year = args[0].Int()
+	if wc.HasArg(0) {
+		year = wc.ArgInt(0)
 	}
 
-	ctx := context.Background()
-	report, err := bridge.statsService.GetRewind(ctx, services.GetRewindInput{
-		AthleteID: bridge.athleteID,
+	report, err := wc.Registry.StatsService.GetRewind(wc.Ctx, services.GetRewindInput{
+		AthleteID: wc.AthleteID,
 		Year:      year,
 	})
 	if err != nil {
@@ -56,10 +46,7 @@ func getRewind(this js.Value, args []js.Value) interface{} {
 	}
 
 	if report == nil {
-		return toJSON(map[string]interface{}{
-			"ok":   true,
-			"data": nil,
-		})
+		return dataJSON(nil)
 	}
 
 	// Convert to response format
@@ -179,8 +166,5 @@ func getRewind(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": data,
-	})
-}
+	return dataJSON(data)
+})

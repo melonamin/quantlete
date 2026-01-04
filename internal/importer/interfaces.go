@@ -184,15 +184,15 @@ type SegmentEffort struct {
 
 // BestEffort represents a best effort on a standard distance.
 type BestEffort struct {
-	ID           int64
-	Name         string
-	ElapsedTime  int
-	MovingTime   int
-	StartDate    time.Time
-	Distance     float64
-	PRRank       *int
-	StartIndex   *int
-	EndIndex     *int
+	ID          int64
+	Name        string
+	ElapsedTime int
+	MovingTime  int
+	StartDate   time.Time
+	Distance    float64
+	PRRank      *int
+	StartIndex  *int
+	EndIndex    *int
 }
 
 // Photo represents an activity photo.
@@ -221,43 +221,147 @@ type RateLimitInfo struct {
 // ImportStorage abstracts storage operations for the importer.
 // In server mode, this wraps the repository layer.
 // In WASM mode, this calls goStorage bridge functions.
+//
+// # Method Categories
+//
+// Methods are categorized as REQUIRED or OPTIONAL:
+//   - REQUIRED: Must be implemented. Returning nil without storing data will cause data loss.
+//   - OPTIONAL: May return nil to no-op. Used for platform-specific features.
+//
+// # Error Handling
+//
+// All methods should return errors on failure. The importer will:
+//   - Log the error for debugging
+//   - Track failures in the progress/error aggregation
+//   - Continue importing other items (non-fatal for individual items)
 type ImportStorage interface {
-	// Activities
+	// ─────────────────────────────────────────────────────────────────────────
+	// Athletes (OPTIONAL)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SaveAthlete stores an athlete profile.
+	// OPTIONAL: In WASM mode, athlete storage is handled by the JS layer during OAuth.
+	// Implementations may return nil to no-op.
+	SaveAthlete(ctx context.Context, a *Athlete) error
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Activities (REQUIRED)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SaveActivity stores an activity.
+	// REQUIRED: This is the core data type. Must be implemented.
 	SaveActivity(ctx context.Context, athleteID int64, a *Activity) error
 
-	// Streams
+	// ─────────────────────────────────────────────────────────────────────────
+	// Streams (REQUIRED when streams are imported)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SaveStream stores a stream.
+	// REQUIRED: Must be implemented when streams are not skipped.
 	SaveStream(ctx context.Context, activityID int64, streamType string, s *Stream) error
 
-	// Gear
+	// ─────────────────────────────────────────────────────────────────────────
+	// Gear (REQUIRED when gear is imported)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SaveGear stores gear.
+	// REQUIRED: Must be implemented to persist gear data.
 	SaveGear(ctx context.Context, athleteID int64, g *Gear) error
 
-	// Segments
+	// ─────────────────────────────────────────────────────────────────────────
+	// Segments (REQUIRED when segments are imported)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SaveSegment stores a segment.
+	// REQUIRED: Must be implemented when segments are not skipped.
 	SaveSegment(ctx context.Context, s *Segment) error
+
+	// SaveSegmentEffort stores a segment effort.
+	// REQUIRED: Must be implemented when segments are not skipped.
 	SaveSegmentEffort(ctx context.Context, athleteID int64, activityID int64, e *SegmentEffort, country string) error
 
-	// Best Efforts
+	// SaveSegmentWithEffort atomically saves both segment and effort in a single transaction.
+	// REQUIRED: Must be implemented when segments are not skipped.
+	SaveSegmentWithEffort(ctx context.Context, athleteID int64, activityID int64, e *SegmentEffort, country string) error
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Best Efforts (REQUIRED when best efforts are imported)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SaveBestEfforts stores best efforts for an activity.
+	// REQUIRED: Must be implemented when best efforts are not skipped.
 	SaveBestEfforts(ctx context.Context, athleteID, activityID int64, sportType string, efforts []BestEffort) error
 
-	// Photos
+	// ─────────────────────────────────────────────────────────────────────────
+	// Photos (REQUIRED when photos are imported)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// SavePhoto stores a photo.
+	// REQUIRED: Must be implemented when photos are not skipped.
 	SavePhoto(ctx context.Context, athleteID, activityID int64, p *Photo) error
 
-	// Gear linking
+	// ─────────────────────────────────────────────────────────────────────────
+	// Gear Linking (OPTIONAL)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// ResolveCustomGearID resolves a custom gear ID from hashtags in activity name.
+	// OPTIONAL: Returns empty string if custom gear linking is not supported.
 	ResolveCustomGearID(ctx context.Context, athleteID int64, activityName string) (string, error)
 
-	// Maintenance
+	// ─────────────────────────────────────────────────────────────────────────
+	// Maintenance (OPTIONAL)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// LogMaintenanceFromHashtags logs maintenance events from activity hashtags.
+	// OPTIONAL: Returns nil if maintenance tracking is not supported.
 	LogMaintenanceFromHashtags(ctx context.Context, athleteID, activityID int64, startDate time.Time, name string) error
 
-	// Sync History
+	// ─────────────────────────────────────────────────────────────────────────
+	// Sync History (OPTIONAL)
+	// ─────────────────────────────────────────────────────────────────────────
+	// These methods track sync run history and watermarks for incremental sync.
+	// Implementations may return empty results to disable sync history.
+
+	// StartSyncRun starts a new sync run record.
+	// OPTIONAL: Returns empty SyncRun if history tracking is not supported.
 	StartSyncRun(ctx context.Context, athleteID int64, opts storage.SyncRunOptions) (*storage.SyncRun, error)
+
+	// CompleteSyncRun completes a sync run with success.
+	// OPTIONAL: Returns nil if history tracking is not supported.
 	CompleteSyncRun(ctx context.Context, runID int64, counts storage.SyncRunCounts) error
+
+	// FailSyncRun marks a sync run as failed.
+	// OPTIONAL: Returns nil if history tracking is not supported.
 	FailSyncRun(ctx context.Context, runID int64, errMsg string, counts storage.SyncRunCounts) error
+
+	// CancelSyncRun marks a sync run as canceled.
+	// OPTIONAL: Returns nil if history tracking is not supported.
 	CancelSyncRun(ctx context.Context, runID int64, counts storage.SyncRunCounts) error
+
+	// GetSyncWatermark returns the sync watermark for incremental syncs.
+	// OPTIONAL: Returns nil if incremental sync is not supported.
 	GetSyncWatermark(ctx context.Context, athleteID int64) (*storage.SyncWatermark, error)
+
+	// SetSyncWatermark sets the sync watermark for incremental syncs.
+	// OPTIONAL: Returns nil if incremental sync is not supported.
 	SetSyncWatermark(ctx context.Context, athleteID int64, wm *storage.SyncWatermark) error
 
-	// State Persistence
+	// ─────────────────────────────────────────────────────────────────────────
+	// State Persistence (REQUIRED for resume capability)
+	// ─────────────────────────────────────────────────────────────────────────
+	// These methods persist import state for resume capability.
+	// If not implemented, imports cannot be resumed after interruption.
+
+	// SaveImportState saves the current import state for resume capability.
+	// REQUIRED for resume: Without this, interrupted imports cannot resume.
 	SaveImportState(ctx context.Context, state *ImportState) error
+
+	// LoadImportState loads the saved import state.
+	// REQUIRED for resume: Returns nil if no saved state exists.
 	LoadImportState(ctx context.Context) (*ImportState, error)
+
+	// ClearImportState clears the saved import state.
+	// REQUIRED for resume: Called after successful import completion.
 	ClearImportState(ctx context.Context) error
 }
 

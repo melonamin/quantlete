@@ -3,10 +3,7 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"syscall/js"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/storage"
@@ -20,15 +17,9 @@ import (
 
 // saveAthlete stores an athlete in the database
 // Called from JS: goStorage.saveAthlete(athleteJSON)
+//
 //wasm:export
-func saveAthlete(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("saveAthlete")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing athlete JSON"))
-	}
-
-	athleteJSON := args[0].String()
+var saveAthlete = wrapWasm("saveAthlete", func(wc *WasmContext) interface{} {
 	var req struct {
 		ID            int64  `json:"id"`
 		Username      string `json:"username"`
@@ -43,7 +34,7 @@ func saveAthlete(this js.Value, args []js.Value) interface{} {
 		Premium       bool   `json:"premium"`
 		Summit        bool   `json:"summit"`
 	}
-	if err := json.Unmarshal([]byte(athleteJSON), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing athlete: %w", err))
 	}
 
@@ -62,16 +53,17 @@ func saveAthlete(this js.Value, args []js.Value) interface{} {
 		Summit:        req.Summit,
 	}
 
-	ctx := context.Background()
-	if err := bridge.athletes.Upsert(ctx, athlete); err != nil {
+	if err := wc.Registry.Athletes().Upsert(wc.Ctx, athlete); err != nil {
 		return errorJSON(err)
 	}
 
 	// Set the athlete ID on the bridge
-	bridge.athleteID = req.ID
+	// Note: This is technically a race, but acceptable since athlete ID is set once
+	// during initialization and read-only thereafter.
+	wc.Bridge.athleteID = req.ID
 
 	return successJSON(fmt.Sprintf("Athlete %d saved", req.ID))
-}
+})
 
 // ============================================================================
 // Athlete Metrics (FTP/Weight)
@@ -81,12 +73,10 @@ func saveAthlete(this js.Value, args []js.Value) interface{} {
 
 // getFtpHistory returns FTP history for cycling
 // Called from JS: goStorage.getFtpHistory()
+//
 //wasm:export
-func getFtpHistory(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getFtpHistory")
-
-	ctx := context.Background()
-	points, err := bridge.athleteMetrics.List(ctx, bridge.athleteID, "ftp_cycling_watts")
+var getFtpHistory = wrapWasmAthlete("getFtpHistory", func(wc *WasmContext) interface{} {
+	points, err := wc.Registry.AthleteMetrics().List(wc.Ctx, wc.AthleteID, "ftp_cycling_watts")
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -99,20 +89,15 @@ func getFtpHistory(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": data,
-	})
-}
+	return dataJSON(data)
+})
 
 // getWeightHistory returns weight history
 // Called from JS: goStorage.getWeightHistory()
+//
 //wasm:export
-func getWeightHistory(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getWeightHistory")
-
-	ctx := context.Background()
-	points, err := bridge.athleteMetrics.List(ctx, bridge.athleteID, "weight")
+var getWeightHistory = wrapWasmAthlete("getWeightHistory", func(wc *WasmContext) interface{} {
+	points, err := wc.Registry.AthleteMetrics().List(wc.Ctx, wc.AthleteID, "weight")
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -125,27 +110,19 @@ func getWeightHistory(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": data,
-	})
-}
+	return dataJSON(data)
+})
 
 // updateFtpHistory replaces FTP history
 // Called from JS: goStorage.updateFtpHistory(entriesJSON)
+//
 //wasm:export
-func updateFtpHistory(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateFtpHistory")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing entries"))
-	}
-
+var updateFtpHistory = wrapWasmAthlete("updateFtpHistory", func(wc *WasmContext) interface{} {
 	var entries []struct {
 		RecordedAt string  `json:"recorded_at"`
 		Value      float64 `json:"value"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &entries); err != nil {
+	if err := wc.ArgJSON(0, &entries); err != nil {
 		return errorJSON(fmt.Errorf("parsing entries: %w", err))
 	}
 
@@ -161,29 +138,23 @@ func updateFtpHistory(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	ctx := context.Background()
-	if err := bridge.athleteMetrics.Replace(ctx, bridge.athleteID, "ftp_cycling_watts", points); err != nil {
+	if err := wc.Registry.AthleteMetrics().Replace(wc.Ctx, wc.AthleteID, "ftp_cycling_watts", points); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON(fmt.Sprintf("FTP history updated (%d entries)", len(points)))
-}
+})
 
 // updateWeightHistory replaces weight history
 // Called from JS: goStorage.updateWeightHistory(entriesJSON)
+//
 //wasm:export
-func updateWeightHistory(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateWeightHistory")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing entries"))
-	}
-
+var updateWeightHistory = wrapWasmAthlete("updateWeightHistory", func(wc *WasmContext) interface{} {
 	var entries []struct {
 		RecordedAt string  `json:"recorded_at"`
 		Value      float64 `json:"value"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &entries); err != nil {
+	if err := wc.ArgJSON(0, &entries); err != nil {
 		return errorJSON(fmt.Errorf("parsing entries: %w", err))
 	}
 
@@ -199,10 +170,9 @@ func updateWeightHistory(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	ctx := context.Background()
-	if err := bridge.athleteMetrics.Replace(ctx, bridge.athleteID, "weight", points); err != nil {
+	if err := wc.Registry.AthleteMetrics().Replace(wc.Ctx, wc.AthleteID, "weight", points); err != nil {
 		return errorJSON(err)
 	}
 
 	return successJSON(fmt.Sprintf("Weight history updated (%d entries)", len(points)))
-}
+})

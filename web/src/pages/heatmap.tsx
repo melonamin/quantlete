@@ -1,4 +1,4 @@
-import { useHeatmap } from '@/lib/api'
+import { useHeatmap, type HeatmapCountryStat } from '@/lib/api'
 import { Heatmap, getActivitiesBounds } from '@/components/maps'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -160,7 +160,7 @@ export function HeatmapPage() {
                       <MapPin className="h-3.5 w-3.5" />
                       All countries
                     </button>
-                    {countryStats.slice(0, 20).map((c) => (
+                    {countryStats.slice(0, 20).map((c: HeatmapCountryStat) => (
                       <button
                         key={c.country}
                         onClick={() => handleCountrySelect(c.country)}
@@ -187,7 +187,8 @@ export function HeatmapPage() {
           {/* More filters button */}
           <Button
             variant={
-              showAdvanced || (hasActiveFilters && (after || before || commute !== 'all' || workoutType))
+              showAdvanced ||
+              (hasActiveFilters && (after || before || commute !== 'all' || workoutType))
                 ? 'default'
                 : 'outline'
             }

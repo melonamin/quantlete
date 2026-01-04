@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useMonthlyStats, useSportTypeStats } from '@/lib/api'
 import { formatDistance, formatDuration } from '@/lib/format'
-import { AccordionTable, type AccordionTableColumn, type AccordionTableGroup } from '@/components/ui/accordion-table'
+import {
+  AccordionTable,
+  type AccordionTableColumn,
+  type AccordionTableGroup,
+} from '@/components/ui/accordion-table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'

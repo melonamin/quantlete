@@ -249,7 +249,9 @@ export class ServerProvider implements DataProvider {
     return get<HrZonesResponse>(`/stats/hr-zones${qs ? `?${qs}` : ''}`)
   }
 
-  async getTrainingLoad(filters: { after?: string; before?: string } = {}): Promise<TrainingLoadResponse> {
+  async getTrainingLoad(
+    filters: { after?: string; before?: string } = {}
+  ): Promise<TrainingLoadResponse> {
     const params = new URLSearchParams()
     if (filters.after) params.set('after', filters.after)
     if (filters.before) params.set('before', filters.before)
@@ -265,7 +267,10 @@ export class ServerProvider implements DataProvider {
     return put<{ status: string }>('/zones/hr', def)
   }
 
-  async deleteHrZoneDefinition(sportType: string, effectiveFrom: string): Promise<{ status: string }> {
+  async deleteHrZoneDefinition(
+    sportType: string,
+    effectiveFrom: string
+  ): Promise<{ status: string }> {
     return del<{ status: string }>(
       `/zones/hr?sport_type=${encodeURIComponent(sportType)}&effective_from=${encodeURIComponent(effectiveFrom)}`
     )
@@ -287,7 +292,10 @@ export class ServerProvider implements DataProvider {
     return get<BestEffortPR[]>(`/stats/best-efforts${params}`)
   }
 
-  async getBestEffortsForDistance(distanceType: string, sportType?: string): Promise<BestEffortItem[]> {
+  async getBestEffortsForDistance(
+    distanceType: string,
+    sportType?: string
+  ): Promise<BestEffortItem[]> {
     const params = sportType ? `?sport_type=${encodeURIComponent(sportType)}` : ''
     return get<BestEffortItem[]>(`/stats/best-efforts/${encodeURIComponent(distanceType)}${params}`)
   }
@@ -371,7 +379,10 @@ export class ServerProvider implements DataProvider {
     return get<SegmentDetailResponse>(`/segments/${id}`)
   }
 
-  async getSegmentEfforts(id: number, filters: SegmentEffortsFilters = {}): Promise<SegmentEffortsResponse> {
+  async getSegmentEfforts(
+    id: number,
+    filters: SegmentEffortsFilters = {}
+  ): Promise<SegmentEffortsResponse> {
     return get<SegmentEffortsResponse>(`/segments/${id}/efforts`, {
       page: filters.page,
       per_page: filters.per_page,
@@ -437,11 +448,18 @@ export class ServerProvider implements DataProvider {
       body: form,
       headers: { Accept: 'application/json' },
     })
+    const body = await response.json().catch(() => null)
     if (!response.ok) {
-      const body = await response.json().catch(() => null)
       throw new Error(body?.error || `Request failed: ${response.status}`)
     }
-    return response.json()
+    // Unwrap envelope response
+    if (body && typeof body === 'object' && 'ok' in body) {
+      if (!body.ok) {
+        throw new Error(body.error || 'Unknown error')
+      }
+      return body.data ?? body
+    }
+    return body
   }
 
   async importChallengesFromProfile(athleteId?: string): Promise<{ imported: number }> {
@@ -455,11 +473,18 @@ export class ServerProvider implements DataProvider {
       credentials: 'include',
       headers: { Accept: 'application/json' },
     })
+    const body = await response.json().catch(() => null)
     if (!response.ok) {
-      const body = await response.json().catch(() => null)
       throw new Error(body?.error || `Request failed: ${response.status}`)
     }
-    return response.json()
+    // Unwrap envelope response
+    if (body && typeof body === 'object' && 'ok' in body) {
+      if (!body.ok) {
+        throw new Error(body.error || 'Unknown error')
+      }
+      return body.data ?? body
+    }
+    return body
   }
 
   // ============================================================================
@@ -480,7 +505,10 @@ export class ServerProvider implements DataProvider {
     return get<DueComponent[]>('/maintenance/due')
   }
 
-  async getGearComponents(gearId: string, filters: ComponentsFilters = {}): Promise<ComponentsResponse> {
+  async getGearComponents(
+    gearId: string,
+    filters: ComponentsFilters = {}
+  ): Promise<ComponentsResponse> {
     return get<ComponentsResponse>(`/gear/${gearId}/components`, {
       page: filters.page,
       per_page: filters.per_page,

@@ -3,10 +3,7 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"syscall/js"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/storage"
@@ -20,15 +17,9 @@ import (
 
 // createSyncRun creates a new sync history record
 // Called from JS: goStorage.createSyncRun(dataJSON)
+//
 //wasm:export
-func createSyncRun(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("createSyncRun")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing data JSON"))
-	}
-
-	dataJSON := args[0].String()
+var createSyncRun = wrapWasm("createSyncRun", func(wc *WasmContext) interface{} {
 	var req struct {
 		AthleteID       int64 `json:"athlete_id"`
 		FullSync        bool  `json:"full_sync"`
@@ -37,12 +28,11 @@ func createSyncRun(this js.Value, args []js.Value) interface{} {
 		SkipBestEfforts bool  `json:"skip_best_efforts"`
 		SkipPhotos      bool  `json:"skip_photos"`
 	}
-	if err := json.Unmarshal([]byte(dataJSON), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing sync run: %w", err))
 	}
 
-	ctx := context.Background()
-	run, err := bridge.syncHistory.StartRun(ctx, req.AthleteID, storage.SyncRunOptions{
+	run, err := wc.Registry.SyncHistory().StartRun(wc.Ctx, req.AthleteID, storage.SyncRunOptions{
 		FullSync:        req.FullSync,
 		SkipStreams:     req.SkipStreams,
 		SkipSegments:    req.SkipSegments,
@@ -57,19 +47,13 @@ func createSyncRun(this js.Value, args []js.Value) interface{} {
 		"ok": true,
 		"id": run.ID,
 	})
-}
+})
 
 // updateSyncRun updates a sync history record status (for pause/resume)
 // Called from JS: goStorage.updateSyncRun(dataJSON)
+//
 //wasm:export
-func updateSyncRun(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("updateSyncRun")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing data JSON"))
-	}
-
-	dataJSON := args[0].String()
+var updateSyncRun = wrapWasm("updateSyncRun", func(wc *WasmContext) interface{} {
 	var req struct {
 		ID                 int64  `json:"id"`
 		Status             string `json:"status"`
@@ -79,7 +63,7 @@ func updateSyncRun(this js.Value, args []js.Value) interface{} {
 		FailedCount        int    `json:"failed_count"`
 		NewestActivityDate string `json:"newest_activity_date"`
 	}
-	if err := json.Unmarshal([]byte(dataJSON), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing sync run update: %w", err))
 	}
 
@@ -100,11 +84,10 @@ func updateSyncRun(this js.Value, args []js.Value) interface{} {
 	}
 
 	// Use the appropriate method based on status
-	ctx := context.Background()
 	var err error
 	switch req.Status {
 	case "canceled":
-		err = bridge.syncHistory.CancelRun(ctx, req.ID, counts)
+		err = wc.Registry.SyncHistory().CancelRun(wc.Ctx, req.ID, counts)
 	case "paused":
 		// For pause, just update the counts - no dedicated method, keep status as running
 		// The TS side handles pause state
@@ -118,19 +101,13 @@ func updateSyncRun(this js.Value, args []js.Value) interface{} {
 	}
 
 	return successJSON(fmt.Sprintf("Sync run %d updated", req.ID))
-}
+})
 
 // completeSyncRun marks a sync run as complete
 // Called from JS: goStorage.completeSyncRun(dataJSON)
+//
 //wasm:export
-func completeSyncRun(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("completeSyncRun")
-
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("missing data JSON"))
-	}
-
-	dataJSON := args[0].String()
+var completeSyncRun = wrapWasm("completeSyncRun", func(wc *WasmContext) interface{} {
 	var req struct {
 		ID                 int64  `json:"id"`
 		Status             string `json:"status"`
@@ -145,7 +122,7 @@ func completeSyncRun(this js.Value, args []js.Value) interface{} {
 		FailedCount        int    `json:"failed_count"`
 		NewestActivityDate string `json:"newest_activity_date"`
 	}
-	if err := json.Unmarshal([]byte(dataJSON), &req); err != nil {
+	if err := wc.ArgJSON(0, &req); err != nil {
 		return errorJSON(fmt.Errorf("parsing sync run completion: %w", err))
 	}
 
@@ -169,15 +146,14 @@ func completeSyncRun(this js.Value, args []js.Value) interface{} {
 		NewestActivityDate: newestDate,
 	}
 
-	ctx := context.Background()
 	var err error
 	switch req.Status {
 	case "completed":
-		err = bridge.syncHistory.CompleteRun(ctx, req.ID, counts)
+		err = wc.Registry.SyncHistory().CompleteRun(wc.Ctx, req.ID, counts)
 	case "failed":
-		err = bridge.syncHistory.FailRun(ctx, req.ID, req.Error, counts)
+		err = wc.Registry.SyncHistory().FailRun(wc.Ctx, req.ID, req.Error, counts)
 	case "canceled":
-		err = bridge.syncHistory.CancelRun(ctx, req.ID, counts)
+		err = wc.Registry.SyncHistory().CancelRun(wc.Ctx, req.ID, counts)
 	default:
 		return errorJSON(fmt.Errorf("unknown status for completion: %s", req.Status))
 	}
@@ -187,7 +163,7 @@ func completeSyncRun(this js.Value, args []js.Value) interface{} {
 	}
 
 	return successJSON(fmt.Sprintf("Sync run %d completed with status %s", req.ID, req.Status))
-}
+})
 
 // ============================================================================
 // Sync History Read
@@ -197,17 +173,15 @@ func completeSyncRun(this js.Value, args []js.Value) interface{} {
 
 // getSyncHistory retrieves sync history records
 // Called from JS: goStorage.getSyncHistory(limit?)
+//
 //wasm:export
-func getSyncHistory(this js.Value, args []js.Value) interface{} {
-	defer recoverPanic("getSyncHistory")
-
+var getSyncHistory = wrapWasmAthlete("getSyncHistory", func(wc *WasmContext) interface{} {
 	limit := 10
-	if len(args) > 0 && args[0].Type() == js.TypeNumber {
-		limit = args[0].Int()
+	if wc.HasArg(0) {
+		limit = wc.ArgInt(0)
 	}
 
-	ctx := context.Background()
-	runs, err := bridge.syncHistory.GetLatest(ctx, bridge.athleteID, limit)
+	runs, err := wc.Registry.SyncHistory().GetLatest(wc.Ctx, wc.AthleteID, limit)
 	if err != nil {
 		return errorJSON(err)
 	}
@@ -242,8 +216,5 @@ func getSyncHistory(this js.Value, args []js.Value) interface{} {
 		items[i] = item
 	}
 
-	return toJSON(map[string]interface{}{
-		"ok":   true,
-		"data": items,
-	})
-}
+	return dataJSON(items)
+})

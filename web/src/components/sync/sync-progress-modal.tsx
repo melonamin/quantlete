@@ -61,45 +61,27 @@ export function SyncProgressModal() {
           </DialogDescription>
         </DialogHeader>
 
-        {progress && progress.status !== 'idle' && (
-          <ImportStatus progress={progress} compact />
-        )}
+        {progress && progress.status !== 'idle' && <ImportStatus progress={progress} compact />}
 
         <DialogFooter className="gap-2 sm:gap-0">
           {isRunning && (
             <>
               {supportsPause && (
-                <Button
-                  variant="outline"
-                  onClick={handlePause}
-                  disabled={pauseImport.isPending}
-                >
+                <Button variant="outline" onClick={handlePause} disabled={pauseImport.isPending}>
                   Pause
                 </Button>
               )}
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                disabled={cancelImport.isPending}
-              >
+              <Button variant="outline" onClick={handleCancel} disabled={cancelImport.isPending}>
                 Cancel Sync
               </Button>
             </>
           )}
           {isPaused && supportsPause && (
             <>
-              <Button
-                variant="default"
-                onClick={handleResume}
-                disabled={resumeImport.isPending}
-              >
+              <Button variant="default" onClick={handleResume} disabled={resumeImport.isPending}>
                 Resume
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                disabled={cancelImport.isPending}
-              >
+              <Button variant="outline" onClick={handleCancel} disabled={cancelImport.isPending}>
                 Cancel Sync
               </Button>
             </>
