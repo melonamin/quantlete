@@ -1,6 +1,8 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -64,19 +66,20 @@ type ServiceRegistry struct {
 	stats           *storage.StatsRepository
 
 	// Services (public)
-	ActivityService    *ActivityService
-	GearService        *GearService
-	SegmentsService    *SegmentsService
-	PhotosService      *PhotosService
-	StatsService       *StatsService
-	DashboardService   *DashboardService
-	MaintenanceService *MaintenanceService
-	ChallengesService  *ChallengesService
+	ActivityService     *ActivityService
+	GearService         *GearService
+	SegmentsService     *SegmentsService
+	PhotosService       *PhotosService
+	StatsService        *StatsService
+	DashboardService    *DashboardService
+	MaintenanceService  *MaintenanceService
+	ChallengesService   *ChallengesService
+	NotificationService *NotificationService
 }
 
 // NewServiceRegistry creates a new registry with all repositories and services initialized.
 // Dependency ordering is handled automatically.
-func NewServiceRegistry(db *storage.DB) *ServiceRegistry {
+func NewServiceRegistry(db *storage.DB, logger *slog.Logger) *ServiceRegistry {
 	r := &ServiceRegistry{db: db}
 
 	// Phase 1: Leaf repositories (no dependencies)
@@ -111,6 +114,7 @@ func NewServiceRegistry(db *storage.DB) *ServiceRegistry {
 	r.DashboardService = NewDashboardService(db, r.stats, r.dashboardConfig)
 	r.MaintenanceService = NewMaintenanceService(r.maintenance)
 	r.ChallengesService = NewChallengesService(r.challenges)
+	r.NotificationService = NewNotificationService(logger, r.settings)
 
 	return r
 }

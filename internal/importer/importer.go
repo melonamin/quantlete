@@ -136,6 +136,24 @@ type Importer struct {
 	// Time-based flush tracking (protected by eventMu).
 	eventMu           sync.Mutex
 	lastEventEmitTime time.Time
+
+	// Optional notification callback called on sync complete.
+	notifyOnComplete func(ctx context.Context, athleteID int64, stats SyncStats)
+}
+
+// SyncStats contains statistics about a completed sync for notifications.
+type SyncStats struct {
+	ActivitiesImported int
+	ActivitiesUpdated  int
+	Duration           time.Duration
+}
+
+// SetNotificationHandler sets a callback to be invoked when sync completes successfully.
+// The callback receives the athlete ID and sync statistics.
+func (i *Importer) SetNotificationHandler(fn func(ctx context.Context, athleteID int64, stats SyncStats)) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.notifyOnComplete = fn
 }
 
 // New creates a new importer with platform-agnostic interfaces.
@@ -340,6 +358,17 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 							"newest_activity_date", i.state.NewestActivityDate.Format(time.RFC3339))
 					}
 				}
+			}
+
+			// Send notification if handler is set
+			if i.notifyOnComplete != nil {
+				stats := SyncStats{
+					ActivitiesImported: counts.ActivitiesImported,
+					ActivitiesUpdated:  counts.ActivitiesTotal - counts.ActivitiesImported - counts.ActivitiesSkipped,
+					Duration:           time.Since(i.progress.StartedAt),
+				}
+				// Run notification in goroutine to not block completion
+				go i.notifyOnComplete(context.Background(), athleteID, stats)
 			}
 
 			// Clear state on successful completion

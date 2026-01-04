@@ -122,9 +122,7 @@ export function DistanceBreakdown() {
                 <TableCell className="text-right">{zone.count}</TableCell>
                 <TableCell className="text-right">{formatDistance(zone.totalDistance)}</TableCell>
                 <TableCell className="text-right">{formatDuration(zone.totalTime)}</TableCell>
-                <TableCell className="text-right">
-                  {formatElevation(zone.totalElevation)}
-                </TableCell>
+                <TableCell className="text-right">{formatElevation(zone.totalElevation)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

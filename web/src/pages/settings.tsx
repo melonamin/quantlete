@@ -13,8 +13,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSearch } from '@tanstack/react-router'
 import { getAuthUrl } from '@/lib/wasm/strava/client'
 import { isServerMode } from '@/lib/mode'
+import { features } from '@/lib/features'
 import {
   EddingtonDefinitionsEditor,
+  NotificationsEditor,
   SchedulerEditor,
   SectionHeader,
   SegmentedButtons,
@@ -41,6 +43,7 @@ import {
   Palette,
   Wrench,
   Smartphone,
+  Bell,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDistance } from 'date-fns'
@@ -577,40 +580,29 @@ export function SettingsPage() {
           </section>
         )}
 
-        {/* APP SECTION */}
-        <section>
-          <SectionHeader icon={Smartphone} title="App" />
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Install</CardTitle>
-                <CardDescription>Install for offline support and faster startup</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Add to Home Screen</p>
-                    <p className="text-sm text-muted-foreground">Install Quantlete as an app</p>
-                  </div>
-                  {isInstalled ? (
-                    <span className="text-sm text-muted-foreground">Installed</span>
-                  ) : canInstall ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        void promptInstall()
-                      }}
-                    >
-                      Install
-                    </Button>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Unavailable</span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+        {/* NOTIFICATIONS SECTION - Server mode only */}
+        {features.showNotificationSettings && isAuthenticated && appSettings && (
+          <section>
+            <SectionHeader icon={Bell} title="Notifications" />
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notification Settings</CardTitle>
+                  <CardDescription>
+                    Configure alerts for import completion and maintenance reminders
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <NotificationsEditor
+                    settings={appSettings}
+                    onSave={(s) => updateAppSettings.mutate(s)}
+                    saving={updateAppSettings.isPending}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   )

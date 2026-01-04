@@ -52,11 +52,7 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        icon={Route}
-        label="Distance"
-        value={formatDistance(activity.distance)}
-      />
+      <StatCard icon={Route} label="Distance" value={formatDistance(activity.distance)} />
       <StatCard
         icon={Clock}
         label="Moving Time"
@@ -80,11 +76,7 @@ export function ActivityStats({ activity }: ActivityStatsProps) {
       <StatCard
         icon={Gauge}
         label={isRunning ? 'Pace' : 'Speed'}
-        value={
-          isRunning
-            ? formatPace(activity.average_speed)
-            : formatSpeed(activity.average_speed)
-        }
+        value={isRunning ? formatPace(activity.average_speed) : formatSpeed(activity.average_speed)}
         subValue={
           isRunning
             ? `Max ${formatPace(activity.max_speed)}`

@@ -38,24 +38,25 @@ type Router struct {
 	registry     *services.ServiceRegistry
 
 	// Handlers for routes not yet using generated adapters
-	webhooksHandler    *handlers.StravaWebhookHandler
-	authHandler        *handlers.AuthHandler
-	importHandler      *handlers.ImportHandler
-	dashboardHandler   *handlers.DashboardHandler
-	goalsHandler       *handlers.GoalsHandler
-	athleteHandler     *handlers.AthleteHandler
-	statsHandler       *handlers.StatsHandler
-	zonesHandler       *handlers.ZonesHandler
-	settingsHandler    *handlers.SettingsHandler
-	segmentsHandler    *handlers.SegmentsHandler
-	gearHandler        *handlers.GearHandler // for custom gear operations
-	maintenanceHandler *handlers.MaintenanceHandler
-	photosHandler      *handlers.PhotosHandler
-	challengesHandler  *handlers.ChallengesHandler
-	exportHandler      *handlers.ExportHandler
-	weatherHandler     *handlers.WeatherHandler
-	setupHandler       *handlers.SetupHandler
-	badgesHandler      *handlers.BadgesHandler
+	webhooksHandler      *handlers.StravaWebhookHandler
+	authHandler          *handlers.AuthHandler
+	importHandler        *handlers.ImportHandler
+	dashboardHandler     *handlers.DashboardHandler
+	goalsHandler         *handlers.GoalsHandler
+	athleteHandler       *handlers.AthleteHandler
+	statsHandler         *handlers.StatsHandler
+	zonesHandler         *handlers.ZonesHandler
+	settingsHandler      *handlers.SettingsHandler
+	segmentsHandler      *handlers.SegmentsHandler
+	gearHandler          *handlers.GearHandler // for custom gear operations
+	maintenanceHandler   *handlers.MaintenanceHandler
+	photosHandler        *handlers.PhotosHandler
+	challengesHandler    *handlers.ChallengesHandler
+	exportHandler        *handlers.ExportHandler
+	weatherHandler       *handlers.WeatherHandler
+	setupHandler         *handlers.SetupHandler
+	badgesHandler        *handlers.BadgesHandler
+	notificationsHandler *handlers.NotificationsHandler
 }
 
 // securityHeaders middleware adds security headers to all responses.
@@ -187,7 +188,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	r.Use(csrfProtection(allowedOrigins))
 
 	// Create service registry (shared with WASM)
-	registry := services.NewServiceRegistry(db)
+	registry := services.NewServiceRegistry(db, slog.Default())
 
 	// Server-only repositories (OAuth, weather API)
 	tokenRepo := storage.NewTokenRepository(db)
@@ -214,6 +215,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	weatherHandler := handlers.NewWeatherHandler(weatherRepo, registry.Activities(), registry.Streams(), stravaClient, slog.Default())
 	setupHandler := handlers.NewSetupHandler(cfg, registry.AppState(), stravaClient)
 	badgesHandler := handlers.NewBadgesHandler(registry.Stats(), registry.Settings(), stravaClient)
+	notificationsHandler := handlers.NewNotificationsHandler(registry.NotificationService, stravaClient)
 
 	router := &Router{
 		Mux:          r,
@@ -222,24 +224,25 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 		stravaClient: stravaClient,
 		registry:     registry,
 
-		webhooksHandler:    webhooksHandler,
-		authHandler:        authHandler,
-		importHandler:      importHandler,
-		dashboardHandler:   dashboardHandler,
-		goalsHandler:       goalsHandler,
-		athleteHandler:     athleteHandler,
-		statsHandler:       statsHandler,
-		zonesHandler:       zonesHandler,
-		settingsHandler:    settingsHandler,
-		segmentsHandler:    segmentsHandler,
-		gearHandler:        gearHandler,
-		maintenanceHandler: maintenanceHandler,
-		photosHandler:      photosHandler,
-		challengesHandler:  challengesHandler,
-		exportHandler:      exportHandler,
-		weatherHandler:     weatherHandler,
-		setupHandler:       setupHandler,
-		badgesHandler:      badgesHandler,
+		webhooksHandler:      webhooksHandler,
+		authHandler:          authHandler,
+		importHandler:        importHandler,
+		dashboardHandler:     dashboardHandler,
+		goalsHandler:         goalsHandler,
+		athleteHandler:       athleteHandler,
+		statsHandler:         statsHandler,
+		zonesHandler:         zonesHandler,
+		settingsHandler:      settingsHandler,
+		segmentsHandler:      segmentsHandler,
+		gearHandler:          gearHandler,
+		maintenanceHandler:   maintenanceHandler,
+		photosHandler:        photosHandler,
+		challengesHandler:    challengesHandler,
+		exportHandler:        exportHandler,
+		weatherHandler:       weatherHandler,
+		setupHandler:         setupHandler,
+		badgesHandler:        badgesHandler,
+		notificationsHandler: notificationsHandler,
 	}
 
 	// Mount routes
@@ -398,6 +401,12 @@ func (r *Router) mountRoutes() {
 		router.Route("/settings", func(router chi.Router) {
 			router.Get("/", r.settingsHandler.Get)
 			router.Put("/", r.settingsHandler.Update)
+		})
+
+		// Notifications routes
+		router.Route("/notifications", func(router chi.Router) {
+			router.Post("/test", r.notificationsHandler.Test)
+			router.Post("/test-all", r.notificationsHandler.TestAll)
 		})
 
 		// Export routes (using generated adapters where available)

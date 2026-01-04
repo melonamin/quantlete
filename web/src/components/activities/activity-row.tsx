@@ -35,9 +35,7 @@ export function ActivityRow({ activity }: ActivityRowProps) {
       <TableCell className="text-muted-foreground">
         {formatDate(activity.start_date_local)}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {formatDistance(activity.distance)}
-      </TableCell>
+      <TableCell className="text-right tabular-nums">{formatDistance(activity.distance)}</TableCell>
       <TableCell className="text-right tabular-nums">
         {formatDuration(activity.moving_time)}
       </TableCell>

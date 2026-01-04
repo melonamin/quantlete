@@ -10,6 +10,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/melonamin/quantlete/internal/importer"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -37,13 +38,22 @@ type Scheduler struct {
 	strava        *strava.Client
 	settingsRepo  *storage.SettingsRepository
 	importer      *importer.Importer
+	maintenance   *services.MaintenanceService
+	notifications *services.NotificationService
 	reconcileTick time.Duration
 
 	mu         sync.Mutex
 	cron       *cron.Cron
 	entryIDs   map[string]cron.EntryID
-	lastConfig *storage.SchedulerSettings
+	lastConfig *schedulerConfigSnapshot
 	cancel     context.CancelFunc
+}
+
+// schedulerConfigSnapshot holds the last applied config for change detection.
+type schedulerConfigSnapshot struct {
+	Scheduler           storage.SchedulerSettings
+	MaintenanceSchedule string
+	MaintenanceEnabled  bool
 }
 
 func New(
@@ -51,12 +61,16 @@ func New(
 	stravaClient *strava.Client,
 	settingsRepo *storage.SettingsRepository,
 	imp *importer.Importer,
+	maintenance *services.MaintenanceService,
+	notifications *services.NotificationService,
 ) *Scheduler {
 	return &Scheduler{
 		logger:        logger,
 		strava:        stravaClient,
 		settingsRepo:  settingsRepo,
 		importer:      imp,
+		maintenance:   maintenance,
+		notifications: notifications,
 		reconcileTick: 30 * time.Second,
 		entryIDs:      map[string]cron.EntryID{},
 	}
@@ -149,7 +163,7 @@ func (s *Scheduler) reconcileOnce(ctx context.Context) {
 		return
 	}
 
-	s.applyConfig(ctx, athlete.ID, &settings.Scheduler)
+	s.applyConfig(ctx, athlete.ID, settings)
 }
 
 func (s *Scheduler) clearJobs() {
@@ -167,22 +181,36 @@ func (s *Scheduler) clearJobs() {
 	s.lastConfig = nil
 }
 
-func (s *Scheduler) applyConfig(_ context.Context, athleteID int64, cfg *storage.SchedulerSettings) {
+func (s *Scheduler) applyConfig(_ context.Context, athleteID int64, settings *storage.AthleteSettings) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.cron == nil || cfg == nil {
+	if s.cron == nil || settings == nil {
 		return
+	}
+
+	// Build current config snapshot
+	var maintenanceSchedule string
+	var maintenanceEnabled bool
+	if settings.Notifications != nil && settings.Notifications.Enabled && settings.Notifications.Events.MaintenanceDue {
+		maintenanceEnabled = true
+		maintenanceSchedule = settings.Notifications.Events.MaintenanceSchedule
+	}
+
+	current := schedulerConfigSnapshot{
+		Scheduler:           settings.Scheduler,
+		MaintenanceSchedule: maintenanceSchedule,
+		MaintenanceEnabled:  maintenanceEnabled,
 	}
 
 	// Avoid churn if unchanged.
-	if s.lastConfig != nil && *s.lastConfig == *cfg {
+	if s.lastConfig != nil && *s.lastConfig == current {
 		return
 	}
-	copied := *cfg
-	s.lastConfig = &copied
+	s.lastConfig = &current
 
-	s.configurePullSyncLocked(cfg.Pull)
+	s.configurePullSyncLocked(settings.Scheduler.Pull)
+	s.configureMaintenanceCheckLocked(athleteID, maintenanceEnabled, maintenanceSchedule)
 }
 
 func (s *Scheduler) setJobLocked(key string, enabled bool, spec string, fn func()) {
@@ -212,6 +240,27 @@ func (s *Scheduler) configurePullSyncLocked(cfg storage.PullSettings) {
 			s.logger.Info("scheduler: pull sync not started", "error", err)
 		}
 	})
+}
+
+func (s *Scheduler) configureMaintenanceCheckLocked(athleteID int64, enabled bool, schedule string) {
+	if s.maintenance == nil || s.notifications == nil {
+		return
+	}
+
+	spec := cronSpecForMaintenanceSchedule(schedule)
+	job := NewMaintenanceCheckJob(s.logger, s.maintenance, s.notifications, s.settingsRepo, athleteID)
+	s.setJobLocked("maintenance_check", enabled, spec, job.Run)
+}
+
+func cronSpecForMaintenanceSchedule(schedule string) string {
+	switch schedule {
+	case "weekly":
+		return "0 9 * * 0" // Sunday at 9:00 AM
+	case "monthly":
+		return "0 9 1 * *" // 1st of month at 9:00 AM
+	default:
+		return "0 9 * * 0" // Default to weekly
+	}
 }
 
 func cronSpecForPullSchedule(sched storage.PullSchedule) string {

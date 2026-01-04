@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/melonamin/quantlete/internal/notifications"
 )
 
 type VirtualWorldTileLayer struct {
@@ -34,7 +36,7 @@ const (
 const (
 	// AthleteSettingsVersion is the current schema version for AthleteSettings.
 	// Increment when adding new fields or changing structure.
-	AthleteSettingsVersion = 3
+	AthleteSettingsVersion = 4
 
 	// SchedulerSettingsVersion is the current schema version for SchedulerSettings.
 	SchedulerSettingsVersion = 2
@@ -56,19 +58,22 @@ type SchedulerSettings struct {
 }
 
 type AthleteSettings struct {
-	Version                int                              `json:"version"`
-	VirtualWorldTileLayers map[string]VirtualWorldTileLayer `json:"virtual_world_tile_layers"`
-	EddingtonDefinitions   []EddingtonDefinition            `json:"eddington_definitions,omitempty"`
-	Scheduler              SchedulerSettings                `json:"scheduler"`
-	EnablePublicBadges     bool                             `json:"enable_public_badges"`
+	Version                int                               `json:"version"`
+	VirtualWorldTileLayers map[string]VirtualWorldTileLayer  `json:"virtual_world_tile_layers"`
+	EddingtonDefinitions   []EddingtonDefinition             `json:"eddington_definitions,omitempty"`
+	Scheduler              SchedulerSettings                 `json:"scheduler"`
+	EnablePublicBadges     bool                              `json:"enable_public_badges"`
+	Notifications          *notifications.NotificationConfig `json:"notifications,omitempty"`
 }
 
 func DefaultAthleteSettings() AthleteSettings {
+	defaultNotifications := notifications.DefaultNotificationConfig()
 	return AthleteSettings{
 		Version:                AthleteSettingsVersion,
 		VirtualWorldTileLayers: map[string]VirtualWorldTileLayer{},
 		EddingtonDefinitions:   defaultEddingtonDefinitions(),
 		Scheduler:              defaultSchedulerSettings(),
+		Notifications:          &defaultNotifications,
 	}
 }
 
@@ -186,6 +191,15 @@ func migrateAthleteSettings(s *AthleteSettings) {
 	if s.Version < 3 {
 		// EnablePublicBadges defaults to false (zero value), no action needed.
 		s.Version = 3
+	}
+
+	// v3 -> v4: Added notification settings.
+	if s.Version < 4 {
+		if s.Notifications == nil {
+			defaultNotifications := notifications.DefaultNotificationConfig()
+			s.Notifications = &defaultNotifications
+		}
+		s.Version = 4
 	}
 
 	// Always normalize scheduler settings.

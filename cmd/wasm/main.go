@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 	"syscall/js"
 
@@ -80,7 +81,7 @@ func initStorage(this js.Value, args []js.Value) interface{} {
 
 	// Initialize bridge with service registry
 	setBridge(&WasmBridge{
-		registry: services.NewServiceRegistry(db),
+		registry: services.NewServiceRegistry(db, slog.Default()),
 	})
 
 	return successJSON("Database initialized")

@@ -45,6 +45,8 @@ export const features = {
   showWebhookSettings: isServerMode(),
   /** Show WASM-specific settings (database management, file import) */
   showWasmSettings: isWasmMode(),
+  /** Show notification settings (server only - requires backend) */
+  showNotificationSettings: isServerMode(),
 
   // Features that work in both modes
   /** Weather data from Open-Meteo (has CORS support) */

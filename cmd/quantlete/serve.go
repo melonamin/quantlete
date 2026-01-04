@@ -17,6 +17,7 @@ import (
 	"github.com/melonamin/quantlete/internal/config"
 	"github.com/melonamin/quantlete/internal/importer"
 	"github.com/melonamin/quantlete/internal/scheduler"
+	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
@@ -163,8 +164,22 @@ func runServe(port int, dev bool) error {
 		return fmt.Errorf("creating importer: %w", err)
 	}
 
+	// Create services for scheduler (maintenance checks, notifications)
+	registry := services.NewServiceRegistry(db, logger)
+
+	// Wire up import completion notifications
+	imp.SetNotificationHandler(func(ctx context.Context, athleteID int64, stats importer.SyncStats) {
+		if err := registry.NotificationService.NotifyImportComplete(ctx, athleteID, services.ImportStats{
+			ActivitiesImported: stats.ActivitiesImported,
+			ActivitiesUpdated:  stats.ActivitiesUpdated,
+			Duration:           stats.Duration,
+		}); err != nil {
+			slog.Warn("failed to send import notification", "error", err)
+		}
+	})
+
 	// Create scheduler (periodic sync, maintenance checks, etc.)
-	sched := scheduler.New(slog.Default(), stravaClient, settingsRepo, imp)
+	sched := scheduler.New(logger, stravaClient, settingsRepo, imp, registry.MaintenanceService, registry.NotificationService)
 	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
 	defer schedulerCancel()
 	if err := sched.Start(schedulerCtx); err != nil {

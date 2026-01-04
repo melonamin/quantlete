@@ -35,7 +35,7 @@ func TestCronSpecForPullSchedule(t *testing.T) {
 func TestScheduler_StartStop(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -79,7 +79,7 @@ func TestScheduler_StartStop(t *testing.T) {
 func TestScheduler_StopWhenNotRunning(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -92,7 +92,7 @@ func TestScheduler_StopWhenNotRunning(t *testing.T) {
 func TestScheduler_ClearJobs(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -136,7 +136,7 @@ func TestScheduler_ClearJobs(t *testing.T) {
 func TestScheduler_SetJobLocked(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -205,7 +205,7 @@ func TestScheduler_SetJobLocked(t *testing.T) {
 func TestScheduler_ConfigurePullSyncLocked(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -268,7 +268,7 @@ func TestScheduler_ConfigurePullSyncLocked(t *testing.T) {
 func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -282,15 +282,17 @@ func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 		_ = sched.Stop(stopCtx)
 	}()
 
-	cfg := &storage.SchedulerSettings{
-		Pull: storage.PullSettings{
-			Enabled:  true,
-			Schedule: storage.PullScheduleHourly,
+	settings := &storage.AthleteSettings{
+		Scheduler: storage.SchedulerSettings{
+			Pull: storage.PullSettings{
+				Enabled:  true,
+				Schedule: storage.PullScheduleHourly,
+			},
 		},
 	}
 
 	// Apply config first time
-	sched.applyConfig(ctx, 12345, cfg)
+	sched.applyConfig(ctx, 12345, settings)
 
 	sched.mu.Lock()
 	firstConfig := sched.lastConfig
@@ -302,7 +304,7 @@ func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 	}
 
 	// Apply same config again - should be a no-op (no churn)
-	sched.applyConfig(ctx, 12345, cfg)
+	sched.applyConfig(ctx, 12345, settings)
 
 	sched.mu.Lock()
 	secondEntryID := sched.entryIDs["pull_sync"]
@@ -313,14 +315,16 @@ func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 	}
 
 	// Apply different config - should update
-	cfg2 := &storage.SchedulerSettings{
-		Pull: storage.PullSettings{
-			Enabled:  true,
-			Schedule: storage.PullScheduleMidnight,
+	settings2 := &storage.AthleteSettings{
+		Scheduler: storage.SchedulerSettings{
+			Pull: storage.PullSettings{
+				Enabled:  true,
+				Schedule: storage.PullScheduleMidnight,
+			},
 		},
 	}
 
-	sched.applyConfig(ctx, 12345, cfg2)
+	sched.applyConfig(ctx, 12345, settings2)
 
 	sched.mu.Lock()
 	thirdEntryID := sched.entryIDs["pull_sync"]
