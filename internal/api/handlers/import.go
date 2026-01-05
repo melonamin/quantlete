@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/importer"
@@ -30,6 +31,7 @@ type ImportHandler struct {
 	importer       *importer.Importer
 	syncHistory    *storage.SyncHistoryRepository
 	stravaClient   *strava.Client
+	devMode        bool
 	allowedOrigins map[string]bool
 }
 
@@ -43,13 +45,33 @@ func NewImportHandler(imp *importer.Importer, syncHistory *storage.SyncHistoryRe
 	}
 }
 
-// SetAllowedOrigins configures the allowed origins for CORS on the SSE endpoint.
-// This should be called after creation to set the allowed origins list.
-func (h *ImportHandler) SetAllowedOrigins(origins []string) {
-	h.allowedOrigins = make(map[string]bool, len(origins))
-	for _, o := range origins {
+// SetOriginValidation configures origin validation for CORS on the SSE endpoint.
+// In dev mode, uses an explicit allowlist. In production mode, dynamically validates
+// that Origin matches the request's Host header (for self-hosted flexibility).
+func (h *ImportHandler) SetOriginValidation(devMode bool, devOrigins []string) {
+	h.devMode = devMode
+	h.allowedOrigins = make(map[string]bool, len(devOrigins))
+	for _, o := range devOrigins {
 		h.allowedOrigins[o] = true
 	}
+}
+
+// isOriginAllowed checks if the Origin header matches the request's Host.
+// This is safe for self-hosted apps where the user controls their proxy config.
+func isOriginAllowed(origin string, r *http.Request) bool {
+	// Extract host from origin (e.g., "http://localhost:8082" -> "localhost:8082")
+	originHost := origin
+	if idx := strings.Index(origin, "://"); idx != -1 {
+		originHost = origin[idx+3:]
+	}
+	// Remove trailing slash if present
+	originHost = strings.TrimSuffix(originHost, "/")
+
+	// Get the Host header from the request
+	requestHost := r.Host
+
+	// Compare hosts (case-insensitive)
+	return strings.EqualFold(originHost, requestHost)
 }
 
 // StartImportRequest represents a request to start an import.
@@ -139,12 +161,20 @@ func (h *ImportHandler) Events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
 
 	// CORS headers for SSE (allows cross-origin EventSource)
-	// Only reflect origin if it's in the allowed origins list to prevent
-	// arbitrary origins from accessing authenticated SSE streams.
+	// In dev mode: check against explicit allowlist
+	// In production: validate Origin matches request Host (for self-hosted flexibility)
 	origin := r.Header.Get("Origin")
-	if origin != "" && h.allowedOrigins[origin] {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	if origin != "" {
+		allowed := false
+		if h.devMode {
+			allowed = h.allowedOrigins[origin]
+		} else {
+			allowed = isOriginAllowed(origin, r)
+		}
+		if allowed {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
 	}
 
 	flusher, ok := w.(http.Flusher)

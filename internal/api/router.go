@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -92,10 +91,15 @@ func isAPIPath(path string) bool {
 
 // csrfProtection middleware validates Origin header for state-changing requests.
 // This prevents CSRF attacks by ensuring requests come from the same origin.
-func csrfProtection(allowedOrigins []string) func(http.Handler) http.Handler {
-	originSet := make(map[string]bool, len(allowedOrigins))
-	for _, o := range allowedOrigins {
-		originSet[o] = true
+//
+// For self-hosted apps, we dynamically validate that Origin matches the request's
+// Host header, since we can't know in advance what domain/port the user will use.
+// In dev mode, we use an explicit allowlist for localhost origins.
+func csrfProtection(devMode bool, devAllowedOrigins []string) func(http.Handler) http.Handler {
+	// Build allowlist for dev mode
+	devOriginSet := make(map[string]bool, len(devAllowedOrigins))
+	for _, o := range devAllowedOrigins {
+		devOriginSet[o] = true
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -110,16 +114,16 @@ func csrfProtection(allowedOrigins []string) func(http.Handler) http.Handler {
 			origin := r.Header.Get("Origin")
 			if origin == "" {
 				// Fallback to Referer if Origin not present (some browsers don't send Origin)
-				origin = r.Header.Get("Referer")
-				if origin != "" {
+				referer := r.Header.Get("Referer")
+				if referer != "" {
 					// Extract just the origin from referer URL
 					// Simple extraction: take everything up to the third slash
 					slashCount := 0
-					for i, c := range origin {
+					for i, c := range referer {
 						if c == '/' {
 							slashCount++
 							if slashCount == 3 {
-								origin = origin[:i]
+								origin = referer[:i]
 								break
 							}
 						}
@@ -134,17 +138,50 @@ func csrfProtection(allowedOrigins []string) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 					return
 				}
+				// No origin and no auth token - allow same-origin requests (no Origin header)
+				// Browsers always send Origin for cross-origin requests
+				next.ServeHTTP(w, r)
+				return
 			}
 
-			// Validate origin against allowlist
-			if origin != "" && !originSet[origin] {
-				http.Error(w, "CSRF validation failed: invalid origin", http.StatusForbidden)
-				return
+			// Validate origin
+			if devMode {
+				// Dev mode: check against explicit allowlist
+				if !devOriginSet[origin] {
+					http.Error(w, "CSRF validation failed: invalid origin", http.StatusForbidden)
+					return
+				}
+			} else {
+				// Production mode: validate Origin matches request Host
+				// This allows the app to work behind any reverse proxy configuration
+				if !IsOriginAllowed(origin, r) {
+					http.Error(w, "CSRF validation failed: invalid origin", http.StatusForbidden)
+					return
+				}
 			}
 
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// IsOriginAllowed checks if the Origin header matches the request's Host.
+// This is safe for self-hosted apps where the user controls their proxy config.
+// Exported for use by SSE handlers that need consistent origin validation.
+func IsOriginAllowed(origin string, r *http.Request) bool {
+	// Extract host from origin (e.g., "http://localhost:8082" -> "localhost:8082")
+	originHost := origin
+	if idx := strings.Index(origin, "://"); idx != -1 {
+		originHost = origin[idx+3:]
+	}
+	// Remove trailing slash if present
+	originHost = strings.TrimSuffix(originHost, "/")
+
+	// Get the Host header from the request
+	requestHost := r.Host
+
+	// Compare hosts (case-insensitive)
+	return strings.EqualFold(originHost, requestHost)
 }
 
 // NewRouter creates a new HTTP router with all routes configured.
@@ -159,33 +196,22 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(securityHeaders)
 
-	// Configure allowed origins for CORS and CSRF
-	var allowedOrigins []string
+	// Configure CORS for dev mode (production serves frontend from same origin)
+	var devAllowedOrigins []string
 	if cfg.Server.DevMode {
-		allowedOrigins = []string{"http://localhost:5173", "http://localhost:8081"}
+		devAllowedOrigins = []string{"http://localhost:5173", "http://localhost:8081"}
 		r.Use(cors.Handler(cors.Options{
-			AllowedOrigins:   allowedOrigins,
+			AllowedOrigins:   devAllowedOrigins,
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 			AllowCredentials: true,
 			MaxAge:           300,
 		}))
-	} else {
-		// In production, allow same-origin requests
-		// The frontend is embedded and served from the same origin
-		host := cfg.Server.Host
-		if host == "" {
-			host = "localhost"
-		}
-		origin := "http://" + host
-		if cfg.Server.Port != 80 && cfg.Server.Port != 0 {
-			origin = fmt.Sprintf("http://%s:%d", host, cfg.Server.Port)
-		}
-		allowedOrigins = []string{origin}
 	}
 
 	// CSRF protection for state-changing requests
-	r.Use(csrfProtection(allowedOrigins))
+	// In dev mode: explicit allowlist; in production: validate Origin matches Host
+	r.Use(csrfProtection(cfg.Server.DevMode, devAllowedOrigins))
 
 	// Create service registry (shared with WASM)
 	registry := services.NewServiceRegistry(db, slog.Default())
@@ -199,7 +225,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	webhooksHandler := handlers.NewStravaWebhookHandler(cfg, imp, registry.Activities(), registry.Settings(), stravaClient)
 	authHandler := handlers.NewAuthHandler(cfg, stravaClient, tokenRepo, registry.Athletes())
 	importHandler := handlers.NewImportHandler(imp, registry.SyncHistory(), stravaClient)
-	importHandler.SetAllowedOrigins(allowedOrigins) // Configure CORS for SSE endpoint
+	importHandler.SetOriginValidation(cfg.Server.DevMode, devAllowedOrigins) // Configure CORS for SSE endpoint
 	dashboardHandler := handlers.NewDashboardHandler(registry.DashboardService, stravaClient)
 	goalsHandler := handlers.NewGoalsHandler(registry.Goals(), stravaClient)
 	athleteHandler := handlers.NewAthleteHandler(registry.AthleteMetrics(), stravaClient)
