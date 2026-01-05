@@ -53,7 +53,24 @@ Start:
 docker compose up -d
 ```
 
+## Custom Port Mapping
+
+When mapping to a different external port, set `QUANTLETE_EXTERNAL_URL`:
+
+```bash
+docker run -d \
+  --name quantlete \
+  -p 3000:8081 \
+  -v quantlete-data:/data \
+  -e QUANTLETE_EXTERNAL_URL=http://localhost:3000 \
+  -e QUANTLETE_STRAVA_CLIENT_ID=your_client_id \
+  -e QUANTLETE_STRAVA_CLIENT_SECRET=your_client_secret \
+  ghcr.io/melonamin/quantlete:latest
+```
+
 ## With Reverse Proxy
+
+When behind a reverse proxy, set `QUANTLETE_EXTERNAL_URL` to your public URL:
 
 ### Traefik
 
@@ -65,9 +82,9 @@ services:
     volumes:
       - quantlete-data:/data
     environment:
+      - QUANTLETE_EXTERNAL_URL=https://quantlete.example.com
       - QUANTLETE_STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
       - QUANTLETE_STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
-      - QUANTLETE_STRAVA_REDIRECT_URI=https://quantlete.example.com/api/v1/auth/strava/callback
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.quantlete.rule=Host(`quantlete.example.com`)"
@@ -88,9 +105,9 @@ services:
     volumes:
       - quantlete-data:/data
     environment:
+      - QUANTLETE_EXTERNAL_URL=https://quantlete.example.com
       - QUANTLETE_STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
       - QUANTLETE_STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
-      - QUANTLETE_STRAVA_REDIRECT_URI=https://quantlete.example.com/api/v1/auth/strava/callback
     networks:
       - caddy
 
