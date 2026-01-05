@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/melonamin/quantlete/internal/importer"
 	"github.com/melonamin/quantlete/internal/notifications"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -232,31 +232,31 @@ func (s *NotificationService) filterAchievements(achievements []Achievement, eve
 	var filtered []Achievement
 	for _, a := range achievements {
 		switch a.Type {
-		case string(importer.AchievementPersonalRecord):
+		case string(shared.AchievementPersonalRecord):
 			if events.PersonalRecords {
 				filtered = append(filtered, a)
 			}
-		case string(importer.AchievementSegmentPR):
+		case string(shared.AchievementSegmentPR):
 			if events.SegmentPRs {
 				filtered = append(filtered, a)
 			}
-		case string(importer.AchievementEddingtonIncrease):
+		case string(shared.AchievementEddingtonIncrease):
 			if events.EddingtonIncrease {
 				filtered = append(filtered, a)
 			}
-		case string(importer.AchievementPowerRecord):
+		case string(shared.AchievementPowerRecord):
 			if events.PowerRecords {
 				filtered = append(filtered, a)
 			}
-		case string(importer.AchievementGoalComplete):
+		case string(shared.AchievementGoalComplete):
 			if events.GoalComplete {
 				filtered = append(filtered, a)
 			}
-		case string(importer.AchievementGearMilestone):
+		case string(shared.AchievementGearMilestone):
 			if events.GearMilestones {
 				filtered = append(filtered, a)
 			}
-		case string(importer.AchievementTrainingLoadAlert):
+		case string(shared.AchievementTrainingLoadAlert):
 			// Training load alerts check specific sub-types
 			if shouldIncludeTrainingLoadAlert(a.SubType, events) {
 				filtered = append(filtered, a)
@@ -270,11 +270,11 @@ func (s *NotificationService) filterAchievements(achievements []Achievement, eve
 // based on its subtype and the enabled event types.
 func shouldIncludeTrainingLoadAlert(subType string, events notifications.EventConfig) bool {
 	switch subType {
-	case importer.AlertSubTypeFatigue:
+	case shared.AlertSubTypeFatigue:
 		return events.FatigueWarning
-	case importer.AlertSubTypePeakForm:
+	case shared.AlertSubTypePeakForm:
 		return events.RecoveryAlert
-	case importer.AlertSubTypeOvertraining:
+	case shared.AlertSubTypeOvertraining:
 		return events.OvertrainingRisk
 	default:
 		return false

@@ -5,26 +5,29 @@ import (
 	"context"
 	"log/slog"
 	"strconv"
+
+	"github.com/melonamin/quantlete/internal/shared"
 )
 
-// AchievementType identifies the category of achievement.
-type AchievementType string
+// AchievementType is an alias to shared.AchievementType for backward compatibility.
+type AchievementType = shared.AchievementType
 
+// Achievement type constants - re-exported from shared for backward compatibility.
 const (
-	AchievementPersonalRecord    AchievementType = "personal_record"
-	AchievementSegmentPR         AchievementType = "segment_pr"
-	AchievementEddingtonIncrease AchievementType = "eddington_increase"
-	AchievementPowerRecord       AchievementType = "power_record"
-	AchievementGoalComplete      AchievementType = "goal_complete"
-	AchievementGearMilestone     AchievementType = "gear_milestone"
-	AchievementTrainingLoadAlert AchievementType = "training_load_alert"
+	AchievementPersonalRecord    = shared.AchievementPersonalRecord
+	AchievementSegmentPR         = shared.AchievementSegmentPR
+	AchievementEddingtonIncrease = shared.AchievementEddingtonIncrease
+	AchievementPowerRecord       = shared.AchievementPowerRecord
+	AchievementGoalComplete      = shared.AchievementGoalComplete
+	AchievementGearMilestone     = shared.AchievementGearMilestone
+	AchievementTrainingLoadAlert = shared.AchievementTrainingLoadAlert
 )
 
-// Training load alert subtypes.
+// Training load alert subtypes - re-exported from shared for backward compatibility.
 const (
-	AlertSubTypeFatigue      = "fatigue"
-	AlertSubTypePeakForm     = "peak_form"
-	AlertSubTypeOvertraining = "overtraining"
+	AlertSubTypeFatigue      = shared.AlertSubTypeFatigue
+	AlertSubTypePeakForm     = shared.AlertSubTypePeakForm
+	AlertSubTypeOvertraining = shared.AlertSubTypeOvertraining
 )
 
 // Achievement represents a detected achievement during import.

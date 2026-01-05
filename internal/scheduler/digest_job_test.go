@@ -125,18 +125,18 @@ func TestDigestJob_calculateDateRange(t *testing.T) {
 			name:   "weekly returns past 7 days",
 			period: DigestPeriodWeekly,
 			checkStart: func(start, now time.Time) bool {
-				// Start should be approximately 7 days ago
-				expected := now.AddDate(0, 0, -7)
-				diff := start.Sub(expected)
-				return diff < time.Second && diff > -time.Second
+				// Start should be 7 days ago at midnight
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				expected := today.AddDate(0, 0, -7)
+				return start.Equal(expected)
 			},
 			checkEnd: func(end, now time.Time) bool {
-				// End should be approximately now
-				diff := end.Sub(now)
-				return diff < time.Second && diff > -time.Second
+				// End should be today at midnight (exclusive end)
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				return end.Equal(today)
 			},
-			startDescribe: "7 days ago",
-			endDescribe:   "now",
+			startDescribe: "7 days ago at midnight",
+			endDescribe:   "today at midnight",
 		},
 		{
 			name:   "monthly returns previous calendar month",
@@ -144,35 +144,33 @@ func TestDigestJob_calculateDateRange(t *testing.T) {
 			checkStart: func(start, now time.Time) bool {
 				// Start should be first day of previous month at midnight
 				firstOfCurrentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-				lastOfPreviousMonth := firstOfCurrentMonth.AddDate(0, 0, -1)
-				expectedStart := time.Date(lastOfPreviousMonth.Year(), lastOfPreviousMonth.Month(), 1, 0, 0, 0, 0, now.Location())
+				expectedStart := firstOfCurrentMonth.AddDate(0, -1, 0)
 				return start.Equal(expectedStart)
 			},
 			checkEnd: func(end, now time.Time) bool {
-				// End should be last day of previous month
+				// End should be first of current month at midnight (exclusive end)
 				firstOfCurrentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-				expectedEnd := firstOfCurrentMonth.AddDate(0, 0, -1)
-				return end.Year() == expectedEnd.Year() &&
-					end.Month() == expectedEnd.Month() &&
-					end.Day() == expectedEnd.Day()
+				return end.Equal(firstOfCurrentMonth)
 			},
 			startDescribe: "first day of previous month",
-			endDescribe:   "last day of previous month",
+			endDescribe:   "first day of current month (exclusive)",
 		},
 		{
 			name:   "unknown period defaults to weekly",
 			period: DigestPeriod("unknown"),
 			checkStart: func(start, now time.Time) bool {
-				expected := now.AddDate(0, 0, -7)
-				diff := start.Sub(expected)
-				return diff < time.Second && diff > -time.Second
+				// Start should be 7 days ago at midnight (fallback to weekly)
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				expected := today.AddDate(0, 0, -7)
+				return start.Equal(expected)
 			},
 			checkEnd: func(end, now time.Time) bool {
-				diff := end.Sub(now)
-				return diff < time.Second && diff > -time.Second
+				// End should be today at midnight (fallback to weekly)
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				return end.Equal(today)
 			},
-			startDescribe: "7 days ago (fallback)",
-			endDescribe:   "now (fallback)",
+			startDescribe: "7 days ago at midnight (fallback)",
+			endDescribe:   "today at midnight (fallback)",
 		},
 	}
 
