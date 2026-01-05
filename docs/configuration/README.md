@@ -53,3 +53,4 @@ storage:
 
 - **[Environment Variables](environment.md)** - All available environment variables
 - **[Config File](config-file.md)** - YAML configuration format and locations
+- **[Notifications](notifications.md)** - Push notifications for events and achievements

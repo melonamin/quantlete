@@ -9,6 +9,7 @@
   - [Overview](configuration/README.md)
   - [Environment Variables](configuration/environment.md)
   - [Config File](configuration/config-file.md)
+  - [Notifications](configuration/notifications.md)
 
 - Reference
   - [Calculations](calculations.md)

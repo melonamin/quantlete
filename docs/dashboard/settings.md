@@ -117,6 +117,31 @@ Remove Strava connection:
 - Keeps imported data
 - Stops automatic syncs
 
+## Notifications
+
+Configure push notifications for events and achievements. See [Notifications Configuration](../configuration/notifications.md) for details.
+
+### Notification Services
+
+Add one or more notification services:
+- **Telegram** - Send to a Telegram chat
+- **Email (SMTP)** - Send via email
+- **Generic Webhook** - Send to any HTTP endpoint
+
+### Event Types
+
+Choose which events trigger notifications:
+
+- **Import Complete** - When sync finishes
+- **Achievements** - PRs, Eddington increases, goal completions
+- **Training Load** - Fatigue warnings, recovery alerts
+- **Maintenance** - Component service reminders
+- **Digests** - Weekly/monthly activity summaries
+
+### Testing
+
+Use the "Test" button to verify each service is configured correctly.
+
 ## Advanced
 
 ### Debug Mode
