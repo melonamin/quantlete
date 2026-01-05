@@ -10,6 +10,7 @@ import { useEffect, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDataProviderStatus } from '@/lib/data/context'
 import { useAuthStatus } from '@/lib/data/hooks'
+import { isWasmMode } from '@/lib/mode'
 import type { DataEvent, DataChangeSet } from '@/lib/data/events'
 
 /**
@@ -53,8 +54,14 @@ export function useDataEvents(): void {
   )
 
   useEffect(() => {
-    // Don't subscribe until authenticated to avoid 401 errors on SSE endpoint
-    if (!initialized || error || !provider || authLoading || !isAuthenticated) {
+    // Basic checks - need provider to be ready
+    if (!initialized || error || !provider) {
+      return
+    }
+
+    // In server mode, wait for auth to avoid 401 errors on SSE endpoint.
+    // In WASM mode, there's no SSE - events come via direct callbacks, so subscribe immediately.
+    if (!isWasmMode() && (authLoading || !isAuthenticated)) {
       return
     }
 
