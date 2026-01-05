@@ -81,7 +81,7 @@ import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 
 import * as goStorage from '@/lib/wasm/go-storage'
 import { loadAuth, isAuthenticated, getAthlete, getAuthUrl, exchangeCode } from '@/lib/wasm/strava'
-import { getCredentials, saveCredentials, hasCredentials } from '@/lib/wasm/strava/credentials'
+import { getCredentials, saveCredentials } from '@/lib/wasm/strava/credentials'
 
 // Global callbacks for Go importer events - set up during subscribeToEvents
 let importProgressCallback: ((progressJson: string) => void) | null = null
@@ -1696,12 +1696,14 @@ export class GoWasmProvider implements DataProvider {
       }
     }
 
+    // Use getCredentials() for both configured check and client_id to ensure consistency
     const creds = getCredentials()
+    const configured = creds !== null && !!creds.clientId && !!creds.clientSecret
     return {
-      configured: hasCredentials(),
+      configured,
       client_id: creds?.clientId,
       source: 'browser',
-      redirect_uri: window.location.origin + '/auth/callback',
+      redirect_uri: window.location.origin + '/oauth/callback',
     }
   }
 
@@ -1711,7 +1713,7 @@ export class GoWasmProvider implements DataProvider {
       configured: true,
       client_id: req.client_id,
       source: 'browser',
-      redirect_uri: window.location.origin + '/auth/callback',
+      redirect_uri: window.location.origin + '/oauth/callback',
     }
   }
 

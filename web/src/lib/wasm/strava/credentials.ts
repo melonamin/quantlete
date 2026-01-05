@@ -51,11 +51,11 @@ export async function saveCredentials(clientId: string, clientSecret: string): P
 
   goStorage.saveStravaCredentials(clientId, clientSecret)
 
-  // Persist to OPFS
-  await goStorage.persistDatabase()
-
-  // Update cache
+  // Update cache immediately so it's available for subsequent calls
   cachedCredentials = { clientId, clientSecret }
+
+  // Persist to OPFS (async, but cache is already updated)
+  await goStorage.persistDatabase()
 }
 
 /**

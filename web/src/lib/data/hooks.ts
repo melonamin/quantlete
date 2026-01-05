@@ -1299,8 +1299,9 @@ export function useUpdateCredentials() {
       if (!provider || !initialized) throw new Error('Provider not ready')
       return provider.updateCredentials(req)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['data', 'setup', 'credentials'] })
+    onSuccess: (data) => {
+      // Set cache directly with mutation result to avoid race condition with refetch
+      queryClient.setQueryData(['data', 'setup', 'credentials'], data)
     },
   })
 }
