@@ -1726,7 +1726,7 @@ export class GoWasmProvider implements DataProvider {
       try {
         const progress = JSON.parse(progressJson) as goStorage.GoImportProgress
         listener(
-          createSyncProgressEvent(progress.phase, {
+          createSyncProgressEvent(progress.status, progress.phase, {
             activities_done: progress.activities_done,
             activities_total: progress.activities_total,
             gear_done: progress.gear_done,
