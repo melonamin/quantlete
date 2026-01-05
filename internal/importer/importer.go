@@ -360,15 +360,22 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 				}
 			}
 
-			// Send notification if handler is set
-			if i.notifyOnComplete != nil {
+			// Send notification if handler is set.
+			// Copy the callback reference under lock to avoid data race with SetNotificationHandler.
+			notifyFn := i.notifyOnComplete
+			if notifyFn != nil {
 				stats := SyncStats{
 					ActivitiesImported: counts.ActivitiesImported,
 					ActivitiesUpdated:  counts.ActivitiesTotal - counts.ActivitiesImported - counts.ActivitiesSkipped,
 					Duration:           time.Since(i.progress.StartedAt),
 				}
-				// Run notification in goroutine to not block completion
-				go i.notifyOnComplete(context.Background(), athleteID, stats)
+				// Run notification in goroutine with timeout context to not block completion.
+				// Use a separate context since the import context may already be canceled.
+				notifyCtx, notifyCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				go func() {
+					defer notifyCancel()
+					notifyFn(notifyCtx, athleteID, stats)
+				}()
 			}
 
 			// Clear state on successful completion

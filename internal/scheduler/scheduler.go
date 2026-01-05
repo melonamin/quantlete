@@ -10,6 +10,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/melonamin/quantlete/internal/importer"
+	notifcfg "github.com/melonamin/quantlete/internal/notifications"
 	"github.com/melonamin/quantlete/internal/services"
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
@@ -189,10 +190,13 @@ func (s *Scheduler) applyConfig(_ context.Context, athleteID int64, settings *st
 		return
 	}
 
-	// Build current config snapshot
+	// Build current config snapshot.
+	// Check for nil at each level to avoid panics on partially initialized settings.
 	var maintenanceSchedule string
 	var maintenanceEnabled bool
-	if settings.Notifications != nil && settings.Notifications.Enabled && settings.Notifications.Events.MaintenanceDue {
+	if settings.Notifications != nil &&
+		settings.Notifications.Enabled &&
+		settings.Notifications.Events.MaintenanceDue {
 		maintenanceEnabled = true
 		maintenanceSchedule = settings.Notifications.Events.MaintenanceSchedule
 	}
@@ -252,11 +256,13 @@ func (s *Scheduler) configureMaintenanceCheckLocked(athleteID int64, enabled boo
 	s.setJobLocked("maintenance_check", enabled, spec, job.Run)
 }
 
+// cronSpecForMaintenanceSchedule converts a maintenance schedule string to a cron spec.
+// Returns a weekly cron spec (Sunday at 9:00 AM) by default.
 func cronSpecForMaintenanceSchedule(schedule string) string {
 	switch schedule {
-	case "weekly":
+	case notifcfg.MaintenanceScheduleWeekly:
 		return "0 9 * * 0" // Sunday at 9:00 AM
-	case "monthly":
+	case notifcfg.MaintenanceScheduleMonthly:
 		return "0 9 1 * *" // 1st of month at 9:00 AM
 	default:
 		return "0 9 * * 0" // Default to weekly

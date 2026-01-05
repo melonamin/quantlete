@@ -42,12 +42,10 @@ import {
   RefreshCw,
   Palette,
   Wrench,
-  Smartphone,
   Bell,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDistance } from 'date-fns'
-import { useInstallPrompt } from '@/hooks/use-install-prompt'
 import { useSettingsStore, type Theme, type UnitSystem } from '@/stores/settings'
 
 interface SettingsSearchParams {
@@ -80,7 +78,6 @@ export function SettingsPage() {
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [authError, setAuthError] = useState<string | null>(search.auth_error || null)
 
-  const { canInstall, isInstalled, promptInstall } = useInstallPrompt()
   const unitSystem = useSettingsStore((s) => s.unitSystem)
   const setUnitSystem = useSettingsStore((s) => s.setUnitSystem)
   const theme = useSettingsStore((s) => s.theme)

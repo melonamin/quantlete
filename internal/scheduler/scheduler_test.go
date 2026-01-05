@@ -343,3 +343,53 @@ func TestSlogCronLogger(t *testing.T) {
 	logger.Info("test message", "key", "value")
 	logger.Error(nil, "test error", "key", "value")
 }
+
+func TestCronSpecForMaintenanceSchedule(t *testing.T) {
+	tests := []struct {
+		schedule string
+		wantSpec string
+	}{
+		{"weekly", "0 9 * * 0"},
+		{"monthly", "0 9 1 * *"},
+		{"", "0 9 * * 0"},        // Default to weekly
+		{"unknown", "0 9 * * 0"}, // Unknown falls back to weekly
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.schedule, func(t *testing.T) {
+			got := cronSpecForMaintenanceSchedule(tt.schedule)
+			if got != tt.wantSpec {
+				t.Errorf("cronSpecForMaintenanceSchedule(%q) = %q, want %q", tt.schedule, got, tt.wantSpec)
+			}
+		})
+	}
+}
+
+func TestScheduler_ConfigureMaintenanceCheckLocked(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	// Create scheduler without maintenance/notifications services
+	sched := New(logger, nil, nil, nil, nil, nil)
+
+	ctx := context.Background()
+
+	if err := sched.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	defer func() {
+		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		_ = sched.Stop(stopCtx)
+	}()
+
+	// Without maintenance/notifications services, configureMaintenanceCheckLocked should be a no-op
+	sched.mu.Lock()
+	sched.configureMaintenanceCheckLocked(12345, true, "weekly")
+	_, exists := sched.entryIDs["maintenance_check"]
+	sched.mu.Unlock()
+
+	if exists {
+		t.Error("maintenance_check job should not be created when services are nil")
+	}
+}

@@ -91,11 +91,11 @@ func (s *Sender) Send(ctx context.Context, title, message string) error {
 // BuildShoutrrrURL converts a ServiceConfig to a Shoutrrr URL format.
 func BuildShoutrrrURL(svc ServiceConfig) (string, error) {
 	switch svc.Type {
-	case "telegram":
+	case ServiceTypeTelegram:
 		return buildTelegramURL(svc.Config)
-	case "smtp":
+	case ServiceTypeSMTP:
 		return buildSMTPURL(svc.Config)
-	case "generic":
+	case ServiceTypeGeneric:
 		return buildGenericURL(svc.Config)
 	default:
 		return "", fmt.Errorf("unknown service type: %s", svc.Type)
