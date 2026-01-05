@@ -72,7 +72,7 @@ export function WelcomeModal() {
 
   // Determine if we should show the modal
   const isAuthenticated = auth?.authenticated ?? false
-  const credentialsConfigured = credentials?.configured ?? false
+  const credentialsConfigured = credentials?.configured // undefined until query completes
   const show = shouldShowOnboarding(
     isAuthenticated,
     authLoading,
@@ -82,14 +82,15 @@ export function WelcomeModal() {
   )
 
   // Derive effective step - auto-advance from credentials if they're configured
-  const effectiveStep = credentialsConfigured && step === 'credentials' ? 'connect' : step
+  const effectiveStep = credentialsConfigured === true && step === 'credentials' ? 'connect' : step
 
   const handleContinue = () => {
-    if (credentialsConfigured) {
+    if (credentialsConfigured === true) {
       setStep('connect')
-    } else {
+    } else if (credentialsConfigured === false) {
       setStep('credentials')
     }
+    // If undefined, don't advance (still loading)
   }
 
   const handleSaveCredentials = async () => {
