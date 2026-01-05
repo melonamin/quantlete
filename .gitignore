@@ -100,3 +100,4 @@ algorithms/.yarn/*
 # ===== Landing =====
 landing/node_modules/
 quantlete
+wasm

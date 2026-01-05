@@ -8,7 +8,7 @@ COPY web/ ./
 RUN yarn build:server
 
 # Build stage - Go binary
-FROM golang:1.24.5-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
 RUN apk add --no-cache git
 
@@ -34,19 +34,18 @@ RUN apk add --no-cache ca-certificates tzdata
 # Create non-root user
 RUN adduser -D -u 1000 quantlete
 
-WORKDIR /app
-
-COPY --from=go-builder /app/quantlete /app/quantlete
+COPY --from=go-builder /app/quantlete /usr/local/bin/quantlete
 
 # Create data directory
 RUN mkdir -p /data && chown quantlete:quantlete /data
 
 USER quantlete
 
+WORKDIR /data
 VOLUME /data
-ENV QUANTLETE_DATA_DIR=/data
+ENV QUANTLETE_STORAGE_DATA_DIR=/data
 
 EXPOSE 8081
 
-ENTRYPOINT ["/app/quantlete"]
+ENTRYPOINT ["quantlete"]
 CMD ["serve", "--port", "8081"]
