@@ -41,6 +41,25 @@ type EventConfig struct {
 	ImportComplete      bool   `json:"importComplete"`
 	MaintenanceDue      bool   `json:"maintenanceDue"`
 	MaintenanceSchedule string `json:"maintenanceSchedule"` // "weekly"|"monthly"
+
+	// Achievements (during import)
+	PersonalRecords   bool `json:"personalRecords"`   // Best effort PRs
+	SegmentPRs        bool `json:"segmentPRs"`        // Segment personal records
+	EddingtonIncrease bool `json:"eddingtonIncrease"` // Eddington number goes up
+	PowerRecords      bool `json:"powerRecords"`      // Peak power PRs
+	GoalComplete      bool `json:"goalComplete"`      // 100% goal completion
+
+	// Training Load (during import)
+	FatigueWarning   bool `json:"fatigueWarning"`   // TSB < -20
+	RecoveryAlert    bool `json:"recoveryAlert"`    // TSB > +10
+	OvertrainingRisk bool `json:"overtrainingRisk"` // ATL > CTL × 1.5
+
+	// Summaries (scheduled)
+	WeeklyDigest  bool `json:"weeklyDigest"`
+	MonthlyDigest bool `json:"monthlyDigest"`
+
+	// Gear
+	GearMilestones bool `json:"gearMilestones"` // Every 5000 km
 }
 
 // DefaultNotificationConfig returns the default opt-in config.
@@ -52,6 +71,21 @@ func DefaultNotificationConfig() NotificationConfig {
 			ImportComplete:      false,
 			MaintenanceDue:      false,
 			MaintenanceSchedule: MaintenanceScheduleWeekly,
+			// Achievements (during import)
+			PersonalRecords:   false,
+			SegmentPRs:        false,
+			EddingtonIncrease: false,
+			PowerRecords:      false,
+			GoalComplete:      false,
+			// Training Load (during import)
+			FatigueWarning:   false,
+			RecoveryAlert:    false,
+			OvertrainingRisk: false,
+			// Summaries (scheduled)
+			WeeklyDigest:  false,
+			MonthlyDigest: false,
+			// Gear
+			GearMilestones: false,
 		},
 	}
 }

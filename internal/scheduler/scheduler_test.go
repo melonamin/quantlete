@@ -35,7 +35,7 @@ func TestCronSpecForPullSchedule(t *testing.T) {
 func TestScheduler_StartStop(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -79,7 +79,7 @@ func TestScheduler_StartStop(t *testing.T) {
 func TestScheduler_StopWhenNotRunning(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -92,7 +92,7 @@ func TestScheduler_StopWhenNotRunning(t *testing.T) {
 func TestScheduler_ClearJobs(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -136,7 +136,7 @@ func TestScheduler_ClearJobs(t *testing.T) {
 func TestScheduler_SetJobLocked(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -205,7 +205,7 @@ func TestScheduler_SetJobLocked(t *testing.T) {
 func TestScheduler_ConfigurePullSyncLocked(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -268,7 +268,7 @@ func TestScheduler_ConfigurePullSyncLocked(t *testing.T) {
 func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 
@@ -369,7 +369,7 @@ func TestScheduler_ConfigureMaintenanceCheckLocked(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	// Create scheduler without maintenance/notifications services
-	sched := New(logger, nil, nil, nil, nil, nil)
+	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
 	ctx := context.Background()
 

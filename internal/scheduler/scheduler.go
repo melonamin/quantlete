@@ -41,6 +41,7 @@ type Scheduler struct {
 	importer      *importer.Importer
 	maintenance   *services.MaintenanceService
 	notifications *services.NotificationService
+	stats         *storage.StatsRepository
 	reconcileTick time.Duration
 
 	mu         sync.Mutex
@@ -55,6 +56,8 @@ type schedulerConfigSnapshot struct {
 	Scheduler           storage.SchedulerSettings
 	MaintenanceSchedule string
 	MaintenanceEnabled  bool
+	WeeklyDigest        bool
+	MonthlyDigest       bool
 }
 
 func New(
@@ -64,6 +67,7 @@ func New(
 	imp *importer.Importer,
 	maintenance *services.MaintenanceService,
 	notifications *services.NotificationService,
+	stats *storage.StatsRepository,
 ) *Scheduler {
 	return &Scheduler{
 		logger:        logger,
@@ -72,6 +76,7 @@ func New(
 		importer:      imp,
 		maintenance:   maintenance,
 		notifications: notifications,
+		stats:         stats,
 		reconcileTick: 30 * time.Second,
 		entryIDs:      map[string]cron.EntryID{},
 	}
@@ -194,17 +199,23 @@ func (s *Scheduler) applyConfig(_ context.Context, athleteID int64, settings *st
 	// Check for nil at each level to avoid panics on partially initialized settings.
 	var maintenanceSchedule string
 	var maintenanceEnabled bool
-	if settings.Notifications != nil &&
-		settings.Notifications.Enabled &&
-		settings.Notifications.Events.MaintenanceDue {
-		maintenanceEnabled = true
-		maintenanceSchedule = settings.Notifications.Events.MaintenanceSchedule
+	var weeklyDigest bool
+	var monthlyDigest bool
+	if settings.Notifications != nil && settings.Notifications.Enabled {
+		if settings.Notifications.Events.MaintenanceDue {
+			maintenanceEnabled = true
+			maintenanceSchedule = settings.Notifications.Events.MaintenanceSchedule
+		}
+		weeklyDigest = settings.Notifications.Events.WeeklyDigest
+		monthlyDigest = settings.Notifications.Events.MonthlyDigest
 	}
 
 	current := schedulerConfigSnapshot{
 		Scheduler:           settings.Scheduler,
 		MaintenanceSchedule: maintenanceSchedule,
 		MaintenanceEnabled:  maintenanceEnabled,
+		WeeklyDigest:        weeklyDigest,
+		MonthlyDigest:       monthlyDigest,
 	}
 
 	// Avoid churn if unchanged.
@@ -215,6 +226,8 @@ func (s *Scheduler) applyConfig(_ context.Context, athleteID int64, settings *st
 
 	s.configurePullSyncLocked(settings.Scheduler.Pull)
 	s.configureMaintenanceCheckLocked(athleteID, maintenanceEnabled, maintenanceSchedule)
+	s.configureWeeklyDigestLocked(athleteID, weeklyDigest)
+	s.configureMonthlyDigestLocked(athleteID, monthlyDigest)
 }
 
 func (s *Scheduler) setJobLocked(key string, enabled bool, spec string, fn func()) {
@@ -254,6 +267,28 @@ func (s *Scheduler) configureMaintenanceCheckLocked(athleteID int64, enabled boo
 	spec := cronSpecForMaintenanceSchedule(schedule)
 	job := NewMaintenanceCheckJob(s.logger, s.maintenance, s.notifications, s.settingsRepo, athleteID)
 	s.setJobLocked("maintenance_check", enabled, spec, job.Run)
+}
+
+func (s *Scheduler) configureWeeklyDigestLocked(athleteID int64, enabled bool) {
+	if s.stats == nil || s.notifications == nil {
+		return
+	}
+
+	// Monday at 9:00 AM
+	spec := "0 9 * * 1"
+	job := NewWeeklyDigestJob(s.logger, s.stats, s.notifications, s.settingsRepo, athleteID)
+	s.setJobLocked("weekly_digest", enabled, spec, job.Run)
+}
+
+func (s *Scheduler) configureMonthlyDigestLocked(athleteID int64, enabled bool) {
+	if s.stats == nil || s.notifications == nil {
+		return
+	}
+
+	// 1st of month at 9:00 AM
+	spec := "0 9 1 * *"
+	job := NewMonthlyDigestJob(s.logger, s.stats, s.notifications, s.settingsRepo, athleteID)
+	s.setJobLocked("monthly_digest", enabled, spec, job.Run)
 }
 
 // cronSpecForMaintenanceSchedule converts a maintenance schedule string to a cron spec.

@@ -39,6 +39,17 @@ type WeeklyStat struct {
 	TotalElevation float64 `json:"total_elevation"`
 }
 
+// DigestStats represents aggregated statistics for digest notifications.
+type DigestStats struct {
+	StartDate      time.Time `json:"start_date"`
+	EndDate        time.Time `json:"end_date"`
+	ActivityCount  int       `json:"activity_count"`
+	TotalDistance  float64   `json:"total_distance"`  // meters
+	TotalTime      int       `json:"total_time"`      // seconds
+	TotalElevation float64   `json:"total_elevation"` // meters
+	TotalCalories  float64   `json:"total_calories"`
+}
+
 // RecentActivity represents a simplified activity for the dashboard.
 type RecentActivity struct {
 	ID              int64      `json:"id"`
@@ -168,6 +179,41 @@ func (r *StatsRepository) GetWeeklyStats(ctx context.Context, athleteID int64) (
 	}
 
 	return stats, rows.Err()
+}
+
+// GetDigestStats returns aggregated statistics for a date range (for digest notifications).
+func (r *StatsRepository) GetDigestStats(ctx context.Context, athleteID int64, startDate, endDate time.Time) (*DigestStats, error) {
+	stats := &DigestStats{
+		StartDate: startDate,
+		EndDate:   endDate,
+	}
+
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(distance), 0),
+			COALESCE(SUM(moving_time), 0),
+			COALESCE(SUM(total_elevation_gain), 0),
+			COALESCE(SUM(calories), 0)
+		FROM activities
+		WHERE athlete_id = ?
+		  AND DATE(start_date_local) >= ?
+		  AND DATE(start_date_local) <= ?
+	`, athleteID, startStr, endStr).Scan(
+		&stats.ActivityCount,
+		&stats.TotalDistance,
+		&stats.TotalTime,
+		&stats.TotalElevation,
+		&stats.TotalCalories,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
 }
 
 // GetRecentActivities returns the most recent activities.

@@ -139,6 +139,10 @@ type Importer struct {
 
 	// Optional notification callback called on sync complete.
 	notifyOnComplete func(ctx context.Context, athleteID int64, stats SyncStats)
+
+	// Optional achievement detection support.
+	achievementStorage  AchievementStorage
+	achievementDetector *AchievementDetector
 }
 
 // SyncStats contains statistics about a completed sync for notifications.
@@ -146,6 +150,7 @@ type SyncStats struct {
 	ActivitiesImported int
 	ActivitiesUpdated  int
 	Duration           time.Duration
+	Achievements       []Achievement
 }
 
 // SetNotificationHandler sets a callback to be invoked when sync completes successfully.
@@ -154,6 +159,14 @@ func (i *Importer) SetNotificationHandler(fn func(ctx context.Context, athleteID
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.notifyOnComplete = fn
+}
+
+// SetAchievementStorage sets the achievement storage for detecting achievements during sync.
+// If set, achievements will be detected and included in SyncStats on completion.
+func (i *Importer) SetAchievementStorage(achievementStorage AchievementStorage) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.achievementStorage = achievementStorage
 }
 
 // New creates a new importer with platform-agnostic interfaces.
@@ -268,6 +281,15 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 		StartedAt: state.StartedAt,
 		Phase:     state.Phase,
 	}
+
+	// Initialize achievement detector if storage is available.
+	// Take snapshot before import to enable before/after comparison.
+	if i.achievementStorage != nil {
+		i.achievementDetector = NewAchievementDetector(nil, i.achievementStorage, athleteID)
+		if snapErr := i.achievementDetector.TakeSnapshot(ctx); snapErr != nil {
+			slog.Debug("failed to take achievement snapshot", "error", snapErr)
+		}
+	}
 	i.mu.Unlock()
 
 	// Reset event emit time under its own mutex
@@ -360,6 +382,23 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 				}
 			}
 
+			// Detect achievements if detector is available.
+			// Copy detector reference under lock to avoid data race.
+			detector := i.achievementDetector
+			activityIDs := i.state.ActivityIDs
+
+			var achievements []Achievement
+			if detector != nil && len(activityIDs) > 0 {
+				// Use a separate context since the import context may already be canceled.
+				detectCtx, detectCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				var detectErr error
+				achievements, detectErr = detector.DetectAchievements(detectCtx, activityIDs)
+				detectCancel()
+				if detectErr != nil {
+					slog.Warn("failed to detect achievements", "error", detectErr)
+				}
+			}
+
 			// Send notification if handler is set.
 			// Copy the callback reference under lock to avoid data race with SetNotificationHandler.
 			notifyFn := i.notifyOnComplete
@@ -368,6 +407,7 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 					ActivitiesImported: counts.ActivitiesImported,
 					ActivitiesUpdated:  counts.ActivitiesTotal - counts.ActivitiesImported - counts.ActivitiesSkipped,
 					Duration:           time.Since(i.progress.StartedAt),
+					Achievements:       achievements,
 				}
 				// Run notification in goroutine with timeout context to not block completion.
 				// Use a separate context since the import context may already be canceled.

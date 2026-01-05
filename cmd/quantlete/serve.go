@@ -102,6 +102,14 @@ func runServe(port int, dev bool) error {
 	maintenanceRepo := storage.NewMaintenanceRepository(db)
 	photoRepo := storage.NewPhotoRepository(db)
 	settingsRepo := storage.NewSettingsRepository(db)
+	statsRepo := storage.NewStatsRepository(db)
+
+	// Create repositories for achievement detection
+	metricsRepo := storage.NewAthleteMetricsRepository(db)
+	zonesRepo := storage.NewZonesRepository(db)
+	powerRepo := storage.NewPowerRepository(db, streamRepo)
+	trainingLoadRepo := storage.NewTrainingLoadRepository(db, streamRepo, metricsRepo, zonesRepo)
+	achievementRepo := storage.NewAchievementRepository(db, statsRepo, gearRepo, powerRepo, trainingLoadRepo)
 
 	// Only do Strava auth setup if not in demo mode
 	if demoMode != "true" {
@@ -164,11 +172,16 @@ func runServe(port int, dev bool) error {
 		return fmt.Errorf("creating importer: %w", err)
 	}
 
+	// Wire up achievement detection
+	achievementAdapter := importer.NewAchievementStorageAdapter(achievementRepo)
+	imp.SetAchievementStorage(achievementAdapter)
+
 	// Create services for scheduler (maintenance checks, notifications)
 	registry := services.NewServiceRegistry(db, logger)
 
-	// Wire up import completion notifications
+	// Wire up import completion and achievement notifications
 	imp.SetNotificationHandler(func(ctx context.Context, athleteID int64, stats importer.SyncStats) {
+		// Send import complete notification
 		if err := registry.NotificationService.NotifyImportComplete(ctx, athleteID, services.ImportStats{
 			ActivitiesImported: stats.ActivitiesImported,
 			ActivitiesUpdated:  stats.ActivitiesUpdated,
@@ -176,10 +189,26 @@ func runServe(port int, dev bool) error {
 		}); err != nil {
 			slog.Warn("failed to send import notification", "error", err)
 		}
+
+		// Send achievement notifications (batched)
+		if len(stats.Achievements) > 0 {
+			achievements := make([]services.Achievement, len(stats.Achievements))
+			for i, a := range stats.Achievements {
+				achievements[i] = services.Achievement{
+					Type:          string(a.Type),
+					Title:         a.Title,
+					Value:         a.Description,
+					PreviousValue: "",
+				}
+			}
+			if err := registry.NotificationService.NotifyAchievements(ctx, athleteID, achievements); err != nil {
+				slog.Warn("failed to send achievement notification", "error", err)
+			}
+		}
 	})
 
 	// Create scheduler (periodic sync, maintenance checks, etc.)
-	sched := scheduler.New(logger, stravaClient, settingsRepo, imp, registry.MaintenanceService, registry.NotificationService)
+	sched := scheduler.New(logger, stravaClient, settingsRepo, imp, registry.MaintenanceService, registry.NotificationService, statsRepo)
 	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
 	defer schedulerCancel()
 	if err := sched.Start(schedulerCtx); err != nil {

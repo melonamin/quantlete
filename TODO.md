@@ -9,7 +9,7 @@ This document tracks remaining implementation work. Completed phases (0-11) have
 | Phase | Focus                          | Status |
 | ----- | ------------------------------ | ------ |
 | 0-11  | Core Implementation            | ✓      |
-| 12    | Polish                         | ~85%   |
+| 12    | Polish                         | ~90%   |
 | 13    | Advanced Analytics             | Planned |
 | 14    | Explorer Tiles                 | Planned |
 
@@ -17,10 +17,10 @@ This document tracks remaining implementation work. Completed phases (0-11) have
 
 ## Phase 12: Polish (Remaining)
 
-### 12.7 Notifications
-- [ ] Integrate Shoutrrr for notifications
-- [ ] Create notification settings UI
-- [ ] Send notifications for import completion, maintenance due
+### 12.7 Notifications ✓
+- [x] Integrate Shoutrrr for notifications
+- [x] Create notification settings UI
+- [x] Send notifications for import completion, maintenance due
 
 ### 12.10 Final Polish
 - [ ] Accessibility audit (ARIA labels, keyboard navigation)
@@ -263,5 +263,5 @@ Create `web/src/lib/geo/tiles.ts`:
 <details>
 <summary>Phase 12: Polish (Completed Items)</summary>
 
-PWA support with service worker, unit system (metric/imperial), settings page with zones/FTP/weight, SVG badges with themes, Strava webhooks, scheduler with sync settings, security hardening (CSRF/CSP/headers), demo mode with realistic data generation.
+PWA support with service worker, unit system (metric/imperial), settings page with zones/FTP/weight, SVG badges with themes, Strava webhooks, scheduler with sync settings, security hardening (CSRF/CSP/headers), demo mode with realistic data generation, Shoutrrr notifications with settings UI.
 </details>

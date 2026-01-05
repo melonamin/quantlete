@@ -44,9 +44,29 @@ export interface NotificationServiceConfig {
 }
 
 export interface NotificationEvents {
+  // Sync Events
   importComplete: boolean
+
+  // Achievements (during import)
+  personalRecords: boolean
+  segmentPRs: boolean
+  eddingtonIncrease: boolean
+  powerRecords: boolean
+  goalComplete: boolean
+
+  // Training Load (during import)
+  fatigueWarning: boolean
+  recoveryAlert: boolean
+  overtrainingRisk: boolean
+
+  // Summaries (scheduled)
+  weeklyDigest: boolean
+  monthlyDigest: boolean
+
+  // Gear
   maintenanceDue: boolean
   maintenanceSchedule: 'weekly' | 'monthly'
+  gearMilestones: boolean
 }
 
 export interface NotificationConfig {

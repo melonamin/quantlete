@@ -36,7 +36,7 @@ const (
 const (
 	// AthleteSettingsVersion is the current schema version for AthleteSettings.
 	// Increment when adding new fields or changing structure.
-	AthleteSettingsVersion = 4
+	AthleteSettingsVersion = 5
 
 	// SchedulerSettingsVersion is the current schema version for SchedulerSettings.
 	SchedulerSettingsVersion = 2
@@ -200,6 +200,15 @@ func migrateAthleteSettings(s *AthleteSettings) {
 			s.Notifications = &defaultNotifications
 		}
 		s.Version = 4
+	}
+
+	// v4 -> v5: Added new notification event types.
+	// New fields: PersonalRecords, SegmentPRs, EddingtonIncrease, PowerRecords,
+	// GoalComplete, FatigueWarning, RecoveryAlert, OvertrainingRisk,
+	// WeeklyDigest, MonthlyDigest, GearMilestones.
+	// All default to false (zero value), no action needed beyond version bump.
+	if s.Version < 5 {
+		s.Version = 5
 	}
 
 	// Always normalize scheduler settings.

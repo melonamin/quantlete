@@ -31,9 +31,29 @@ const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   enabled: false,
   services: [],
   events: {
+    // Sync Events
     importComplete: true,
+
+    // Achievements
+    personalRecords: false,
+    segmentPRs: false,
+    eddingtonIncrease: false,
+    powerRecords: false,
+    goalComplete: false,
+
+    // Training Load
+    fatigueWarning: false,
+    recoveryAlert: false,
+    overtrainingRisk: false,
+
+    // Summaries
+    weeklyDigest: false,
+    monthlyDigest: false,
+
+    // Gear
     maintenanceDue: false,
     maintenanceSchedule: 'weekly',
+    gearMilestones: false,
   },
 }
 
@@ -284,57 +304,261 @@ export function NotificationsEditor({ settings, onSave, saving }: NotificationsE
               <p className="text-sm text-muted-foreground">Choose which events trigger notifications</p>
             </div>
 
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <Label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={events.importComplete}
-                  onCheckedChange={(checked) =>
-                    setEvents({ ...events, importComplete: !!checked })
-                  }
-                  disabled={saving}
-                />
-                Import Complete
-              </Label>
-              <p className="text-xs text-muted-foreground ml-6">
-                Notify when a data import finishes
-              </p>
-            </div>
-
-            <div className="space-y-3 rounded-md border border-border p-3">
-              <Label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={events.maintenanceDue}
-                  onCheckedChange={(checked) =>
-                    setEvents({ ...events, maintenanceDue: !!checked })
-                  }
-                  disabled={saving}
-                />
-                Maintenance Due
-              </Label>
-              <p className="text-xs text-muted-foreground ml-6">
-                Remind about bike maintenance on a schedule
-              </p>
-
-              {events.maintenanceDue && (
-                <div className="flex items-center justify-between gap-4 ml-6">
-                  <Label className="text-sm text-muted-foreground">Schedule</Label>
-                  <Select
-                    value={events.maintenanceSchedule}
-                    onValueChange={(value: 'weekly' | 'monthly') =>
-                      setEvents({ ...events, maintenanceSchedule: value })
+            {/* Sync Events */}
+            <div className="rounded-md border border-border p-3">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Sync Events</p>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={events.importComplete}
+                    onCheckedChange={(checked) =>
+                      setEvents({ ...events, importComplete: !!checked })
                     }
                     disabled={saving}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
+                  Import Complete
+                </Label>
+                <p className="text-xs text-muted-foreground ml-6">
+                  Notify when a data import finishes
+                </p>
+              </div>
+            </div>
+
+            {/* Achievements */}
+            <div className="rounded-md border border-border p-3">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Achievements</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.personalRecords}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, personalRecords: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Personal Records
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when setting a new best time on standard distances
+                  </p>
                 </div>
-              )}
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.segmentPRs}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, segmentPRs: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Segment PRs
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when setting a personal record on a segment
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.eddingtonIncrease}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, eddingtonIncrease: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Eddington Increase
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when your Eddington number increases
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.powerRecords}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, powerRecords: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Power Records
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when setting new peak power records
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.goalComplete}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, goalComplete: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Goal Complete
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when completing weekly/monthly/yearly goals
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Training Load */}
+            <div className="rounded-md border border-border p-3">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Training Load</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.fatigueWarning}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, fatigueWarning: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Fatigue Warning
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Warn when training stress balance is very low
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.recoveryAlert}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, recoveryAlert: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Recovery Alert
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when fully recovered from training
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.overtrainingRisk}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, overtrainingRisk: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Overtraining Risk
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Warn when acute load exceeds chronic load significantly
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Summaries */}
+            <div className="rounded-md border border-border p-3">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Summaries</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.weeklyDigest}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, weeklyDigest: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Weekly Digest
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Send weekly activity summary on Mondays
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.monthlyDigest}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, monthlyDigest: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Monthly Digest
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Send monthly activity summary on the 1st
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Gear */}
+            <div className="rounded-md border border-border p-3">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Gear</p>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.maintenanceDue}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, maintenanceDue: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Maintenance Due
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Remind about bike maintenance on a schedule
+                  </p>
+
+                  {events.maintenanceDue && (
+                    <div className="flex items-center justify-between gap-4 ml-6">
+                      <Label className="text-sm text-muted-foreground">Schedule</Label>
+                      <Select
+                        value={events.maintenanceSchedule}
+                        onValueChange={(value: 'weekly' | 'monthly') =>
+                          setEvents({ ...events, maintenanceSchedule: value })
+                        }
+                        disabled={saving}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={events.gearMilestones}
+                      onCheckedChange={(checked) =>
+                        setEvents({ ...events, gearMilestones: !!checked })
+                      }
+                      disabled={saving}
+                    />
+                    Gear Milestones
+                  </Label>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Notify when gear reaches 5,000 km milestones
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </>
