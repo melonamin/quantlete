@@ -313,3 +313,31 @@ func (h *ImportHandler) Watermark(w http.ResponseWriter, r *http.Request) {
 
 	shared.WriteSuccess(w, wm)
 }
+
+// ResetWatermark handles DELETE /api/v1/import/watermark
+// This clears the sync watermark so the next import will be a full sync.
+//
+// Note: This endpoint is not rate-limited. In a multi-user environment,
+// consider adding rate limiting to prevent abuse (repeated resets could
+// trigger expensive full syncs and hit Strava API rate limits).
+func (h *ImportHandler) ResetWatermark(w http.ResponseWriter, r *http.Request) {
+	if h.syncHistory == nil {
+		shared.WriteMessage(w, "watermark reset")
+		return
+	}
+
+	athlete := h.stravaClient.GetAthlete()
+	if athlete == nil {
+		shared.WriteJSONResponse(w, http.StatusUnauthorized, shared.ErrorMessage("not authenticated"))
+		return
+	}
+
+	if err := h.syncHistory.ClearWatermark(r.Context(), athlete.ID); err != nil {
+		slog.Error("failed to reset watermark", "error", err, "athlete_id", athlete.ID)
+		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to reset watermark"))
+		return
+	}
+
+	slog.Info("sync watermark reset", "athlete_id", athlete.ID)
+	shared.WriteMessage(w, "watermark reset - next sync will be full")
+}

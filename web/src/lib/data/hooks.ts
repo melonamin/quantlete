@@ -652,6 +652,24 @@ export function useSyncWatermark(enabled = true) {
   })
 }
 
+export function useResetSyncWatermark() {
+  const { provider, initialized } = useDataProviderStatus()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.resetSyncWatermark()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['data', 'import', 'watermark'] })
+    },
+    onError: (error) => {
+      console.error('Failed to reset sync watermark:', error)
+    },
+  })
+}
+
 // ============================================================================
 // Settings
 // ============================================================================

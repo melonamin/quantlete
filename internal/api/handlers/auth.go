@@ -100,8 +100,8 @@ type AuthStatusResponse struct {
 // InitiateOAuth handles GET /api/v1/auth/strava.
 // Redirects the user to Strava's OAuth authorization page.
 func (h *AuthHandler) InitiateOAuth(w http.ResponseWriter, r *http.Request) {
-	if h.cfg.Strava.ClientID == "" {
-		http.Error(w, "Strava client ID not configured", http.StatusServiceUnavailable)
+	if !h.strava.HasCredentials() {
+		http.Error(w, "Strava credentials not configured", http.StatusServiceUnavailable)
 		return
 	}
 

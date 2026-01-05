@@ -182,14 +182,17 @@ func (r *StatsRepository) GetWeeklyStats(ctx context.Context, athleteID int64) (
 }
 
 // GetDigestStats returns aggregated statistics for a date range (for digest notifications).
+// Uses range filter on start_date_local to allow index usage (avoids DATE() function).
 func (r *StatsRepository) GetDigestStats(ctx context.Context, athleteID int64, startDate, endDate time.Time) (*DigestStats, error) {
 	stats := &DigestStats{
 		StartDate: startDate,
 		EndDate:   endDate,
 	}
 
-	startStr := startDate.Format("2006-01-02")
-	endStr := endDate.Format("2006-01-02")
+	// Truncate to start of day and use half-open interval [start, end+1day)
+	// This is more efficient than DATE() as it can use indexes.
+	startTrunc := startDate.Truncate(24 * time.Hour)
+	endExclusive := endDate.Truncate(24 * time.Hour).Add(24 * time.Hour)
 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
@@ -200,9 +203,9 @@ func (r *StatsRepository) GetDigestStats(ctx context.Context, athleteID int64, s
 			COALESCE(SUM(calories), 0)
 		FROM activities
 		WHERE athlete_id = ?
-		  AND DATE(start_date_local) >= ?
-		  AND DATE(start_date_local) <= ?
-	`, athleteID, startStr, endStr).Scan(
+		  AND start_date_local >= ?
+		  AND start_date_local < ?
+	`, athleteID, startTrunc, endExclusive).Scan(
 		&stats.ActivityCount,
 		&stats.TotalDistance,
 		&stats.TotalTime,

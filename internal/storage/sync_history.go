@@ -300,6 +300,16 @@ func (r *SyncHistoryRepository) SetWatermark(ctx context.Context, athleteID int6
 	return r.appState.Set(ctx, key, string(data))
 }
 
+// ClearWatermark removes the sync watermark for an athlete, forcing a full sync on next import.
+func (r *SyncHistoryRepository) ClearWatermark(ctx context.Context, athleteID int64) error {
+	if r.appState == nil {
+		return nil
+	}
+
+	key := fmt.Sprintf("sync_watermark:%d", athleteID)
+	return r.appState.Delete(ctx, key)
+}
+
 // Helper functions
 func boolToInt(b bool) int {
 	if b {

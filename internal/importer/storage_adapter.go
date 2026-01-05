@@ -109,3 +109,109 @@ func (a *AchievementStorageAdapter) GetLatestTrainingLoad(ctx context.Context, a
 		TSB: load.TSB,
 	}, nil
 }
+
+// NotificationHistoryAdapter wraps a storage.NotificationHistoryRepository to implement
+// the importer.NotificationHistoryChecker interface.
+type NotificationHistoryAdapter struct {
+	repo *storage.NotificationHistoryRepository
+}
+
+// NewNotificationHistoryAdapter creates a new adapter wrapping the storage repository.
+func NewNotificationHistoryAdapter(repo *storage.NotificationHistoryRepository) *NotificationHistoryAdapter {
+	return &NotificationHistoryAdapter{repo: repo}
+}
+
+// HasBeenNotified checks if an achievement has already been notified.
+func (a *NotificationHistoryAdapter) HasBeenNotified(ctx context.Context, athleteID int64, achievementType, key string) (bool, error) {
+	return a.repo.HasBeenNotified(ctx, athleteID, achievementType, key)
+}
+
+// FilterNotified filters out achievements that have already been notified.
+// Returns only achievements that have NOT been notified yet.
+// Uses batch lookup to avoid N+1 queries.
+func (a *NotificationHistoryAdapter) FilterNotified(ctx context.Context, athleteID int64, achievements []Achievement) ([]Achievement, error) {
+	if len(achievements) == 0 {
+		return nil, nil
+	}
+
+	// Convert to storage items, keeping track of original achievements
+	items := make([]storage.NotificationHistoryItem, 0, len(achievements))
+	// Track achievements without keys - these will always be included
+	var keylessAchievements []Achievement
+
+	for _, ach := range achievements {
+		if ach.Key == "" {
+			keylessAchievements = append(keylessAchievements, ach)
+			continue
+		}
+		items = append(items, storage.NotificationHistoryItem{
+			AthleteID:       athleteID,
+			AchievementType: string(ach.Type),
+			AchievementKey:  ach.Key,
+		})
+	}
+
+	// If all achievements lack keys, return them all
+	if len(items) == 0 {
+		return keylessAchievements, nil
+	}
+
+	// Use batch lookup in storage layer
+	notNotified, err := a.repo.FilterNotified(ctx, athleteID, items)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build set of not-notified (type, key) pairs for O(1) lookup
+	notNotifiedSet := make(map[string]struct{}, len(notNotified))
+	for _, item := range notNotified {
+		notNotifiedSet[item.AchievementType+":"+item.AchievementKey] = struct{}{}
+	}
+
+	// Filter original achievements, keeping keyless ones and not-notified ones
+	result := make([]Achievement, 0, len(keylessAchievements)+len(notNotified))
+	result = append(result, keylessAchievements...)
+
+	for _, ach := range achievements {
+		if ach.Key == "" {
+			continue // Already added keyless achievements
+		}
+		key := string(ach.Type) + ":" + ach.Key
+		if _, ok := notNotifiedSet[key]; ok {
+			result = append(result, ach)
+		}
+	}
+
+	return result, nil
+}
+
+// MarkNotified records that an achievement has been notified.
+func (a *NotificationHistoryAdapter) MarkNotified(ctx context.Context, athleteID int64, achievementType, key string) error {
+	return a.repo.MarkNotified(ctx, athleteID, achievementType, key)
+}
+
+// MarkNotifiedBatch records multiple achievements as notified.
+func (a *NotificationHistoryAdapter) MarkNotifiedBatch(ctx context.Context, athleteID int64, achievements []Achievement) error {
+	if len(achievements) == 0 {
+		return nil
+	}
+
+	items := make([]storage.NotificationHistoryItem, 0, len(achievements))
+	for _, ach := range achievements {
+		if ach.Key == "" {
+			continue // Skip achievements without keys
+		}
+		items = append(items, storage.NotificationHistoryItem{
+			AthleteID:       athleteID,
+			AchievementType: string(ach.Type),
+			AchievementKey:  ach.Key,
+		})
+	}
+
+	// Early return if all achievements had empty keys
+	if len(items) == 0 {
+		return nil
+	}
+
+	return a.repo.MarkNotifiedBatch(ctx, athleteID, items)
+}

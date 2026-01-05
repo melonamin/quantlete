@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -63,6 +64,7 @@ type EventConfig struct {
 }
 
 // DefaultNotificationConfig returns the default opt-in config.
+// Note: When notifications are enabled, importComplete defaults to true as the most common use case.
 func DefaultNotificationConfig() NotificationConfig {
 	return NotificationConfig{
 		Enabled:  false,
@@ -147,6 +149,7 @@ func (s *ServiceConfig) validateTelegram() error {
 // validateSMTP validates SMTP-specific configuration.
 func (s *ServiceConfig) validateSMTP() error {
 	host := s.Config["host"]
+	port := s.Config["port"]
 	from := s.Config["from"]
 	to := s.Config["to"]
 
@@ -158,6 +161,17 @@ func (s *ServiceConfig) validateSMTP() error {
 	}
 	if to == "" {
 		return fmt.Errorf("smtp to address is required")
+	}
+
+	// Validate port if provided
+	if port != "" {
+		portNum, err := strconv.Atoi(port)
+		if err != nil {
+			return fmt.Errorf("smtp port must be a number: %w", err)
+		}
+		if portNum < 1 || portNum > 65535 {
+			return fmt.Errorf("smtp port must be between 1 and 65535")
+		}
 	}
 
 	// Validate email addresses
@@ -172,6 +186,9 @@ func (s *ServiceConfig) validateSMTP() error {
 }
 
 // validateGeneric validates generic webhook configuration.
+// Generic webhooks in shoutrrr use the "generic" scheme format:
+// generic://webhook.example.com/path or generic+https://webhook.example.com/path
+// However, we also accept standard HTTP/HTTPS URLs for convenience and convert them.
 func (s *ServiceConfig) validateGeneric() error {
 	urlStr := s.Config["url"]
 	if urlStr == "" {
@@ -183,9 +200,16 @@ func (s *ServiceConfig) validateGeneric() error {
 		return fmt.Errorf("generic url is invalid: %w", err)
 	}
 
-	// Only allow http/https schemes
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return fmt.Errorf("generic url must use http or https scheme")
+	// Accept http, https, generic, generic+http, generic+https schemes
+	validSchemes := map[string]bool{
+		"http":          true,
+		"https":         true,
+		"generic":       true,
+		"generic+http":  true,
+		"generic+https": true,
+	}
+	if !validSchemes[parsed.Scheme] {
+		return fmt.Errorf("generic url must use http, https, or generic scheme (got %q)", parsed.Scheme)
 	}
 
 	if parsed.Host == "" {

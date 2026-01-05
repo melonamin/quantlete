@@ -34,6 +34,11 @@ const (
 	EventDataChanged  EventType = "data:changed"
 )
 
+// Timeout constants for async operations.
+const (
+	achievementDetectionTimeout = 30 * time.Second
+)
+
 // Event represents an import event for SSE streaming.
 type Event struct {
 	Type EventType   `json:"type"`
@@ -142,6 +147,7 @@ type Importer struct {
 
 	// Optional achievement detection support.
 	achievementStorage  AchievementStorage
+	notificationHistory NotificationHistoryChecker
 	achievementDetector *AchievementDetector
 }
 
@@ -167,6 +173,14 @@ func (i *Importer) SetAchievementStorage(achievementStorage AchievementStorage) 
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.achievementStorage = achievementStorage
+}
+
+// SetNotificationHistory sets the notification history checker for filtering already-notified achievements.
+// If set, achievements that have already been notified will be filtered out.
+func (i *Importer) SetNotificationHistory(checker NotificationHistoryChecker) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.notificationHistory = checker
 }
 
 // New creates a new importer with platform-agnostic interfaces.
@@ -285,7 +299,10 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 	// Initialize achievement detector if storage is available.
 	// Take snapshot before import to enable before/after comparison.
 	if i.achievementStorage != nil {
-		i.achievementDetector = NewAchievementDetector(nil, i.achievementStorage, athleteID)
+		i.achievementDetector = NewAchievementDetector(slog.Default(), i.achievementStorage, athleteID)
+		if i.notificationHistory != nil {
+			i.achievementDetector.SetNotificationHistory(i.notificationHistory)
+		}
 		if snapErr := i.achievementDetector.TakeSnapshot(ctx); snapErr != nil {
 			slog.Debug("failed to take achievement snapshot", "error", snapErr)
 		}
@@ -312,7 +329,6 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 
 		err := i.runImport(ctx, opts)
 		i.mu.Lock()
-		defer i.mu.Unlock()
 
 		i.progress.CompletedAt = time.Now()
 
@@ -353,75 +369,82 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 					}
 				}
 			}
-		} else {
-			i.progress.Status = StatusCompleted
-			i.progress.Phase = PhaseCompleted
+			i.mu.Unlock()
+			return
+		}
 
-			// Emit completed event and data changed
-			i.emitSyncComplete("completed", "")
-			i.emitDataChanged(DataChangeSet{All: true})
+		// Success path
+		i.progress.Status = StatusCompleted
+		i.progress.Phase = PhaseCompleted
 
-			// Log completed run
-			if i.currentRunID > 0 {
-				if logErr := i.storage.CompleteSyncRun(context.Background(), i.currentRunID, counts); logErr != nil {
-					slog.Warn("failed to log completed sync run", "error", logErr)
-				}
+		// Emit completed event and data changed
+		i.emitSyncComplete("completed", "")
+		i.emitDataChanged(DataChangeSet{All: true})
 
-				// Update watermark with newest activity date
-				if i.state.NewestActivityDate != nil {
-					wm := &storage.SyncWatermark{
-						LastSyncedAt:       time.Now(),
-						NewestActivityDate: i.state.NewestActivityDate,
-					}
-					if wmErr := i.storage.SetSyncWatermark(context.Background(), athleteID, wm); wmErr != nil {
-						slog.Warn("failed to update sync watermark", "error", wmErr)
-					} else {
-						slog.Info("updated sync watermark",
-							"newest_activity_date", i.state.NewestActivityDate.Format(time.RFC3339))
-					}
-				}
+		// Log completed run
+		if i.currentRunID > 0 {
+			if logErr := i.storage.CompleteSyncRun(context.Background(), i.currentRunID, counts); logErr != nil {
+				slog.Warn("failed to log completed sync run", "error", logErr)
 			}
 
-			// Detect achievements if detector is available.
-			// Copy detector reference under lock to avoid data race.
-			detector := i.achievementDetector
-			activityIDs := i.state.ActivityIDs
-
-			var achievements []Achievement
-			if detector != nil && len(activityIDs) > 0 {
-				// Use a separate context since the import context may already be canceled.
-				detectCtx, detectCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				var detectErr error
-				achievements, detectErr = detector.DetectAchievements(detectCtx, activityIDs)
-				detectCancel()
-				if detectErr != nil {
-					slog.Warn("failed to detect achievements", "error", detectErr)
+			// Update watermark with newest activity date
+			if i.state.NewestActivityDate != nil {
+				wm := &storage.SyncWatermark{
+					LastSyncedAt:       time.Now(),
+					NewestActivityDate: i.state.NewestActivityDate,
+				}
+				if wmErr := i.storage.SetSyncWatermark(context.Background(), athleteID, wm); wmErr != nil {
+					slog.Warn("failed to update sync watermark", "error", wmErr)
+				} else {
+					slog.Info("updated sync watermark",
+						"newest_activity_date", i.state.NewestActivityDate.Format(time.RFC3339))
 				}
 			}
+		}
 
-			// Send notification if handler is set.
-			// Copy the callback reference under lock to avoid data race with SetNotificationHandler.
-			notifyFn := i.notifyOnComplete
-			if notifyFn != nil {
-				stats := SyncStats{
-					ActivitiesImported: counts.ActivitiesImported,
-					ActivitiesUpdated:  counts.ActivitiesTotal - counts.ActivitiesImported - counts.ActivitiesSkipped,
-					Duration:           time.Since(i.progress.StartedAt),
-					Achievements:       achievements,
-				}
-				// Run notification in goroutine with timeout context to not block completion.
-				// Use a separate context since the import context may already be canceled.
-				notifyCtx, notifyCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				go func() {
-					defer notifyCancel()
-					notifyFn(notifyCtx, athleteID, stats)
-				}()
-			}
+		// Copy references under lock for use after unlock.
+		// This pattern ensures thread-safety: we capture all needed values while
+		// holding the lock, then release it before any slow I/O operations
+		// (achievement detection, notifications). This prevents blocking Progress()
+		// calls during potentially slow network operations.
+		detector := i.achievementDetector
+		activityIDs := append([]int64(nil), i.state.ActivityIDs...) // Deep copy to avoid data race
+		notifyFn := i.notifyOnComplete
+		startedAt := i.progress.StartedAt
+		i.mu.Unlock()
 
-			// Clear state on successful completion
-			if clearErr := i.stateManager.Clear(context.Background()); clearErr != nil {
-				slog.Warn("failed to clear import state", "error", clearErr)
+		// Achievement detection and notifications run outside the lock
+		// to avoid blocking other operations during potentially slow calls.
+
+		var achievements []Achievement
+		if detector != nil && len(activityIDs) > 0 {
+			// Use a separate context since the import context may already be canceled.
+			detectCtx, detectCancel := context.WithTimeout(context.Background(), achievementDetectionTimeout)
+			var detectErr error
+			achievements, detectErr = detector.DetectAchievements(detectCtx, activityIDs)
+			detectCancel()
+			if detectErr != nil {
+				slog.Warn("failed to detect achievements", "error", detectErr)
 			}
+		}
+
+		if notifyFn != nil {
+			stats := SyncStats{
+				ActivitiesImported: counts.ActivitiesImported,
+				ActivitiesUpdated:  counts.ActivitiesTotal - counts.ActivitiesImported - counts.ActivitiesSkipped,
+				Duration:           time.Since(startedAt),
+				Achievements:       achievements,
+			}
+			// Run notification in goroutine to not block completion.
+			// The handler manages its own timeout via notificationHandlerTimeout.
+			go func() {
+				notifyFn(context.Background(), athleteID, stats)
+			}()
+		}
+
+		// Clear state on successful completion
+		if clearErr := i.stateManager.Clear(context.Background()); clearErr != nil {
+			slog.Warn("failed to clear import state", "error", clearErr)
 		}
 	}()
 

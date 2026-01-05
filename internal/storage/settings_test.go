@@ -131,7 +131,7 @@ func TestAthleteSettings_JSONRoundTrip(t *testing.T) {
 func TestAthleteSettings_MigrationV3ToV4(t *testing.T) {
 	// Simulate old settings without notifications
 	oldSettings := AthleteSettings{
-		Version: 3,
+		Version:                3,
 		VirtualWorldTileLayers: map[string]VirtualWorldTileLayer{},
 		Scheduler: SchedulerSettings{
 			Version: SchedulerSettingsVersion,

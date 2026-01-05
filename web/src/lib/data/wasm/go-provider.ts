@@ -1668,6 +1668,11 @@ export class GoWasmProvider implements DataProvider {
     return null
   }
 
+  async resetSyncWatermark(): Promise<{ message: string }> {
+    // Not implemented - WASM mode doesn't track watermark
+    return { message: 'watermark reset' }
+  }
+
   // ============================================================================
   // Export
   // ============================================================================

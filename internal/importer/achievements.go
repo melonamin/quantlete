@@ -4,6 +4,7 @@ package importer
 import (
 	"context"
 	"log/slog"
+	"strconv"
 )
 
 // AchievementType identifies the category of achievement.
@@ -14,19 +15,40 @@ const (
 	AchievementSegmentPR         AchievementType = "segment_pr"
 	AchievementEddingtonIncrease AchievementType = "eddington_increase"
 	AchievementPowerRecord       AchievementType = "power_record"
+	AchievementGoalComplete      AchievementType = "goal_complete"
 	AchievementGearMilestone     AchievementType = "gear_milestone"
 	AchievementTrainingLoadAlert AchievementType = "training_load_alert"
+)
+
+// Training load alert subtypes.
+const (
+	AlertSubTypeFatigue      = "fatigue"
+	AlertSubTypePeakForm     = "peak_form"
+	AlertSubTypeOvertraining = "overtraining"
 )
 
 // Achievement represents a detected achievement during import.
 type Achievement struct {
 	Type        AchievementType `json:"type"`
+	SubType     string          `json:"sub_type,omitempty"` // Used for training load alert subtypes
 	Title       string          `json:"title"`
 	Description string          `json:"description"`
 	ActivityID  int64           `json:"activity_id,omitempty"`
 	GearID      string          `json:"gear_id,omitempty"`
 	Value       float64         `json:"value,omitempty"`
 	PrevValue   float64         `json:"prev_value,omitempty"`
+	Key         string          `json:"key,omitempty"` // Unique key for deduplication
+}
+
+// NotificationHistoryChecker checks if achievements have already been notified.
+type NotificationHistoryChecker interface {
+	// HasBeenNotified checks if a single achievement has already been notified.
+	HasBeenNotified(ctx context.Context, athleteID int64, achievementType, key string) (bool, error)
+
+	// FilterNotified filters out achievements that have already been notified.
+	// Returns only achievements that have NOT been notified yet.
+	// Uses batch lookup to avoid N+1 queries.
+	FilterNotified(ctx context.Context, athleteID int64, achievements []Achievement) ([]Achievement, error)
 }
 
 // AchievementStorage abstracts storage operations needed for achievement detection.
@@ -91,9 +113,10 @@ type TrainingLoadInfo struct {
 
 // AchievementDetector detects achievements during import.
 type AchievementDetector struct {
-	logger    *slog.Logger
-	storage   AchievementStorage
-	athleteID int64
+	logger              *slog.Logger
+	storage             AchievementStorage
+	notificationHistory NotificationHistoryChecker
+	athleteID           int64
 
 	// Snapshots taken before import for comparison.
 	eddingtonBefore     int
@@ -111,6 +134,11 @@ func NewAchievementDetector(logger *slog.Logger, storage AchievementStorage, ath
 		storage:   storage,
 		athleteID: athleteID,
 	}
+}
+
+// SetNotificationHistory sets the notification history checker for filtering already-notified achievements.
+func (d *AchievementDetector) SetNotificationHistory(checker NotificationHistoryChecker) {
+	d.notificationHistory = checker
 }
 
 // TakeSnapshot captures current state before import for comparison after.
@@ -152,6 +180,7 @@ func (d *AchievementDetector) TakeSnapshot(ctx context.Context) error {
 
 // DetectAchievements detects achievements based on imported activities.
 // Returns a slice of achievements detected during this import.
+// If a NotificationHistoryChecker is set, already-notified achievements are filtered out.
 func (d *AchievementDetector) DetectAchievements(ctx context.Context, importedActivityIDs []int64) ([]Achievement, error) {
 	if d.storage == nil || len(importedActivityIDs) == 0 {
 		return nil, nil
@@ -208,7 +237,32 @@ func (d *AchievementDetector) DetectAchievements(ctx context.Context, importedAc
 	}
 
 	d.logger.Info("achievements detected", "count", len(achievements))
+
+	// Filter out already-notified achievements if notification history is available.
+	if d.notificationHistory != nil && len(achievements) > 0 {
+		achievements = d.filterNotified(ctx, achievements)
+		d.logger.Info("achievements after filtering", "count", len(achievements))
+	}
+
 	return achievements, nil
+}
+
+// filterNotified removes achievements that have already been notified.
+// Uses batch lookup to avoid N+1 queries.
+func (d *AchievementDetector) filterNotified(ctx context.Context, achievements []Achievement) []Achievement {
+	filtered, err := d.notificationHistory.FilterNotified(ctx, d.athleteID, achievements)
+	if err != nil {
+		d.logger.Warn("failed to check notification history, including all achievements", "error", err)
+		// On error, include all achievements to avoid missing notifications
+		return achievements
+	}
+
+	skipped := len(achievements) - len(filtered)
+	if skipped > 0 {
+		d.logger.Debug("filtered out already-notified achievements", "skipped", skipped)
+	}
+
+	return filtered
 }
 
 // detectPersonalRecords checks best_efforts table for pr_rank=1 on imported activity IDs.
@@ -225,6 +279,7 @@ func (d *AchievementDetector) detectPersonalRecords(ctx context.Context, activit
 			Title:       "New Personal Record",
 			Description: formatPRDescription(pr.Name, pr.ElapsedTime),
 			ActivityID:  pr.ActivityID,
+			Key:         GeneratePersonalRecordKey(pr.DistanceType, pr.ActivityID),
 		})
 	}
 	return achievements, nil
@@ -244,6 +299,7 @@ func (d *AchievementDetector) detectSegmentPRs(ctx context.Context, activityIDs 
 			Title:       "Segment PR",
 			Description: formatSegmentPRDescription(pr.SegmentName, pr.ElapsedTime),
 			ActivityID:  pr.ActivityID,
+			Key:         GenerateSegmentPRKey(pr.SegmentID, pr.ActivityID),
 		})
 	}
 	return achievements, nil
@@ -263,6 +319,7 @@ func (d *AchievementDetector) detectEddingtonChange(ctx context.Context) (*Achie
 			Description: formatEddingtonDescription(d.eddingtonBefore, current),
 			Value:       float64(current),
 			PrevValue:   float64(d.eddingtonBefore),
+			Key:         GenerateEddingtonKey(current),
 		}, nil
 	}
 	return nil, nil
@@ -289,6 +346,7 @@ func (d *AchievementDetector) detectPowerRecords(ctx context.Context, activityID
 				ActivityID:  rec.ActivityID,
 				Value:       rec.Watts,
 				PrevValue:   prevBest,
+				Key:         GeneratePowerRecordKey(rec.DurationS, rec.ActivityID),
 			})
 		}
 	}
@@ -318,6 +376,7 @@ func (d *AchievementDetector) detectGearMilestones(ctx context.Context) ([]Achie
 
 		for _, threshold := range gearMilestoneThresholds {
 			if prevDist < threshold && currentDist >= threshold {
+				milestoneKm := int(threshold / 1000)
 				achievements = append(achievements, Achievement{
 					Type:        AchievementGearMilestone,
 					Title:       "Gear Milestone",
@@ -325,6 +384,7 @@ func (d *AchievementDetector) detectGearMilestones(ctx context.Context) ([]Achie
 					GearID:      gearID,
 					Value:       currentDist,
 					PrevValue:   prevDist,
+					Key:         GenerateGearMilestoneKey(gearID, milestoneKm),
 				})
 				break // Only report the highest threshold crossed
 			}
@@ -357,9 +417,11 @@ func (d *AchievementDetector) detectTrainingLoadAlerts(ctx context.Context) ([]A
 	if load.TSB < tsbOvertrainingThreshold {
 		achievements = append(achievements, Achievement{
 			Type:        AchievementTrainingLoadAlert,
+			SubType:     AlertSubTypeOvertraining,
 			Title:       "Overtraining Warning",
 			Description: formatOvertrainingDescription(load.TSB),
 			Value:       load.TSB,
+			Key:         GenerateTrainingLoadKey(AlertSubTypeOvertraining, load.Day),
 		})
 	}
 
@@ -367,9 +429,11 @@ func (d *AchievementDetector) detectTrainingLoadAlerts(ctx context.Context) ([]A
 	if load.TSB > tsbPeakFormThreshold && load.CTL > ctlFitnessGainThreshold {
 		achievements = append(achievements, Achievement{
 			Type:        AchievementTrainingLoadAlert,
+			SubType:     AlertSubTypePeakForm,
 			Title:       "Peak Form",
 			Description: formatPeakFormDescription(load.TSB, load.CTL),
 			Value:       load.TSB,
+			Key:         GenerateTrainingLoadKey(AlertSubTypePeakForm, load.Day),
 		})
 	}
 
@@ -377,9 +441,11 @@ func (d *AchievementDetector) detectTrainingLoadAlerts(ctx context.Context) ([]A
 	if load.ATL > atlHighFatigueThreshold {
 		achievements = append(achievements, Achievement{
 			Type:        AchievementTrainingLoadAlert,
+			SubType:     AlertSubTypeFatigue,
 			Title:       "High Fatigue",
 			Description: formatHighFatigueDescription(load.ATL),
 			Value:       load.ATL,
+			Key:         GenerateTrainingLoadKey(AlertSubTypeFatigue, load.Day),
 		})
 	}
 
@@ -397,32 +463,32 @@ func formatSegmentPRDescription(segmentName string, elapsedTime int) string {
 }
 
 func formatEddingtonDescription(before, after int) string {
-	return "E" + itoa(before) + " -> E" + itoa(after)
+	return "E" + strconv.Itoa(before) + " -> E" + strconv.Itoa(after)
 }
 
 func formatPowerRecordDescription(durationS int, watts, prevBest float64) string {
 	durationStr := formatPowerDuration(durationS)
 	if prevBest > 0 {
-		return durationStr + ": " + itoa(int(watts)) + "W (+" + itoa(int(watts-prevBest)) + "W)"
+		return durationStr + ": " + strconv.Itoa(int(watts)) + "W (+" + strconv.Itoa(int(watts-prevBest)) + "W)"
 	}
-	return durationStr + ": " + itoa(int(watts)) + "W"
+	return durationStr + ": " + strconv.Itoa(int(watts)) + "W"
 }
 
 func formatGearMilestoneDescription(thresholdMeters float64) string {
 	km := int(thresholdMeters / 1000)
-	return itoa(km) + " km milestone reached"
+	return strconv.Itoa(km) + " km milestone reached"
 }
 
 func formatOvertrainingDescription(tsb float64) string {
-	return "Training Stress Balance at " + itoa(int(tsb)) + " - consider recovery"
+	return "Training Stress Balance at " + strconv.Itoa(int(tsb)) + " - consider recovery"
 }
 
 func formatPeakFormDescription(tsb, ctl float64) string {
-	return "TSB " + itoa(int(tsb)) + " with CTL " + itoa(int(ctl)) + " - ideal for racing"
+	return "TSB " + strconv.Itoa(int(tsb)) + " with CTL " + strconv.Itoa(int(ctl)) + " - ideal for racing"
 }
 
 func formatHighFatigueDescription(atl float64) string {
-	return "Acute Training Load at " + itoa(int(atl)) + " - high fatigue"
+	return "Acute Training Load at " + strconv.Itoa(int(atl)) + " - high fatigue"
 }
 
 func formatDuration(seconds int) string {
@@ -430,12 +496,12 @@ func formatDuration(seconds int) string {
 	m := (seconds % 3600) / 60
 	s := seconds % 60
 	if h > 0 {
-		return itoa(h) + "h " + itoa(m) + "m " + itoa(s) + "s"
+		return strconv.Itoa(h) + "h " + strconv.Itoa(m) + "m " + strconv.Itoa(s) + "s"
 	}
 	if m > 0 {
-		return itoa(m) + "m " + itoa(s) + "s"
+		return strconv.Itoa(m) + "m " + strconv.Itoa(s) + "s"
 	}
-	return itoa(s) + "s"
+	return strconv.Itoa(s) + "s"
 }
 
 func formatPowerDuration(seconds int) string {
@@ -451,29 +517,46 @@ func formatPowerDuration(seconds int) string {
 	case 3600:
 		return "1hr"
 	default:
-		return itoa(seconds) + "s"
+		return strconv.Itoa(seconds) + "s"
 	}
 }
 
-// itoa converts int to string without importing strconv.
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	neg := i < 0
-	if neg {
-		i = -i
-	}
-	var b [20]byte
-	pos := len(b) - 1
-	for i > 0 {
-		b[pos] = byte('0' + i%10)
-		pos--
-		i /= 10
-	}
-	if neg {
-		b[pos] = '-'
-		pos--
-	}
-	return string(b[pos+1:])
+// Key generation functions for achievement deduplication.
+// These generate unique keys that identify specific achievements to prevent
+// duplicate notifications on re-import.
+
+// GeneratePersonalRecordKey generates a unique key for a personal record achievement.
+// Format: pr_{distance_type}_{activity_id}
+func GeneratePersonalRecordKey(distanceType string, activityID int64) string {
+	return "pr_" + distanceType + "_" + strconv.FormatInt(activityID, 10)
+}
+
+// GenerateSegmentPRKey generates a unique key for a segment PR achievement.
+// Format: segment_{segment_id}_{activity_id}
+func GenerateSegmentPRKey(segmentID, activityID int64) string {
+	return "segment_" + strconv.FormatInt(segmentID, 10) + "_" + strconv.FormatInt(activityID, 10)
+}
+
+// GenerateEddingtonKey generates a unique key for an Eddington number achievement.
+// Format: eddington_{number}
+func GenerateEddingtonKey(number int) string {
+	return "eddington_" + strconv.Itoa(number)
+}
+
+// GeneratePowerRecordKey generates a unique key for a power record achievement.
+// Format: power_{duration}_{activity_id}
+func GeneratePowerRecordKey(durationS int, activityID int64) string {
+	return "power_" + strconv.Itoa(durationS) + "_" + strconv.FormatInt(activityID, 10)
+}
+
+// GenerateGearMilestoneKey generates a unique key for a gear milestone achievement.
+// Format: gear_{gear_id}_{milestone_km}
+func GenerateGearMilestoneKey(gearID string, milestoneKm int) string {
+	return "gear_" + gearID + "_" + strconv.Itoa(milestoneKm)
+}
+
+// GenerateTrainingLoadKey generates a unique key for a training load alert.
+// Format: training_{type}_{date}
+func GenerateTrainingLoadKey(alertType, date string) string {
+	return "training_" + alertType + "_" + date
 }

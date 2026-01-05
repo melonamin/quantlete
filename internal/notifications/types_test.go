@@ -126,6 +126,38 @@ func TestServiceConfig_Validate(t *testing.T) {
 			wantErr: "smtp to address is invalid",
 		},
 		{
+			name: "smtp invalid port non-numeric",
+			config: ServiceConfig{
+				ID:      "test-id",
+				Type:    ServiceTypeSMTP,
+				Name:    "My SMTP",
+				Enabled: true,
+				Config: map[string]string{
+					"host": "smtp.example.com",
+					"port": "abc",
+					"from": "sender@example.com",
+					"to":   "receiver@example.com",
+				},
+			},
+			wantErr: "smtp port must be a number",
+		},
+		{
+			name: "smtp invalid port out of range",
+			config: ServiceConfig{
+				ID:      "test-id",
+				Type:    ServiceTypeSMTP,
+				Name:    "My SMTP",
+				Enabled: true,
+				Config: map[string]string{
+					"host": "smtp.example.com",
+					"port": "99999",
+					"from": "sender@example.com",
+					"to":   "receiver@example.com",
+				},
+			},
+			wantErr: "smtp port must be between 1 and 65535",
+		},
+		{
 			name: "valid generic webhook",
 			config: ServiceConfig{
 				ID:      "test-id",
@@ -150,6 +182,32 @@ func TestServiceConfig_Validate(t *testing.T) {
 			wantErr: "generic url is required",
 		},
 		{
+			name: "valid generic with generic scheme",
+			config: ServiceConfig{
+				ID:      "test-id",
+				Type:    ServiceTypeGeneric,
+				Name:    "My Webhook",
+				Enabled: true,
+				Config: map[string]string{
+					"url": "generic://webhook.example.com/path",
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid generic with generic+https scheme",
+			config: ServiceConfig{
+				ID:      "test-id",
+				Type:    ServiceTypeGeneric,
+				Name:    "My Webhook",
+				Enabled: true,
+				Config: map[string]string{
+					"url": "generic+https://webhook.example.com/path",
+				},
+			},
+			wantErr: "",
+		},
+		{
 			name: "generic invalid scheme",
 			config: ServiceConfig{
 				ID:      "test-id",
@@ -160,7 +218,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 					"url": "ftp://example.com/webhook",
 				},
 			},
-			wantErr: "generic url must use http or https scheme",
+			wantErr: "generic url must use http, https, or generic scheme",
 		},
 		{
 			name: "generic missing host",

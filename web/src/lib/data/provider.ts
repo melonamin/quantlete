@@ -242,6 +242,7 @@ export interface DataProvider {
   getSyncHistory(limit?: number): Promise<SyncRun[]>
   getLatestSync(): Promise<SyncRun | null>
   getSyncWatermark(): Promise<SyncWatermark | null>
+  resetSyncWatermark(): Promise<{ message: string }>
 
   // ============================================================================
   // Export

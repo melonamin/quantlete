@@ -631,6 +631,11 @@ func inferParamType(pos, context, fullSQL string) string {
 	isGearQuery := strings.Contains(lowerSQL, "from gear") ||
 		strings.Contains(lowerSQL, "from v_gear")
 
+	// For INSERT statements, infer type from column name at corresponding position
+	if insertType := inferInsertParamType(pos, fullSQL); insertType != "" {
+		return insertType
+	}
+
 	// Gear ID is a string (Strava format: "b12345")
 	if strings.Contains(lowerCtx, "gear_id = "+placeholder) || strings.Contains(lowerCtx, "gear_id="+placeholder) {
 		return "string"
@@ -664,6 +669,90 @@ func inferParamType(pos, context, fullSQL string) string {
 	}
 
 	// Default to string (dates, sport_type, etc.)
+	return "string"
+}
+
+// inferInsertParamType infers parameter type from INSERT statement column names.
+// Returns empty string if not an INSERT or column not found.
+func inferInsertParamType(pos, fullSQL string) string {
+	upperSQL := strings.ToUpper(fullSQL)
+
+	// Check if this is an INSERT statement
+	insertIdx := strings.Index(upperSQL, "INSERT INTO")
+	if insertIdx == -1 {
+		return ""
+	}
+
+	// Find the column list: INSERT INTO table_name (col1, col2, ...)
+	openParen := strings.Index(fullSQL[insertIdx:], "(")
+	if openParen == -1 {
+		return ""
+	}
+	openParen += insertIdx
+
+	closeParen := strings.Index(fullSQL[openParen:], ")")
+	if closeParen == -1 {
+		return ""
+	}
+	closeParen += openParen
+
+	// Extract column names
+	columnPart := fullSQL[openParen+1 : closeParen]
+	columns := strings.Split(columnPart, ",")
+	for i := range columns {
+		columns[i] = strings.TrimSpace(columns[i])
+	}
+
+	// Find which column this parameter corresponds to by counting placeholders in VALUES
+	valuesIdx := strings.Index(upperSQL, "VALUES")
+	if valuesIdx == -1 {
+		return ""
+	}
+
+	valuesParen := strings.Index(fullSQL[valuesIdx:], "(")
+	if valuesParen == -1 {
+		return ""
+	}
+	valuesParen += valuesIdx
+
+	valuesCloseParen := strings.Index(fullSQL[valuesParen:], ")")
+	if valuesCloseParen == -1 {
+		return ""
+	}
+	valuesCloseParen += valuesParen
+
+	// Extract values and find parameter position
+	valuesPart := fullSQL[valuesParen+1 : valuesCloseParen]
+	values := strings.Split(valuesPart, ",")
+
+	placeholder := "?" + pos
+	for i, v := range values {
+		if strings.TrimSpace(v) == placeholder && i < len(columns) {
+			return inferTypeFromColumnName(columns[i])
+		}
+	}
+
+	return ""
+}
+
+// inferTypeFromColumnName infers Go type from a column name.
+func inferTypeFromColumnName(colName string) string {
+	lowerName := strings.ToLower(strings.TrimSpace(colName))
+
+	// ID fields
+	if lowerName == "athlete_id" || lowerName == "activity_id" || lowerName == "segment_id" {
+		return "int64"
+	}
+	if lowerName == "gear_id" {
+		return "string"
+	}
+
+	// Timestamp fields
+	if strings.HasSuffix(lowerName, "_at") {
+		return "SQLiteTime"
+	}
+
+	// Default to string
 	return "string"
 }
 

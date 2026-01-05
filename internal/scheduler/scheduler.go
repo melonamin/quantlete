@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -34,6 +35,10 @@ func (l slogCronLogger) Error(err error, msg string, keysAndValues ...any) {
 	l.logger.Error(msg, append(keysAndValues, "error", err)...)
 }
 
+// Scheduler manages periodic jobs for a single authenticated athlete.
+// Jobs are keyed by athlete ID to allow proper cleanup when the athlete changes.
+// Note: Currently the scheduler handles one athlete at a time (via strava.GetAthlete()),
+// but athlete-specific job keys ensure correct behavior if this assumption changes.
 type Scheduler struct {
 	logger        *slog.Logger
 	strava        *strava.Client
@@ -266,7 +271,8 @@ func (s *Scheduler) configureMaintenanceCheckLocked(athleteID int64, enabled boo
 
 	spec := cronSpecForMaintenanceSchedule(schedule)
 	job := NewMaintenanceCheckJob(s.logger, s.maintenance, s.notifications, s.settingsRepo, athleteID)
-	s.setJobLocked("maintenance_check", enabled, spec, job.Run)
+	key := fmt.Sprintf("maintenance_check_%d", athleteID)
+	s.setJobLocked(key, enabled, spec, job.Run)
 }
 
 func (s *Scheduler) configureWeeklyDigestLocked(athleteID int64, enabled bool) {
@@ -277,7 +283,8 @@ func (s *Scheduler) configureWeeklyDigestLocked(athleteID int64, enabled bool) {
 	// Monday at 9:00 AM
 	spec := "0 9 * * 1"
 	job := NewWeeklyDigestJob(s.logger, s.stats, s.notifications, s.settingsRepo, athleteID)
-	s.setJobLocked("weekly_digest", enabled, spec, job.Run)
+	key := fmt.Sprintf("weekly_digest_%d", athleteID)
+	s.setJobLocked(key, enabled, spec, job.Run)
 }
 
 func (s *Scheduler) configureMonthlyDigestLocked(athleteID int64, enabled bool) {
@@ -288,7 +295,8 @@ func (s *Scheduler) configureMonthlyDigestLocked(athleteID int64, enabled bool) 
 	// 1st of month at 9:00 AM
 	spec := "0 9 1 * *"
 	job := NewMonthlyDigestJob(s.logger, s.stats, s.notifications, s.settingsRepo, athleteID)
-	s.setJobLocked("monthly_digest", enabled, spec, job.Run)
+	key := fmt.Sprintf("monthly_digest_%d", athleteID)
+	s.setJobLocked(key, enabled, spec, job.Run)
 }
 
 // cronSpecForMaintenanceSchedule converts a maintenance schedule string to a cron spec.

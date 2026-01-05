@@ -139,3 +139,8 @@ func (db *DB) QueryRow(query string, args ...any) *sql.Row {
 func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	return db.conn.QueryRowContext(ctx, query, args...)
 }
+
+// BeginTx starts a transaction with the given options.
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return db.conn.BeginTx(ctx, opts)
+}

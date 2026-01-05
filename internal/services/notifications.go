@@ -6,8 +6,16 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/importer"
 	"github.com/melonamin/quantlete/internal/notifications"
 	"github.com/melonamin/quantlete/internal/storage"
+)
+
+// Training load alert type constants.
+const (
+	AlertTypeFatigueWarning   = "fatigue_warning"
+	AlertTypeRecoveryAlert    = "recovery_alert"
+	AlertTypeOvertrainingRisk = "overtraining_risk"
 )
 
 // SettingsRepository defines the interface for accessing athlete settings.
@@ -48,7 +56,8 @@ type MaintenanceItem struct {
 
 // Achievement represents a single achievement from a sync.
 type Achievement struct {
-	Type          string // "personal_record", "segment_pr", "eddington", "power_record", "goal_complete"
+	Type          string // One of importer.AchievementType* constants
+	SubType       string // Used for training load alert subtypes (importer.AlertSubType* constants)
 	Title         string
 	Value         string
 	PreviousValue string
@@ -56,7 +65,7 @@ type Achievement struct {
 
 // TrainingLoadAlert represents a training load status alert.
 type TrainingLoadAlert struct {
-	Type string  // "fatigue_warning", "recovery_alert", "overtraining_risk"
+	Type string  // One of AlertType* constants
 	TSB  float64 // Training Stress Balance
 	ATL  float64 // Acute Training Load
 	CTL  float64 // Chronic Training Load
@@ -223,29 +232,53 @@ func (s *NotificationService) filterAchievements(achievements []Achievement, eve
 	var filtered []Achievement
 	for _, a := range achievements {
 		switch a.Type {
-		case "personal_record":
+		case string(importer.AchievementPersonalRecord):
 			if events.PersonalRecords {
 				filtered = append(filtered, a)
 			}
-		case "segment_pr":
+		case string(importer.AchievementSegmentPR):
 			if events.SegmentPRs {
 				filtered = append(filtered, a)
 			}
-		case "eddington":
+		case string(importer.AchievementEddingtonIncrease):
 			if events.EddingtonIncrease {
 				filtered = append(filtered, a)
 			}
-		case "power_record":
+		case string(importer.AchievementPowerRecord):
 			if events.PowerRecords {
 				filtered = append(filtered, a)
 			}
-		case "goal_complete":
+		case string(importer.AchievementGoalComplete):
 			if events.GoalComplete {
+				filtered = append(filtered, a)
+			}
+		case string(importer.AchievementGearMilestone):
+			if events.GearMilestones {
+				filtered = append(filtered, a)
+			}
+		case string(importer.AchievementTrainingLoadAlert):
+			// Training load alerts check specific sub-types
+			if shouldIncludeTrainingLoadAlert(a.SubType, events) {
 				filtered = append(filtered, a)
 			}
 		}
 	}
 	return filtered
+}
+
+// shouldIncludeTrainingLoadAlert checks if a training load alert should be included
+// based on its subtype and the enabled event types.
+func shouldIncludeTrainingLoadAlert(subType string, events notifications.EventConfig) bool {
+	switch subType {
+	case importer.AlertSubTypeFatigue:
+		return events.FatigueWarning
+	case importer.AlertSubTypePeakForm:
+		return events.RecoveryAlert
+	case importer.AlertSubTypeOvertraining:
+		return events.OvertrainingRisk
+	default:
+		return false
+	}
 }
 
 // formatAchievementsMessage formats the achievements notification message.
@@ -278,11 +311,11 @@ func (s *NotificationService) NotifyTrainingLoad(ctx context.Context, athleteID 
 	// Check if this specific alert type is enabled
 	enabled := false
 	switch alert.Type {
-	case "fatigue_warning":
+	case AlertTypeFatigueWarning:
 		enabled = config.Events.FatigueWarning
-	case "recovery_alert":
+	case AlertTypeRecoveryAlert:
 		enabled = config.Events.RecoveryAlert
-	case "overtraining_risk":
+	case AlertTypeOvertrainingRisk:
 		enabled = config.Events.OvertrainingRisk
 	}
 
@@ -321,11 +354,11 @@ func (s *NotificationService) NotifyTrainingLoad(ctx context.Context, athleteID 
 // formatTrainingLoadMessage formats the training load alert message.
 func formatTrainingLoadMessage(alert TrainingLoadAlert) string {
 	switch alert.Type {
-	case "fatigue_warning":
+	case AlertTypeFatigueWarning:
 		return fmt.Sprintf("High fatigue (TSB: %.0f). Consider rest.", alert.TSB)
-	case "recovery_alert":
+	case AlertTypeRecoveryAlert:
 		return fmt.Sprintf("Recovered! TSB: +%.0f. Ready to push.", alert.TSB)
-	case "overtraining_risk":
+	case AlertTypeOvertrainingRisk:
 		return fmt.Sprintf("Overtraining risk: ATL (%.0f) >> CTL (%.0f)", alert.ATL, alert.CTL)
 	default:
 		return fmt.Sprintf("Training load alert: TSB=%.0f, ATL=%.0f, CTL=%.0f", alert.TSB, alert.ATL, alert.CTL)
@@ -371,26 +404,15 @@ func (s *NotificationService) NotifyGearMilestone(ctx context.Context, athleteID
 	return nil
 }
 
-// DigestStats contains activity statistics for a time period.
-type DigestStats struct {
-	StartDate      time.Time
-	EndDate        time.Time
-	ActivityCount  int
-	TotalDistance  float64 // meters
-	TotalTime      int     // seconds
-	TotalElevation float64 // meters
-	TotalCalories  float64
-}
-
 // NotifyWeeklyDigest sends a weekly activity digest notification (if enabled).
-func (s *NotificationService) NotifyWeeklyDigest(ctx context.Context, athleteID int64, stats DigestStats) error {
+func (s *NotificationService) NotifyWeeklyDigest(ctx context.Context, athleteID int64, stats storage.DigestStats) error {
 	return s.notifyDigest(ctx, athleteID, stats, "week", "Weekly Activity Digest", func(events notifications.EventConfig) bool {
 		return events.WeeklyDigest
 	})
 }
 
 // NotifyMonthlyDigest sends a monthly activity digest notification (if enabled).
-func (s *NotificationService) NotifyMonthlyDigest(ctx context.Context, athleteID int64, stats DigestStats) error {
+func (s *NotificationService) NotifyMonthlyDigest(ctx context.Context, athleteID int64, stats storage.DigestStats) error {
 	return s.notifyDigest(ctx, athleteID, stats, "month", "Monthly Activity Digest", func(events notifications.EventConfig) bool {
 		return events.MonthlyDigest
 	})
@@ -400,7 +422,7 @@ func (s *NotificationService) NotifyMonthlyDigest(ctx context.Context, athleteID
 func (s *NotificationService) notifyDigest(
 	ctx context.Context,
 	athleteID int64,
-	stats DigestStats,
+	stats storage.DigestStats,
 	period string,
 	title string,
 	isEnabled func(notifications.EventConfig) bool,
@@ -441,7 +463,7 @@ func (s *NotificationService) notifyDigest(
 }
 
 // formatDigestMessage formats the digest notification message.
-func formatDigestMessage(stats DigestStats, period string) string {
+func formatDigestMessage(stats storage.DigestStats, period string) string {
 	distanceKm := stats.TotalDistance / 1000.0
 	hours := stats.TotalTime / 3600
 	minutes := (stats.TotalTime % 3600) / 60

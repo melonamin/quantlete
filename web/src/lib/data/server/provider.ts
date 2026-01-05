@@ -588,6 +588,10 @@ export class ServerProvider implements DataProvider {
     return get<SyncWatermark | null>('/import/watermark')
   }
 
+  async resetSyncWatermark(): Promise<{ message: string }> {
+    return del<{ message: string }>('/import/watermark')
+  }
+
   async getExportStats(): Promise<ExportStats> {
     return get<ExportStats>('/export/stats')
   }

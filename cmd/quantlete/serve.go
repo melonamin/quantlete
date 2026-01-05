@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -21,6 +22,9 @@ import (
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
+
+// notificationHandlerTimeout is the timeout for notification handlers.
+const notificationHandlerTimeout = 30 * time.Second
 
 func newServeCmd() *cobra.Command {
 	var port int
@@ -176,13 +180,22 @@ func runServe(port int, dev bool) error {
 	achievementAdapter := importer.NewAchievementStorageAdapter(achievementRepo)
 	imp.SetAchievementStorage(achievementAdapter)
 
+	// Wire up notification history for deduplication
+	notificationHistoryRepo := storage.NewNotificationHistoryRepository(db)
+	notificationHistoryAdapter := importer.NewNotificationHistoryAdapter(notificationHistoryRepo)
+	imp.SetNotificationHistory(notificationHistoryAdapter)
+
 	// Create services for scheduler (maintenance checks, notifications)
 	registry := services.NewServiceRegistry(db, logger)
 
-	// Wire up import completion and achievement notifications
-	imp.SetNotificationHandler(func(ctx context.Context, athleteID int64, stats importer.SyncStats) {
+	// Wire up import completion and achievement notifications.
+	// Note: The passed ctx may already be canceled, so we create a fresh context.
+	imp.SetNotificationHandler(func(_ context.Context, athleteID int64, stats importer.SyncStats) {
+		notifyCtx, cancel := context.WithTimeout(context.Background(), notificationHandlerTimeout)
+		defer cancel()
+
 		// Send import complete notification
-		if err := registry.NotificationService.NotifyImportComplete(ctx, athleteID, services.ImportStats{
+		if err := registry.NotificationService.NotifyImportComplete(notifyCtx, athleteID, services.ImportStats{
 			ActivitiesImported: stats.ActivitiesImported,
 			ActivitiesUpdated:  stats.ActivitiesUpdated,
 			Duration:           stats.Duration,
@@ -196,13 +209,20 @@ func runServe(port int, dev bool) error {
 			for i, a := range stats.Achievements {
 				achievements[i] = services.Achievement{
 					Type:          string(a.Type),
+					SubType:       a.SubType,
 					Title:         a.Title,
 					Value:         a.Description,
 					PreviousValue: "",
 				}
 			}
-			if err := registry.NotificationService.NotifyAchievements(ctx, athleteID, achievements); err != nil {
+			if err := registry.NotificationService.NotifyAchievements(notifyCtx, athleteID, achievements); err != nil {
 				slog.Warn("failed to send achievement notification", "error", err)
+			} else {
+				// Only mark achievements as notified after successful notification.
+				// This ensures transient failures don't permanently suppress achievements.
+				if err := notificationHistoryAdapter.MarkNotifiedBatch(notifyCtx, athleteID, stats.Achievements); err != nil {
+					slog.Warn("failed to mark achievements as notified", "error", err)
+				}
 			}
 		}
 	})

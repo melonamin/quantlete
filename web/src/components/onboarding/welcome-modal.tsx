@@ -31,13 +31,13 @@ import { shouldShowOnboarding } from './utils'
 
 type OnboardingStep = 'welcome' | 'credentials' | 'connect'
 
-function getAuthUrl(credentialsConfigured: boolean, source: string): string {
-  // In server mode with env credentials, use server OAuth endpoint
-  if (!isWasmMode() && source === 'env') {
+function getAuthUrl(credentialsConfigured: boolean): string {
+  // Server mode always uses server OAuth endpoint (credentials are in server database)
+  if (!isWasmMode()) {
     return '/api/v1/auth/strava'
   }
 
-  // In WASM mode or server mode with database credentials, use WASM auth
+  // WASM mode uses client-side auth with credentials from browser storage
   if (credentialsConfigured) {
     try {
       return getWasmAuthUrl(`${window.location.origin}/oauth/callback`)
@@ -115,8 +115,8 @@ export function WelcomeModal() {
     }
   }
 
-  // Get auth URL based on mode and credentials source
-  const authUrl = getAuthUrl(credentialsConfigured, credentials?.source ?? '')
+  // Get auth URL based on mode
+  const authUrl = getAuthUrl(credentialsConfigured)
 
   const wasmMode = isWasmMode()
 

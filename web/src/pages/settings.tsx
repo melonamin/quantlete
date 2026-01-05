@@ -6,7 +6,9 @@ import {
   useHasResumableImport,
   useImportProgress,
   useLatestSync,
+  useResetSyncWatermark,
   useStartImport,
+  useSyncWatermark,
   useUpdateAppSettings,
 } from '@/lib/data/hooks'
 import { useQueryClient } from '@tanstack/react-query'
@@ -43,9 +45,11 @@ import {
   Palette,
   Wrench,
   Bell,
+  Calendar,
+  RotateCcw,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { formatDistance } from 'date-fns'
+import { format, formatDistance } from 'date-fns'
 import { useSettingsStore, type Theme, type UnitSystem } from '@/stores/settings'
 
 interface SettingsSearchParams {
@@ -60,8 +64,10 @@ export function SettingsPage() {
   const { data: progress } = useImportProgress()
   const { data: latestSync } = useLatestSync()
   const { data: hasResumable } = useHasResumableImport()
+  const { data: watermark } = useSyncWatermark(isServerMode())
   const startImport = useStartImport()
   const cancelImport = useCancelImport()
+  const resetWatermark = useResetSyncWatermark()
 
   const isAuthenticated = authStatus?.authenticated ?? false
   const isDemoMode = authStatus?.demo_mode ?? false
@@ -193,7 +199,7 @@ export function SettingsPage() {
                       <Button disabled className="bg-strava/50">
                         Configure credentials first
                       </Button>
-                    ) : credentials?.source === 'env' ? (
+                    ) : isServerMode() ? (
                       <Button asChild className="bg-strava hover:bg-strava/90">
                         <a href="/api/v1/auth/strava">Connect Strava</a>
                       </Button>
@@ -282,6 +288,43 @@ export function SettingsPage() {
                           </Button>
                         )}
                       </div>
+
+                      {/* Watermark info - shows last sync date for incremental imports */}
+                      {isServerMode() && watermark && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                Syncing activities after{' '}
+                                <span className="font-medium text-foreground">
+                                  {format(new Date(watermark.last_synced_at), 'MMM d, yyyy')}
+                                </span>
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => resetWatermark.mutate()}
+                              disabled={resetWatermark.isPending || isImporting}
+                              className="h-7 text-xs"
+                              title="Reset to force a full sync on next import"
+                            >
+                              {resetWatermark.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                              )}
+                              Reset
+                            </Button>
+                          </div>
+                          {resetWatermark.isError && (
+                            <p className="text-xs text-destructive">
+                              Failed to reset watermark. Please try again.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       <div className="rounded-md border border-border bg-muted/30">
                         <Button

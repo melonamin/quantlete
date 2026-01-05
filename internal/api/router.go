@@ -296,6 +296,7 @@ func (r *Router) mountRoutes() {
 			router.Post("/resume", r.importHandler.Resume)
 			router.Get("/history", r.importHandler.History)
 			router.Get("/watermark", r.importHandler.Watermark)
+			router.Delete("/watermark", r.importHandler.ResetWatermark)
 		})
 
 		// Dashboard routes (using generated adapters)

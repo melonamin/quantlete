@@ -6,16 +6,16 @@ import (
 	"log/slog"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/containrrr/shoutrrr"
-	"github.com/containrrr/shoutrrr/pkg/router"
 )
 
 // Sender sends notifications via configured services.
 type Sender struct {
 	logger   *slog.Logger
 	services []ServiceConfig
-	router   *router.ServiceRouter
+	urls     []string // Shoutrrr URLs for enabled services
 }
 
 // NewSender creates a new notification sender with the given services.
@@ -26,7 +26,6 @@ func NewSender(logger *slog.Logger, services []ServiceConfig) (*Sender, error) {
 	}
 
 	// Build URLs for all enabled services
-	var urls []string
 	for _, svc := range services {
 		if !svc.Enabled {
 			continue
@@ -40,15 +39,7 @@ func NewSender(logger *slog.Logger, services []ServiceConfig) (*Sender, error) {
 			)
 			continue
 		}
-		urls = append(urls, u)
-	}
-
-	if len(urls) > 0 {
-		sr, err := shoutrrr.CreateSender(urls...)
-		if err != nil {
-			return nil, fmt.Errorf("creating shoutrrr router: %w", err)
-		}
-		s.router = sr
+		s.urls = append(s.urls, u)
 	}
 
 	return s, nil
@@ -56,7 +47,7 @@ func NewSender(logger *slog.Logger, services []ServiceConfig) (*Sender, error) {
 
 // Send sends a notification to all enabled services.
 func (s *Sender) Send(ctx context.Context, title, message string) error {
-	if s.router == nil {
+	if len(s.urls) == 0 {
 		s.logger.Debug("no notification services configured, skipping send")
 		return nil
 	}
@@ -67,7 +58,23 @@ func (s *Sender) Send(ctx context.Context, title, message string) error {
 		fullMessage = fmt.Sprintf("%s\n\n%s", title, message)
 	}
 
-	errs := s.router.Send(fullMessage, nil)
+	// Create a fresh router per send to avoid race conditions.
+	// Shoutrrr's ServiceRouter is not safe for concurrent use when modifying Timeout.
+	sr, err := shoutrrr.CreateSender(s.urls...)
+	if err != nil {
+		return fmt.Errorf("creating shoutrrr router: %w", err)
+	}
+
+	// Set router timeout from context deadline if available.
+	// Shoutrrr doesn't support context directly, so we approximate by setting
+	// the router's timeout field based on the context's remaining time.
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining > 0 {
+			sr.Timeout = remaining
+		}
+	}
+
+	errs := sr.Send(fullMessage, nil)
 
 	// Collect all errors
 	var errMsgs []string
