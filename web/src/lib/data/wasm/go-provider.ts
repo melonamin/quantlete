@@ -1706,7 +1706,7 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async updateCredentials(req: UpdateCredentialsRequest): Promise<CredentialsStatus> {
-    saveCredentials(req.client_id, req.client_secret)
+    await saveCredentials(req.client_id, req.client_secret)
     return {
       configured: true,
       client_id: req.client_id,
