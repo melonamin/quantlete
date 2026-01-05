@@ -116,6 +116,8 @@ export function useRefreshToken() {
 
 export function useDashboard() {
   const { provider, initialized, error } = useDataProviderStatus()
+  const { data: auth, isLoading: authLoading } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated ?? false
 
   return useQuery({
     queryKey: ['data', 'dashboard'],
@@ -123,13 +125,15 @@ export function useDashboard() {
       if (!provider) throw new Error('Provider not ready')
       return provider.getDashboard()
     },
-    enabled: initialized && !error && !!provider,
+    enabled: initialized && !error && !!provider && !authLoading && isAuthenticated,
     staleTime: 1000 * 60, // 1 minute
   })
 }
 
 export function useDashboardStats() {
   const { provider, initialized, error } = useDataProviderStatus()
+  const { data: auth, isLoading: authLoading } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated ?? false
 
   return useQuery({
     queryKey: ['data', 'dashboard', 'stats'],
@@ -137,12 +141,14 @@ export function useDashboardStats() {
       if (!provider) throw new Error('Provider not ready')
       return provider.getDashboardStats()
     },
-    enabled: initialized && !error && !!provider,
+    enabled: initialized && !error && !!provider && !authLoading && isAuthenticated,
   })
 }
 
 export function useDashboardConfig() {
   const { provider, initialized, error } = useDataProviderStatus()
+  const { data: auth, isLoading: authLoading } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated ?? false
 
   return useQuery({
     queryKey: ['data', 'dashboard', 'config'],
@@ -150,7 +156,7 @@ export function useDashboardConfig() {
       if (!provider) throw new Error('Provider not ready')
       return provider.getDashboardConfig()
     },
-    enabled: initialized && !error && !!provider,
+    enabled: initialized && !error && !!provider && !authLoading && isAuthenticated,
   })
 }
 
@@ -524,6 +530,8 @@ export function useEddingtonHistory(sportType?: string) {
 
 export function useImportProgress(enabled = true) {
   const { provider, initialized, error } = useDataProviderStatus()
+  const { data: auth, isLoading: authLoading } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated ?? false
 
   return useQuery({
     queryKey: ['data', 'import', 'progress'],
@@ -531,7 +539,7 @@ export function useImportProgress(enabled = true) {
       if (!provider) throw new Error('Provider not ready')
       return provider.getImportProgress()
     },
-    enabled: enabled && initialized && !error && !!provider,
+    enabled: enabled && initialized && !error && !!provider && !authLoading && isAuthenticated,
     // Data is updated via events from useDataEvents hook
     staleTime: Infinity,
   })

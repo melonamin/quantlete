@@ -47,6 +47,7 @@ Thumbs.db
 .env.*
 !.env.*.example
 !.env.demo
+!.env.wasm
 
 # Data
 /data/

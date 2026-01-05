@@ -36,8 +36,8 @@ Run entirely in your browser using WebAssembly. Your data stays on your device.
 docker run -d \
   -p 8081:8081 \
   -v quantlete-data:/data \
-  -e STRAVA_CLIENT_ID=your_client_id \
-  -e STRAVA_CLIENT_SECRET=your_client_secret \
+  -e QUANTLETE_STRAVA_CLIENT_ID=your_client_id \
+  -e QUANTLETE_STRAVA_CLIENT_SECRET=your_client_secret \
   ghcr.io/melonamin/quantlete:latest
 ```
 
@@ -62,8 +62,8 @@ volumes:
 Create a `.env` file with your Strava credentials:
 
 ```bash
-STRAVA_CLIENT_ID=your_client_id
-STRAVA_CLIENT_SECRET=your_client_secret
+QUANTLETE_STRAVA_CLIENT_ID=your_client_id
+QUANTLETE_STRAVA_CLIENT_SECRET=your_client_secret
 ```
 
 > **Note:** Never commit `.env` files or credentials to version control.

@@ -9,15 +9,19 @@
 import { useEffect, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDataProviderStatus } from '@/lib/data/context'
+import { useAuthStatus } from '@/lib/data/hooks'
 import type { DataEvent, DataChangeSet } from '@/lib/data/events'
 
 /**
  * Hook that subscribes to data events and handles query invalidation.
  * Should be called once at the app root level.
+ * Only subscribes when user is authenticated to avoid 401 errors.
  */
 export function useDataEvents(): void {
   const queryClient = useQueryClient()
   const { provider, initialized, error } = useDataProviderStatus()
+  const { data: auth, isLoading: authLoading } = useAuthStatus()
+  const isAuthenticated = auth?.authenticated ?? false
 
   const invalidateForChanges = useCallback(
     (changes: DataChangeSet) => {
@@ -49,7 +53,8 @@ export function useDataEvents(): void {
   )
 
   useEffect(() => {
-    if (!initialized || error || !provider) {
+    // Don't subscribe until authenticated to avoid 401 errors on SSE endpoint
+    if (!initialized || error || !provider || authLoading || !isAuthenticated) {
       return
     }
 
@@ -100,5 +105,5 @@ export function useDataEvents(): void {
     }
 
     return provider.subscribeToEvents(handleEvent)
-  }, [provider, initialized, error, queryClient, invalidateForChanges])
+  }, [provider, initialized, error, authLoading, isAuthenticated, queryClient, invalidateForChanges])
 }

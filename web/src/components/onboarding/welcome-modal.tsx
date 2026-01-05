@@ -54,6 +54,7 @@ export function WelcomeModal() {
   const { data: auth, isLoading: authLoading } = useAuthStatus()
   const { data: credentials, isLoading: credentialsLoading } = useCredentialsStatus()
   const updateCredentials = useUpdateCredentials()
+
   const { dismissed, dismiss } = useOnboardingStore()
 
   // Multi-step flow: welcome -> credentials (if not configured) -> connect
@@ -73,6 +74,7 @@ export function WelcomeModal() {
   // Determine if we should show the modal
   const isAuthenticated = auth?.authenticated ?? false
   const credentialsConfigured = credentials?.configured // undefined until query completes
+
   const show = shouldShowOnboarding(
     isAuthenticated,
     authLoading,
@@ -117,7 +119,7 @@ export function WelcomeModal() {
   }
 
   // Get auth URL based on mode
-  const authUrl = getAuthUrl(credentialsConfigured)
+  const authUrl = getAuthUrl(credentialsConfigured ?? false)
 
   const wasmMode = isWasmMode()
 
