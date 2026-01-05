@@ -751,12 +751,9 @@ export interface MaintenanceRule {
 }
 
 export interface RequestInput {
-  id: string
-  name?: string | null
-  hashtag?: string | null
-  retired?: boolean | null
-  purchase_price?: number | null
-  purchase_currency?: string | null
+  component_id: number
+  activity_id?: number | null
+  completed_at: string
 }
 
 /** RuleInput represents a rule in create/update requests. */
@@ -797,6 +794,29 @@ export interface UpdateComponentInput {
   image_url?: string | null
   maintenance_hashtag?: string | null
   rules?: RuleInput[]
+}
+
+// ============================================================================
+// From notifications.go
+// ============================================================================
+
+/** TestAllResult represents the result of testing a single notification service. */
+export interface TestAllResult {
+  serviceId: string
+  serviceName: string
+  success: boolean
+  error?: string
+}
+
+/** TestRequest is the request body for testing a single notification service. */
+export interface TestRequest {
+  serviceId: string
+}
+
+/** TestResult is the response for a notification test. */
+export interface TestResult {
+  success: boolean
+  error?: string
 }
 
 // ============================================================================
@@ -1453,6 +1473,18 @@ export interface GetMonthlyStatsRow {
   total_elevation: number
 }
 
+/** GetNotifiedKeysByTypesRow represents a row returned by GetNotifiedKeysByTypes. */
+export interface GetNotifiedKeysByTypesRow {
+  achievement_type: string
+  achievement_key: string
+}
+
+/** GetNotifiedKeysRow represents a row returned by GetNotifiedKeys. */
+export interface GetNotifiedKeysRow {
+  achievement_type: string
+  achievement_key: string
+}
+
 /** GetPowerBestsForDurationsRow represents a row returned by GetPowerBestsForDurations. */
 export interface GetPowerBestsForDurationsRow {
   duration_s: string
@@ -1686,6 +1718,11 @@ export interface GetYearlyStatsRow {
   total_elevation: number
 }
 
+/** HasBeenNotifiedRow represents a row returned by HasBeenNotified. */
+export interface HasBeenNotifiedRow {
+  count: number
+}
+
 // ============================================================================
 // From segments.go
 // ============================================================================
@@ -1863,6 +1900,7 @@ export interface AthleteSettings {
   eddington_definitions?: EddingtonDefinition[]
   scheduler: SchedulerSettings
   enable_public_badges: boolean
+  notifications?: NotificationConfig | null
 }
 
 export interface EddingtonDefinition {
@@ -2003,6 +2041,17 @@ export interface DashboardStats {
   month_distance: number
   month_moving_time: number
   month_elevation_gain: number
+}
+
+/** DigestStats represents aggregated statistics for digest notifications. */
+export interface DigestStats {
+  start_date: string
+  end_date: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+  total_calories: number
 }
 
 export interface DistributionSlice {
@@ -2357,6 +2406,44 @@ export interface SyncRun {
 export interface SyncWatermark {
   last_synced_at: string
   newest_activity_date?: string | null
+}
+
+// ============================================================================
+// From types.go
+// ============================================================================
+
+/** EventConfig defines which events trigger notifications. */
+export interface EventConfig {
+  importComplete: boolean
+  maintenanceDue: boolean
+  maintenanceSchedule: string
+  personalRecords: boolean
+  segmentPRs: boolean
+  eddingtonIncrease: boolean
+  powerRecords: boolean
+  goalComplete: boolean
+  fatigueWarning: boolean
+  recoveryAlert: boolean
+  overtrainingRisk: boolean
+  weeklyDigest: boolean
+  monthlyDigest: boolean
+  gearMilestones: boolean
+}
+
+/** NotificationConfig holds the notification configuration for an athlete. */
+export interface NotificationConfig {
+  enabled: boolean
+  services: ServiceConfig[]
+  events: EventConfig
+}
+
+/** ServiceConfig defines a notification service configuration. */
+export interface ServiceConfig {
+  id: string
+  type: string
+  name: string
+  enabled: boolean
+  config: Record<string, string>
 }
 
 // ============================================================================

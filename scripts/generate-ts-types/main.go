@@ -85,11 +85,14 @@ var skipSuffixes = []string{
 // allowedConfigTypes are Config types that ARE part of the public API
 // and should be generated despite the general "Config" exclusion rule
 var allowedConfigTypes = map[string]bool{
-	"TrainingGoalsConfig":    true,
-	"GoalsSportConfig":       true,
-	"HRZoneConfig":           true,
-	"DashboardConfig":        true,
-	"DashboardWidgetConfig":  true,
+	"TrainingGoalsConfig":   true,
+	"GoalsSportConfig":      true,
+	"HRZoneConfig":          true,
+	"DashboardConfig":       true,
+	"DashboardWidgetConfig": true,
+	"NotificationConfig":    true,
+	"ServiceConfig":         true,
+	"EventConfig":           true,
 }
 
 // shouldSkipType determines if a type should be excluded from generation
@@ -126,6 +129,7 @@ func main() {
 		{filepath.Join(root, "internal", "services"), false},
 		{filepath.Join(root, "internal", "api", "handlers"), false},
 		{filepath.Join(root, "internal", "storage"), false},
+		{filepath.Join(root, "internal", "notifications"), false},
 		// NOTE: internal/strava is NOT included - those are Strava API wire types,
 		// not our API output types. The frontend uses handler output types.
 	}
