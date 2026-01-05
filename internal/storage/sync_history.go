@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -227,10 +228,11 @@ func (r *SyncHistoryRepository) GetLatest(ctx context.Context, athleteID int64, 
 		var run SyncRun
 		var startedAt, completedAt, newestActivityDate, createdAt SQLiteTime
 		var fullSync, skipStreams, skipSegments, skipBestEfforts, skipPhotos int
+		var errorMsg sql.NullString
 
 		err := rows.Scan(
 			&run.ID, &run.AthleteID, &startedAt, &completedAt, &run.DurationSeconds,
-			&run.Status, &run.Error,
+			&run.Status, &errorMsg,
 			&run.ActivitiesTotal, &run.ActivitiesImported, &run.ActivitiesSkipped,
 			&run.GearImported, &run.StreamsImported, &run.SegmentsImported,
 			&run.PhotosImported, &run.FailedCount,
@@ -249,6 +251,7 @@ func (r *SyncHistoryRepository) GetLatest(ctx context.Context, athleteID int64, 
 			run.NewestActivityDate = &newestActivityDate.Time
 		}
 		run.CreatedAt = createdAt.Time
+		run.Error = errorMsg.String // Empty string if NULL
 
 		run.FullSync = fullSync != 0
 		run.SkipStreams = skipStreams != 0
