@@ -129,6 +129,7 @@ describe('ImportSSEClient', () => {
 
       const eventSource = MockEventSource.lastInstance!
       eventSource.simulateEvent('sync:progress', {
+        status: 'running',
         phase: 'activities',
         activities_done: 10,
         activities_total: 100,
@@ -147,6 +148,7 @@ describe('ImportSSEClient', () => {
 
       expect(listener).toHaveBeenCalledWith({
         type: 'sync:progress',
+        status: 'running',
         phase: 'activities',
         activitiesDone: 10,
         activitiesTotal: 100,
@@ -177,6 +179,7 @@ describe('ImportSSEClient', () => {
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'sync:progress',
+          status: 'idle', // defaults to 'idle' when not provided
           activitiesDone: 0,
           activitiesTotal: 0,
           gearDone: 0,

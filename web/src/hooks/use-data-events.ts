@@ -64,7 +64,7 @@ export function useDataEvents(): void {
           // Update import progress cache directly (avoids refetch)
           queryClient.setQueryData(['data', 'import', 'progress'], (old: unknown) => ({
             ...(old as object),
-            status: 'running',
+            status: event.status,
             phase: event.phase,
             activities_done: event.activitiesDone,
             activities_total: event.activitiesTotal,

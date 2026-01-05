@@ -139,10 +139,11 @@ describe('createSyncProgressEvent', () => {
       estimated_eta: '5m 30s',
     }
 
-    const event = createSyncProgressEvent('streams', progress)
+    const event = createSyncProgressEvent('running', 'streams', progress)
 
     expect(event).toEqual({
       type: 'sync:progress',
+      status: 'running',
       phase: 'streams',
       activitiesDone: 10,
       activitiesTotal: 100,
@@ -176,7 +177,7 @@ describe('createSyncProgressEvent', () => {
       photos_total: 0,
     }
 
-    const event = createSyncProgressEvent('activities', progress)
+    const event = createSyncProgressEvent('idle', 'activities', progress)
 
     expect(event.estimatedEta).toBeUndefined()
   })
@@ -282,7 +283,7 @@ describe('cross-language constants sync', () => {
     // Go: EventSyncProgress = "sync:progress"
     // Go: EventSyncComplete = "sync:complete"
     // Go: EventDataChanged = "data:changed"
-    const syncProgressEvent = createSyncProgressEvent('activities', {
+    const syncProgressEvent = createSyncProgressEvent('running', 'activities', {
       activities_done: 0,
       activities_total: 0,
       gear_done: 0,
@@ -297,6 +298,7 @@ describe('cross-language constants sync', () => {
       photos_total: 0,
     })
     expect(syncProgressEvent.type).toBe('sync:progress')
+    expect(syncProgressEvent.status).toBe('running')
 
     const syncCompleteEvent = createSyncCompleteEvent('completed')
     expect(syncCompleteEvent.type).toBe('sync:complete')

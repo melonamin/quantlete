@@ -39,6 +39,7 @@ export class ImportSSEClient {
         const data = JSON.parse(e.data)
         const event: SyncProgressEvent = {
           type: 'sync:progress',
+          status: data.status ?? 'idle',
           phase: data.phase as ImportPhase,
           activitiesDone: data.activities_done ?? 0,
           activitiesTotal: data.activities_total ?? 0,

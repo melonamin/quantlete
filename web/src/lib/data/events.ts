@@ -17,6 +17,7 @@ import type { ImportPhase } from './types'
  */
 export interface SyncProgressEvent {
   type: 'sync:progress'
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'canceled' | 'paused'
   phase: ImportPhase
   activitiesDone: number
   activitiesTotal: number
@@ -133,6 +134,7 @@ export class DataEventEmitter {
  * Create a sync progress event from import progress data.
  */
 export function createSyncProgressEvent(
+  status: SyncProgressEvent['status'],
   phase: ImportPhase,
   progress: {
     activities_done: number
@@ -155,6 +157,7 @@ export function createSyncProgressEvent(
 ): SyncProgressEvent {
   return {
     type: 'sync:progress',
+    status,
     phase,
     activitiesDone: progress.activities_done,
     activitiesTotal: progress.activities_total,
