@@ -17,6 +17,7 @@ type Config struct {
 type ServerConfig struct {
 	Port         int           `mapstructure:"port"`
 	Host         string        `mapstructure:"host"`
+	ExternalURL  string        `mapstructure:"external_url"` // External URL for OAuth callbacks (e.g., https://quantlete.example.com)
 	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `mapstructure:"write_timeout"`
 	IdleTimeout  time.Duration `mapstructure:"idle_timeout"`
@@ -72,6 +73,27 @@ func Default() *Config {
 // DBPath returns the full path to the database file.
 func (c *Config) DBPath() string {
 	return c.Storage.DataDir + "/" + c.Storage.DBFile
+}
+
+// GetExternalURL returns the external URL for the server.
+// If ExternalURL is set, it's used directly. Otherwise, constructs from host/port.
+func (s *ServerConfig) GetExternalURL() string {
+	if s.ExternalURL != "" {
+		return s.ExternalURL
+	}
+	host := s.Host
+	if host == "" {
+		host = "localhost"
+	}
+	if s.Port == 80 || s.Port == 0 {
+		return fmt.Sprintf("http://%s", host)
+	}
+	return fmt.Sprintf("http://%s:%d", host, s.Port)
+}
+
+// GetOAuthCallbackURL returns the full OAuth callback URL.
+func (s *ServerConfig) GetOAuthCallbackURL() string {
+	return s.GetExternalURL() + "/api/v1/auth/strava/callback"
 }
 
 // Validate checks if the configuration is valid.

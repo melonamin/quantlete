@@ -34,6 +34,7 @@ func Load() (*Config, error) {
 	// Explicitly bind nested env vars (AutomaticEnv doesn't work well with nested structs)
 	_ = v.BindEnv("server.port", "QUANTLETE_SERVER_PORT")
 	_ = v.BindEnv("server.host", "QUANTLETE_SERVER_HOST")
+	_ = v.BindEnv("server.external_url", "QUANTLETE_EXTERNAL_URL")
 	_ = v.BindEnv("server.dev_mode", "QUANTLETE_SERVER_DEV_MODE")
 	_ = v.BindEnv("strava.client_id", "QUANTLETE_STRAVA_CLIENT_ID")
 	_ = v.BindEnv("strava.client_secret", "QUANTLETE_STRAVA_CLIENT_SECRET")

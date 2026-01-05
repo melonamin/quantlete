@@ -79,6 +79,12 @@ func runServe(port int, dev bool) error {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
+	// Set redirect URI from external URL if not explicitly configured
+	if cfg.Strava.RedirectURI == "" || cfg.Strava.RedirectURI == "http://localhost:8081/api/v1/auth/strava/callback" {
+		cfg.Strava.RedirectURI = cfg.Server.GetOAuthCallbackURL()
+		slog.Debug("using external URL for OAuth callback", "redirect_uri", cfg.Strava.RedirectURI)
+	}
+
 	// Create Strava client
 	stravaClient := strava.NewClient(&cfg.Strava)
 
@@ -272,6 +278,7 @@ func runServe(port int, dev bool) error {
 
 	slog.Info("starting server",
 		"addr", addr,
+		"external_url", cfg.Server.GetExternalURL(),
 		"dev", cfg.Server.DevMode,
 		"strava_configured", cfg.Strava.ClientID != "",
 	)
