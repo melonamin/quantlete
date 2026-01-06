@@ -153,7 +153,18 @@ func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportTy
 			WHERE athlete_id = ? AND sport_type = ? AND effective_from = ?
 		`, athleteID, sportType, eff)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Invalidate zone distributions for affected activities.
+	// Activities from effective_from onwards may now use a different zone definition.
+	q := NewQueries(r.db.Conn())
+	if err := q.DeleteZoneDistributionsForSportType(ctx, athleteID, sportType, eff.Format("2006-01-02")); err != nil {
+		return fmt.Errorf("invalidate zone distributions: %w", err)
+	}
+
+	return nil
 }
 
 type HRZoneConfig struct {

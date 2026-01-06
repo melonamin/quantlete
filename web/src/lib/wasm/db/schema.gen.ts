@@ -891,6 +891,11 @@ CREATE TABLE IF NOT EXISTS activity_zone_distributions (
 );
 
 -- Note: No index needed on activity_id - PRIMARY KEY already creates one
+
+-- Index on zone_def_id for potential future use:
+-- - Direct invalidation by zone definition (e.g., when deleting a specific definition)
+-- - Querying which activities used a particular zone definition
+-- Currently unused but kept for forward compatibility.
 CREATE INDEX IF NOT EXISTS idx_zone_dist_zone_def ON activity_zone_distributions(zone_def_id);
 `,
   }

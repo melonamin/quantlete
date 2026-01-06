@@ -169,6 +169,15 @@ export interface SaveStreamOutput {
 }
 
 // ============================================================================
+// From app_state.go
+// ============================================================================
+
+export interface SaveStravaCredentialsInput {
+  client_id: string
+  client_secret: string
+}
+
+// ============================================================================
 // From athlete.go
 // ============================================================================
 
@@ -202,6 +211,25 @@ export interface WeightHistoryResponse {
 export interface AthleteMetricPoint {
   recorded_at: string
   value: number
+}
+
+// ============================================================================
+// From athletes.go
+// ============================================================================
+
+export interface SaveAthleteInput {
+  id: number
+  username: string
+  firstname: string
+  lastname: string
+  profile_medium: string
+  profile: string
+  city: string
+  state: string
+  country: string
+  sex: string
+  premium: boolean
+  summit: boolean
 }
 
 // ============================================================================
@@ -254,6 +282,14 @@ export interface ChallengeItem {
   local_badge_url?: string
   completion_date?: string | null
   month?: string
+}
+
+export interface GetChallengesRequest {
+  month: string
+  page: number
+  per_page: number
+  order_by: string
+  order_dir: string
 }
 
 export interface ImportBody {
@@ -624,7 +660,7 @@ export interface HealthResponse {
 // From import.go
 // ============================================================================
 
-export interface OptsInput {
+export interface StartImportOpts {
   full_sync: boolean
   resume: boolean
   skip_streams: boolean
@@ -702,6 +738,16 @@ export interface CreateComponentInput {
   rules?: RuleInput[]
 }
 
+export interface DeleteCustomGearRequest {
+  id: string
+  force: boolean
+}
+
+export interface DeleteHRZoneDefinitionHRZoneDeleteReq {
+  sport_type: string
+  effective_from: string
+}
+
 export interface DueComponent {
   distance_since: number
   moving_time_since: number
@@ -728,16 +774,18 @@ export interface DueComponentItem {
   is_due: boolean
 }
 
-export interface HRZoneDeleteReqInput {
-  sport_type: string
-  effective_from: string
+export interface GetCustomGearRequest {
+  include_retired: boolean
+  page: number
+  per_page: number
+  order_by: string
+  order_dir: string
 }
 
-export interface HRZoneReqInput {
-  sport_type: string
-  effective_from: string
-  method: string
-  zones: unknown
+export interface GetGearComponentsRequest {
+  gear_id: string
+  page: number
+  per_page: number
 }
 
 /** ListComponentsInput contains parameters for listing components. */
@@ -765,6 +813,12 @@ export interface LogMaintenanceInput {
   completed_at: string
 }
 
+export interface LogMaintenanceRequest {
+  component_id: number
+  activity_id?: number | null
+  completed_at: string
+}
+
 export interface MaintenanceLogEntry {
   component_id: number
   activity_id?: number | null
@@ -778,14 +832,6 @@ export interface MaintenanceRule {
   threshold_value: number
   created_at: string
   updated_at: string
-}
-
-export interface RequestInput {
-  id: number
-  name?: string | null
-  image_url?: string | null
-  maintenance_hashtag?: string | null
-  rules?: unknown[]
 }
 
 /** RuleInput represents a rule in create/update requests. */
@@ -826,6 +872,13 @@ export interface UpdateComponentInput {
   image_url?: string | null
   maintenance_hashtag?: string | null
   rules?: RuleInput[]
+}
+
+export interface UpsertHRZoneDefinitionHRZoneReq {
+  sport_type: string
+  effective_from: string
+  method: string
+  zones: unknown
 }
 
 // ============================================================================
@@ -2085,6 +2138,11 @@ export interface CalendarMonthSummary {
   challenges_completed: number
 }
 
+export interface ComputePowerBestEffortsInput {
+  activity_id: number
+  athlete_id: number
+}
+
 /** DailyTrainingLoadPoint represents training load for a single day. */
 export interface DailyTrainingLoadPoint {
   day: string
@@ -2469,6 +2527,44 @@ export interface YearStat {
 /** ZoneTrendOutput contains zone trend data. */
 export interface ZoneTrendOutput {
   weeks: WeeklyZoneDistribution[]
+}
+
+// ============================================================================
+// From sync.go
+// ============================================================================
+
+export interface CompleteSyncRunRequest {
+  id: number
+  status: string
+  error: string
+  activities_total: number
+  activities_imported: number
+  activities_skipped: number
+  gear_imported: number
+  streams_imported: number
+  segments_imported: number
+  photos_imported: number
+  failed_count: number
+  newest_activity_date: string
+}
+
+export interface CreateSyncRunInput {
+  athlete_id: number
+  full_sync: boolean
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+}
+
+export interface UpdateSyncRunInput {
+  id: number
+  status: string
+  activities_total: number
+  activities_imported: number
+  streams_imported: number
+  failed_count: number
+  newest_activity_date: string
 }
 
 // ============================================================================

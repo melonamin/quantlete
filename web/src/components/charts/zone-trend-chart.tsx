@@ -23,10 +23,15 @@ export function ZoneTrendChart({
       trigger: 'axis',
       axisPointer: { type: 'cross' },
       formatter: (params: unknown) => {
-        const items = params as Array<{ seriesName: string; value: number; color: string }>
+        const items = params as Array<{
+          seriesName: string
+          value: number
+          color: string
+          axisValue: string
+        }>
         if (!items?.length) return ''
 
-        const week = items[0].value !== undefined ? data[items[0].value as unknown as number]?.week : ''
+        const week = items[0].axisValue
         const lines = items.map(
           (item) =>
             `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${item.color};margin-right:5px"></span>${item.seriesName}: <b>${item.value.toFixed(1)}%</b>`

@@ -757,6 +757,11 @@ func inferTypeFromColumnName(colName string) string {
 		return "string"
 	}
 
+	// Zone distribution seconds fields
+	if strings.HasPrefix(lowerName, "seconds_z") || lowerName == "total_seconds" {
+		return "int"
+	}
+
 	// Timestamp fields
 	if strings.HasSuffix(lowerName, "_at") {
 		return "SQLiteTime"

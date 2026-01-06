@@ -59,12 +59,12 @@ func (r *ZoneDistributionRepository) Save(ctx context.Context, dist ActivityZone
 		ctx,
 		dist.ActivityID,
 		dist.ZoneDefID,
-		strconv.Itoa(dist.SecondsZ1),
-		strconv.Itoa(dist.SecondsZ2),
-		strconv.Itoa(dist.SecondsZ3),
-		strconv.Itoa(dist.SecondsZ4),
-		strconv.Itoa(dist.SecondsZ5),
-		strconv.Itoa(dist.TotalSeconds),
+		dist.SecondsZ1,
+		dist.SecondsZ2,
+		dist.SecondsZ3,
+		dist.SecondsZ4,
+		dist.SecondsZ5,
+		dist.TotalSeconds,
 		SQLiteTime{Time: dist.ComputedAt},
 	)
 }
