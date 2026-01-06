@@ -116,7 +116,7 @@ func NewServiceRegistry(db *storage.DB, logger *slog.Logger) *ServiceRegistry {
 	r.MaintenanceService = NewMaintenanceService(r.maintenance)
 	r.ChallengesService = NewChallengesService(r.challenges)
 	r.NotificationService = NewNotificationService(logger, r.settings)
-	r.InsightsService = NewInsightsService(r.trainingLoad)
+	r.InsightsService = NewInsightsService(r.trainingLoad, r.power, r.activities)
 
 	return r
 }

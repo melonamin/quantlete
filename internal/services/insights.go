@@ -21,9 +21,21 @@ const (
 	// CTL thresholds for fitness trends.
 	ctlDropPercentThreshold = -10.0 // CTL drop percentage that triggers warning
 	ctlMinForAnalysis       = 5.0   // Minimum CTL for meaningful percentage calculations
+	ctlPeakLookbackDays     = 90    // Days to check for CTL peak
+	ctlRampThreshold        = 15.0  // % CTL increase that's "too fast"
+	ctlRampWindowDays       = 7     // Days to measure ramp rate
 
 	// ATL/CTL ratio for overtraining risk.
 	overtrainingRiskRatio = 1.5 // ATL > CTL * this ratio indicates risk
+
+	// Power PR detection.
+	powerPRWindowDays = 7 // Days to look for recent power PRs
+
+	// Activity pattern thresholds.
+	restDayThreshold    = 7  // Consecutive days without rest triggers warning
+	consistencyWeeks    = 4  // Weeks of consistent training for positive insight
+	varietyThreshold    = 10 // Same sport activities before suggesting variety
+	patternLookbackDays = 30 // Days to analyze for patterns
 
 	// Analysis configuration.
 	minDataPointsForCTL = 7 // Minimum data points for CTL trend analysis
@@ -33,15 +45,21 @@ const (
 // InsightsService analyzes training load metrics and generates coaching insights.
 type InsightsService struct {
 	trainingLoad *storage.TrainingLoadRepository
+	power        *storage.PowerRepository
+	activities   *storage.ActivityRepository
 	logger       *slog.Logger
 }
 
 // NewInsightsService creates a new insights service.
 func NewInsightsService(
 	trainingLoad *storage.TrainingLoadRepository,
+	power *storage.PowerRepository,
+	activities *storage.ActivityRepository,
 ) *InsightsService {
 	return &InsightsService{
 		trainingLoad: trainingLoad,
+		power:        power,
+		activities:   activities,
 		logger:       slog.Default().With("service", "insights"),
 	}
 }
@@ -105,22 +123,50 @@ func (s *InsightsService) GetInsights(ctx context.Context, in GetInsightsInput) 
 		return nil, Wrapf(ErrInternal, "failed to get training load summary: %v", err)
 	}
 
-	// Get historical training load for CTL trend analysis.
-	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
-	series, err := s.trainingLoad.GetDailySeries(ctx, in.AthleteID, &sevenDaysAgo, nil)
+	// Get 90-day CTL history for fitness peak and ramp detection.
+	ninetyDaysAgo := time.Now().AddDate(0, 0, -ctlPeakLookbackDays)
+	ctlSeries, err := s.trainingLoad.GetDailySeries(ctx, in.AthleteID, &ninetyDaysAgo, nil)
 	if err != nil {
 		return nil, Wrapf(ErrInternal, "failed to get training load series: %v", err)
 	}
 
 	// Sort series by date to ensure oldest-first ordering for trend analysis.
-	sort.Slice(series, func(i, j int) bool {
-		return series[i].Day < series[j].Day
+	sort.Slice(ctlSeries, func(i, j int) bool {
+		return ctlSeries[i].Day < ctlSeries[j].Day
 	})
+
+	// Get recent activities for pattern analysis.
+	patternStart := time.Now().AddDate(0, 0, -patternLookbackDays)
+	activities, _, err := s.activities.List(ctx, storage.ActivityFilters{
+		AthleteID:  in.AthleteID,
+		StartAfter: &patternStart,
+	}, storage.Pagination{PerPage: 500})
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get activities: %v", err)
+	}
+
+	// Get recent power PRs.
+	prWindow := time.Now().AddDate(0, 0, -powerPRWindowDays)
+	powerPRs, err := s.power.GetBest(ctx, in.AthleteID, []int{5, 60, 300, 1200}, &prWindow, nil, nil)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get power PRs: %v", err)
+	}
 
 	// Apply training load rules to generate insights.
 	if summary != nil {
-		insights = append(insights, s.applyTrainingLoadRules(summary, series)...)
+		insights = append(insights, s.applyTrainingLoadRules(summary, ctlSeries)...)
 	}
+
+	// Apply CTL-based insights (fitness peak, ramp rate).
+	if len(ctlSeries) > 0 {
+		insights = append(insights, s.applyCTLInsights(ctlSeries)...)
+	}
+
+	// Apply power PR insight.
+	insights = append(insights, s.applyPowerPRInsight(powerPRs)...)
+
+	// Apply activity pattern insights.
+	insights = append(insights, s.applyActivityPatternInsights(activities)...)
 
 	// Sort by severity priority (stable sort preserves order within same priority).
 	sort.SliceStable(insights, func(i, j int) bool {
@@ -212,4 +258,194 @@ func (s *InsightsService) applyTrainingLoadRules(summary *storage.DailyTrainingL
 	}
 
 	return insights
+}
+
+// applyCTLInsights generates insights from CTL trends (fitness peak, ramp rate).
+func (s *InsightsService) applyCTLInsights(series []storage.DailyTrainingLoadPoint) []Insight {
+	var insights []Insight
+
+	if len(series) < minDataPointsForCTL {
+		return insights
+	}
+
+	currentCTL := series[len(series)-1].CTL
+
+	// Rule: Fitness Peak - CTL at 90-day high.
+	maxCTL := 0.0
+	for _, p := range series[:len(series)-1] { // Exclude current day.
+		if p.CTL > maxCTL {
+			maxCTL = p.CTL
+		}
+	}
+	if currentCTL > ctlMinForAnalysis && currentCTL >= maxCTL {
+		insights = append(insights, Insight{
+			ID:          "fitness_peak",
+			Type:        "fitness",
+			Severity:    "success",
+			Title:       "Peak fitness!",
+			Description: fmt.Sprintf("Your CTL (%.0f) is at its highest in %d days. Great time for a race!", currentCTL, ctlPeakLookbackDays),
+		})
+	}
+
+	// Rule: Ramp Too Fast - CTL increased >15% in 7 days.
+	if len(series) >= ctlRampWindowDays {
+		weekAgoCTL := series[len(series)-ctlRampWindowDays].CTL
+		if weekAgoCTL > ctlMinForAnalysis {
+			rampPercent := ((currentCTL - weekAgoCTL) / weekAgoCTL) * 100
+			if rampPercent > ctlRampThreshold {
+				insights = append(insights, Insight{
+					ID:          "ramp_too_fast",
+					Type:        "fitness",
+					Severity:    "warning",
+					Title:       "Ramp rate warning",
+					Description: fmt.Sprintf("Your CTL increased %.0f%% in %d days. Watch for injury signs.", rampPercent, ctlRampWindowDays),
+				})
+			}
+		}
+	}
+
+	return insights
+}
+
+// applyPowerPRInsight generates insight for recent power PRs.
+func (s *InsightsService) applyPowerPRInsight(prs []storage.PeakPowerBest) []Insight {
+	var insights []Insight
+
+	if len(prs) == 0 {
+		return insights
+	}
+
+	// Find the most impressive PR (longest duration with good power).
+	// Prefer longer durations as they're harder to set PRs on.
+	var bestPR *storage.PeakPowerBest
+	for i := range prs {
+		if prs[i].Watts > 0 {
+			if bestPR == nil || prs[i].DurationS > bestPR.DurationS {
+				bestPR = &prs[i]
+			}
+		}
+	}
+
+	if bestPR != nil {
+		durationStr := formatDuration(bestPR.DurationS)
+		insights = append(insights, Insight{
+			ID:          "power_pr",
+			Type:        "fitness",
+			Severity:    "success",
+			Title:       "New power PR!",
+			Description: fmt.Sprintf("You set a new %s power record (%.0fW)!", durationStr, bestPR.Watts),
+		})
+	}
+
+	return insights
+}
+
+// applyActivityPatternInsights generates insights from activity patterns.
+func (s *InsightsService) applyActivityPatternInsights(activities []storage.Activity) []Insight {
+	var insights []Insight
+
+	if len(activities) == 0 {
+		return insights
+	}
+
+	// Build a set of activity dates and sport type counts.
+	activityDates := make(map[string]bool)
+	sportCounts := make(map[string]int)
+	for _, a := range activities {
+		dayStr := a.StartDateLocal.Format("2006-01-02")
+		activityDates[dayStr] = true
+		sportCounts[a.SportType]++
+	}
+
+	// Rule: Rest Day Needed - consecutive days without rest.
+	consecutiveDays := countConsecutiveActivityDays(activityDates)
+	if consecutiveDays >= restDayThreshold {
+		insights = append(insights, Insight{
+			ID:          "rest_day_needed",
+			Type:        "recovery",
+			Severity:    "warning",
+			Title:       "Take a rest day",
+			Description: fmt.Sprintf("You've trained %d days straight. Rest is when you get stronger.", consecutiveDays),
+		})
+	}
+
+	// Rule: Consistency King - activities every week for 4+ weeks.
+	weeksWithActivity := countWeeksWithActivity(activityDates)
+	if weeksWithActivity >= consistencyWeeks {
+		insights = append(insights, Insight{
+			ID:          "consistency_king",
+			Type:        "fitness",
+			Severity:    "success",
+			Title:       "Consistent training",
+			Description: fmt.Sprintf("%d weeks of regular training. Consistency beats intensity!", weeksWithActivity),
+		})
+	}
+
+	// Rule: Variety Check - same sport for 10+ consecutive activities.
+	if len(activities) >= varietyThreshold {
+		// Check last N activities for same sport.
+		lastSport := activities[0].SportType // Most recent.
+		sameCount := 0
+		for _, a := range activities {
+			if a.SportType == lastSport {
+				sameCount++
+			} else {
+				break
+			}
+		}
+		if sameCount >= varietyThreshold {
+			insights = append(insights, Insight{
+				ID:          "variety_check",
+				Type:        "fitness",
+				Severity:    "info",
+				Title:       "Mix it up?",
+				Description: fmt.Sprintf("%d %s in a row. Cross-training can prevent overuse injuries.", sameCount, lastSport),
+			})
+		}
+	}
+
+	return insights
+}
+
+// countConsecutiveActivityDays counts consecutive days with activities ending today.
+func countConsecutiveActivityDays(dates map[string]bool) int {
+	today := time.Now()
+	count := 0
+	for i := 0; i < 30; i++ { // Check up to 30 days back.
+		dayStr := today.AddDate(0, 0, -i).Format("2006-01-02")
+		if dates[dayStr] {
+			count++
+		} else {
+			break
+		}
+	}
+	return count
+}
+
+// countWeeksWithActivity counts distinct weeks (Mon-Sun) with at least one activity.
+func countWeeksWithActivity(dates map[string]bool) int {
+	weeksWithActivity := make(map[string]bool)
+	for dateStr := range dates {
+		t, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			continue
+		}
+		// Get ISO week (year, week number).
+		year, week := t.ISOWeek()
+		weekKey := fmt.Sprintf("%d-%02d", year, week)
+		weeksWithActivity[weekKey] = true
+	}
+	return len(weeksWithActivity)
+}
+
+// formatDuration formats seconds into human-readable duration.
+func formatDuration(seconds int) string {
+	switch {
+	case seconds < 60:
+		return fmt.Sprintf("%ds", seconds)
+	case seconds < 3600:
+		return fmt.Sprintf("%dm", seconds/60)
+	default:
+		return fmt.Sprintf("%dh", seconds/3600)
+	}
 }

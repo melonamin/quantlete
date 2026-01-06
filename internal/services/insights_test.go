@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/melonamin/quantlete/internal/storage"
 )
@@ -164,4 +165,266 @@ func TestInsightsService_InsightStructure(t *testing.T) {
 			t.Errorf("Invalid severity %q", insight.Severity)
 		}
 	}
+}
+
+func TestInsightsService_ApplyCTLInsights(t *testing.T) {
+	svc := &InsightsService{}
+
+	tests := []struct {
+		name           string
+		series         []storage.DailyTrainingLoadPoint
+		wantInsightIDs []string
+	}{
+		{
+			name:           "insufficient data",
+			series:         []storage.DailyTrainingLoadPoint{{Day: "2024-01-01", CTL: 50}},
+			wantInsightIDs: nil,
+		},
+		{
+			name: "fitness peak - CTL at 90-day high",
+			series: func() []storage.DailyTrainingLoadPoint {
+				// Slow increase: 40 → 44 over 10 days = 10% over whole period.
+				// Last 7 days: 41 → 44 = ~7% (below 15% threshold).
+				s := make([]storage.DailyTrainingLoadPoint, 10)
+				for i := range s {
+					s[i] = storage.DailyTrainingLoadPoint{Day: "2024-01-0" + string(rune('1'+i)), CTL: 40 + float64(i)*0.4}
+				}
+				return s
+			}(),
+			wantInsightIDs: []string{"fitness_peak"},
+		},
+		{
+			name: "ramp too fast - CTL increased >15% in 7 days",
+			series: func() []storage.DailyTrainingLoadPoint {
+				// Fast increase: 40 → 50 over 10 days.
+				// Last 7 days: series[3]=42 → series[9]=50 = 19% increase (> 15%).
+				s := make([]storage.DailyTrainingLoadPoint, 10)
+				for i := range s {
+					s[i] = storage.DailyTrainingLoadPoint{Day: "2024-01-0" + string(rune('1'+i)), CTL: 40 + float64(i)*1.1}
+				}
+				return s
+			}(),
+			wantInsightIDs: []string{"fitness_peak", "ramp_too_fast"},
+		},
+		{
+			name: "no fitness peak when CTL is decreasing",
+			series: func() []storage.DailyTrainingLoadPoint {
+				s := make([]storage.DailyTrainingLoadPoint, 10)
+				for i := range s {
+					s[i] = storage.DailyTrainingLoadPoint{Day: "2024-01-0" + string(rune('1'+i)), CTL: float64(50 - i)}
+				}
+				return s
+			}(),
+			wantInsightIDs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			insights := svc.applyCTLInsights(tt.series)
+
+			gotIDs := make(map[string]bool)
+			for _, insight := range insights {
+				gotIDs[insight.ID] = true
+			}
+
+			for _, wantID := range tt.wantInsightIDs {
+				if !gotIDs[wantID] {
+					t.Errorf("expected insight %q not found in results: %v", wantID, insights)
+				}
+			}
+
+			for _, insight := range insights {
+				found := false
+				for _, wantID := range tt.wantInsightIDs {
+					if insight.ID == wantID {
+						found = true
+						break
+					}
+				}
+				if !found && len(tt.wantInsightIDs) > 0 {
+					t.Errorf("unexpected insight %q in results", insight.ID)
+				}
+			}
+		})
+	}
+}
+
+func TestInsightsService_ApplyPowerPRInsight(t *testing.T) {
+	svc := &InsightsService{}
+
+	tests := []struct {
+		name           string
+		prs            []storage.PeakPowerBest
+		wantInsightIDs []string
+	}{
+		{
+			name:           "no PRs",
+			prs:            nil,
+			wantInsightIDs: nil,
+		},
+		{
+			name: "single PR",
+			prs: []storage.PeakPowerBest{
+				{DurationS: 300, Watts: 350},
+			},
+			wantInsightIDs: []string{"power_pr"},
+		},
+		{
+			name: "multiple PRs - prefers longer duration",
+			prs: []storage.PeakPowerBest{
+				{DurationS: 5, Watts: 800},
+				{DurationS: 60, Watts: 450},
+				{DurationS: 1200, Watts: 280},
+			},
+			wantInsightIDs: []string{"power_pr"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			insights := svc.applyPowerPRInsight(tt.prs)
+
+			if len(tt.wantInsightIDs) == 0 && len(insights) > 0 {
+				t.Errorf("expected no insights, got %v", insights)
+			}
+
+			for _, wantID := range tt.wantInsightIDs {
+				found := false
+				for _, insight := range insights {
+					if insight.ID == wantID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected insight %q not found", wantID)
+				}
+			}
+		})
+	}
+}
+
+func TestInsightsService_ApplyActivityPatternInsights(t *testing.T) {
+	svc := &InsightsService{}
+
+	// Helper to create activities with dates.
+	makeActivities := func(daysAgo []int, sport string) []storage.Activity {
+		activities := make([]storage.Activity, len(daysAgo))
+		now := timeNow()
+		for i, d := range daysAgo {
+			activities[i] = storage.Activity{
+				StartDateLocal: storage.SQLiteTime{Time: now.AddDate(0, 0, -d)},
+				SportType:      sport,
+			}
+		}
+		return activities
+	}
+
+	tests := []struct {
+		name           string
+		activities     []storage.Activity
+		wantInsightIDs []string
+	}{
+		{
+			name:           "no activities",
+			activities:     nil,
+			wantInsightIDs: nil,
+		},
+		{
+			name:           "rest day needed - 7+ consecutive days",
+			activities:     makeActivities([]int{0, 1, 2, 3, 4, 5, 6, 7}, "Ride"),
+			wantInsightIDs: []string{"rest_day_needed"},
+		},
+		{
+			name: "variety check - 10+ same sport",
+			activities: func() []storage.Activity {
+				acts := make([]storage.Activity, 12)
+				now := timeNow()
+				for i := range acts {
+					acts[i] = storage.Activity{
+						StartDateLocal: storage.SQLiteTime{Time: now.AddDate(0, 0, -i*2)},
+						SportType:      "Ride",
+					}
+				}
+				return acts
+			}(),
+			wantInsightIDs: []string{"variety_check"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			insights := svc.applyActivityPatternInsights(tt.activities)
+
+			gotIDs := make(map[string]bool)
+			for _, insight := range insights {
+				gotIDs[insight.ID] = true
+			}
+
+			for _, wantID := range tt.wantInsightIDs {
+				if !gotIDs[wantID] {
+					t.Errorf("expected insight %q not found in results: %v", wantID, insights)
+				}
+			}
+		})
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		seconds int
+		want    string
+	}{
+		{5, "5s"},
+		{30, "30s"},
+		{60, "1m"},
+		{300, "5m"},
+		{3600, "1h"},
+		{7200, "2h"},
+	}
+
+	for _, tt := range tests {
+		got := formatDuration(tt.seconds)
+		if got != tt.want {
+			t.Errorf("formatDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
+		}
+	}
+}
+
+func TestCountConsecutiveActivityDays(t *testing.T) {
+	// Note: This test uses dates relative to the function's time.Now().
+	// In production, the function checks consecutive days ending at today.
+
+	// Create dates map with consecutive days from today.
+	dates := make(map[string]bool)
+	today := time.Now()
+	for i := 0; i < 5; i++ {
+		dates[today.AddDate(0, 0, -i).Format("2006-01-02")] = true
+	}
+
+	count := countConsecutiveActivityDays(dates)
+	if count != 5 {
+		t.Errorf("countConsecutiveActivityDays = %d, want 5", count)
+	}
+}
+
+func TestCountWeeksWithActivity(t *testing.T) {
+	dates := map[string]bool{
+		"2024-01-01": true, // Week 1
+		"2024-01-08": true, // Week 2
+		"2024-01-09": true, // Week 2 (same week)
+		"2024-01-15": true, // Week 3
+		"2024-01-22": true, // Week 4
+	}
+
+	count := countWeeksWithActivity(dates)
+	if count != 4 {
+		t.Errorf("countWeeksWithActivity = %d, want 4", count)
+	}
+}
+
+// timeNow returns current time wrapped in SQLiteTime for test helpers.
+func timeNow() time.Time {
+	return time.Now()
 }
