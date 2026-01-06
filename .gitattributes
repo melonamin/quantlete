@@ -1,0 +1,3 @@
+# Mark generated files for GitHub diff suppression
+*.gen.go linguist-generated=true
+*.gen.ts linguist-generated=true

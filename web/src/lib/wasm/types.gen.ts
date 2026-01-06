@@ -315,6 +315,14 @@ export interface ListChallengesOutput {
   total_pages: number
 }
 
+export interface RequestInput {
+  month: string
+  page: number
+  per_page: number
+  order_by: string
+  order_dir: string
+}
+
 // ============================================================================
 // From dashboard.go
 // ============================================================================
@@ -1635,6 +1643,108 @@ export interface GetRecentActivitiesRow {
   total_elevation_gain: number
   average_speed: number
   max_speed: number
+}
+
+/** GetRewindActiveDayListRow represents a row returned by GetRewindActiveDayList. */
+export interface GetRewindActiveDayListRow {
+  day: string
+}
+
+/** GetRewindActiveDaysRow represents a row returned by GetRewindActiveDays. */
+export interface GetRewindActiveDaysRow {
+  count: number
+}
+
+/** GetRewindBiggestDistanceRow represents a row returned by GetRewindBiggestDistance. */
+export interface GetRewindBiggestDistanceRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  distance: number
+}
+
+/** GetRewindBiggestDurationRow represents a row returned by GetRewindBiggestDuration. */
+export interface GetRewindBiggestDurationRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  moving_time: number
+}
+
+/** GetRewindBiggestElevationRow represents a row returned by GetRewindBiggestElevation. */
+export interface GetRewindBiggestElevationRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  total_elevation_gain: number
+}
+
+/** GetRewindDateRangeRow represents a row returned by GetRewindDateRange. */
+export interface GetRewindDateRangeRow {
+  min_day: number
+  max_day: number
+}
+
+/** GetRewindLocationsRow represents a row returned by GetRewindLocations. */
+export interface GetRewindLocationsRow {
+  start_lat: number
+  start_lng: number
+  count: number
+}
+
+/** GetRewindMonthsRow represents a row returned by GetRewindMonths. */
+export interface GetRewindMonthsRow {
+  month: string
+  activity_count: number
+  distance_m: number
+  elevation_m: number
+}
+
+/** GetRewindMovingTimeBySportRow represents a row returned by GetRewindMovingTimeBySport. */
+export interface GetRewindMovingTimeBySportRow {
+  sport_type: string
+  moving_time: number
+}
+
+/** GetRewindPRsByMonthRow represents a row returned by GetRewindPRsByMonth. */
+export interface GetRewindPRsByMonthRow {
+  distance_type: number
+  dt: string
+  elapsed_time: number
+  best_so_far: number
+}
+
+/** GetRewindRandomPhotoRow represents a row returned by GetRewindRandomPhoto. */
+export interface GetRewindRandomPhotoRow {
+  id: number
+  activity_id: number
+  url: string
+  thumbnail_url: string
+  caption: string
+}
+
+/** GetRewindStartTimesByHourRow represents a row returned by GetRewindStartTimesByHour. */
+export interface GetRewindStartTimesByHourRow {
+  hour: string
+  count: number
+}
+
+/** GetRewindTotalsRow represents a row returned by GetRewindTotals. */
+export interface GetRewindTotalsRow {
+  activity_count: number
+  distance_m: number
+  elevation_m: number
+  total_time: number
+  kudos_count: number
+  commute_distance_m: number
+}
+
+/** GetRewindYearsRow represents a row returned by GetRewindYears. */
+export interface GetRewindYearsRow {
+  year: string
 }
 
 /** GetSegmentByIDRow represents a row returned by GetSegmentByID. */
