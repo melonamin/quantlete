@@ -141,6 +141,8 @@ export interface GoStorageInterface {
   getEddingtonHistory(arg0?: string): string
   /** genGetHeatmapData wraps StatsService.GetHeatmapData */
   getHeatmapData(arg0?: string): string
+  /** genGetInsights wraps InsightsService.GetInsights */
+  getInsights(): string
   /** genGetPowerStats wraps StatsService.GetPowerStats */
   getPowerStats(arg0?: string): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */

@@ -36,6 +36,7 @@ import {
   GoalRecommendations,
   ActivityInsights,
   KudosLeaders,
+  SmartCoach,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -243,6 +244,13 @@ export function DashboardPage() {
             defaultWidth: 4,
             defaultHeight: 2,
             render: () => <ActivityInsights />,
+          },
+          {
+            id: 'smart_coach',
+            title: 'Smart Coach',
+            defaultWidth: 4,
+            defaultHeight: 2,
+            render: () => <SmartCoach />,
           },
           // Row 2: Recent activities + Sport breakdown
           {

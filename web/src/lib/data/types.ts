@@ -50,6 +50,10 @@ export type {
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
+  InsightType,
+  InsightSeverity,
+  Insight,
+  InsightsResponse,
 } from '@/lib/api/stats'
 
 // Gear types

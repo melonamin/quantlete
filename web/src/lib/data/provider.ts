@@ -41,6 +41,7 @@ import type {
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
+  InsightsResponse,
   // Gear
   Gear,
   GearFilters,
@@ -150,6 +151,7 @@ export interface DataProvider {
     sport_type?: string
   }): Promise<HrZonesResponse>
   getTrainingLoad(filters?: { after?: string; before?: string }): Promise<TrainingLoadResponse>
+  getInsights(): Promise<InsightsResponse>
   getHrZoneDefinitions(): Promise<HrZoneDefinition[]>
   upsertHrZoneDefinition(def: HrZoneDefinition): Promise<{ status: string }>
   deleteHrZoneDefinition(sportType: string, effectiveFrom: string): Promise<{ status: string }>

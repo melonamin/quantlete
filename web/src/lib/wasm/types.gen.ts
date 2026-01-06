@@ -644,6 +644,24 @@ export interface StartImportRequest {
 }
 
 // ============================================================================
+// From insights.go
+// ============================================================================
+
+/** Insight represents a single coaching insight. */
+export interface Insight {
+  id: string
+  type: string
+  severity: string
+  title: string
+  description: string
+}
+
+/** InsightsOutput contains the list of coaching insights. */
+export interface InsightsOutput {
+  insights: Insight[]
+}
+
+// ============================================================================
 // From maintenance.go
 // ============================================================================
 
@@ -748,12 +766,6 @@ export interface MaintenanceRule {
   threshold_value: number
   created_at: string
   updated_at: string
-}
-
-export interface RequestInput {
-  component_id: number
-  activity_id?: number | null
-  completed_at: string
 }
 
 /** RuleInput represents a rule in create/update requests. */
@@ -2223,6 +2235,11 @@ export interface RecentActivity {
   moving_time: number
   elevation_gain: number
   summary_polyline?: string
+}
+
+export interface RequestInput {
+  activity_id: number
+  athlete_id: number
 }
 
 /** SaveBestEffortsInput contains parameters for saving best efforts for an activity. */
