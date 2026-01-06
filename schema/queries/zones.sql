@@ -37,7 +37,7 @@ ORDER BY week;
 -- Find activities with HR streams but no zone distribution.
 SELECT a.id
 FROM activities a
-JOIN activity_streams s ON s.activity_id = a.id AND s.type = 'heartrate'
+JOIN activity_streams s ON s.activity_id = a.id AND s.stream_type = 'heartrate'
 LEFT JOIN activity_zone_distributions zd ON zd.activity_id = a.id
 WHERE a.athlete_id = ?1 AND zd.activity_id IS NULL;
 
