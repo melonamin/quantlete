@@ -37,6 +37,7 @@ import type {
   PowerStatsResponse,
   HrZonesResponse,
   TrainingLoadResponse,
+  ZoneTrendResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -258,6 +259,13 @@ export class ServerProvider implements DataProvider {
     if (filters.before) params.set('before', filters.before)
     const qs = params.toString()
     return get<TrainingLoadResponse>(`/stats/training-load${qs ? `?${qs}` : ''}`)
+  }
+
+  async getZoneTrend(weeks: number = 52): Promise<ZoneTrendResponse> {
+    const params = new URLSearchParams()
+    if (weeks) params.set('weeks', String(weeks))
+    const qs = params.toString()
+    return get<ZoneTrendResponse>(`/stats/zone-trend${qs ? `?${qs}` : ''}`)
   }
 
   async getInsights(): Promise<InsightsResponse> {

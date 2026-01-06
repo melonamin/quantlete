@@ -151,6 +151,8 @@ export interface GoStorageInterface {
   getWrapped(arg0?: string): string
   /** genGetWrappedYears wraps StatsService.GetWrappedYears */
   getWrappedYears(): string
+  /** genGetZoneTrend wraps StatsService.GetZoneTrend */
+  getZoneTrend(arg0?: string): string
 
   // Calendar
   /** Calendar */

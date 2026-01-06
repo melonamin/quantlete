@@ -118,7 +118,18 @@ func (r *ZonesRepository) UpsertHR(ctx context.Context, athleteID int64, def HRZ
 				zones = EXCLUDED.zones
 		`, athleteID, def.SportType, eff, def.Method, def.Zones)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Invalidate zone distributions for affected activities.
+	// This triggers recomputation on next zone trend access.
+	q := NewQueries(r.db.Conn())
+	if err := q.DeleteZoneDistributionsForSportType(ctx, athleteID, def.SportType, eff.Format("2006-01-02")); err != nil {
+		return fmt.Errorf("invalidate zone distributions: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportType, effectiveFrom string) error {

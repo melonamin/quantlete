@@ -23,6 +23,7 @@ import {
   PeakPowerOutputs,
   HeartRateZones,
   TrainingLoad,
+  ZoneTrend,
   DaytimeStats,
   WeekdayStats,
   RecentChallenges,
@@ -345,6 +346,14 @@ export function DashboardPage() {
             defaultHeight: 3,
             defaultHidden: true,
             render: () => <TrainingLoad />,
+          },
+          {
+            id: 'zone_trend',
+            title: 'HR Zone Trend',
+            defaultWidth: 8,
+            defaultHeight: 2,
+            defaultHidden: true,
+            render: () => <ZoneTrend />,
           },
           {
             id: 'recent_challenges',

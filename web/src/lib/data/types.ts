@@ -47,6 +47,8 @@ export type {
   HrZonesResponse,
   DailyTrainingLoadPoint,
   TrainingLoadResponse,
+  ZoneTrendResponse,
+  WeeklyZoneDistribution,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,

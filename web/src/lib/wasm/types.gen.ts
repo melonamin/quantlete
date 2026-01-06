@@ -728,6 +728,18 @@ export interface DueComponentItem {
   is_due: boolean
 }
 
+export interface HRZoneDeleteReqInput {
+  sport_type: string
+  effective_from: string
+}
+
+export interface HRZoneReqInput {
+  sport_type: string
+  effective_from: string
+  method: string
+  zones: unknown
+}
+
 /** ListComponentsInput contains parameters for listing components. */
 export interface ListComponentsInput {
   gear_id: string
@@ -766,6 +778,14 @@ export interface MaintenanceRule {
   threshold_value: number
   created_at: string
   updated_at: string
+}
+
+export interface RequestInput {
+  id: number
+  name?: string | null
+  image_url?: string | null
+  maintenance_hashtag?: string | null
+  rules?: unknown[]
 }
 
 /** RuleInput represents a rule in create/update requests. */
@@ -1125,6 +1145,18 @@ export interface GetActivitiesRow {
   start_lng?: number | null
 }
 
+/** GetActivityForZoneComputationRow represents a row returned by GetActivityForZoneComputation. */
+export interface GetActivityForZoneComputationRow {
+  id: number
+  sport_type: string
+  start_date: string
+}
+
+/** GetActivityIDsWithoutZoneDistributionRow represents a row returned by GetActivityIDsWithoutZoneDistribution. */
+export interface GetActivityIDsWithoutZoneDistributionRow {
+  id: number
+}
+
 /** GetActivityRow represents a row returned by GetActivity. */
 export interface GetActivityRow {
   id: number
@@ -1184,6 +1216,19 @@ export interface GetActivityTSSRow {
   tss: number
   normalized_power: number
   intensity_factor: number
+}
+
+/** GetActivityZoneDistributionRow represents a row returned by GetActivityZoneDistribution. */
+export interface GetActivityZoneDistributionRow {
+  activity_id: number
+  zone_def_id: string
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total_seconds: number
+  computed_at: string
 }
 
 /** GetAllDailyTSSRow represents a row returned by GetAllDailyTSS. */
@@ -1721,6 +1766,17 @@ export interface GetWeeklyStatsRow {
   total_elevation: number
 }
 
+/** GetWeeklyZoneDistributionRow represents a row returned by GetWeeklyZoneDistribution. */
+export interface GetWeeklyZoneDistributionRow {
+  week: string
+  z1: number
+  z2: number
+  z3: number
+  z4: number
+  z5: number
+  total: number
+}
+
 /** GetYearlyStatsRow represents a row returned by GetYearlyStats. */
 export interface GetYearlyStatsRow {
   year: string
@@ -2153,6 +2209,11 @@ export interface GetWrappedInput {
   year: number
 }
 
+/** GetZoneTrendInput contains parameters for getting zone trend data. */
+export interface GetZoneTrendInput {
+  weeks: number
+}
+
 export interface HRZonesResponse {
   method: string
   zones: HRZoneConfig
@@ -2292,6 +2353,22 @@ export interface WeeklyStat {
   total_elevation: number
 }
 
+/** WeeklyZoneDistribution represents zone data for a single week. */
+export interface WeeklyZoneDistribution {
+  week: string
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total: number
+  percent_z1: number
+  percent_z2: number
+  percent_z3: number
+  percent_z4: number
+  percent_z5: number
+}
+
 /** WrappedBiggest contains the biggest activities. */
 export interface WrappedBiggest {
   longest_distance?: WrappedBiggestActivity | null
@@ -2387,6 +2464,11 @@ export interface YearStat {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** ZoneTrendOutput contains zone trend data. */
+export interface ZoneTrendOutput {
+  weeks: WeeklyZoneDistribution[]
 }
 
 // ============================================================================
@@ -2501,6 +2583,23 @@ export interface WrappedReport {
   streaks: WrappedStreaks
   random_photo?: WrappedPhoto | null
   biggest: WrappedBiggest
+}
+
+// ============================================================================
+// From zone_distribution.go
+// ============================================================================
+
+/** ActivityZoneDistribution stores the time spent in each HR zone for an activity. */
+export interface ActivityZoneDistribution {
+  activity_id: number
+  zone_def_id: string
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total_seconds: number
+  computed_at: string
 }
 
 // ============================================================================

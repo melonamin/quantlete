@@ -38,6 +38,7 @@ import type {
   PowerStatsResponse,
   HrZonesResponse,
   TrainingLoadResponse,
+  ZoneTrendResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -151,6 +152,7 @@ export interface DataProvider {
     sport_type?: string
   }): Promise<HrZonesResponse>
   getTrainingLoad(filters?: { after?: string; before?: string }): Promise<TrainingLoadResponse>
+  getZoneTrend(weeks?: number): Promise<ZoneTrendResponse>
   getInsights(): Promise<InsightsResponse>
   getHrZoneDefinitions(): Promise<HrZoneDefinition[]>
   upsertHrZoneDefinition(def: HrZoneDefinition): Promise<{ status: string }>

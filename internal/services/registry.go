@@ -45,25 +45,26 @@ type ServiceRegistry struct {
 	db *storage.DB
 
 	// Repositories (private - use accessor methods)
-	activities      *storage.ActivityRepository
-	athletes        *storage.AthleteRepository
-	streams         *storage.StreamRepository
-	gear            *storage.GearRepository
-	segments        *storage.SegmentRepository
-	bestEfforts     *storage.BestEffortsRepository
-	photos          *storage.PhotoRepository
-	appState        *storage.AppStateRepository
-	syncHistory     *storage.SyncHistoryRepository
-	power           *storage.PowerRepository
-	athleteMetrics  *storage.AthleteMetricsRepository
-	zones           *storage.ZonesRepository
-	trainingLoad    *storage.TrainingLoadRepository
-	goals           *storage.GoalsRepository
-	challenges      *storage.ChallengeRepository
-	maintenance     *storage.MaintenanceRepository
-	settings        *storage.SettingsRepository
-	dashboardConfig *storage.DashboardConfigRepository
-	stats           *storage.StatsRepository
+	activities       *storage.ActivityRepository
+	athletes         *storage.AthleteRepository
+	streams          *storage.StreamRepository
+	gear             *storage.GearRepository
+	segments         *storage.SegmentRepository
+	bestEfforts      *storage.BestEffortsRepository
+	photos           *storage.PhotoRepository
+	appState         *storage.AppStateRepository
+	syncHistory      *storage.SyncHistoryRepository
+	power            *storage.PowerRepository
+	athleteMetrics   *storage.AthleteMetricsRepository
+	zones            *storage.ZonesRepository
+	trainingLoad     *storage.TrainingLoadRepository
+	goals            *storage.GoalsRepository
+	challenges       *storage.ChallengeRepository
+	maintenance      *storage.MaintenanceRepository
+	settings         *storage.SettingsRepository
+	dashboardConfig  *storage.DashboardConfigRepository
+	stats            *storage.StatsRepository
+	zoneDistribution *storage.ZoneDistributionRepository
 
 	// Services (public)
 	ActivityService     *ActivityService
@@ -105,13 +106,14 @@ func NewServiceRegistry(db *storage.DB, logger *slog.Logger) *ServiceRegistry {
 	r.syncHistory = storage.NewSyncHistoryRepository(db, r.appState)
 	r.power = storage.NewPowerRepository(db, r.streams)
 	r.trainingLoad = storage.NewTrainingLoadRepository(db, r.streams, r.athleteMetrics, r.zones)
+	r.zoneDistribution = storage.NewZoneDistributionRepository(db, r.streams, r.zones)
 
 	// Phase 3: Services
 	r.ActivityService = NewActivityService(r.activities, r.streams)
 	r.GearService = NewGearService(r.gear)
 	r.SegmentsService = NewSegmentsService(r.segments)
 	r.PhotosService = NewPhotosService(r.photos)
-	r.StatsService = NewStatsService(r.stats, r.power, r.bestEfforts, r.trainingLoad)
+	r.StatsService = NewStatsService(r.stats, r.power, r.bestEfforts, r.trainingLoad, r.zoneDistribution)
 	r.DashboardService = NewDashboardService(db, r.stats, r.dashboardConfig)
 	r.MaintenanceService = NewMaintenanceService(r.maintenance)
 	r.ChallengesService = NewChallengesService(r.challenges)
@@ -202,4 +204,8 @@ func (r *ServiceRegistry) DashboardConfig() *storage.DashboardConfigRepository {
 
 func (r *ServiceRegistry) Stats() *storage.StatsRepository {
 	return r.stats
+}
+
+func (r *ServiceRegistry) ZoneDistribution() *storage.ZoneDistributionRepository {
+	return r.zoneDistribution
 }
