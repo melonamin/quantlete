@@ -74,24 +74,26 @@ Rule-based text alerts from training data (TSB, streaks, CTL trends).
 - [x] Create `SmartCoach` dashboard widget
 - [x] Add to widget grid (default visible)
 
-### 13.3 Zone Trend Analysis ⭐ Quick Win
+### 13.3 Zone Trend Analysis ✓
 
 Stacked area chart showing % training time in HR zones over 52 weeks.
 
 **Database**:
-- [ ] Create migration `004_zone_distribution.sql`
-- [ ] Add `activity_zone_distribution` table
+- [x] Create migration `005_zone_distribution.sql`
+- [x] Add `activity_zone_distributions` table
 
 **Backend**:
-- [ ] Add `GetWeeklyZoneDistribution` query to `schema/queries/zones.sql`
-- [ ] Add `SaveActivityZoneDistribution()` to storage
-- [ ] Add `GetZoneTrend` service method
-- [ ] Modify importer to compute zone distribution from HR streams
+- [x] Add `GetWeeklyZoneDistribution` query to `schema/queries/zones.sql`
+- [x] Add `ZoneDistributionRepository` with lazy computation
+- [x] Add `GetZoneTrend` service method
+- [x] Compute zone distribution from HR streams on-demand
 
 **Frontend**:
-- [ ] Create `ZoneTrendChart` component (stacked area)
-- [ ] Create `ZoneTrend` dashboard widget
-- [ ] Add to widget grid (hidden by default)
+- [x] Create `ZoneTrendChart` component (stacked area)
+- [x] Create `ZoneTrend` dashboard widget
+- [x] Add to widget grid (hidden by default)
+- [x] Redesign `HeartRateZones` widget with progress bar table
+- [x] Add `minHeight` support to prevent chart collapse
 
 ### 13.4 Aerobic Decoupling (Cardiac Drift)
 
