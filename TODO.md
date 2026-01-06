@@ -50,23 +50,29 @@ Add UI to input gear purchase prices and display cost/km.
 - [ ] Add "Edit Price" button for Strava gear
 - [ ] Create `GearROISummary` component (total investment, avg cost/km)
 
-### 13.2 Smart Coach Insights ⭐ Quick Win
+### 13.2 Smart Coach Insights ✓
 
 Rule-based text alerts from training data (TSB, streaks, CTL trends).
 
 **Backend**:
-- [ ] Create `internal/services/insights.go` with rule engine
-- [ ] Implement insight rules:
+- [x] Create `internal/services/insights.go` with rule engine
+- [x] Implement insight rules:
   - High Fatigue (TSB < -20)
   - CTL Drop (>10% in 7 days)
-  - Streak Detection (consecutive active days)
   - Well Recovered (TSB > 10)
   - Overtraining Risk (ATL > CTL × 1.5)
+  - Building Fitness (balanced TSB with positive CTL)
+  - Fitness Peak (CTL at 90-day high)
+  - Ramp Too Fast (CTL up >15% in 7 days)
+  - Power PR (new record in past 7 days)
+  - Rest Day Needed (7+ consecutive activity days)
+  - Consistency King (4+ weeks with activity)
+  - Variety Check (10+ same sport in a row)
 
 **Frontend**:
-- [ ] Add `useInsights` hook
-- [ ] Create `SmartCoach` dashboard widget
-- [ ] Add to widget grid (default visible)
+- [x] Add `useInsights` hook
+- [x] Create `SmartCoach` dashboard widget
+- [x] Add to widget grid (default visible)
 
 ### 13.3 Zone Trend Analysis ⭐ Quick Win
 
