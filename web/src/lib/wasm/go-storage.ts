@@ -43,6 +43,17 @@ import type {
   DashboardConfig as GenDashboardConfig,
 } from './types.gen'
 
+// Import Insight types from the canonical source
+import type {
+  InsightType,
+  InsightSeverity,
+  Insight,
+  InsightsResponse,
+} from '@/lib/api/stats'
+
+// Re-export for consumers that import from this module
+export type { InsightType, InsightSeverity, Insight, InsightsResponse }
+
 // Re-export for consumers
 export type { GoStorageResult }
 export { parseGoResult }
@@ -1499,6 +1510,18 @@ export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResu
     'getTrainingLoad'
   )
   return { series: result.series || [], summary: result.summary }
+}
+
+// ============================================================================
+// Insights
+// ============================================================================
+
+export function getInsights(): InsightsResponse {
+  const result = callGoStorage<InsightsResponse>(
+    () => goStorage.getInsights(),
+    'getInsights'
+  )
+  return { insights: result.insights ?? [] }
 }
 
 // ============================================================================

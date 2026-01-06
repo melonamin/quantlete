@@ -7,6 +7,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDataProviderStatus } from './context'
+import { STALE_TIME } from '@/lib/constants'
 import type {
   Activity,
   ActivityFilters,
@@ -48,6 +49,7 @@ import type {
   HrZoneDefinition,
   HrZonesResponse,
   ImportProgress,
+  InsightsResponse,
   LogMaintenanceRequest,
   MonthlyStat,
   PhotosFilters,
@@ -332,6 +334,24 @@ export function useTrainingLoad(filters?: { after?: string; before?: string }) {
       return provider.getTrainingLoad(filters)
     },
     enabled: initialized && !error && !!provider,
+  })
+}
+
+/**
+ * Hook to fetch coaching insights based on training load and activity patterns.
+ * Returns insights about fatigue, recovery, streaks, and fitness trends.
+ */
+export function useInsights() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'stats', 'insights'],
+    queryFn: async (): Promise<InsightsResponse> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getInsights()
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: STALE_TIME.LONG,
   })
 }
 

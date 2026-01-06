@@ -10,3 +10,13 @@ export const PAGINATION = {
 
 // Storage key for settings - keep in sync with web/index.html (inline theme script)
 export const SETTINGS_STORAGE_KEY = 'quantlete-settings'
+
+// React Query stale times (in milliseconds)
+export const STALE_TIME = {
+  /** 5 minutes - for data that changes infrequently like insights */
+  LONG: 1000 * 60 * 5,
+  /** 1 minute - for most activity data */
+  MEDIUM: 1000 * 60,
+  /** 30 seconds - for auth status and frequently changing data */
+  SHORT: 1000 * 30,
+} as const

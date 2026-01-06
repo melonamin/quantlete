@@ -36,6 +36,7 @@ import type {
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
+  InsightsResponse,
   Gear,
   GearFilters,
   GearListResponse,
@@ -633,6 +634,15 @@ export class GoWasmProvider implements DataProvider {
           }
         : undefined,
     }
+  }
+
+  async getInsights(): Promise<InsightsResponse> {
+    this.assertInitialized()
+    // Validate athlete is set (ensures goStorage has the athlete ID)
+    this.getAthleteId()
+
+    // goStorage.getInsights() already returns { insights: [...] } with null coalescing
+    return goStorage.getInsights()
   }
 
   async getHrZoneDefinitions(): Promise<HrZoneDefinition[]> {

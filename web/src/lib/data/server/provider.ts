@@ -40,6 +40,7 @@ import type {
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
+  InsightsResponse,
   // Gear
   Gear,
   GearFilters,
@@ -257,6 +258,10 @@ export class ServerProvider implements DataProvider {
     if (filters.before) params.set('before', filters.before)
     const qs = params.toString()
     return get<TrainingLoadResponse>(`/stats/training-load${qs ? `?${qs}` : ''}`)
+  }
+
+  async getInsights(): Promise<InsightsResponse> {
+    return get<InsightsResponse>('/stats/insights')
   }
 
   async getHrZoneDefinitions(): Promise<HrZoneDefinition[]> {

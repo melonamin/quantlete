@@ -19,6 +19,25 @@ export type {
 } from '@/lib/wasm/types.gen'
 
 // ============================================================================
+// Insight types - enhanced with string literal types for type safety
+// The generated types use generic strings; these provide better type checking
+// ============================================================================
+export type InsightType = 'fatigue' | 'recovery' | 'fitness'
+export type InsightSeverity = 'info' | 'warning' | 'success'
+
+export interface Insight {
+  id: string
+  type: InsightType
+  severity: InsightSeverity
+  title: string
+  description: string
+}
+
+export interface InsightsResponse {
+  insights: Insight[]
+}
+
+// ============================================================================
 // Composite response types - not generated from Go
 // These aggregate generated types into API response structures
 // ============================================================================
