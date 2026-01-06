@@ -102,3 +102,6 @@ algorithms/.yarn/*
 landing/node_modules/
 quantlete
 wasm
+
+# Git worktrees
+.worktrees/
