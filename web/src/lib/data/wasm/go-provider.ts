@@ -33,6 +33,7 @@ import type {
   PowerStatsResponse,
   HrZonesResponse,
   TrainingLoadResponse,
+  ZoneTrendResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -634,6 +635,14 @@ export class GoWasmProvider implements DataProvider {
           }
         : undefined,
     }
+  }
+
+  async getZoneTrend(weeks: number = 52): Promise<ZoneTrendResponse> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    // Result shape matches ZoneTrendResponse directly
+    return goStorage.getZoneTrend({ weeks })
   }
 
   async getInsights(): Promise<InsightsResponse> {

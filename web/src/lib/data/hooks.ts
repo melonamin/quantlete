@@ -75,6 +75,7 @@ import type {
   WeeklyStat,
   WeightHistoryResponse,
   YearlyStat,
+  ZoneTrendResponse,
   ActivityWeather,
 } from './types'
 
@@ -334,6 +335,20 @@ export function useTrainingLoad(filters?: { after?: string; before?: string }) {
       return provider.getTrainingLoad(filters)
     },
     enabled: initialized && !error && !!provider,
+  })
+}
+
+export function useZoneTrend(weeks = 52) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'stats', 'zoneTrend', weeks],
+    queryFn: async (): Promise<ZoneTrendResponse> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getZoneTrend(weeks)
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: 1000 * 60 * 5, // 5 minutes - zone data is expensive to compute
   })
 }
 

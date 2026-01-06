@@ -70,6 +70,15 @@ export const zoneColorsArray = [
   zoneColors.z5,
 ]
 
+// Zone labels for training zones
+export const zoneLabels = [
+  'Z1 Recovery',
+  'Z2 Endurance',
+  'Z3 Tempo',
+  'Z4 Threshold',
+  'Z5 VO2max',
+]
+
 // UI color tokens (semantic)
 export const uiColors = {
   success: '#4ade80', // terminal green

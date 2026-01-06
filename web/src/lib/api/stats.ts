@@ -16,6 +16,7 @@ export type {
   DailyTrainingLoadPoint,
   PowerZonesResponse,
   DistributionSlice,
+  WeeklyZoneDistribution,
 } from '@/lib/wasm/types.gen'
 
 // ============================================================================
@@ -55,6 +56,11 @@ export interface TrainingLoadResponse {
   summary?: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint
 }
 
+// ZoneTrendResponse - zone distribution data over time
+export interface ZoneTrendResponse {
+  weeks: import('@/lib/wasm/types.gen').WeeklyZoneDistribution[]
+}
+
 // ============================================================================
 // Frontend-only types - defined here for specific TS requirements
 // Safe to modify as needed
@@ -83,6 +89,7 @@ export {
   usePowerZones,
   useHrZones,
   useTrainingLoad,
+  useZoneTrend,
   useHrZoneDefinitions,
   useUpsertHrZoneDefinition,
   useDeleteHrZoneDefinition,

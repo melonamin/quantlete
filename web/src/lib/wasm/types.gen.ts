@@ -169,6 +169,15 @@ export interface SaveStreamOutput {
 }
 
 // ============================================================================
+// From app_state.go
+// ============================================================================
+
+export interface SaveStravaCredentialsInput {
+  client_id: string
+  client_secret: string
+}
+
+// ============================================================================
 // From athlete.go
 // ============================================================================
 
@@ -202,6 +211,25 @@ export interface WeightHistoryResponse {
 export interface AthleteMetricPoint {
   recorded_at: string
   value: number
+}
+
+// ============================================================================
+// From athletes.go
+// ============================================================================
+
+export interface SaveAthleteInput {
+  id: number
+  username: string
+  firstname: string
+  lastname: string
+  profile_medium: string
+  profile: string
+  city: string
+  state: string
+  country: string
+  sex: string
+  premium: boolean
+  summit: boolean
 }
 
 // ============================================================================
@@ -254,6 +282,14 @@ export interface ChallengeItem {
   local_badge_url?: string
   completion_date?: string | null
   month?: string
+}
+
+export interface GetChallengesRequest {
+  month: string
+  page: number
+  per_page: number
+  order_by: string
+  order_dir: string
 }
 
 export interface ImportBody {
@@ -624,7 +660,7 @@ export interface HealthResponse {
 // From import.go
 // ============================================================================
 
-export interface OptsInput {
+export interface StartImportOpts {
   full_sync: boolean
   resume: boolean
   skip_streams: boolean
@@ -702,6 +738,16 @@ export interface CreateComponentInput {
   rules?: RuleInput[]
 }
 
+export interface DeleteCustomGearRequest {
+  id: string
+  force: boolean
+}
+
+export interface DeleteHRZoneDefinitionHRZoneDeleteReq {
+  sport_type: string
+  effective_from: string
+}
+
 export interface DueComponent {
   distance_since: number
   moving_time_since: number
@@ -728,6 +774,20 @@ export interface DueComponentItem {
   is_due: boolean
 }
 
+export interface GetCustomGearRequest {
+  include_retired: boolean
+  page: number
+  per_page: number
+  order_by: string
+  order_dir: string
+}
+
+export interface GetGearComponentsRequest {
+  gear_id: string
+  page: number
+  per_page: number
+}
+
 /** ListComponentsInput contains parameters for listing components. */
 export interface ListComponentsInput {
   gear_id: string
@@ -748,6 +808,12 @@ export interface ListComponentsOutput {
 
 /** LogMaintenanceInput contains parameters for logging maintenance. */
 export interface LogMaintenanceInput {
+  component_id: number
+  activity_id?: number | null
+  completed_at: string
+}
+
+export interface LogMaintenanceRequest {
   component_id: number
   activity_id?: number | null
   completed_at: string
@@ -806,6 +872,13 @@ export interface UpdateComponentInput {
   image_url?: string | null
   maintenance_hashtag?: string | null
   rules?: RuleInput[]
+}
+
+export interface UpsertHRZoneDefinitionHRZoneReq {
+  sport_type: string
+  effective_from: string
+  method: string
+  zones: unknown
 }
 
 // ============================================================================
@@ -1125,6 +1198,18 @@ export interface GetActivitiesRow {
   start_lng?: number | null
 }
 
+/** GetActivityForZoneComputationRow represents a row returned by GetActivityForZoneComputation. */
+export interface GetActivityForZoneComputationRow {
+  id: number
+  sport_type: string
+  start_date: string
+}
+
+/** GetActivityIDsWithoutZoneDistributionRow represents a row returned by GetActivityIDsWithoutZoneDistribution. */
+export interface GetActivityIDsWithoutZoneDistributionRow {
+  id: number
+}
+
 /** GetActivityRow represents a row returned by GetActivity. */
 export interface GetActivityRow {
   id: number
@@ -1184,6 +1269,19 @@ export interface GetActivityTSSRow {
   tss: number
   normalized_power: number
   intensity_factor: number
+}
+
+/** GetActivityZoneDistributionRow represents a row returned by GetActivityZoneDistribution. */
+export interface GetActivityZoneDistributionRow {
+  activity_id: number
+  zone_def_id: string
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total_seconds: number
+  computed_at: string
 }
 
 /** GetAllDailyTSSRow represents a row returned by GetAllDailyTSS. */
@@ -1691,6 +1789,16 @@ export interface GetStatsBySportTypeRow {
   total_elevation: number
 }
 
+/** GetTotalZoneDistributionRow represents a row returned by GetTotalZoneDistribution. */
+export interface GetTotalZoneDistributionRow {
+  z1: number
+  z2: number
+  z3: number
+  z4: number
+  z5: number
+  total: number
+}
+
 /** GetTrainingGoalsConfigRow represents a row returned by GetTrainingGoalsConfig. */
 export interface GetTrainingGoalsConfigRow {
   config: string
@@ -1719,6 +1827,17 @@ export interface GetWeeklyStatsRow {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** GetWeeklyZoneDistributionRow represents a row returned by GetWeeklyZoneDistribution. */
+export interface GetWeeklyZoneDistributionRow {
+  week: string
+  z1: number
+  z2: number
+  z3: number
+  z4: number
+  z5: number
+  total: number
 }
 
 /** GetYearlyStatsRow represents a row returned by GetYearlyStats. */
@@ -2029,6 +2148,11 @@ export interface CalendarMonthSummary {
   challenges_completed: number
 }
 
+export interface ComputePowerBestEffortsInput {
+  activity_id: number
+  athlete_id: number
+}
+
 /** DailyTrainingLoadPoint represents training load for a single day. */
 export interface DailyTrainingLoadPoint {
   day: string
@@ -2153,6 +2277,11 @@ export interface GetWrappedInput {
   year: number
 }
 
+/** GetZoneTrendInput contains parameters for getting zone trend data. */
+export interface GetZoneTrendInput {
+  weeks: number
+}
+
 export interface HRZonesResponse {
   method: string
   zones: HRZoneConfig
@@ -2237,11 +2366,6 @@ export interface RecentActivity {
   summary_polyline?: string
 }
 
-export interface RequestInput {
-  activity_id: number
-  athlete_id: number
-}
-
 /** SaveBestEffortsInput contains parameters for saving best efforts for an activity. */
 export interface SaveBestEffortsInput {
   athlete_id: number
@@ -2290,6 +2414,22 @@ export interface WeeklyStat {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** WeeklyZoneDistribution represents zone data for a single week. */
+export interface WeeklyZoneDistribution {
+  week: string
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total: number
+  percent_z1: number
+  percent_z2: number
+  percent_z3: number
+  percent_z4: number
+  percent_z5: number
 }
 
 /** WrappedBiggest contains the biggest activities. */
@@ -2387,6 +2527,49 @@ export interface YearStat {
   total_distance: number
   total_time: number
   total_elevation: number
+}
+
+/** ZoneTrendOutput contains zone trend data. */
+export interface ZoneTrendOutput {
+  weeks: WeeklyZoneDistribution[]
+}
+
+// ============================================================================
+// From sync.go
+// ============================================================================
+
+export interface CompleteSyncRunRequest {
+  id: number
+  status: string
+  error: string
+  activities_total: number
+  activities_imported: number
+  activities_skipped: number
+  gear_imported: number
+  streams_imported: number
+  segments_imported: number
+  photos_imported: number
+  failed_count: number
+  newest_activity_date: string
+}
+
+export interface CreateSyncRunInput {
+  athlete_id: number
+  full_sync: boolean
+  skip_streams: boolean
+  skip_segments: boolean
+  skip_best_efforts: boolean
+  skip_photos: boolean
+}
+
+export interface UpdateSyncRunInput {
+  id: number
+  status: string
+  activities_total: number
+  activities_imported: number
+  streams_imported: number
+  failed_count: number
+  newest_activity_date: string
 }
 
 // ============================================================================
@@ -2501,6 +2684,33 @@ export interface WrappedReport {
   streaks: WrappedStreaks
   random_photo?: WrappedPhoto | null
   biggest: WrappedBiggest
+}
+
+// ============================================================================
+// From zone_distribution.go
+// ============================================================================
+
+/** ActivityZoneDistribution stores the time spent in each HR zone for an activity. */
+export interface ActivityZoneDistribution {
+  activity_id: number
+  zone_def_id: string
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total_seconds: number
+  computed_at: string
+}
+
+/** TotalZoneDistribution represents aggregated zone data across all activities. */
+export interface TotalZoneDistribution {
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total_seconds: number
 }
 
 // ============================================================================

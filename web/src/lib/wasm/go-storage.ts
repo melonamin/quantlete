@@ -41,6 +41,7 @@ import type {
   EddingtonResult,
   EddingtonHistoryPoint,
   DashboardConfig as GenDashboardConfig,
+  WeeklyZoneDistribution,
 } from './types.gen'
 
 // Import Insight types from the canonical source
@@ -77,6 +78,7 @@ export type {
   EddingtonStep,
   EddingtonResult,
   EddingtonHistoryPoint,
+  WeeklyZoneDistribution,
 }
 
 // Namespace for Go WASM interop - prevents direct global pollution.
@@ -1510,6 +1512,26 @@ export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResu
     'getTrainingLoad'
   )
   return { series: result.series || [], summary: result.summary }
+}
+
+// ============================================================================
+// Zone Trend
+// ============================================================================
+
+export interface ZoneTrendFilters {
+  weeks?: number
+}
+
+export interface ZoneTrendResult {
+  weeks: WeeklyZoneDistribution[]
+}
+
+export function getZoneTrend(filters?: ZoneTrendFilters): ZoneTrendResult {
+  const result = callGoStorage<ZoneTrendResult>(
+    () => goStorage.getZoneTrend(JSON.stringify(filters || {})),
+    'getZoneTrend'
+  )
+  return { weeks: result.weeks || [] }
 }
 
 // ============================================================================

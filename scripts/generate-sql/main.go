@@ -422,8 +422,18 @@ func inferGoType(name, expr, fullSQL string) string {
 	if lowerName == "gear_id" {
 		return "string"
 	}
+	// zone_def_id is a composite text key like "Run:2024-01-01"
+	if lowerName == "zone_def_id" {
+		return "string"
+	}
 	if strings.HasSuffix(lowerName, "_id") {
 		return "int64"
+	}
+
+	// Zone distribution seconds fields use int (not int64) because per-activity
+	// and per-week durations fit comfortably within 32-bit range (~68 years max).
+	if strings.HasPrefix(lowerName, "seconds_z") || lowerName == "total_seconds" {
+		return "int"
 	}
 
 	// Count fields - athlete_effort_count is nullable
@@ -745,6 +755,11 @@ func inferTypeFromColumnName(colName string) string {
 	}
 	if lowerName == "gear_id" {
 		return "string"
+	}
+
+	// Zone distribution seconds fields
+	if strings.HasPrefix(lowerName, "seconds_z") || lowerName == "total_seconds" {
+		return "int"
 	}
 
 	// Timestamp fields

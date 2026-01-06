@@ -229,7 +229,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	dashboardHandler := handlers.NewDashboardHandler(registry.DashboardService, stravaClient)
 	goalsHandler := handlers.NewGoalsHandler(registry.Goals(), stravaClient)
 	athleteHandler := handlers.NewAthleteHandler(registry.AthleteMetrics(), stravaClient)
-	statsHandler := handlers.NewStatsHandler(registry.StatsService, db, registry.Streams(), registry.AthleteMetrics(), registry.Zones(), stravaClient)
+	statsHandler := handlers.NewStatsHandler(registry.StatsService, db, registry.Streams(), registry.AthleteMetrics(), registry.Zones(), registry.ZoneDistribution(), stravaClient)
 	zonesHandler := handlers.NewZonesHandler(registry.Zones(), stravaClient)
 	settingsHandler := handlers.NewSettingsHandler(registry.Settings(), stravaClient)
 	segmentsHandler := handlers.NewSegmentsHandler(registry.SegmentsService, stravaClient)
@@ -354,6 +354,7 @@ func (r *Router) mountRoutes() {
 			router.Get("/power-zones", r.statsHandler.GetPowerZones) // Manual: complex zone calculation
 			router.Get("/hr-zones", r.statsHandler.GetHRZones)       // Manual: complex zone calculation
 			router.Get("/training-load", handlers.GenStatsServiceGetTrainingLoad(r.registry.StatsService, r.stravaClient))
+			router.Get("/zone-trend", handlers.GenStatsServiceGetZoneTrend(r.registry.StatsService, r.stravaClient))
 			router.Get("/insights", handlers.GenInsightsServiceGetInsights(r.registry.InsightsService, r.stravaClient))
 			router.Get("/daytime", handlers.GenDashboardServiceGetDaytimeDistribution(r.registry.DashboardService, r.stravaClient))
 			router.Get("/weekday", handlers.GenDashboardServiceGetWeekdayDistribution(r.registry.DashboardService, r.stravaClient))

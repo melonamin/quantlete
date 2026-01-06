@@ -11,10 +11,11 @@ import (
 
 // StatsService handles stats business logic.
 type StatsService struct {
-	stats        *storage.StatsRepository
-	power        *storage.PowerRepository
-	bestEfforts  *storage.BestEffortsRepository
-	trainingLoad *storage.TrainingLoadRepository
+	stats            *storage.StatsRepository
+	power            *storage.PowerRepository
+	bestEfforts      *storage.BestEffortsRepository
+	trainingLoad     *storage.TrainingLoadRepository
+	zoneDistribution *storage.ZoneDistributionRepository
 }
 
 // NewStatsService creates a new stats service.
@@ -23,12 +24,14 @@ func NewStatsService(
 	power *storage.PowerRepository,
 	bestEfforts *storage.BestEffortsRepository,
 	trainingLoad *storage.TrainingLoadRepository,
+	zoneDistribution *storage.ZoneDistributionRepository,
 ) *StatsService {
 	return &StatsService{
-		stats:        stats,
-		power:        power,
-		bestEfforts:  bestEfforts,
-		trainingLoad: trainingLoad,
+		stats:            stats,
+		power:            power,
+		bestEfforts:      bestEfforts,
+		trainingLoad:     trainingLoad,
+		zoneDistribution: zoneDistribution,
 	}
 }
 
@@ -215,6 +218,40 @@ type DailyTrainingLoadPoint struct {
 type TrainingLoadOutput struct {
 	Series  []DailyTrainingLoadPoint `json:"series"`
 	Summary *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+}
+
+// --- Zone Trend ---
+
+// GetZoneTrendInput contains parameters for getting zone trend data.
+type GetZoneTrendInput struct {
+	AthleteID int64 `json:"-" adapter:"context"`
+	Weeks     int   `json:"weeks" adapter:"query"` // Default: 52, max: 104
+}
+
+const (
+	defaultZoneTrendWeeks = 52
+	maxZoneTrendWeeks     = 104 // ~2 years
+)
+
+// WeeklyZoneDistribution represents zone data for a single week.
+type WeeklyZoneDistribution struct {
+	Week      string  `json:"week"` // "YYYY-WNN" format
+	SecondsZ1 int     `json:"seconds_z1"`
+	SecondsZ2 int     `json:"seconds_z2"`
+	SecondsZ3 int     `json:"seconds_z3"`
+	SecondsZ4 int     `json:"seconds_z4"`
+	SecondsZ5 int     `json:"seconds_z5"`
+	Total     int     `json:"total"`
+	PercentZ1 float64 `json:"percent_z1"`
+	PercentZ2 float64 `json:"percent_z2"`
+	PercentZ3 float64 `json:"percent_z3"`
+	PercentZ4 float64 `json:"percent_z4"`
+	PercentZ5 float64 `json:"percent_z5"`
+}
+
+// ZoneTrendOutput contains zone trend data.
+type ZoneTrendOutput struct {
+	Weeks []WeeklyZoneDistribution `json:"weeks"`
 }
 
 // --- Wrapped ---
@@ -650,6 +687,56 @@ func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadIn
 	return &TrainingLoadOutput{
 		Series:  seriesOut,
 		Summary: summaryOut,
+	}, nil
+}
+
+// GetZoneTrend returns weekly HR zone distribution data.
+//
+//adapter:wasm getZoneTrend category=Stats
+//adapter:http GET /api/v1/stats/zone-trend
+func (s *StatsService) GetZoneTrend(ctx context.Context, in GetZoneTrendInput) (*ZoneTrendOutput, error) {
+	if s.zoneDistribution == nil {
+		return nil, Wrapf(ErrInternal, "zone distribution repository not configured")
+	}
+
+	// Validate and normalize weeks parameter
+	weeks := in.Weeks
+	if weeks <= 0 {
+		weeks = defaultZoneTrendWeeks
+	} else if weeks > maxZoneTrendWeeks {
+		weeks = maxZoneTrendWeeks
+	}
+
+	// Ensure zone distributions are computed for activities with HR streams
+	if err := s.zoneDistribution.EnsureComputed(ctx, in.AthleteID); err != nil {
+		return nil, Wrapf(ErrInternal, "failed to compute zone distributions: %v", err)
+	}
+
+	data, err := s.zoneDistribution.GetWeeklyDistribution(ctx, in.AthleteID, weeks)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get zone trend: %v", err)
+	}
+
+	result := make([]WeeklyZoneDistribution, len(data))
+	for i, d := range data {
+		result[i] = WeeklyZoneDistribution{
+			Week:      d.Week,
+			SecondsZ1: d.SecondsZ1,
+			SecondsZ2: d.SecondsZ2,
+			SecondsZ3: d.SecondsZ3,
+			SecondsZ4: d.SecondsZ4,
+			SecondsZ5: d.SecondsZ5,
+			Total:     d.Total,
+			PercentZ1: d.PercentZ1,
+			PercentZ2: d.PercentZ2,
+			PercentZ3: d.PercentZ3,
+			PercentZ4: d.PercentZ4,
+			PercentZ5: d.PercentZ5,
+		}
+	}
+
+	return &ZoneTrendOutput{
+		Weeks: result,
 	}, nil
 }
 

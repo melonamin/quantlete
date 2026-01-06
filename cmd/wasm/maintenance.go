@@ -400,21 +400,21 @@ var getHrZoneDefinitions = wrapWasmAthlete("getHrZoneDefinitions", func(wc *Wasm
 //
 //wasm:export
 var upsertHrZoneDefinition = wrapWasmAthlete("upsertHrZoneDefinition", func(wc *WasmContext) interface{} {
-	var req struct {
+	var hrZoneReq struct {
 		SportType     string          `json:"sport_type"`
 		EffectiveFrom string          `json:"effective_from"`
 		Method        string          `json:"method"`
 		Zones         json.RawMessage `json:"zones"`
 	}
-	if err := wc.ArgJSON(0, &req); err != nil {
+	if err := wc.ArgJSON(0, &hrZoneReq); err != nil {
 		return errorJSON(fmt.Errorf("parsing zone: %w", err))
 	}
 
 	def := storage.HRZoneDefinition{
-		SportType:     req.SportType,
-		EffectiveFrom: req.EffectiveFrom,
-		Method:        req.Method,
-		Zones:         req.Zones,
+		SportType:     hrZoneReq.SportType,
+		EffectiveFrom: hrZoneReq.EffectiveFrom,
+		Method:        hrZoneReq.Method,
+		Zones:         hrZoneReq.Zones,
 	}
 
 	if err := wc.Registry.Zones().UpsertHR(wc.Ctx, wc.AthleteID, def); err != nil {
@@ -429,15 +429,15 @@ var upsertHrZoneDefinition = wrapWasmAthlete("upsertHrZoneDefinition", func(wc *
 //
 //wasm:export
 var deleteHrZoneDefinition = wrapWasmAthlete("deleteHrZoneDefinition", func(wc *WasmContext) interface{} {
-	var req struct {
+	var hrZoneDeleteReq struct {
 		SportType     string `json:"sport_type"`
 		EffectiveFrom string `json:"effective_from"`
 	}
-	if err := wc.ArgJSON(0, &req); err != nil {
+	if err := wc.ArgJSON(0, &hrZoneDeleteReq); err != nil {
 		return errorJSON(fmt.Errorf("parsing request: %w", err))
 	}
 
-	if err := wc.Registry.Zones().DeleteHR(wc.Ctx, wc.AthleteID, req.SportType, req.EffectiveFrom); err != nil {
+	if err := wc.Registry.Zones().DeleteHR(wc.Ctx, wc.AthleteID, hrZoneDeleteReq.SportType, hrZoneDeleteReq.EffectiveFrom); err != nil {
 		return errorJSON(err)
 	}
 

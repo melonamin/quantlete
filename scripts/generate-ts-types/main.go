@@ -173,16 +173,20 @@ func main() {
 		return allStructs[i].Package < allStructs[j].Package
 	})
 
-	// Detect collisions but only fail for non-services/storage pairs
+	// Detect collisions but only fail for unexpected pairs
 	collisions := detectCollisions(allStructs)
 	realCollisions := make(map[string][]string)
 	for name, packages := range collisions {
-		// Allow services/storage collisions (services takes precedence)
+		// Allow expected collisions where services takes precedence
 		if len(packages) == 2 {
+			// services/storage: services wraps storage types
 			isServiceStorageCollision := (packages[0] == "services" && packages[1] == "storage") ||
 				(packages[0] == "storage" && packages[1] == "services")
-			if isServiceStorageCollision {
-				continue // This is expected - services wraps storage types
+			// services/main: WASM handlers (cmd/wasm) wrap service types
+			isServiceMainCollision := (packages[0] == "services" && packages[1] == "main") ||
+				(packages[0] == "main" && packages[1] == "services")
+			if isServiceStorageCollision || isServiceMainCollision {
+				continue
 			}
 		}
 		realCollisions[name] = packages
@@ -592,6 +596,8 @@ func extractComment(doc *ast.CommentGroup) string {
 
 func findEnclosingFunc(file *ast.File, fset *token.FileSet, pos token.Pos) string {
 	var funcName string
+
+	// First, check for regular function declarations
 	ast.Inspect(file, func(n ast.Node) bool {
 		if fn, ok := n.(*ast.FuncDecl); ok {
 			if fn.Pos() < pos && pos < fn.End() {
@@ -600,6 +606,37 @@ func findEnclosingFunc(file *ast.File, fset *token.FileSet, pos token.Pos) strin
 		}
 		return true
 	})
+
+	if funcName != "" {
+		return funcName
+	}
+
+	// If not in a function declaration, check for function literals inside variable declarations.
+	// This handles the WASM pattern: var createComponent = wrapWasm(..., func() { var req struct{} })
+	ast.Inspect(file, func(n ast.Node) bool {
+		genDecl, ok := n.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.VAR {
+			return true
+		}
+
+		for _, spec := range genDecl.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok || len(valueSpec.Names) == 0 || len(valueSpec.Values) == 0 {
+				continue
+			}
+
+			// Check if position is within this variable declaration's value
+			for _, val := range valueSpec.Values {
+				if val.Pos() <= pos && pos <= val.End() {
+					// Found the enclosing var declaration, use its name
+					funcName = valueSpec.Names[0].Name
+					return false // stop searching
+				}
+			}
+		}
+		return true
+	})
+
 	return funcName
 }
 

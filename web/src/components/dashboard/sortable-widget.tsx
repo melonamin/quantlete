@@ -20,6 +20,7 @@ interface SortableWidgetProps {
   title: string
   width: WidgetWidth
   height: WidgetHeight
+  minHeight?: WidgetHeight
   editMode: boolean
   onWidthChange: (width: WidgetWidth) => void
   onHeightChange: (height: WidgetHeight) => void
@@ -52,6 +53,7 @@ const HEIGHT_CLASSES: Record<WidgetHeight, string> = {
 interface CompactControlsProps {
   width: WidgetWidth
   height: WidgetHeight
+  minHeight?: WidgetHeight
   onWidthChange: (width: WidgetWidth) => void
   onHeightChange: (height: WidgetHeight) => void
   onHide: () => void
@@ -60,10 +62,15 @@ interface CompactControlsProps {
 function CompactControls({
   width,
   height,
+  minHeight,
   onWidthChange,
   onHeightChange,
   onHide,
 }: CompactControlsProps) {
+  const heightOptions = minHeight
+    ? HEIGHT_OPTIONS.filter((opt) => opt.value >= minHeight)
+    : HEIGHT_OPTIONS
+
   return (
     <div className="flex flex-col gap-3 p-3">
       {/* Width controls */}
@@ -95,7 +102,7 @@ function CompactControls({
       <div className="flex flex-col gap-1.5">
         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Height</span>
         <div className="flex gap-1">
-          {HEIGHT_OPTIONS.map((opt) => {
+          {heightOptions.map((opt) => {
             const isActive = height === opt.value
             return (
               <button
@@ -132,6 +139,7 @@ export function SortableWidget({
   title,
   width,
   height,
+  minHeight,
   editMode,
   onWidthChange,
   onHeightChange,
@@ -162,6 +170,11 @@ export function SortableWidget({
 
   // Use compact mode for narrowest widgets (col-span-4 = ~300px)
   const isCompact = width === 4
+
+  // Filter height options based on minHeight
+  const heightOptions = minHeight
+    ? HEIGHT_OPTIONS.filter((opt) => opt.value >= minHeight)
+    : HEIGHT_OPTIONS
 
   return (
     <>
@@ -246,6 +259,7 @@ export function SortableWidget({
                       <CompactControls
                         width={width}
                         height={height}
+                        minHeight={minHeight}
                         onWidthChange={onWidthChange}
                         onHeightChange={onHeightChange}
                         onHide={onHide}
@@ -280,7 +294,7 @@ export function SortableWidget({
                     {/* Height Controls */}
                     <div className="flex items-center border-r border-border">
                       <ChevronsUpDown className="h-3 w-3 mx-1 text-muted-foreground" />
-                      {HEIGHT_OPTIONS.map((opt) => {
+                      {heightOptions.map((opt) => {
                         const isActive = height === opt.value
                         return (
                           <button
