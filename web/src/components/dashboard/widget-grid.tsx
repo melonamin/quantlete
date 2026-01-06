@@ -55,6 +55,7 @@ export interface WidgetDefinition {
   title: string
   defaultWidth: WidgetWidth
   defaultHeight?: WidgetHeight
+  minHeight?: WidgetHeight
   defaultHidden?: boolean
   render: () => ReactNode
 }
@@ -184,6 +185,7 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
         id: w.id,
         width: w.width,
         height: w.height ?? (w.def as WidgetDefinition).defaultHeight ?? 2,
+        minHeight: (w.def as WidgetDefinition).minHeight,
         hidden: w.hidden,
         title: (w.def as WidgetDefinition).title,
         render: (w.def as WidgetDefinition).render,
@@ -393,6 +395,7 @@ export function WidgetGrid({ widgets }: { widgets: WidgetDefinition[] }) {
                   title={w.title}
                   width={w.width}
                   height={w.height}
+                  minHeight={w.minHeight}
                   editMode={editMode}
                   onWidthChange={(width) => setWidgetWidth(w.id, width)}
                   onHeightChange={(height) => setWidgetHeight(w.id, height)}

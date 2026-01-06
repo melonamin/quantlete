@@ -2366,11 +2366,6 @@ export interface RecentActivity {
   summary_polyline?: string
 }
 
-export interface RequestInput {
-  activity_id: number
-  athlete_id: number
-}
-
 /** SaveBestEffortsInput contains parameters for saving best efforts for an activity. */
 export interface SaveBestEffortsInput {
   athlete_id: number

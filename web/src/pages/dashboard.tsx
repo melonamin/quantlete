@@ -352,6 +352,7 @@ export function DashboardPage() {
             title: 'HR Zone Trend',
             defaultWidth: 8,
             defaultHeight: 2,
+            minHeight: 2,
             defaultHidden: true,
             render: () => <ZoneTrend />,
           },
