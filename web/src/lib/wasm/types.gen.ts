@@ -1789,6 +1789,16 @@ export interface GetStatsBySportTypeRow {
   total_elevation: number
 }
 
+/** GetTotalZoneDistributionRow represents a row returned by GetTotalZoneDistribution. */
+export interface GetTotalZoneDistributionRow {
+  z1: number
+  z2: number
+  z3: number
+  z4: number
+  z5: number
+  total: number
+}
+
 /** GetTrainingGoalsConfigRow represents a row returned by GetTrainingGoalsConfig. */
 export interface GetTrainingGoalsConfigRow {
   config: string
@@ -2696,6 +2706,16 @@ export interface ActivityZoneDistribution {
   seconds_z5: number
   total_seconds: number
   computed_at: string
+}
+
+/** TotalZoneDistribution represents aggregated zone data across all activities. */
+export interface TotalZoneDistribution {
+  seconds_z1: number
+  seconds_z2: number
+  seconds_z3: number
+  seconds_z4: number
+  seconds_z5: number
+  total_seconds: number
 }
 
 // ============================================================================

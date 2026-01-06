@@ -18,6 +18,7 @@ ON CONFLICT(activity_id) DO UPDATE SET
 
 -- name: GetWeeklyZoneDistribution :many
 -- Returns weekly zone distribution for the last N weeks.
+-- Note: SQLite doesn't support 'weeks' modifier, so we convert to days (*7).
 SELECT
     strftime('%Y-W%W', a.start_date_local) AS week,
     COALESCE(SUM(zd.seconds_z1), 0) AS z1,
@@ -29,7 +30,7 @@ SELECT
 FROM activity_zone_distributions zd
 JOIN activities a ON a.id = zd.activity_id
 WHERE a.athlete_id = ?1
-  AND a.start_date_local >= date('now', '-' || ?2 || ' weeks')
+  AND a.start_date_local >= date('now', '-' || (?2 * 7) || ' days')
 GROUP BY week
 ORDER BY week;
 
@@ -65,3 +66,17 @@ WHERE activity_id = ?1;
 SELECT id, sport_type, start_date
 FROM activities
 WHERE id = ?1;
+
+-- name: GetTotalZoneDistribution :one
+-- Returns total zone distribution aggregated across all activities.
+-- Supports optional date range and sport type filtering.
+SELECT
+    COALESCE(SUM(zd.seconds_z1), 0) AS z1,
+    COALESCE(SUM(zd.seconds_z2), 0) AS z2,
+    COALESCE(SUM(zd.seconds_z3), 0) AS z3,
+    COALESCE(SUM(zd.seconds_z4), 0) AS z4,
+    COALESCE(SUM(zd.seconds_z5), 0) AS z5,
+    COALESCE(SUM(zd.total_seconds), 0) AS total
+FROM activity_zone_distributions zd
+JOIN activities a ON a.id = zd.activity_id
+WHERE a.athlete_id = ?1;

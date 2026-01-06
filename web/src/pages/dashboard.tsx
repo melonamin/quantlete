@@ -335,7 +335,7 @@ export function DashboardPage() {
             id: 'heart_rate_zones',
             title: 'Heart Rate Zones',
             defaultWidth: 4,
-            defaultHeight: 2,
+            defaultHeight: 1,
             defaultHidden: true,
             render: () => <HeartRateZones />,
           },

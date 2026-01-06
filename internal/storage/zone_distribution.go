@@ -265,15 +265,15 @@ func (r *ZoneDistributionRepository) getActivityForZone(ctx context.Context, act
 		return nil, nil
 	}
 
-	startDate, err := time.Parse("2006-01-02T15:04:05Z", row.StartDate)
-	if err != nil {
+	var startDate SQLiteTime
+	if err := startDate.Scan(row.StartDate); err != nil {
 		return nil, fmt.Errorf("parse start date: %w", err)
 	}
 
 	return &ActivityForZone{
 		ID:        row.ID,
 		SportType: row.SportType,
-		StartDate: startDate,
+		StartDate: startDate.Time,
 	}, nil
 }
 
@@ -303,5 +303,36 @@ func (r *ZoneDistributionRepository) GetByActivityID(ctx context.Context, activi
 		SecondsZ5:    row.SecondsZ5,
 		TotalSeconds: row.TotalSeconds,
 		ComputedAt:   computedAt,
+	}, nil
+}
+
+// TotalZoneDistribution represents aggregated zone data across all activities.
+type TotalZoneDistribution struct {
+	SecondsZ1    int `json:"seconds_z1"`
+	SecondsZ2    int `json:"seconds_z2"`
+	SecondsZ3    int `json:"seconds_z3"`
+	SecondsZ4    int `json:"seconds_z4"`
+	SecondsZ5    int `json:"seconds_z5"`
+	TotalSeconds int `json:"total_seconds"`
+}
+
+// GetTotalDistribution returns aggregated zone distribution across all activities.
+func (r *ZoneDistributionRepository) GetTotalDistribution(ctx context.Context, athleteID int64) (*TotalZoneDistribution, error) {
+	q := NewQueries(r.db.Conn())
+	row, err := q.GetTotalZoneDistribution(ctx, athleteID)
+	if err != nil {
+		return nil, fmt.Errorf("get total zone distribution: %w", err)
+	}
+	if row == nil {
+		return &TotalZoneDistribution{}, nil
+	}
+
+	return &TotalZoneDistribution{
+		SecondsZ1:    int(row.Z1),
+		SecondsZ2:    int(row.Z2),
+		SecondsZ3:    int(row.Z3),
+		SecondsZ4:    int(row.Z4),
+		SecondsZ5:    int(row.Z5),
+		TotalSeconds: int(row.Total),
 	}, nil
 }

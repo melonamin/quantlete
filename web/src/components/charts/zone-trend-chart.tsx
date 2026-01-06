@@ -1,9 +1,12 @@
 import type { EChartsOption } from 'echarts'
 import type { WeeklyZoneDistribution } from '@/lib/wasm/types.gen'
 import { EChartsWrapper } from './echarts-wrapper'
-import { zoneColorsArray, defaultGridConfig, defaultTooltipConfig } from './chart-constants'
-
-const zoneLabels = ['Z1 Recovery', 'Z2 Endurance', 'Z3 Tempo', 'Z4 Threshold', 'Z5 VO2max']
+import {
+  zoneColorsArray,
+  zoneLabels,
+  defaultGridConfig,
+  defaultTooltipConfig,
+} from './chart-constants'
 
 export function ZoneTrendChart({
   data,

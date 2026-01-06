@@ -15,12 +15,13 @@ import (
 )
 
 type StatsHandler struct {
-	svc     *services.StatsService
-	db      *storage.DB
-	streams *storage.StreamRepository
-	metrics *storage.AthleteMetricsRepository
-	zones   *storage.ZonesRepository
-	strava  *strava.Client
+	svc              *services.StatsService
+	db               *storage.DB
+	streams          *storage.StreamRepository
+	metrics          *storage.AthleteMetricsRepository
+	zones            *storage.ZonesRepository
+	zoneDistribution *storage.ZoneDistributionRepository
+	strava           *strava.Client
 }
 
 func NewStatsHandler(
@@ -29,15 +30,17 @@ func NewStatsHandler(
 	streams *storage.StreamRepository,
 	metrics *storage.AthleteMetricsRepository,
 	zones *storage.ZonesRepository,
+	zoneDistribution *storage.ZoneDistributionRepository,
 	stravaClient *strava.Client,
 ) *StatsHandler {
 	return &StatsHandler{
-		svc:     svc,
-		db:      db,
-		streams: streams,
-		metrics: metrics,
-		zones:   zones,
-		strava:  stravaClient,
+		svc:              svc,
+		db:               db,
+		streams:          streams,
+		metrics:          metrics,
+		zones:            zones,
+		zoneDistribution: zoneDistribution,
+		strava:           stravaClient,
 	}
 }
 
@@ -254,20 +257,7 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var after *time.Time
-	var before *time.Time
-	if t, ok := shared.ParseDateParam(r.URL.Query().Get("after")); ok {
-		after = &t
-	}
-	if t, ok := shared.ParseDateParam(r.URL.Query().Get("before")); ok {
-		before = &t
-	}
-
-	var sportTypes []string
-	if st := r.URL.Query().Get("sport_type"); st != "" {
-		sportTypes = strings.Split(st, ",")
-	}
-
+	// Get zone definitions for the response
 	defs, err := h.zones.ListHR(r.Context(), athlete.ID)
 	if err != nil {
 		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load zone definitions"))
@@ -283,116 +273,60 @@ func (h *StatsHandler) GetHRZones(w http.ResponseWriter, r *http.Request) {
 			Method:        "percent_hrmax",
 			Zones:         b,
 		})
+		defs, _ = h.zones.ListHR(r.Context(), athlete.ID)
 	}
 
-	// Fetch activities with HR streams in range.
-	query := `
-		SELECT DISTINCT a.id, a.sport_type, a.start_date
-		FROM activities a
-		JOIN activity_streams s ON s.activity_id = a.id AND s.stream_type = 'heartrate'
-		WHERE a.athlete_id = ?
-	`
-	args := []any{athlete.ID}
-	if after != nil {
-		query += " AND a.start_date >= ?"
-		args = append(args, *after)
-	}
-	if before != nil {
-		query += " AND a.start_date <= ?"
-		args = append(args, *before)
-	}
-	if len(sportTypes) > 0 {
-		placeholders := make([]string, len(sportTypes))
-		for i, st := range sportTypes {
-			placeholders[i] = "?"
-			args = append(args, st)
-		}
-		query += " AND a.sport_type IN (" + storage.JoinStrings(placeholders, ",") + ")"
-	}
-
-	rows, err := h.db.QueryContext(r.Context(), query, args...)
-	if err != nil {
-		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to query activities"))
-		return
-	}
-
-	// Collect all activity info first to avoid nested queries with open rows cursor.
-	// SQLite with single connection can deadlock if we query while rows are open.
-	type activityInfo struct {
-		id        int64
-		sportType string
-		start     storage.SQLiteTime
-	}
-	var activities []activityInfo
-	for rows.Next() {
-		var a activityInfo
-		if err := rows.Scan(&a.id, &a.sportType, &a.start); err != nil {
-			_ = rows.Close()
-			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to scan activities"))
-			return
-		}
-		activities = append(activities, a)
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to iterate activities"))
-		return
-	}
-	_ = rows.Close()
-
-	secondsByZone := make([]int, 5)
-	totalSeconds := 0
-
+	// Find the "All" definition for display, or use the first one
 	var method string
 	var cfg storage.HRZoneConfig
-	cfgSet := false
-
-	// Now process each activity with the cursor closed
-	for _, a := range activities {
-		group := sportGroup(a.sportType)
-		def, zcfg, err := h.zones.GetApplicableHR(r.Context(), athlete.ID, group, a.start.Time)
-		if err != nil {
-			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to load zone definition"))
-			return
-		}
-		if def == nil || zcfg == nil || len(zcfg.Bounds) < 5 {
-			continue
-		}
-		if !cfgSet {
+	for _, def := range defs {
+		if def.SportType == "All" {
 			method = def.Method
-			cfg = *zcfg
-			cfgSet = true
-		}
-
-		streams, err := h.streams.GetByActivityID(r.Context(), a.id)
-		if err != nil {
-			continue
-		}
-		var hrRaw []byte
-		for _, s := range streams {
-			if s.StreamType == "heartrate" {
-				hrRaw = s.Data
+			if err := json.Unmarshal(def.Zones, &cfg); err == nil {
 				break
 			}
 		}
-		hrs, err := storage.DecodeFloat64Array(hrRaw)
-		if err != nil {
-			continue
-		}
-		for _, hr := range hrs {
-			idx := storage.HRZoneIndex(def.Method, zcfg, hr)
-			if idx >= 0 && idx < 5 {
-				secondsByZone[idx]++
-				totalSeconds++
-			}
-		}
+	}
+	if method == "" && len(defs) > 0 {
+		method = defs[0].Method
+		_ = json.Unmarshal(defs[0].Zones, &cfg)
 	}
 
+	// Ensure zone distributions are computed
+	if h.zoneDistribution != nil {
+		if err := h.zoneDistribution.EnsureComputed(r.Context(), athlete.ID); err != nil {
+			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to compute zone distributions"))
+			return
+		}
+
+		// Get aggregated totals from pre-computed data
+		totals, err := h.zoneDistribution.GetTotalDistribution(r.Context(), athlete.ID)
+		if err != nil {
+			shared.WriteJSONResponse(w, http.StatusInternalServerError, shared.ErrorMessage("failed to get zone distribution"))
+			return
+		}
+
+		shared.WriteSuccess(w, HRZonesResponse{
+			Method: method,
+			Zones:  cfg,
+			SecondsByZone: []int{
+				totals.SecondsZ1,
+				totals.SecondsZ2,
+				totals.SecondsZ3,
+				totals.SecondsZ4,
+				totals.SecondsZ5,
+			},
+			TotalSeconds: totals.TotalSeconds,
+		})
+		return
+	}
+
+	// Fallback: return zeros if zone distribution not configured
 	shared.WriteSuccess(w, HRZonesResponse{
 		Method:        method,
 		Zones:         cfg,
-		SecondsByZone: secondsByZone,
-		TotalSeconds:  totalSeconds,
+		SecondsByZone: []int{0, 0, 0, 0, 0},
+		TotalSeconds:  0,
 	})
 }
 
@@ -537,16 +471,6 @@ func (h *StatsHandler) GetTrainingLoad(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shared.WriteSuccess(w, result)
-}
-
-func sportGroup(sportType string) string {
-	if strings.Contains(sportType, "Ride") || sportType == "Handcycle" {
-		return "Ride"
-	}
-	if strings.Contains(sportType, "Run") {
-		return "Run"
-	}
-	return "All"
 }
 
 type DistributionSlice struct {
