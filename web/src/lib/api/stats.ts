@@ -17,6 +17,9 @@ export type {
   PowerZonesResponse,
   DistributionSlice,
   WeeklyZoneDistribution,
+  ComputationStats,
+  WeeklyMetrics,
+  PolarizedBreakdown,
 } from '@/lib/wasm/types.gen'
 
 // ============================================================================
@@ -54,6 +57,9 @@ export interface PowerStatsResponse {
 export interface TrainingLoadResponse {
   series: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint[]
   summary?: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint
+  stats?: import('@/lib/wasm/types.gen').ComputationStats
+  weekly_metrics?: import('@/lib/wasm/types.gen').WeeklyMetrics
+  polarized?: import('@/lib/wasm/types.gen').PolarizedBreakdown
 }
 
 // ZoneTrendResponse - zone distribution data over time

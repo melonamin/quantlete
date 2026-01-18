@@ -2148,6 +2148,16 @@ export interface CalendarMonthSummary {
   challenges_completed: number
 }
 
+/** ComputationStats provides diagnostic information about TSS computation. */
+export interface ComputationStats {
+  total_activities: number
+  activities_with_power: number
+  activities_with_tss: number
+  cycling_ftp_configured: boolean
+  running_ftp_configured: boolean
+  hr_zones_configured: boolean
+}
+
 export interface ComputePowerBestEffortsInput {
   activity_id: number
   athlete_id: number
@@ -2340,6 +2350,15 @@ export interface PeakPowerHistoryPoint {
   watts: number
 }
 
+/** PolarizedBreakdown shows training intensity distribution. */
+export interface PolarizedBreakdown {
+  low_percent: number
+  moderate_percent: number
+  high_percent: number
+  total_seconds: number
+  period_days: number
+}
+
 /** PowerStatsOutput contains power statistics. */
 export interface PowerStatsOutput {
   durations_s: number[]
@@ -2405,6 +2424,17 @@ export interface SportTypeStat {
 export interface TrainingLoadOutput {
   series: DailyTrainingLoadPoint[]
   summary?: DailyTrainingLoadPoint | null
+  stats?: ComputationStats | null
+  weekly_metrics?: WeeklyMetrics | null
+  polarized?: PolarizedBreakdown | null
+}
+
+/** WeeklyMetrics contains weekly training metrics. */
+export interface WeeklyMetrics {
+  rest_days: number
+  monotony: number
+  weekly_strain: number
+  weekly_trimp: number
 }
 
 /** WeeklyStat represents statistics for a single sport type in the current week. */

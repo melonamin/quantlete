@@ -326,3 +326,67 @@ func TssForTargetTsb(currentCtl, currentAtl, targetTsb, ctlTau, atlTau float64) 
 
 	return numerator / denominator
 }
+
+// Monotony calculates training monotony from daily TSS values.
+// Monotony = Mean TSS / StdDev TSS
+// High monotony (>2.0) indicates repetitive training which can increase injury risk.
+// Returns 0 if there's no variance (stddev is 0).
+func Monotony(dailyTSS []float64) float64 {
+	n := len(dailyTSS)
+	if n == 0 {
+		return 0
+	}
+
+	// Calculate mean
+	sum := 0.0
+	for _, tss := range dailyTSS {
+		sum += tss
+	}
+	mean := sum / float64(n)
+
+	// Calculate standard deviation
+	sumSqDiff := 0.0
+	for _, tss := range dailyTSS {
+		diff := tss - mean
+		sumSqDiff += diff * diff
+	}
+
+	variance := sumSqDiff / float64(n)
+	if variance <= 0 {
+		return 0 // No variance means infinite monotony, return 0 to indicate undefined
+	}
+
+	stdDev := math.Sqrt(variance)
+	if stdDev == 0 {
+		return 0
+	}
+
+	return mean / stdDev
+}
+
+// DefaultTRIMPWeights are the standard zone weights for TRIMP calculation.
+// Zone 1 = 1, Zone 2 = 2, Zone 3 = 3, Zone 4 = 4, Zone 5 = 5
+var DefaultTRIMPWeights = []float64{1, 2, 3, 4, 5}
+
+// ZoneBasedTRIMP calculates Training Impulse from time spent in each HR zone.
+// zoneSeconds: array of seconds spent in [Z1, Z2, Z3, Z4, Z5]
+// weights: zone multipliers (use DefaultTRIMPWeights if nil)
+// TRIMP = Σ(time_in_zone × zone_weight)
+func ZoneBasedTRIMP(zoneSeconds []int, weights []float64) float64 {
+	if len(zoneSeconds) == 0 {
+		return 0
+	}
+
+	if weights == nil || len(weights) == 0 {
+		weights = DefaultTRIMPWeights
+	}
+
+	trimp := 0.0
+	for i := 0; i < len(zoneSeconds) && i < len(weights); i++ {
+		// Convert seconds to minutes for TRIMP calculation
+		minutes := float64(zoneSeconds[i]) / 60.0
+		trimp += minutes * weights[i]
+	}
+
+	return trimp
+}

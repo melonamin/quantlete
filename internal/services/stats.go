@@ -214,10 +214,40 @@ type DailyTrainingLoadPoint struct {
 	TSB float64 `json:"tsb"`
 }
 
+// ComputationStats provides diagnostic information about TSS computation.
+type ComputationStats struct {
+	TotalActivities      int  `json:"total_activities"`
+	ActivitiesWithPower  int  `json:"activities_with_power"`
+	ActivitiesWithTSS    int  `json:"activities_with_tss"`
+	CyclingFTPConfigured bool `json:"cycling_ftp_configured"`
+	RunningFTPConfigured bool `json:"running_ftp_configured"`
+	HRZonesConfigured    bool `json:"hr_zones_configured"`
+}
+
+// WeeklyMetrics contains weekly training metrics.
+type WeeklyMetrics struct {
+	RestDays     int     `json:"rest_days"`      // Days with no activity (0-7)
+	Monotony     float64 `json:"monotony"`       // Mean TSS / StdDev TSS
+	WeeklyStrain float64 `json:"weekly_strain"`  // Total TSS last 7 days
+	WeeklyTRIMP  float64 `json:"weekly_trimp"`   // Total TRIMP last 7 days
+}
+
+// PolarizedBreakdown shows training intensity distribution.
+type PolarizedBreakdown struct {
+	LowPercent      float64 `json:"low_percent"`      // Z1+Z2 %
+	ModeratePercent float64 `json:"moderate_percent"` // Z3 %
+	HighPercent     float64 `json:"high_percent"`     // Z4+Z5 %
+	TotalSeconds    int     `json:"total_seconds"`
+	PeriodDays      int     `json:"period_days"` // 30
+}
+
 // TrainingLoadOutput contains training load data.
 type TrainingLoadOutput struct {
-	Series  []DailyTrainingLoadPoint `json:"series"`
-	Summary *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+	Series        []DailyTrainingLoadPoint `json:"series"`
+	Summary       *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+	Stats         *ComputationStats        `json:"stats,omitempty"`
+	WeeklyMetrics *WeeklyMetrics           `json:"weekly_metrics,omitempty"`
+	Polarized     *PolarizedBreakdown      `json:"polarized,omitempty"`
 }
 
 // --- Zone Trend ---
@@ -684,10 +714,151 @@ func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadIn
 		}
 	}
 
-	return &TrainingLoadOutput{
+	// Get computation stats for diagnostics
+	repoStats, err := s.trainingLoad.GetComputationStats(ctx, in.AthleteID, after, before)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get computation stats: %v", err)
+	}
+
+	var statsOut *ComputationStats
+	if repoStats != nil {
+		statsOut = &ComputationStats{
+			TotalActivities:      repoStats.TotalActivities,
+			ActivitiesWithPower:  repoStats.ActivitiesWithPower,
+			ActivitiesWithTSS:    repoStats.ActivitiesWithTSS,
+			CyclingFTPConfigured: repoStats.CyclingFTPConfigured,
+			RunningFTPConfigured: repoStats.RunningFTPConfigured,
+			HRZonesConfigured:    repoStats.HRZonesConfigured,
+		}
+	}
+
+	output := &TrainingLoadOutput{
 		Series:  seriesOut,
 		Summary: summaryOut,
-	}, nil
+		Stats:   statsOut,
+	}
+
+	// Calculate weekly metrics if we have enough data
+	if len(seriesOut) > 0 {
+		output.WeeklyMetrics = s.calculateWeeklyMetrics(seriesOut)
+	}
+
+	// Get polarized breakdown for last 30 days
+	if s.zoneDistribution != nil {
+		output.Polarized = s.getPolarizedBreakdown(ctx, in.AthleteID)
+	}
+
+	return output, nil
+}
+
+// calculateWeeklyMetrics computes rest days, monotony, and strain from the last 7 days.
+func (s *StatsService) calculateWeeklyMetrics(series []DailyTrainingLoadPoint) *WeeklyMetrics {
+	// Get last 7 days of data
+	n := len(series)
+	startIdx := n - 7
+	if startIdx < 0 {
+		startIdx = 0
+	}
+
+	lastWeek := series[startIdx:]
+	if len(lastWeek) == 0 {
+		return nil
+	}
+
+	// Calculate rest days and collect TSS values
+	restDays := 0
+	var dailyTSS []float64
+	totalStrain := 0.0
+
+	for _, p := range lastWeek {
+		if p.TSS == 0 {
+			restDays++
+		}
+		dailyTSS = append(dailyTSS, p.TSS)
+		totalStrain += p.TSS
+	}
+
+	// Calculate monotony (mean / stddev)
+	monotony := 0.0
+	if len(dailyTSS) > 1 {
+		mean := totalStrain / float64(len(dailyTSS))
+		var sumSqDiff float64
+		for _, tss := range dailyTSS {
+			diff := tss - mean
+			sumSqDiff += diff * diff
+		}
+		stdDev := 0.0
+		if len(dailyTSS) > 0 {
+			stdDev = sqrtFloat(sumSqDiff / float64(len(dailyTSS)))
+		}
+		if stdDev > 0 {
+			monotony = mean / stdDev
+		}
+	}
+
+	return &WeeklyMetrics{
+		RestDays:     restDays,
+		Monotony:     roundTo2(monotony),
+		WeeklyStrain: roundTo2(totalStrain),
+		WeeklyTRIMP:  0, // Will be computed when TRIMP data is available
+	}
+}
+
+// getPolarizedBreakdown returns training intensity distribution for the last 30 days.
+func (s *StatsService) getPolarizedBreakdown(ctx context.Context, athleteID int64) *PolarizedBreakdown {
+	// Ensure zone distributions are computed
+	if err := s.zoneDistribution.EnsureComputed(ctx, athleteID); err != nil {
+		return nil
+	}
+
+	// Get aggregated zone distribution for last 30 days
+	data, err := s.zoneDistribution.GetWeeklyDistribution(ctx, athleteID, 5) // ~5 weeks ≈ 30+ days
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+
+	// Sum across all weeks
+	var z1, z2, z3, z4, z5, total int
+	for _, w := range data {
+		z1 += w.SecondsZ1
+		z2 += w.SecondsZ2
+		z3 += w.SecondsZ3
+		z4 += w.SecondsZ4
+		z5 += w.SecondsZ5
+		total += w.Total
+	}
+
+	if total == 0 {
+		return nil
+	}
+
+	low := float64(z1+z2) / float64(total) * 100
+	moderate := float64(z3) / float64(total) * 100
+	high := float64(z4+z5) / float64(total) * 100
+
+	return &PolarizedBreakdown{
+		LowPercent:      roundTo2(low),
+		ModeratePercent: roundTo2(moderate),
+		HighPercent:     roundTo2(high),
+		TotalSeconds:    total,
+		PeriodDays:      30,
+	}
+}
+
+func sqrtFloat(x float64) float64 {
+	if x <= 0 {
+		return 0
+	}
+	// Newton's method for square root
+	z := x / 2
+	for i := 0; i < 10; i++ {
+		z = (z + x/z) / 2
+	}
+	return z
+}
+
+func roundTo2(v float64) float64 {
+	return float64(int(v*100+0.5)) / 100
 }
 
 // GetZoneTrend returns weekly HR zone distribution data.
