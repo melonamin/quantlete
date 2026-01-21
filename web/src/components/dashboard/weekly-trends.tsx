@@ -10,7 +10,7 @@ import { useWeeklyTrends } from '@/lib/data/hooks'
 import { useSportTypeStats } from '@/lib/data/hooks'
 import { formatSportType } from '@/lib/sport-types'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
-import { formatDuration } from '@/lib/format'
+import { formatDuration, metersToDisplayUnit } from '@/lib/format'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,7 +27,8 @@ type Metric = 'distance' | 'time' | 'elevation'
 export function WeeklyTrends() {
   const [metric, setMetric] = useState<Metric>('distance')
   const [sportType, setSportType] = useState<string>('')
-  const { formatDistance, formatElevation } = useFormattedMetrics()
+  const { formatDistance, formatElevation, distanceUnit, elevationUnit, unitSystem } =
+    useFormattedMetrics()
 
   const { data: sportStats } = useSportTypeStats()
   const { data, isLoading, error } = useWeeklyTrends({
@@ -58,33 +59,37 @@ export function WeeklyTrends() {
   const getValue = (d: (typeof chartData)[0]) => {
     switch (metric) {
       case 'distance':
-        return d.distance / 1000 // Convert to km
+        return metersToDisplayUnit(d.distance, unitSystem)
       case 'time':
         return d.time / 3600 // Convert to hours
       case 'elevation':
-        return d.elevation
+        return unitSystem === 'imperial' ? d.elevation / 0.3048 : d.elevation // Convert to feet if imperial
     }
   }
 
   const formatValue = (value: number) => {
     switch (metric) {
       case 'distance':
-        return formatDistance(value * 1000)
+        // Value is already in display units (km or mi), convert back to meters for formatting
+        return formatDistance(
+          unitSystem === 'imperial' ? value * 1609.344 : value * 1000
+        )
       case 'time':
         return formatDuration(value * 3600)
       case 'elevation':
-        return formatElevation(value)
+        // Value is already in display units (m or ft), convert back to meters for formatting
+        return formatElevation(unitSystem === 'imperial' ? value * 0.3048 : value)
     }
   }
 
   const getYAxisLabel = () => {
     switch (metric) {
       case 'distance':
-        return 'km'
+        return distanceUnit
       case 'time':
         return 'hours'
       case 'elevation':
-        return 'm'
+        return elevationUnit
     }
   }
 

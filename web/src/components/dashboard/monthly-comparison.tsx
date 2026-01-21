@@ -10,7 +10,7 @@ import { useMonthlyComparison } from '@/lib/data/hooks'
 import { useSportTypeStats } from '@/lib/data/hooks'
 import { formatSportType } from '@/lib/sport-types'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
-import { formatDuration } from '@/lib/format'
+import { formatDuration, metersToDisplayUnit } from '@/lib/format'
 import { WidgetWrapper } from './widget-wrapper'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,7 +43,8 @@ export function MonthlyComparison() {
   const [metric, setMetric] = useState<Metric>('distance')
   const [sportType, setSportType] = useState<string>('')
   const [hiddenYears, setHiddenYears] = useState<Set<number>>(new Set())
-  const { formatDistance, formatElevation } = useFormattedMetrics()
+  const { formatDistance, formatElevation, distanceUnit, elevationUnit, unitSystem } =
+    useFormattedMetrics()
 
   const { data: sportStats } = useSportTypeStats()
   const { data, isLoading, error } = useMonthlyComparison({
@@ -74,19 +75,19 @@ export function MonthlyComparison() {
       let value: number
       switch (metric) {
         case 'distance':
-          value = point.total_distance / 1000 // km
+          value = metersToDisplayUnit(point.total_distance, unitSystem)
           break
         case 'time':
           value = point.total_time / 3600 // hours
           break
         case 'elevation':
-          value = point.total_elevation
+          value = unitSystem === 'imperial' ? point.total_elevation / 0.3048 : point.total_elevation
           break
       }
       monthMap.set(point.month, value)
     }
     return result
-  }, [data, metric])
+  }, [data, metric, unitSystem])
 
   // Get years sorted in descending order (latest year first)
   const years = useMemo(() => {
@@ -96,22 +97,24 @@ export function MonthlyComparison() {
   const formatValue = (value: number) => {
     switch (metric) {
       case 'distance':
-        return formatDistance(value * 1000)
+        // Value is already in display units (km or mi), convert back to meters for formatting
+        return formatDistance(unitSystem === 'imperial' ? value * 1609.344 : value * 1000)
       case 'time':
         return formatDuration(value * 3600)
       case 'elevation':
-        return formatElevation(value)
+        // Value is already in display units (m or ft), convert back to meters for formatting
+        return formatElevation(unitSystem === 'imperial' ? value * 0.3048 : value)
     }
   }
 
   const getYAxisLabel = () => {
     switch (metric) {
       case 'distance':
-        return 'km'
+        return distanceUnit
       case 'time':
         return 'hours'
       case 'elevation':
-        return 'm'
+        return elevationUnit
     }
   }
 

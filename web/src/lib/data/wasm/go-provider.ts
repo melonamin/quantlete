@@ -275,6 +275,10 @@ export class GoWasmProvider implements DataProvider {
       commute: filters.commute,
       trainer: filters.trainer,
       search: filters.search,
+      min_distance_m: filters.min_distance_m,
+      max_distance_m: filters.max_distance_m,
+      min_duration_s: filters.min_duration_s,
+      max_duration_s: filters.max_duration_s,
       order_by: filters.order_by,
       order_dir: filters.order_dir,
     })

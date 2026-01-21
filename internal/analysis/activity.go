@@ -49,6 +49,7 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 
 	var splits []Split
 	splitStart := 0
+	splitStartTime := time[0]
 	nextSplitDist := splitLengthM
 	splitIndex := 1
 
@@ -67,18 +68,21 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 			wattsCount++
 		}
 
-		// Check if we've crossed a split boundary
-		if distance[i] >= nextSplitDist {
-			// Interpolate to find exact split point
+		// Handle multiple split boundaries crossed in a single sample
+		for distance[i] >= nextSplitDist {
 			prevDist := distance[i-1]
 			currDist := distance[i]
 			prevTime := time[i-1]
 			currTime := time[i]
 
+			// Guard against division by zero when consecutive samples have equal distance
+			if currDist == prevDist {
+				break
+			}
+
 			// Linear interpolation factor
 			fraction := (nextSplitDist - prevDist) / (currDist - prevDist)
 			splitEndTime := prevTime + fraction*(currTime-prevTime)
-			splitStartTime := time[splitStart]
 
 			split := Split{
 				Index:        splitIndex,
@@ -104,8 +108,9 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 
 			splits = append(splits, split)
 
-			// Reset for next split
+			// Reset for next split - use interpolated time as new start
 			splitIndex++
+			splitStartTime = splitEndTime
 			nextSplitDist += splitLengthM
 			splitStart = i
 			hrSum, wattsSum = 0, 0
@@ -117,9 +122,9 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 	lastDist := distance[len(distance)-1]
 	if lastDist > (float64(splitIndex)-1)*splitLengthM {
 		partialDist := lastDist - (float64(splitIndex)-1)*splitLengthM
-		partialTime := time[len(time)-1] - time[splitStart]
+		partialTime := time[len(time)-1] - splitStartTime
 
-		if partialDist > splitLengthM*0.1 { // Only include if > 10% of a split
+		if partialDist > splitLengthM*0.1 && partialDist > 0 { // Only include if > 10% of a split
 			split := Split{
 				Index:        splitIndex,
 				DistanceM:    partialDist,
@@ -148,19 +153,25 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 		return nil
 	}
 
-	// Find fastest and slowest splits (by pace)
-	fastestIdx, slowestIdx := 0, 0
+	// Find fastest and slowest splits (by pace), only considering full splits
+	fastestIdx, slowestIdx := -1, -1
 	for i, s := range splits {
 		// Skip partial splits for comparison
 		if s.DistanceM < splitLengthM*0.9 {
 			continue
 		}
-		if s.PaceSecsPerM < splits[fastestIdx].PaceSecsPerM {
+		if fastestIdx == -1 || s.PaceSecsPerM < splits[fastestIdx].PaceSecsPerM {
 			fastestIdx = i
 		}
-		if s.PaceSecsPerM > splits[slowestIdx].PaceSecsPerM {
+		if slowestIdx == -1 || s.PaceSecsPerM > splits[slowestIdx].PaceSecsPerM {
 			slowestIdx = i
 		}
+	}
+
+	// If no full splits found, use the first split as both fastest and slowest
+	if fastestIdx == -1 {
+		fastestIdx = 0
+		slowestIdx = 0
 	}
 
 	return &SplitsResult{

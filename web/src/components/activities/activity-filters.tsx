@@ -73,12 +73,7 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
   )
 
   // Reset local state when filters are cleared externally (e.g., via "Clear filters" button)
-  const filtersKey = `${filters.min_distance_m ?? ''}-${filters.max_distance_m ?? ''}-${filters.min_duration_s ?? ''}-${filters.max_duration_s ?? ''}`
-  const [prevFiltersKey, setPrevFiltersKey] = useState(filtersKey)
-
-  if (filtersKey !== prevFiltersKey) {
-    setPrevFiltersKey(filtersKey)
-    // Only reset if the external filter was cleared (undefined)
+  useEffect(() => {
     if (filters.min_distance_m === undefined && localMinDistance !== '') {
       setLocalMinDistance('')
     }
@@ -91,7 +86,13 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
     if (filters.max_duration_s === undefined && localMaxDuration !== '') {
       setLocalMaxDuration('')
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.min_distance_m,
+    filters.max_distance_m,
+    filters.min_duration_s,
+    filters.max_duration_s,
+  ])
 
   // Debounce search
   useEffect(() => {
