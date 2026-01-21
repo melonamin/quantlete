@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import type { EChartsOption } from 'echarts'
 import { EChartsWrapper } from './echarts-wrapper'
-import { defaultTooltipConfig, chartColors } from './chart-constants'
+import { defaultTooltipConfig, chartColors, maxInlineLegendItems } from './chart-constants'
 
 export interface DonutSlice {
   name: string
@@ -48,23 +48,28 @@ export function DonutChart({
   const isCompact = dimensions.height < 200 || dimensions.width < 280
   const isNarrow = dimensions.width < 350
   const effectiveShowLegend = showLegend && !isCompact
+  const hasManyCategories = data.length > maxInlineLegendItems
 
-  // Adapt chart configuration based on size
+  // Adapt chart configuration based on size and number of categories
   const chartConfig = isCompact
     ? {
         radius: ['35%', '60%'] as [string, string],
         center: ['50%', '50%'] as [string, string],
         legendPosition: {} as Record<string, unknown>,
+        legendType: 'plain' as const,
       }
-    : isNarrow
+    : isNarrow || hasManyCategories
       ? {
-          radius: ['40%', '65%'] as [string, string],
-          center: ['50%', '40%'] as [string, string],
+          // Use bottom legend for narrow views or when there are many categories
+          radius: ['35%', '60%'] as [string, string],
+          center: ['50%', hasManyCategories ? '40%' : '40%'] as [string, string],
           legendPosition: {
             bottom: 0,
             left: 'center',
             orient: 'horizontal' as const,
           },
+          // Use scrollable legend when there are many categories
+          legendType: hasManyCategories ? ('scroll' as const) : ('plain' as const),
         }
       : {
           radius: ['40%', '70%'] as [string, string],
@@ -74,6 +79,7 @@ export function DonutChart({
             top: 'center',
             orient: 'vertical' as const,
           },
+          legendType: 'plain' as const,
         }
 
   const option: EChartsOption = {
@@ -88,13 +94,23 @@ export function DonutChart({
     legend: effectiveShowLegend
       ? {
           ...chartConfig.legendPosition,
+          type: chartConfig.legendType,
           textStyle: {
             color: '#888',
-            fontSize: isNarrow ? 10 : 12,
+            fontSize: isNarrow || hasManyCategories ? 10 : 12,
           },
-          itemWidth: isNarrow ? 10 : 14,
-          itemHeight: isNarrow ? 10 : 14,
-          itemGap: isNarrow ? 6 : 10,
+          itemWidth: isNarrow || hasManyCategories ? 10 : 14,
+          itemHeight: isNarrow || hasManyCategories ? 10 : 14,
+          itemGap: isNarrow || hasManyCategories ? 6 : 10,
+          // Scroll legend controls
+          pageButtonItemGap: 5,
+          pageButtonGap: 5,
+          pageIconColor: '#888',
+          pageIconInactiveColor: '#444',
+          pageTextStyle: {
+            color: '#888',
+            fontSize: 10,
+          },
         }
       : undefined,
     series: [

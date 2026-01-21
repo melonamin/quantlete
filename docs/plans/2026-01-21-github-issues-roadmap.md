@@ -36,11 +36,11 @@ The Welcome widget's "Lifetime Stats" section overlaps with navigation elements 
 
 When the Sport Distribution donut chart has 10+ sport types, legend labels overlap and become unreadable. The fix involves switching to a bottom legend for charts with many categories.
 
-- [ ] Add `maxInlineLabels` threshold constant (default: 6) to chart constants
-- [ ] Update `DonutChart` component to conditionally show inline labels vs bottom legend
-- [ ] Add scrollable legend support for many categories using ECharts `legend.type: 'scroll'`
-- [ ] Test with various category counts (3, 6, 10, 15 sport types)
-- [ ] Update Sport Distribution widget to use the improved DonutChart
+- [x] Add `maxInlineLabels` threshold constant (default: 6) to chart constants
+- [x] Update `DonutChart` component to conditionally show inline labels vs bottom legend
+- [x] Add scrollable legend support for many categories using ECharts `legend.type: 'scroll'`
+- [x] Test with various category counts (3, 6, 10, 15 sport types)
+- [x] Update Sport Distribution widget to use the improved DonutChart
 
 ### Task 4: Improve chart color palettes (#13)
 

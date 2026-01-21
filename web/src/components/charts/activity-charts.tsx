@@ -6,6 +6,7 @@ import {
   calendarPalettes,
   defaultGridConfig,
   defaultTooltipConfig,
+  maxInlineLegendItems,
 } from './chart-constants'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
@@ -179,8 +180,9 @@ export function SportDistributionChart({
   // Responsive layout logic based on container dimensions
   const isCompact = dimensions.height < 200 || dimensions.width < 280
   const isNarrow = dimensions.width < 350
+  const hasManyCategories = data.length > maxInlineLegendItems
 
-  // Adapt chart configuration based on size
+  // Adapt chart configuration based on size and number of categories
   const chartConfig = isCompact
     ? {
         // Compact mode: no legend, centered chart, smaller radius
@@ -188,11 +190,12 @@ export function SportDistributionChart({
         center: ['50%', '50%'] as [string, string],
         showLegend: false,
         legendPosition: {} as Record<string, unknown>,
+        legendType: 'plain' as const,
       }
-    : isNarrow
+    : isNarrow || hasManyCategories
       ? {
-          // Narrow mode: horizontal legend below chart
-          radius: ['40%', '65%'] as [string, string],
+          // Use bottom legend for narrow views or when there are many categories
+          radius: ['35%', '60%'] as [string, string],
           center: ['50%', '40%'] as [string, string],
           showLegend: true,
           legendPosition: {
@@ -200,6 +203,8 @@ export function SportDistributionChart({
             left: 'center',
             orient: 'horizontal' as const,
           },
+          // Use scrollable legend when there are many categories
+          legendType: hasManyCategories ? ('scroll' as const) : ('plain' as const),
         }
       : {
           // Full mode: vertical legend on right side
@@ -211,6 +216,7 @@ export function SportDistributionChart({
             top: 'center',
             orient: 'vertical' as const,
           },
+          legendType: 'plain' as const,
         }
 
   const option: EChartsOption = {
@@ -226,13 +232,23 @@ export function SportDistributionChart({
     legend: chartConfig.showLegend
       ? {
           ...chartConfig.legendPosition,
+          type: chartConfig.legendType,
           textStyle: {
             color: '#888',
-            fontSize: isNarrow ? 10 : 12,
+            fontSize: isNarrow || hasManyCategories ? 10 : 12,
           },
-          itemWidth: isNarrow ? 10 : 14,
-          itemHeight: isNarrow ? 10 : 14,
-          itemGap: isNarrow ? 6 : 10,
+          itemWidth: isNarrow || hasManyCategories ? 10 : 14,
+          itemHeight: isNarrow || hasManyCategories ? 10 : 14,
+          itemGap: isNarrow || hasManyCategories ? 6 : 10,
+          // Scroll legend controls
+          pageButtonItemGap: 5,
+          pageButtonGap: 5,
+          pageIconColor: '#888',
+          pageIconInactiveColor: '#444',
+          pageTextStyle: {
+            color: '#888',
+            fontSize: 10,
+          },
         }
       : undefined,
     series: [

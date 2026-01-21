@@ -132,3 +132,7 @@ export const defaultAxisStyle = {
     fontSize: 10,
   },
 }
+
+// Legend configuration thresholds
+// When a chart has more than this many categories, switch from inline to scrollable legend
+export const maxInlineLegendItems = 6
