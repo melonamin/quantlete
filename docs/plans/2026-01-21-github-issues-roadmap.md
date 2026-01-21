@@ -25,12 +25,12 @@ The Training Load page shows CTL=0, ATL=0, TSB=0 despite activities with power/H
 
 The Welcome widget's "Lifetime Stats" section overlaps with navigation elements and the "Master Athlete" badge is cut off. This is a CSS/layout issue in `web/src/components/dashboard/intro-text.tsx` related to flex container height and overflow handling.
 
-- [ ] Reproduce issue and identify exact cause (widget height vs content)
-- [ ] Check `WidgetWrapper` overflow handling
-- [ ] Add appropriate `minHeight` to Welcome widget configuration
-- [ ] Add `overflow-hidden` or `overflow-y-auto` to content container
-- [ ] Test at different widget sizes (1x1, 2x1, 2x2)
-- [ ] Verify badge text is fully visible
+- [x] Reproduce issue and identify exact cause (widget height vs content)
+- [x] Check `WidgetWrapper` overflow handling
+- [x] Add appropriate `minHeight` to Welcome widget configuration
+- [x] Add `overflow-hidden` or `overflow-y-auto` to content container
+- [x] Test at different widget sizes (1x1, 2x1, 2x2)
+- [x] Verify badge text is fully visible
 
 ### Task 3: Fix Sport Distribution legend overlap (#14)
 

@@ -230,7 +230,8 @@ export function DashboardPage() {
             id: 'intro_text',
             title: 'Welcome',
             defaultWidth: 4,
-            defaultHeight: 1,
+            defaultHeight: 2,
+            minHeight: 2,
             render: () => <IntroText />,
           },
           {
