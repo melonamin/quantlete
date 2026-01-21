@@ -155,9 +155,9 @@ The Rewind view has UX issues: months shown as numbers instead of names, unneces
 
 Weather data is not available in WASM mode because external API calls cannot work in browser due to CORS. This requires an architectural decision on the approach.
 
-- [ ] Document the three options: proxy through backend, client-friendly API, accept limitation
-- [ ] Decide on approach (recommend: accept as permanent WASM limitation with clear UI message)
-- [ ] If accepting limitation: add clear "Weather unavailable in browser mode" message in UI
-- [ ] If implementing proxy: design API endpoint that proxies Open-Meteo requests
-- [ ] Update `getActivityWeather()` in go-provider.ts based on chosen approach
-- [ ] Add feature flag or mode detection to show/hide weather section appropriately
+- [x] Document the three options: proxy through backend, client-friendly API, accept limitation
+- [x] Decide on approach (recommend: accept as permanent WASM limitation with clear UI message)
+- [x] If accepting limitation: add clear "Weather unavailable in browser mode" message in UI
+- [x] If implementing proxy: design API endpoint that proxies Open-Meteo requests
+- [x] Update `getActivityWeather()` in go-provider.ts based on chosen approach
+- [x] Add feature flag or mode detection to show/hide weather section appropriately

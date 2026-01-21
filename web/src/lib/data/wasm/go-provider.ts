@@ -313,8 +313,23 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async getActivityWeather(_id: number): Promise<ActivityWeather | null> {
-    // Weather lookup is server-only: requires external API calls (Open-Meteo)
-    // that cannot work in browser WASM mode due to CORS and API key exposure.
+    // Weather lookup is server-only - permanent WASM limitation.
+    //
+    // Options considered:
+    // 1. Accept limitation (CHOSEN): Show clear UI message explaining weather
+    //    is unavailable in browser mode. This is the simplest and most honest
+    //    approach - no proxy complexity, no additional infrastructure.
+    //
+    // 2. Proxy through backend: Would require a separate server deployment,
+    //    defeating the purpose of the browser-only WASM mode.
+    //
+    // 3. Direct Open-Meteo from browser: The Open-Meteo API is CORS-enabled,
+    //    but requires activity location/date which we'd need to fetch first.
+    //    This adds complexity and still requires storing Strava temperature
+    //    streams which are only available in server mode.
+    //
+    // The UI (WeatherBadge component) shows a clear message when in WASM mode
+    // explaining that weather data requires server deployment.
     return null
   }
 
