@@ -183,10 +183,15 @@ export function MonthlyComparison() {
       ...defaultTooltipConfig,
       trigger: 'axis',
       formatter: (params: unknown) => {
-        const items = params as Array<{ seriesName: string; value: number | null; color: string }>
+        const items = params as Array<{
+          seriesName: string
+          value: number | null
+          color: string
+          dataIndex: number
+        }>
         if (!items || items.length === 0) return ''
 
-        const month = MONTH_LABELS[(items[0] as { dataIndex: number }).dataIndex]
+        const month = MONTH_LABELS[items[0].dataIndex]
         const lines = items
           .filter((item) => item.value !== null && item.value !== undefined)
           .map((item) => {
@@ -241,8 +246,9 @@ export function MonthlyComparison() {
 
   // Handle ECharts legend select event
   const handleChartEvents = {
-    legendselectchanged: (params: { name: string; selected: Record<string, boolean> }) => {
-      const year = parseInt(params.name, 10)
+    legendselectchanged: (params: unknown) => {
+      const event = params as { name: string; selected: Record<string, boolean> }
+      const year = parseInt(event.name, 10)
       if (!isNaN(year)) {
         handleLegendClick(year)
       }
