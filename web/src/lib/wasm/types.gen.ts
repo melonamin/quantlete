@@ -1963,6 +1963,25 @@ export interface HasBeenNotifiedRow {
   count: number
 }
 
+/** UpdateGearPriceRow represents a row returned by UpdateGearPrice. */
+export interface UpdateGearPriceRow {
+  id: string
+  athlete_id: number
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  created_at: string
+  updated_at: string
+}
+
 // ============================================================================
 // From segments.go
 // ============================================================================
@@ -2510,10 +2529,25 @@ export interface SportTypeStat {
   total_elevation: number
 }
 
+/** TrainingLoadDiagnostics provides insights into why TSS might be zero or missing. */
+export interface TrainingLoadDiagnostics {
+  total_activities: number
+  activities_with_power: number
+  activities_with_speed: number
+  activities_with_hr: number
+  activities_with_tss: number
+  has_cycling_ftp: boolean
+  has_running_ftp: boolean
+  cycling_ftp_value?: number | null
+  running_ftp_value?: number | null
+  missing_config_warnings?: string[]
+}
+
 /** TrainingLoadOutput contains training load data. */
 export interface TrainingLoadOutput {
   series: DailyTrainingLoadPoint[]
   summary?: DailyTrainingLoadPoint | null
+  diagnostics?: TrainingLoadDiagnostics | null
 }
 
 /** WeeklyStat represents statistics for a single sport type in the current week. */

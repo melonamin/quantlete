@@ -214,10 +214,25 @@ type DailyTrainingLoadPoint struct {
 	TSB float64 `json:"tsb"`
 }
 
+// TrainingLoadDiagnostics provides insights into why TSS might be zero or missing.
+type TrainingLoadDiagnostics struct {
+	TotalActivities       int      `json:"total_activities"`
+	ActivitiesWithPower   int      `json:"activities_with_power"`
+	ActivitiesWithSpeed   int      `json:"activities_with_speed"`
+	ActivitiesWithHR      int      `json:"activities_with_hr"`
+	ActivitiesWithTSS     int      `json:"activities_with_tss"`
+	HasCyclingFTP         bool     `json:"has_cycling_ftp"`
+	HasRunningFTP         bool     `json:"has_running_ftp"`
+	CyclingFTPValue       *float64 `json:"cycling_ftp_value,omitempty"`
+	RunningFTPValue       *float64 `json:"running_ftp_value,omitempty"`
+	MissingConfigWarnings []string `json:"missing_config_warnings,omitempty"`
+}
+
 // TrainingLoadOutput contains training load data.
 type TrainingLoadOutput struct {
-	Series  []DailyTrainingLoadPoint `json:"series"`
-	Summary *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+	Series      []DailyTrainingLoadPoint `json:"series"`
+	Summary     *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+	Diagnostics *TrainingLoadDiagnostics `json:"diagnostics,omitempty"`
 }
 
 // --- Zone Trend ---
@@ -684,9 +699,28 @@ func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadIn
 		}
 	}
 
+	// Get diagnostics to help users understand why TSS might be zero
+	storageDiag, _ := s.trainingLoad.GetDiagnostics(ctx, in.AthleteID)
+	var diagOut *TrainingLoadDiagnostics
+	if storageDiag != nil {
+		diagOut = &TrainingLoadDiagnostics{
+			TotalActivities:       storageDiag.TotalActivities,
+			ActivitiesWithPower:   storageDiag.ActivitiesWithPower,
+			ActivitiesWithSpeed:   storageDiag.ActivitiesWithSpeed,
+			ActivitiesWithHR:      storageDiag.ActivitiesWithHR,
+			ActivitiesWithTSS:     storageDiag.ActivitiesWithTSS,
+			HasCyclingFTP:         storageDiag.HasCyclingFTP,
+			HasRunningFTP:         storageDiag.HasRunningFTP,
+			CyclingFTPValue:       storageDiag.CyclingFTPValue,
+			RunningFTPValue:       storageDiag.RunningFTPValue,
+			MissingConfigWarnings: storageDiag.MissingConfigWarnings,
+		}
+	}
+
 	return &TrainingLoadOutput{
-		Series:  seriesOut,
-		Summary: summaryOut,
+		Series:      seriesOut,
+		Summary:     summaryOut,
+		Diagnostics: diagOut,
 	}, nil
 }
 

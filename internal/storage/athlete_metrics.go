@@ -89,3 +89,7 @@ func (r *AthleteMetricsRepository) LatestBefore(ctx context.Context, athleteID i
 	}
 	return &p, nil
 }
+
+func (r *AthleteMetricsRepository) GetCurrentFTP(ctx context.Context, athleteID int64, metric string) (*AthleteMetricPoint, error) {
+	return r.LatestBefore(ctx, athleteID, metric, time.Now())
+}

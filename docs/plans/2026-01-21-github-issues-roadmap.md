@@ -13,13 +13,13 @@ Address all 12 open GitHub issues in priority order: bugs first, then dashboard 
 
 The Training Load page shows CTL=0, ATL=0, TSB=0 despite activities with power/HR data. This is a critical bug affecting core analytics functionality. The issue likely stems from missing FTP configuration, stream data not being processed, or date range filtering problems in `internal/storage/training_load.go`.
 
-- [ ] Add debug logging to `computeAndUpsertActivity()` to trace why activities are skipped
-- [ ] Verify FTP/threshold values are being read from athlete settings
-- [ ] Check that `activity_training_load` table is being populated during import
-- [ ] Add UI warning when FTP/threshold not configured
-- [ ] Add activity count breakdown showing: total activities, activities with power data, activities with computed TSS
-- [ ] Write tests for TSS calculation pipeline
-- [ ] Verify fix by checking Training Load page shows non-zero values
+- [x] Add debug logging to `computeAndUpsertActivity()` to trace why activities are skipped
+- [x] Verify FTP/threshold values are being read from athlete settings
+- [x] Check that `activity_training_load` table is being populated during import
+- [x] Add UI warning when FTP/threshold not configured
+- [x] Add activity count breakdown showing: total activities, activities with power data, activities with computed TSS
+- [x] Write tests for TSS calculation pipeline
+- [x] Verify fix by checking Training Load page shows non-zero values
 
 ### Task 2: Fix Welcome widget text overlap (#19)
 
