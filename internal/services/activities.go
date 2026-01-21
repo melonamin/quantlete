@@ -32,18 +32,22 @@ func NewActivityService(repo *storage.ActivityRepository, streams *storage.Strea
 
 // ListActivitiesInput contains parameters for listing activities.
 type ListActivitiesInput struct {
-	AthleteID   int64      `json:"-" adapter:"context"`
-	SportTypes  []string   `json:"sport_types" adapter:"query,name=sport_type,split=,"`
-	StartAfter  *time.Time `json:"after" adapter:"query"`
-	StartBefore *time.Time `json:"before" adapter:"query"`
-	GearID      string     `json:"gear_id" adapter:"query"`
-	Commute     *bool      `json:"commute" adapter:"query"`
-	Trainer     *bool      `json:"trainer" adapter:"query"`
-	Search      string     `json:"search" adapter:"query"`
-	Page        int        `json:"page" adapter:"query,default=1"`
-	PerPage     int        `json:"per_page" adapter:"query,default=50"`
-	OrderBy     string     `json:"order_by" adapter:"query,default=start_date"`
-	OrderDir    string     `json:"order_dir" adapter:"query,default=desc"`
+	AthleteID    int64      `json:"-" adapter:"context"`
+	SportTypes   []string   `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	StartAfter   *time.Time `json:"after" adapter:"query"`
+	StartBefore  *time.Time `json:"before" adapter:"query"`
+	GearID       string     `json:"gear_id" adapter:"query"`
+	Commute      *bool      `json:"commute" adapter:"query"`
+	Trainer      *bool      `json:"trainer" adapter:"query"`
+	Search       string     `json:"search" adapter:"query"`
+	MinDistanceM *float64   `json:"min_distance_m" adapter:"query"`
+	MaxDistanceM *float64   `json:"max_distance_m" adapter:"query"`
+	MinDurationS *int       `json:"min_duration_s" adapter:"query"`
+	MaxDurationS *int       `json:"max_duration_s" adapter:"query"`
+	Page         int        `json:"page" adapter:"query,default=1"`
+	PerPage      int        `json:"per_page" adapter:"query,default=50"`
+	OrderBy      string     `json:"order_by" adapter:"query,default=start_date"`
+	OrderDir     string     `json:"order_dir" adapter:"query,default=desc"`
 }
 
 // ActivityItem represents an activity in responses.
@@ -193,14 +197,18 @@ const maxStreamDataSize = 100000
 //adapter:http GET /api/v1/activities
 func (s *ActivityService) List(ctx context.Context, in ListActivitiesInput) (*ListActivitiesOutput, error) {
 	filters := storage.ActivityFilters{
-		AthleteID:   in.AthleteID,
-		SportTypes:  in.SportTypes,
-		StartAfter:  in.StartAfter,
-		StartBefore: in.StartBefore,
-		GearID:      in.GearID,
-		Commute:     in.Commute,
-		Trainer:     in.Trainer,
-		Search:      in.Search,
+		AthleteID:    in.AthleteID,
+		SportTypes:   in.SportTypes,
+		StartAfter:   in.StartAfter,
+		StartBefore:  in.StartBefore,
+		GearID:       in.GearID,
+		Commute:      in.Commute,
+		Trainer:      in.Trainer,
+		Search:       in.Search,
+		MinDistanceM: in.MinDistanceM,
+		MaxDistanceM: in.MaxDistanceM,
+		MinDurationS: in.MinDurationS,
+		MaxDurationS: in.MaxDurationS,
 	}
 
 	page := storage.Pagination{

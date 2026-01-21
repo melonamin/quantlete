@@ -116,15 +116,15 @@ The Activity detail page is missing splits table, HR zone distribution, and pace
 
 The Activities page lacks ability to filter by distance or time duration. Users need filters like "show all runs longer than 10km" or "find activities over 2 hours".
 
-- [ ] Add `min_distance_m`, `max_distance_m`, `min_duration_s`, `max_duration_s` to API types
-- [ ] Update SQL query in `schema/queries/activities.sql` with distance/duration WHERE clauses
-- [ ] Update `ActivityService.List` input struct with new filter fields and adapter tags
-- [ ] Run `just generate` to regenerate adapters
-- [ ] Add distance input fields to `ActivityFiltersPanel` (with km/mi unit label)
-- [ ] Add duration input fields (hours:minutes format)
-- [ ] Add unit conversion based on user preference (km vs mi)
-- [ ] Add input validation (min < max, reasonable bounds)
-- [ ] Update `useActivities` hook to pass new filter parameters
+- [x] Add `min_distance_m`, `max_distance_m`, `min_duration_s`, `max_duration_s` to API types
+- [x] Update SQL query in `schema/queries/activities.sql` with distance/duration WHERE clauses
+- [x] Update `ActivityService.List` input struct with new filter fields and adapter tags
+- [x] Run `just generate` to regenerate adapters
+- [x] Add distance input fields to `ActivityFiltersPanel` (with km/mi unit label)
+- [x] Add duration input fields (hours:minutes format)
+- [x] Add unit conversion based on user preference (km vs mi)
+- [x] Add input validation (min < max, reasonable bounds)
+- [x] Update `useActivities` hook to pass new filter parameters
 
 ### Task 10: Group Eddington by sport (#16)
 

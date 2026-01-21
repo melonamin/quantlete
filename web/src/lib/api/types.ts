@@ -76,6 +76,10 @@ export interface ActivityFilters {
   search?: string
   commute?: boolean
   trainer?: boolean
+  min_distance_m?: number
+  max_distance_m?: number
+  min_duration_s?: number
+  max_duration_s?: number
   page?: number
   per_page?: number
   order_by?: string

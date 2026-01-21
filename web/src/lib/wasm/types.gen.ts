@@ -115,6 +115,10 @@ export interface ListActivitiesInput {
   commute?: boolean | null
   trainer?: boolean | null
   search: string
+  min_distance_m?: number | null
+  max_distance_m?: number | null
+  min_duration_s?: number | null
+  max_duration_s?: number | null
   page: number
   per_page: number
   order_by: string
