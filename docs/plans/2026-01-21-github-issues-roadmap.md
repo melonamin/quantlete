@@ -59,14 +59,14 @@ Multiple charts have poor color differentiation. This task establishes a consist
 
 The Activity Calendar widget needs intensity-based coloring, rolling 365-day view option, and a legend. Currently shows calendar year only with monochrome gradient and no legend to interpret colors.
 
-- [ ] Add `CalendarRange` type (`'year' | 'rolling365'`) and toggle UI to widget
-- [ ] Modify `useCalendarData` hook to support rolling 365 days calculation
-- [ ] Add intensity metric calculation to calendar SQL query (using `suffer_score` or TSS)
-- [ ] Update `calendarPalettes` in chart-constants with multi-color intensity gradient (gray/green/amber/orange/red)
-- [ ] Create `CalendarLegend` component showing color scale with ranges
-- [ ] Update `ActivityCalendarChart` to use multi-color gradient based on metric
-- [ ] Add intensity metric tab to widget alongside Count/Distance/Time/Calories
-- [ ] Run `just generate` after SQL changes
+- [x] Add `CalendarRange` type (`'year' | 'rolling365'`) and toggle UI to widget
+- [x] Modify `useCalendarData` hook to support rolling 365 days calculation
+- [x] Add intensity metric calculation to calendar SQL query (using `suffer_score` or TSS)
+- [x] Update `calendarPalettes` in chart-constants with multi-color intensity gradient (gray/green/amber/orange/red)
+- [x] Create `CalendarLegend` component showing color scale with ranges
+- [x] Update `ActivityCalendarChart` to use multi-color gradient based on metric
+- [x] Add intensity metric tab to widget alongside Count/Distance/Time/Calories
+- [x] Run `just generate` after SQL changes
 
 ### Task 6: Add Weekly Trends widget (#11)
 

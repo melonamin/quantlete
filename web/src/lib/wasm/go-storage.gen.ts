@@ -159,6 +159,8 @@ export interface GoStorageInterface {
   getCalendarActivities(arg0?: string): string
   /** genGetCalendarData wraps DashboardService.GetCalendarData */
   getCalendarData(arg0?: string): string
+  /** genGetCalendarDataRange wraps DashboardService.GetCalendarDataRange */
+  getCalendarDataRange(arg0?: string): string
   /** genGetCalendarSummary wraps DashboardService.GetCalendarSummary */
   getCalendarSummary(arg0?: string): string
 

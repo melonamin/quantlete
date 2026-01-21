@@ -79,6 +79,7 @@ export {
   useMonthlyStats,
   useYearlyStats,
   useCalendarData,
+  useCalendarDataRange,
   useCalendarActivities,
   useCalendarSummary,
   useHeatmap,

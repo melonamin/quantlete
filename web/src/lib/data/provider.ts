@@ -125,6 +125,7 @@ export interface DataProvider {
   getMonthlyStats(year?: number): Promise<MonthlyStat[]>
   getYearlyStats(): Promise<YearlyStat[]>
   getCalendarData(year: number): Promise<CalendarDay[]>
+  getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]>
   getCalendarActivities(year: number, month: number): Promise<CalendarActivity[]>
   getCalendarSummary(year: number, month: number): Promise<CalendarMonthSummary>
   getDashboardConfig(): Promise<DashboardConfig>

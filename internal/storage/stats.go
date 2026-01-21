@@ -328,11 +328,12 @@ func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, 
 
 // CalendarDay represents activity data for a single day.
 type CalendarDay struct {
-	Date          string  `json:"date"` // YYYY-MM-DD format
-	ActivityCount int     `json:"activity_count"`
-	TotalDistance float64 `json:"total_distance"`
-	TotalTime     int     `json:"total_time"` // moving_time in seconds
-	TotalCalories float64 `json:"total_calories"`
+	Date           string  `json:"date"` // YYYY-MM-DD format
+	ActivityCount  int     `json:"activity_count"`
+	TotalDistance  float64 `json:"total_distance"`
+	TotalTime      int     `json:"total_time"` // moving_time in seconds
+	TotalCalories  float64 `json:"total_calories"`
+	TotalIntensity int     `json:"total_intensity"` // sum of suffer_score (relative effort)
 }
 
 // CalendarActivity represents an activity summary for the calendar view.
@@ -354,7 +355,8 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 			COUNT(*) as activity_count,
 			COALESCE(SUM(distance), 0) as total_distance,
 			COALESCE(SUM(moving_time), 0) as total_time,
-			COALESCE(SUM(calories), 0) as total_calories
+			COALESCE(SUM(calories), 0) as total_calories,
+			COALESCE(SUM(suffer_score), 0) as total_intensity
 		FROM activities
 		WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
 		GROUP BY date
@@ -368,7 +370,41 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 	var days []CalendarDay
 	for rows.Next() {
 		var d CalendarDay
-		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance, &d.TotalTime, &d.TotalCalories); err != nil {
+		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance, &d.TotalTime, &d.TotalCalories, &d.TotalIntensity); err != nil {
+			return nil, err
+		}
+		days = append(days, d)
+	}
+
+	return days, rows.Err()
+}
+
+// GetCalendarDataRange returns daily activity counts for a date range.
+func (r *StatsRepository) GetCalendarDataRange(ctx context.Context, athleteID int64, startDate, endDate string) ([]CalendarDay, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			strftime('%Y-%m-%d', start_date_local) as date,
+			COUNT(*) as activity_count,
+			COALESCE(SUM(distance), 0) as total_distance,
+			COALESCE(SUM(moving_time), 0) as total_time,
+			COALESCE(SUM(calories), 0) as total_calories,
+			COALESCE(SUM(suffer_score), 0) as total_intensity
+		FROM activities
+		WHERE athlete_id = ?
+			AND date(start_date_local) >= ?
+			AND date(start_date_local) <= ?
+		GROUP BY date
+		ORDER BY date ASC
+	`, athleteID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var days []CalendarDay
+	for rows.Next() {
+		var d CalendarDay
+		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance, &d.TotalTime, &d.TotalCalories, &d.TotalIntensity); err != nil {
 			return nil, err
 		}
 		days = append(days, d)

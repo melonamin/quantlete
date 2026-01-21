@@ -287,7 +287,8 @@ export function SportDistributionChart({
 }
 
 // Activity calendar heatmap
-export type CalendarMetric = 'count' | 'distance' | 'time' | 'calories'
+export type CalendarMetric = 'count' | 'distance' | 'time' | 'calories' | 'intensity'
+export type CalendarRange = 'year' | 'rolling365'
 
 interface CalendarData {
   date: string
@@ -295,11 +296,14 @@ interface CalendarData {
   distance?: number
   time?: number // seconds
   calories?: number
+  intensity?: number // suffer_score / relative effort
 }
 
 interface ActivityCalendarChartProps {
   data: CalendarData[]
-  year: number
+  year?: number // Used when rangeType is 'year'
+  rangeType?: CalendarRange
+  dateRange?: [string, string] // [startDate, endDate] for rolling365
   metric?: CalendarMetric
   height?: number | string
   loading?: boolean
@@ -309,6 +313,8 @@ interface ActivityCalendarChartProps {
 export function ActivityCalendarChart({
   data,
   year,
+  rangeType = 'year',
+  dateRange,
   metric = 'count',
   height = 180,
   loading = false,
@@ -325,6 +331,8 @@ export function ActivityCalendarChart({
         return (d.time ?? 0) / 60 // Convert to minutes
       case 'calories':
         return d.calories ?? 0
+      case 'intensity':
+        return d.intensity ?? 0
     }
   }
 
@@ -342,12 +350,18 @@ export function ActivityCalendarChart({
       }
       case 'calories':
         return `${date}<br/>${Math.round(value)} kcal`
+      case 'intensity':
+        return `${date}<br/>Intensity: ${Math.round(value)}`
     }
   }
 
   const values = data.map((d) => getValue(d))
   const maxValue = Math.max(...values, 1)
   const palette = calendarPalettes[metric]
+
+  // Calculate the calendar range based on rangeType
+  const calendarRange =
+    rangeType === 'rolling365' && dateRange ? dateRange : year?.toString() ?? new Date().getFullYear().toString()
 
   const option: EChartsOption = {
     tooltip: {
@@ -370,7 +384,7 @@ export function ActivityCalendarChart({
       left: 30,
       right: 30,
       cellSize: ['auto', 13],
-      range: year.toString(),
+      range: calendarRange,
       itemStyle: {
         borderWidth: 2,
         borderColor: 'transparent',

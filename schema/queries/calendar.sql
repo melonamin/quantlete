@@ -7,11 +7,27 @@ SELECT
     activity_count,
     total_distance,
     total_time,
-    total_calories
+    total_calories,
+    total_intensity
 FROM v_calendar_days
 WHERE athlete_id = ?1
     AND date >= ?2 || '-01-01'
     AND date <= ?2 || '-12-31'
+ORDER BY date ASC;
+
+-- name: GetCalendarDataRange :many
+-- Get calendar day data for a date range (for rolling 365 view).
+SELECT
+    date,
+    activity_count,
+    total_distance,
+    total_time,
+    total_calories,
+    total_intensity
+FROM v_calendar_days
+WHERE athlete_id = ?1
+    AND date >= ?2
+    AND date <= ?3
 ORDER BY date ASC;
 
 -- name: GetCalendarActivities :many

@@ -391,6 +391,22 @@ export class GoWasmProvider implements DataProvider {
       total_distance: d.total_distance,
       total_time: d.total_time,
       total_calories: d.total_calories,
+      total_intensity: d.total_intensity,
+    }))
+  }
+
+  async getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getCalendarDataRange(startDate, endDate)
+    return result.map((d) => ({
+      date: d.date,
+      activity_count: d.activity_count,
+      total_distance: d.total_distance,
+      total_time: d.total_time,
+      total_calories: d.total_calories,
+      total_intensity: d.total_intensity,
     }))
   }
 

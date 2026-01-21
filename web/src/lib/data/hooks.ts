@@ -256,6 +256,19 @@ export function useCalendarData(year: number) {
   })
 }
 
+export function useCalendarDataRange(startDate: string, endDate: string) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'calendar', 'range', startDate, endDate],
+    queryFn: async (): Promise<CalendarDay[]> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getCalendarDataRange(startDate, endDate)
+    },
+    enabled: initialized && !error && !!provider && !!startDate && !!endDate,
+  })
+}
+
 export function useCalendarActivities(year: number, month: number) {
   const { provider, initialized, error } = useDataProviderStatus()
 

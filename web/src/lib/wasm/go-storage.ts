@@ -505,6 +505,15 @@ export function getCalendarData(year: number): CalendarDay[] {
   )
 }
 
+export function getCalendarDataRange(startDate: string, endDate: string): CalendarDay[] {
+  return (
+    callGoStorage<CalendarDay[] | undefined>(
+      () => goStorage.getCalendarDataRange(JSON.stringify({ start_date: startDate, end_date: endDate })),
+      'getCalendarDataRange'
+    ) || []
+  )
+}
+
 // CalendarActivityResult extends CalendarActivity with the same fields
 export type CalendarActivityResult = CalendarActivity
 

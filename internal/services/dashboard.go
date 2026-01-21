@@ -128,11 +128,12 @@ type GetCalendarDataInput struct {
 
 // CalendarDayOutput represents activity data for a single day.
 type CalendarDayOutput struct {
-	Date          string  `json:"date"`
-	ActivityCount int     `json:"activity_count"`
-	TotalDistance float64 `json:"total_distance"`
-	TotalTime     int     `json:"total_time"`
-	TotalCalories float64 `json:"total_calories"`
+	Date           string  `json:"date"`
+	ActivityCount  int     `json:"activity_count"`
+	TotalDistance  float64 `json:"total_distance"`
+	TotalTime      int     `json:"total_time"`
+	TotalCalories  float64 `json:"total_calories"`
+	TotalIntensity int     `json:"total_intensity"`
 }
 
 // GetCalendarActivitiesInput contains parameters for getting calendar activities.
@@ -422,11 +423,54 @@ func (s *DashboardService) GetCalendarData(ctx context.Context, in GetCalendarDa
 	out := make([]CalendarDayOutput, len(data))
 	for i, d := range data {
 		out[i] = CalendarDayOutput{
-			Date:          d.Date,
-			ActivityCount: d.ActivityCount,
-			TotalDistance: d.TotalDistance,
-			TotalTime:     d.TotalTime,
-			TotalCalories: d.TotalCalories,
+			Date:           d.Date,
+			ActivityCount:  d.ActivityCount,
+			TotalDistance:  d.TotalDistance,
+			TotalTime:      d.TotalTime,
+			TotalCalories:  d.TotalCalories,
+			TotalIntensity: d.TotalIntensity,
+		}
+	}
+
+	return out, nil
+}
+
+// GetCalendarDataRangeInput contains parameters for getting calendar data by date range.
+type GetCalendarDataRangeInput struct {
+	AthleteID int64  `json:"-" adapter:"context"`
+	StartDate string `json:"start_date" adapter:"query"`
+	EndDate   string `json:"end_date" adapter:"query"`
+}
+
+// GetCalendarDataRange returns daily activity counts for a date range.
+//
+//adapter:wasm getCalendarDataRange category=Calendar
+//adapter:http GET /api/v1/dashboard/calendar/range
+func (s *DashboardService) GetCalendarDataRange(ctx context.Context, in GetCalendarDataRangeInput) ([]CalendarDayOutput, error) {
+	startDate := in.StartDate
+	endDate := in.EndDate
+
+	// Default to rolling 365 days if not specified
+	if startDate == "" || endDate == "" {
+		now := time.Now()
+		endDate = now.Format("2006-01-02")
+		startDate = now.AddDate(0, 0, -365).Format("2006-01-02")
+	}
+
+	data, err := s.stats.GetCalendarDataRange(ctx, in.AthleteID, startDate, endDate)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get calendar data range: %v", err)
+	}
+
+	out := make([]CalendarDayOutput, len(data))
+	for i, d := range data {
+		out[i] = CalendarDayOutput{
+			Date:           d.Date,
+			ActivityCount:  d.ActivityCount,
+			TotalDistance:  d.TotalDistance,
+			TotalTime:      d.TotalTime,
+			TotalCalories:  d.TotalCalories,
+			TotalIntensity: d.TotalIntensity,
 		}
 	}
 

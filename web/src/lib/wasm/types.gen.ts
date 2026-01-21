@@ -337,6 +337,7 @@ export interface CalendarDayOutput {
   total_distance: number
   total_time: number
   total_calories: number
+  total_intensity: number
 }
 
 /** CalendarMonthSummaryOutput represents a monthly summary for the calendar. */
@@ -414,6 +415,12 @@ export interface GetCalendarActivitiesInput {
 /** GetCalendarDataInput contains parameters for getting calendar data. */
 export interface GetCalendarDataInput {
   year: number
+}
+
+/** GetCalendarDataRangeInput contains parameters for getting calendar data by date range. */
+export interface GetCalendarDataRangeInput {
+  start_date: string
+  end_date: string
 }
 
 /** GetDistributionInput contains parameters for distribution queries. */
@@ -1352,6 +1359,16 @@ export interface GetCalendarActivitiesRow {
   total_elevation_gain: number
 }
 
+/** GetCalendarDataRangeRow represents a row returned by GetCalendarDataRange. */
+export interface GetCalendarDataRangeRow {
+  date: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_calories: number
+  total_intensity: number
+}
+
 /** GetCalendarDataRow represents a row returned by GetCalendarData. */
 export interface GetCalendarDataRow {
   date: string
@@ -1359,6 +1376,7 @@ export interface GetCalendarDataRow {
   total_distance: number
   total_time: number
   total_calories: number
+  total_intensity: number
 }
 
 /** GetCalendarSummaryRow represents a row returned by GetCalendarSummary. */
@@ -2262,6 +2280,7 @@ export interface CalendarDay {
   total_distance: number
   total_time: number
   total_calories: number
+  total_intensity: number
 }
 
 export interface CalendarMonthSummary {

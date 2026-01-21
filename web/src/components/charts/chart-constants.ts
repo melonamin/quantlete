@@ -52,6 +52,15 @@ export const calendarPalettes = {
     'rgba(251, 146, 60, 0.8)',
     '#fb923c',
   ],
+  // Multi-color intensity gradient (gray -> green -> amber -> orange -> red)
+  // Represents workout intensity from rest/easy to very hard
+  intensity: [
+    'rgba(107, 114, 128, 0.3)', // gray - rest/very easy
+    '#4ade80', // green - easy/moderate
+    '#fbbf24', // amber - moderate/tempo
+    '#fb923c', // orange - hard/threshold
+    '#f87171', // red - very hard/VO2max
+  ],
 }
 
 // Zone colors for training zones (Recovery → VO2max)

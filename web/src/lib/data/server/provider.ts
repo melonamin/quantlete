@@ -182,6 +182,10 @@ export class ServerProvider implements DataProvider {
     return get<CalendarDay[]>(`/dashboard/calendar?year=${year}`)
   }
 
+  async getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]> {
+    return get<CalendarDay[]>(`/dashboard/calendar/range?start_date=${startDate}&end_date=${endDate}`)
+  }
+
   async getCalendarActivities(year: number, month: number): Promise<CalendarActivity[]> {
     return get<CalendarActivity[]>(`/dashboard/calendar/activities?year=${year}&month=${month}`)
   }
