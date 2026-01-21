@@ -30,6 +30,8 @@ import type {
   HeatmapFilters,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   // Activity streams
   ActivityStream,
@@ -139,8 +141,10 @@ export interface DataProvider {
   // Heatmap & Eddington
   // ============================================================================
   getHeatmapData(filters: HeatmapFilters): Promise<HeatmapResponse>
-  getEddingtonData(sportType?: string): Promise<EddingtonResult>
-  getEddingtonHistory(sportType?: string): Promise<EddingtonHistoryPoint[]>
+  getEddingtonData(sportType?: string, sportGroup?: string): Promise<EddingtonResult>
+  getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]>
+  getEddingtonCompare(): Promise<EddingtonCompareOutput>
+  getSportGroups(): Promise<SportGroup[]>
 
   // ============================================================================
   // Stats & Training

@@ -1219,6 +1219,7 @@ export const tssForTargetTsb = (
 
 export interface EddingtonFilters {
   sport_types?: string[]
+  sport_group?: string
 }
 
 // EddingtonHistoryPoint imported from types.gen.ts
@@ -1247,6 +1248,53 @@ export function getEddingtonData(filters?: EddingtonFilters): EddingtonDataResul
     distribution: result.distribution || [],
     next_steps: result.next_steps || [],
   } as EddingtonDataResult
+}
+
+export function getEddingtonHistory(filters?: EddingtonFilters): EddingtonHistoryPoint[] {
+  const result = callGoStorage<EddingtonHistoryPoint[] | undefined>(
+    () => goStorage.getEddingtonHistory(JSON.stringify(filters || {})),
+    'getEddingtonHistory'
+  )
+  return result || []
+}
+
+// EddingtonCompareItem represents Eddington data for a single sport group
+export interface EddingtonCompareItem {
+  sport_group: string
+  name: string
+  number: number
+}
+
+// EddingtonCompareResult contains Eddington numbers for all predefined sport groups
+export interface EddingtonCompareResult {
+  groups: EddingtonCompareItem[]
+  all_number: number
+}
+
+export function getEddingtonCompare(): EddingtonCompareResult {
+  const result = callGoStorage<EddingtonCompareResult>(
+    () => goStorage.getEddingtonCompare(),
+    'getEddingtonCompare'
+  )
+  return {
+    groups: result.groups || [],
+    all_number: result.all_number,
+  }
+}
+
+// SportGroup represents a predefined group of related sport types
+export interface SportGroup {
+  id: string
+  name: string
+  sport_types: string[]
+}
+
+export function getSportGroups(): SportGroup[] {
+  const result = callGoStorage<SportGroup[] | undefined>(
+    () => goStorage.getSportGroups(),
+    'getSportGroups'
+  )
+  return result || []
 }
 
 // ============================================================================

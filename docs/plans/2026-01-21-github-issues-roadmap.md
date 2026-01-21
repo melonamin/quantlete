@@ -130,15 +130,15 @@ The Activities page lacks ability to filter by distance or time duration. Users 
 
 The Eddington number currently calculates across all activity types combined, producing meaningless results for multi-sport athletes. Need sport-specific Eddington calculations.
 
-- [ ] Add `sport_group` parameter to Eddington API endpoint
-- [ ] Create `/api/v1/eddington/compare` endpoint returning all sport groups at once
-- [ ] Define sport groupings (Running: Run/VirtualRun/TrailRun, Cycling: Ride/VirtualRide/etc.)
-- [ ] Run `just generate` after API changes
-- [ ] Update `useEddington` hook to accept sport group parameter
-- [ ] Update Eddington page to show sport selector prominently
-- [ ] Update Eddington dashboard widget to show multiple sports
-- [ ] Add sport comparison table showing Eddington per sport group
-- [ ] Update Eddington definitions editor to support sport filtering
+- [x] Add `sport_group` parameter to Eddington API endpoint
+- [x] Create `/api/v1/eddington/compare` endpoint returning all sport groups at once
+- [x] Define sport groupings (Running: Run/VirtualRun/TrailRun, Cycling: Ride/VirtualRide/etc.)
+- [x] Run `just generate` after API changes
+- [x] Update `useEddington` hook to accept sport group parameter
+- [x] Update Eddington page to show sport selector prominently
+- [x] Update Eddington dashboard widget to show multiple sports
+- [x] Add sport comparison table showing Eddington per sport group
+- [x] Update Eddington definitions editor to support sport filtering
 
 ### Task 11: Improve Rewind/Wrapped view (#18)
 

@@ -29,6 +29,8 @@ import type {
   HeatmapFilters,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   // Activity streams
   ActivityStream,
@@ -226,14 +228,28 @@ export class ServerProvider implements DataProvider {
     return get<HeatmapResponse>(`/stats/heatmap${qs ? `?${qs}` : ''}`)
   }
 
-  async getEddingtonData(sportType?: string): Promise<EddingtonResult> {
-    const params = sportType ? `?sport_type=${sportType}` : ''
-    return get<EddingtonResult>(`/stats/eddington${params}`)
+  async getEddingtonData(sportType?: string, sportGroup?: string): Promise<EddingtonResult> {
+    const params = new URLSearchParams()
+    if (sportType) params.set('sport_type', sportType)
+    if (sportGroup) params.set('sport_group', sportGroup)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return get<EddingtonResult>(`/stats/eddington${query}`)
   }
 
-  async getEddingtonHistory(sportType?: string): Promise<EddingtonHistoryPoint[]> {
-    const params = sportType ? `?sport_type=${sportType}` : ''
-    return get<EddingtonHistoryPoint[]>(`/stats/eddington/history${params}`)
+  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
+    const params = new URLSearchParams()
+    if (sportType) params.set('sport_type', sportType)
+    if (sportGroup) params.set('sport_group', sportGroup)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return get<EddingtonHistoryPoint[]>(`/stats/eddington/history${query}`)
+  }
+
+  async getEddingtonCompare(): Promise<EddingtonCompareOutput> {
+    return get<EddingtonCompareOutput>('/stats/eddington/compare')
+  }
+
+  async getSportGroups(): Promise<SportGroup[]> {
+    return get<SportGroup[]>('/stats/sport-groups')
   }
 
   // ============================================================================

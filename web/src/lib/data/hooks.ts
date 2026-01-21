@@ -37,6 +37,7 @@ import type {
   DashboardStats,
   DistributionSlice,
   DueComponent,
+  EddingtonCompareOutput,
   EddingtonHistoryPoint,
   EddingtonResult,
   ExportStats,
@@ -67,6 +68,7 @@ import type {
   SegmentEffortsResponse,
   SegmentsFilters,
   SegmentsResponse,
+  SportGroup,
   SportTypeStat,
   StartImportRequest,
   SyncWatermark,
@@ -599,29 +601,56 @@ export function useHeatmap(filters: HeatmapFilters) {
   })
 }
 
-export function useEddington(sportType?: string) {
+export function useEddington(sportType?: string, sportGroup?: string) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
-    queryKey: ['data', 'eddington', sportType],
+    queryKey: ['data', 'eddington', sportType, sportGroup],
     queryFn: async (): Promise<EddingtonResult> => {
       if (!provider) throw new Error('Provider not ready')
-      return provider.getEddingtonData(sportType)
+      return provider.getEddingtonData(sportType, sportGroup)
     },
     enabled: initialized && !error && !!provider,
   })
 }
 
-export function useEddingtonHistory(sportType?: string) {
+export function useEddingtonHistory(sportType?: string, sportGroup?: string) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
-    queryKey: ['data', 'eddington', 'history', sportType],
+    queryKey: ['data', 'eddington', 'history', sportType, sportGroup],
     queryFn: async (): Promise<EddingtonHistoryPoint[]> => {
       if (!provider) throw new Error('Provider not ready')
-      return provider.getEddingtonHistory(sportType)
+      return provider.getEddingtonHistory(sportType, sportGroup)
     },
     enabled: initialized && !error && !!provider,
+  })
+}
+
+export function useEddingtonCompare() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'eddington', 'compare'],
+    queryFn: async (): Promise<EddingtonCompareOutput> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getEddingtonCompare()
+    },
+    enabled: initialized && !error && !!provider,
+  })
+}
+
+export function useSportGroups() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'sportGroups'],
+    queryFn: async (): Promise<SportGroup[]> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getSportGroups()
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: Infinity, // Sport groups don't change
   })
 }
 

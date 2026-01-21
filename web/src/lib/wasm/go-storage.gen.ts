@@ -137,6 +137,8 @@ export interface GoStorageInterface {
   getBestEffortPRs(arg0?: string): string
   /** genGetBestEffortsForType wraps StatsService.GetBestEffortsForType */
   getBestEffortsForType(arg0?: string): string
+  /** genGetEddingtonCompare wraps StatsService.GetEddingtonCompare */
+  getEddingtonCompare(): string
   /** genGetEddingtonData wraps StatsService.GetEddingtonData */
   getEddingtonData(arg0?: string): string
   /** genGetEddingtonHistory wraps StatsService.GetEddingtonHistory */
@@ -149,6 +151,8 @@ export interface GoStorageInterface {
   getMonthlyComparison(arg0?: string): string
   /** genGetPowerStats wraps StatsService.GetPowerStats */
   getPowerStats(arg0?: string): string
+  /** genGetSportGroups wraps StatsService.GetSportGroups */
+  getSportGroups(): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */
   getTrainingLoad(arg0?: string): string
   /** genGetWeeklyTrends wraps StatsService.GetWeeklyTrends */

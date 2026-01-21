@@ -2438,6 +2438,19 @@ export interface DistributionSlice {
   count: number
 }
 
+/** EddingtonCompareItem represents Eddington data for a single sport group. */
+export interface EddingtonCompareItem {
+  sport_group: string
+  name: string
+  number: number
+}
+
+/** EddingtonCompareOutput contains Eddington numbers for all predefined sport groups. */
+export interface EddingtonCompareOutput {
+  groups: EddingtonCompareItem[]
+  all_number: number
+}
+
 /** EddingtonDay represents a day's distance for Eddington calculation. */
 export interface EddingtonDay {
   date: string
@@ -2484,11 +2497,13 @@ export interface GetBestEffortsForTypeInput {
 /** GetEddingtonDataInput contains parameters for getting Eddington data. */
 export interface GetEddingtonDataInput {
   sport_types: string[]
+  sport_group: string
 }
 
 /** GetEddingtonHistoryInput contains parameters for getting Eddington history. */
 export interface GetEddingtonHistoryInput {
   sport_types: string[]
+  sport_group: string
 }
 
 /** GetHeatmapDataInput contains parameters for getting heatmap data. */
@@ -2665,6 +2680,13 @@ export interface SaveBestEffortsInputItem {
 /** SaveBestEffortsOutput contains the result of saving best efforts. */
 export interface SaveBestEffortsOutput {
   message: string
+}
+
+/** SportGroup represents a predefined group of related sport types. */
+export interface SportGroup {
+  id: string
+  name: string
+  sport_types: string[]
 }
 
 /** SportTypeStat represents statistics for a single sport type. */

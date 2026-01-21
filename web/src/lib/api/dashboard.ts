@@ -16,6 +16,9 @@ export type {
   EddingtonStep,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareItem,
+  EddingtonCompareOutput,
+  SportGroup,
 } from '@/lib/wasm/types.gen'
 
 // HeatmapResponse - composite response type (not generated from Go)
@@ -85,6 +88,8 @@ export {
   useHeatmap,
   useEddington,
   useEddingtonHistory,
+  useEddingtonCompare,
+  useSportGroups,
   useDashboardConfig,
   useUpdateDashboardConfig,
 } from '@/lib/data'

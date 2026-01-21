@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { useSportGroups } from '@/lib/api'
 import type { AppSettings } from '@/lib/api/settings'
 
 const DEFAULT_EDDINGTON_DEFS = [
@@ -57,6 +58,8 @@ export function EddingtonDefinitionsEditor({
       ? current.eddington_definitions
       : DEFAULT_EDDINGTON_DEFS
 
+  const { data: sportGroups } = useSportGroups()
+
   const [name, setName] = useState('')
   const [sportTypes, setSportTypes] = useState('')
   const [showInNav, setShowInNav] = useState(true)
@@ -64,7 +67,7 @@ export function EddingtonDefinitionsEditor({
 
   const add = () => {
     if (!name.trim()) return
-    const id = `e_${Math.random().toString(16).slice(2, 10)}`
+    const id = `e_${crypto.randomUUID().slice(0, 8)}`
     const types = sportTypes
       .split(',')
       .map((s) => s.trim())
@@ -84,6 +87,25 @@ export function EddingtonDefinitionsEditor({
     onSave(next)
     setName('')
     setSportTypes('')
+  }
+
+  const addFromSportGroup = (groupId: string) => {
+    const group = sportGroups?.find((g) => g.id === groupId)
+    if (!group) return
+    const id = `e_${crypto.randomUUID().slice(0, 8)}`
+    const next = structuredClone(current)
+    next.eddington_definitions = [
+      ...(defs ?? []),
+      {
+        id,
+        name: group.name,
+        sport_types: group.sport_types,
+        show_in_nav: true,
+        show_in_dashboard_widget: true,
+      },
+    ]
+    next.version = Math.max(next.version ?? 3, 3)
+    onSave(next)
   }
 
   const update = (
@@ -109,6 +131,16 @@ export function EddingtonDefinitionsEditor({
     onSave(next)
   }
 
+  // Helper to apply sport group to sport types input
+  const applySportGroupToInput = (groupId: string) => {
+    const group = sportGroups?.find((g) => g.id === groupId)
+    if (!group) return
+    setSportTypes(group.sport_types.join(','))
+    if (!name.trim()) {
+      setName(group.name)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -120,6 +152,25 @@ export function EddingtonDefinitionsEditor({
         all activities.
       </p>
 
+      {/* Quick add from predefined sport groups */}
+      {sportGroups && sportGroups.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">Quick add from sport groups</Label>
+          <div className="flex flex-wrap gap-2">
+            {sportGroups.map((group) => (
+              <Button
+                key={group.id}
+                variant="outline"
+                size="sm"
+                onClick={() => addFromSportGroup(group.id)}
+              >
+                + {group.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1">
           <Label className="text-sm text-muted-foreground">Name</Label>
@@ -130,7 +181,25 @@ export function EddingtonDefinitionsEditor({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-sm text-muted-foreground">Sport types (optional)</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-sm text-muted-foreground">Sport types (optional)</Label>
+            {sportGroups && sportGroups.length > 0 && (
+              <div className="flex gap-1">
+                {sportGroups.slice(0, 3).map((group) => (
+                  <Button
+                    key={group.id}
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => applySportGroupToInput(group.id)}
+                    title={`Use ${group.name} sport types`}
+                  >
+                    {group.name}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
           <Input
             value={sportTypes}
             onChange={(e) => setSportTypes(e.target.value)}

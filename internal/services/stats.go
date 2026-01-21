@@ -133,6 +133,7 @@ type BestEffortListItem struct {
 type GetEddingtonDataInput struct {
 	AthleteID  int64    `json:"-" adapter:"context"`
 	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	SportGroup string   `json:"sport_group" adapter:"query"` // Predefined sport group ID (e.g., "cycling", "running")
 }
 
 // EddingtonDay represents a day's distance for Eddington calculation.
@@ -158,6 +159,7 @@ type EddingtonOutput struct {
 type GetEddingtonHistoryInput struct {
 	AthleteID  int64    `json:"-" adapter:"context"`
 	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	SportGroup string   `json:"sport_group" adapter:"query"` // Predefined sport group ID (e.g., "cycling", "running")
 }
 
 // EddingtonHistoryPoint represents a milestone point where the Eddington number increases.
@@ -542,7 +544,16 @@ func (s *StatsService) GetBestEffortsForType(ctx context.Context, in GetBestEffo
 //adapter:wasm getEddingtonData category=Stats
 //adapter:http GET /api/v1/stats/eddington
 func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonDataInput) (*EddingtonOutput, error) {
-	result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, in.SportTypes)
+	// Resolve sport types from sport_group if provided and sport_types is empty
+	sportTypes := in.SportTypes
+	if len(sportTypes) == 0 && in.SportGroup != "" {
+		group := shared.SportGroupByID(in.SportGroup)
+		if group != nil {
+			sportTypes = group.SportTypes
+		}
+	}
+
+	result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, sportTypes)
 	if err != nil {
 		return nil, Wrapf(ErrInternal, "failed to get eddington data: %v", err)
 	}
@@ -575,7 +586,16 @@ func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonData
 //adapter:wasm getEddingtonHistory category=Stats
 //adapter:http GET /api/v1/stats/eddington/history
 func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonHistoryInput) ([]EddingtonHistoryPoint, error) {
-	points, err := s.stats.GetEddingtonHistory(ctx, in.AthleteID, in.SportTypes)
+	// Resolve sport types from sport_group if provided and sport_types is empty
+	sportTypes := in.SportTypes
+	if len(sportTypes) == 0 && in.SportGroup != "" {
+		group := shared.SportGroupByID(in.SportGroup)
+		if group != nil {
+			sportTypes = group.SportTypes
+		}
+	}
+
+	points, err := s.stats.GetEddingtonHistory(ctx, in.AthleteID, sportTypes)
 	if err != nil {
 		return nil, Wrapf(ErrInternal, "failed to get eddington history: %v", err)
 	}
@@ -589,6 +609,91 @@ func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonH
 		result[i] = EddingtonHistoryPoint{
 			Date:   p.Date,
 			Number: p.Number,
+		}
+	}
+	return result, nil
+}
+
+// --- Eddington Compare ---
+
+// GetEddingtonCompareInput contains parameters for comparing Eddington across sport groups.
+type GetEddingtonCompareInput struct {
+	AthleteID int64 `json:"-" adapter:"context"`
+}
+
+// EddingtonCompareItem represents Eddington data for a single sport group.
+type EddingtonCompareItem struct {
+	SportGroup string `json:"sport_group"` // e.g., "cycling", "running"
+	Name       string `json:"name"`        // e.g., "Cycling", "Running"
+	Number     int    `json:"number"`      // The Eddington number
+}
+
+// EddingtonCompareOutput contains Eddington numbers for all predefined sport groups.
+type EddingtonCompareOutput struct {
+	Groups    []EddingtonCompareItem `json:"groups"`
+	AllNumber int                    `json:"all_number"` // Eddington for all activities
+}
+
+// GetEddingtonCompare returns Eddington numbers for all predefined sport groups at once.
+//
+//adapter:wasm getEddingtonCompare category=Stats
+//adapter:http GET /api/v1/stats/eddington/compare
+func (s *StatsService) GetEddingtonCompare(ctx context.Context, in GetEddingtonCompareInput) (*EddingtonCompareOutput, error) {
+	// Get Eddington for all activities
+	allResult, err := s.stats.GetEddingtonData(ctx, in.AthleteID, nil)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get eddington for all activities: %v", err)
+	}
+
+	// Get Eddington for each sport group
+	groups := shared.PredefinedSportGroups()
+	items := make([]EddingtonCompareItem, 0, len(groups))
+
+	for _, group := range groups {
+		result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, group.SportTypes)
+		if err != nil {
+			return nil, Wrapf(ErrInternal, "failed to get eddington for %s: %v", group.ID, err)
+		}
+		// Only include groups that have at least some activity
+		if result.Number > 0 {
+			items = append(items, EddingtonCompareItem{
+				SportGroup: group.ID,
+				Name:       group.Name,
+				Number:     result.Number,
+			})
+		}
+	}
+
+	return &EddingtonCompareOutput{
+		Groups:    items,
+		AllNumber: allResult.Number,
+	}, nil
+}
+
+// GetSportGroupsInput is an empty input for GetSportGroups.
+type GetSportGroupsInput struct {
+	AthleteID int64 `json:"-" adapter:"context"`
+}
+
+// SportGroup represents a predefined group of related sport types.
+type SportGroup struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	SportTypes []string `json:"sport_types"`
+}
+
+// GetSportGroups returns the list of predefined sport groups.
+//
+//adapter:wasm getSportGroups category=Stats
+//adapter:http GET /api/v1/stats/sport-groups
+func (s *StatsService) GetSportGroups(ctx context.Context, in GetSportGroupsInput) ([]SportGroup, error) {
+	groups := shared.PredefinedSportGroups()
+	result := make([]SportGroup, len(groups))
+	for i, g := range groups {
+		result[i] = SportGroup{
+			ID:         g.ID,
+			Name:       g.Name,
+			SportTypes: g.SportTypes,
 		}
 	}
 	return result, nil

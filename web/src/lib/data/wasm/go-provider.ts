@@ -26,6 +26,8 @@ import type {
   HeatmapFilters,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   WidgetWidth,
   WidgetHeight,
@@ -526,11 +528,14 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getEddingtonData(sportType?: string): Promise<EddingtonResult> {
+  async getEddingtonData(sportType?: string, sportGroup?: string): Promise<EddingtonResult> {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getEddingtonData({ sport_types: sportType ? [sportType] : undefined })
+    const result = goStorage.getEddingtonData({
+      sport_types: sportType ? sportType.split(',') : undefined,
+      sport_group: sportGroup,
+    })
     return {
       number: result.number,
       distribution: result.distribution.map((d) => ({
@@ -544,14 +549,44 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getEddingtonHistory(sportType?: string): Promise<EddingtonHistoryPoint[]> {
+  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getEddingtonData({ sport_types: sportType ? [sportType] : undefined })
-    return result.history.map((h) => ({
+    const result = goStorage.getEddingtonHistory({
+      sport_types: sportType ? sportType.split(',') : undefined,
+      sport_group: sportGroup,
+    })
+    return result.map((h) => ({
       date: h.date,
       number: h.number,
+    }))
+  }
+
+  async getEddingtonCompare(): Promise<EddingtonCompareOutput> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getEddingtonCompare()
+    return {
+      groups: result.groups.map((g) => ({
+        sport_group: g.sport_group,
+        name: g.name,
+        number: g.number,
+      })),
+      all_number: result.all_number,
+    }
+  }
+
+  async getSportGroups(): Promise<SportGroup[]> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getSportGroups()
+    return result.map((g) => ({
+      id: g.id,
+      name: g.name,
+      sport_types: g.sport_types,
     }))
   }
 
