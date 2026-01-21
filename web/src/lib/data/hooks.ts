@@ -73,6 +73,7 @@ import type {
   TrainingLoadResponse,
   UpdateCredentialsRequest,
   WeeklyStat,
+  WeeklyTrendsResponse,
   WeightHistoryResponse,
   YearlyStat,
   ZoneTrendResponse,
@@ -362,6 +363,24 @@ export function useZoneTrend(weeks = 52) {
     },
     enabled: initialized && !error && !!provider,
     staleTime: 1000 * 60 * 5, // 5 minutes - zone data is expensive to compute
+  })
+}
+
+/**
+ * Hook to fetch weekly trends data for trend analysis widgets.
+ * Returns rolling N weeks of activity statistics with optional sport type filter.
+ */
+export function useWeeklyTrends(filters?: { weeks?: number; sport_type?: string }) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'stats', 'weeklyTrends', filters?.weeks ?? 12, filters?.sport_type ?? ''],
+    queryFn: async (): Promise<WeeklyTrendsResponse> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getWeeklyTrends(filters)
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
 

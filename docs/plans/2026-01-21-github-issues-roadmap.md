@@ -72,15 +72,15 @@ The Activity Calendar widget needs intensity-based coloring, rolling 365-day vie
 
 Add a new dashboard widget showing rolling 12-week trends with sport type filter and metric toggle. The current Monthly Activity widget only shows one bar, which is insufficient for trend analysis.
 
-- [ ] Add SQL query `GetWeeklyTrends` in `schema/queries/stats.sql` grouping by ISO week
-- [ ] Add `WeeklyTrends` method to stats service in `internal/services/stats.go`
-- [ ] Add API endpoint and handler for weekly trends
-- [ ] Run `just generate` to create adapters
-- [ ] Create `WeeklyTrendsChart` component (line + area chart)
-- [ ] Create `WeeklyTrends` widget with sport type filter UI
-- [ ] Add metric toggle (distance/time/elevation)
-- [ ] Register widget in dashboard config with default size 2x2
-- [ ] Add React Query hook `useWeeklyTrends`
+- [x] Add SQL query `GetWeeklyTrends` in `schema/queries/stats.sql` grouping by ISO week
+- [x] Add `WeeklyTrends` method to stats service in `internal/services/stats.go`
+- [x] Add API endpoint and handler for weekly trends
+- [x] Run `just generate` to create adapters
+- [x] Create `WeeklyTrendsChart` component (line + area chart)
+- [x] Create `WeeklyTrends` widget with sport type filter UI
+- [x] Add metric toggle (distance/time/elevation)
+- [x] Register widget in dashboard config with default size 2x2
+- [x] Add React Query hook `useWeeklyTrends`
 
 ### Task 7: Add Monthly cross-year comparison (#12)
 

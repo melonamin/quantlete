@@ -63,6 +63,11 @@ export interface ZoneTrendResponse {
   weeks: import('@/lib/wasm/types.gen').WeeklyZoneDistribution[]
 }
 
+// WeeklyTrendsResponse - rolling weekly trends data
+export interface WeeklyTrendsResponse {
+  weeks: import('@/lib/wasm/types.gen').WeeklyTrendPoint[]
+}
+
 // ============================================================================
 // Frontend-only types - defined here for specific TS requirements
 // Safe to modify as needed

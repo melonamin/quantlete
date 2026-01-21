@@ -952,3 +952,70 @@ func (s *StatsService) SaveBestEfforts(ctx context.Context, in SaveBestEffortsIn
 		Message: fmt.Sprintf("Best efforts for activity %d saved (%d efforts)", in.ActivityID, len(efforts)),
 	}, nil
 }
+
+// --- Weekly Trends ---
+
+// GetWeeklyTrendsInput contains parameters for getting weekly trends data.
+type GetWeeklyTrendsInput struct {
+	AthleteID int64  `json:"-" adapter:"context"`
+	Weeks     int    `json:"weeks" adapter:"query"`      // Number of weeks to include (default: 12, max: 52)
+	SportType string `json:"sport_type" adapter:"query"` // Optional sport type filter
+}
+
+// WeeklyTrendPoint represents a single week's aggregated data.
+type WeeklyTrendPoint struct {
+	Week           string  `json:"week"`            // ISO week format "YYYY-WNN"
+	WeekStart      string  `json:"week_start"`      // Date of week start "YYYY-MM-DD"
+	ActivityCount  int     `json:"activity_count"`  // Number of activities
+	TotalDistance  float64 `json:"total_distance"`  // Total distance in meters
+	TotalTime      int     `json:"total_time"`      // Total time in seconds
+	TotalElevation float64 `json:"total_elevation"` // Total elevation gain in meters
+}
+
+// GetWeeklyTrendsOutput contains the weekly trends data.
+type GetWeeklyTrendsOutput struct {
+	Weeks []WeeklyTrendPoint `json:"weeks"`
+}
+
+const (
+	defaultWeeklyTrendsWeeks = 12
+	maxWeeklyTrendsWeeks     = 52
+)
+
+// GetWeeklyTrends returns weekly aggregated stats for trend analysis.
+//
+//adapter:wasm getWeeklyTrends category=Stats
+//adapter:http GET /api/v1/stats/weekly-trends
+func (s *StatsService) GetWeeklyTrends(ctx context.Context, in GetWeeklyTrendsInput) (*GetWeeklyTrendsOutput, error) {
+	// Validate and normalize weeks parameter
+	weeks := in.Weeks
+	if weeks <= 0 {
+		weeks = defaultWeeklyTrendsWeeks
+	} else if weeks > maxWeeklyTrendsWeeks {
+		weeks = maxWeeklyTrendsWeeks
+	}
+
+	// Convert weeks to days for the SQL query
+	days := weeks * 7
+
+	rows, err := s.stats.GetWeeklyTrends(ctx, in.AthleteID, days, in.SportType)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get weekly trends: %v", err)
+	}
+
+	result := make([]WeeklyTrendPoint, len(rows))
+	for i, r := range rows {
+		result[i] = WeeklyTrendPoint{
+			Week:           r.Week,
+			WeekStart:      r.WeekStart,
+			ActivityCount:  r.ActivityCount,
+			TotalDistance:  r.TotalDistance,
+			TotalTime:      r.TotalTime,
+			TotalElevation: r.TotalElevation,
+		}
+	}
+
+	return &GetWeeklyTrendsOutput{
+		Weeks: result,
+	}, nil
+}

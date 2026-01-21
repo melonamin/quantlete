@@ -38,6 +38,7 @@ import {
   ActivityInsights,
   KudosLeaders,
   SmartCoach,
+  WeeklyTrends,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -285,7 +286,15 @@ export function DashboardPage() {
             defaultWidth: 4,
             render: () => <TrainingGoals />,
           },
-          // Row 4: Full-width calendar
+          // Row 4: Weekly trends (rolling 12-week view)
+          {
+            id: 'weekly_trends',
+            title: 'Weekly Trends',
+            defaultWidth: 8,
+            defaultHeight: 2,
+            render: () => <WeeklyTrends />,
+          },
+          // Row 5: Full-width calendar
           {
             id: 'activity_calendar',
             title: 'Activity Calendar',

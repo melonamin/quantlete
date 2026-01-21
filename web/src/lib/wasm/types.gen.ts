@@ -1956,6 +1956,16 @@ export interface GetWeeklyStatsRow {
   total_elevation: number
 }
 
+/** GetWeeklyTrendsRow represents a row returned by GetWeeklyTrends. */
+export interface GetWeeklyTrendsRow {
+  week: string
+  week_start: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
 /** GetWeeklyZoneDistributionRow represents a row returned by GetWeeklyZoneDistribution. */
 export interface GetWeeklyZoneDistributionRow {
   week: string
@@ -2419,6 +2429,17 @@ export interface GetTrainingLoadInput {
   before?: string | null
 }
 
+/** GetWeeklyTrendsInput contains parameters for getting weekly trends data. */
+export interface GetWeeklyTrendsInput {
+  weeks: number
+  sport_type: string
+}
+
+/** GetWeeklyTrendsOutput contains the weekly trends data. */
+export interface GetWeeklyTrendsOutput {
+  weeks: WeeklyTrendPoint[]
+}
+
 /** GetWrappedInput contains parameters for getting wrapped data. */
 export interface GetWrappedInput {
   year: number
@@ -2572,6 +2593,16 @@ export interface TrainingLoadOutput {
 /** WeeklyStat represents statistics for a single sport type in the current week. */
 export interface WeeklyStat {
   sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** WeeklyTrendPoint represents a single week's aggregated data. */
+export interface WeeklyTrendPoint {
+  week: string
+  week_start: string
   activity_count: number
   total_distance: number
   total_time: number

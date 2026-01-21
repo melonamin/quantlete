@@ -1555,6 +1555,36 @@ export function getZoneTrend(filters?: ZoneTrendFilters): ZoneTrendResult {
 }
 
 // ============================================================================
+// Weekly Trends
+// ============================================================================
+
+export interface WeeklyTrendsFilters {
+  weeks?: number
+  sport_type?: string
+}
+
+export interface WeeklyTrendPoint {
+  week: string
+  week_start: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface WeeklyTrendsResult {
+  weeks: WeeklyTrendPoint[]
+}
+
+export function getWeeklyTrends(filters?: WeeklyTrendsFilters): WeeklyTrendsResult {
+  const result = callGoStorage<WeeklyTrendsResult>(
+    () => goStorage.getWeeklyTrends(JSON.stringify(filters || {})),
+    'getWeeklyTrends'
+  )
+  return { weeks: result.weeks || [] }
+}
+
+// ============================================================================
 // Insights
 // ============================================================================
 

@@ -64,12 +64,16 @@ type RecentActivity struct {
 
 // StatsRepository handles statistics queries.
 type StatsRepository struct {
-	db *DB
+	db      *DB
+	queries *Queries
 }
 
 // NewStatsRepository creates a new stats repository.
 func NewStatsRepository(db *DB) *StatsRepository {
-	return &StatsRepository{db: db}
+	return &StatsRepository{
+		db:      db,
+		queries: NewQueries(db),
+	}
 }
 
 // GetDashboardStats returns aggregated statistics for the dashboard.
@@ -830,4 +834,9 @@ func (r *StatsRepository) GetEddingtonData(ctx context.Context, athleteID int64,
 		Distribution: days,
 		NextSteps:    nextSteps,
 	}, nil
+}
+
+// GetWeeklyTrends returns weekly aggregated stats for trend analysis.
+func (r *StatsRepository) GetWeeklyTrends(ctx context.Context, athleteID int64, days int, sportType string) ([]GetWeeklyTrendsRow, error) {
+	return r.queries.GetWeeklyTrends(ctx, athleteID, strconv.Itoa(days), sportType)
 }

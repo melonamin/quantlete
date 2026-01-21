@@ -147,6 +147,8 @@ export interface GoStorageInterface {
   getPowerStats(arg0?: string): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */
   getTrainingLoad(arg0?: string): string
+  /** genGetWeeklyTrends wraps StatsService.GetWeeklyTrends */
+  getWeeklyTrends(arg0?: string): string
   /** genGetWrapped wraps StatsService.GetWrapped */
   getWrapped(arg0?: string): string
   /** genGetWrappedYears wraps StatsService.GetWrappedYears */
