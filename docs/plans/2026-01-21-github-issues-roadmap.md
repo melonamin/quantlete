@@ -46,14 +46,14 @@ When the Sport Distribution donut chart has 10+ sport types, legend labels overl
 
 Multiple charts have poor color differentiation. This task establishes a consistent color system that will be used by all subsequent chart work. Defines semantic colors for sports, weekdays, and time-of-day distributions.
 
-- [ ] Create comprehensive `sportColors` map in `web/src/components/charts/chart-constants.ts` (20+ sport types)
-- [ ] Create `weekdayColors` array with weekend/weekday distinction
-- [ ] Create `daytimeColors` map (Night/Morning/Afternoon/Evening)
-- [ ] Update `DonutChart` to accept `colorMap` prop for semantic coloring
-- [ ] Update Sport Distribution widget to use `sportColors`
-- [ ] Update Weekday widget to use `weekdayColors`
-- [ ] Update Time of Day widget to use `daytimeColors`
-- [ ] Add slice grouping for charts with >8 categories (group small values into "Other")
+- [x] Create comprehensive `sportColors` map in `web/src/components/charts/chart-constants.ts` (20+ sport types)
+- [x] Create `weekdayColors` array with weekend/weekday distinction
+- [x] Create `daytimeColors` map (Night/Morning/Afternoon/Evening)
+- [x] Update `DonutChart` to accept `colorMap` prop for semantic coloring
+- [x] Update Sport Distribution widget to use `sportColors`
+- [x] Update Weekday widget to use `weekdayColors`
+- [x] Update Time of Day widget to use `daytimeColors`
+- [x] Add slice grouping for charts with >8 categories (group small values into "Other")
 
 ### Task 5: Enhance Activity Calendar (#10)
 

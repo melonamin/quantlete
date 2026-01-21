@@ -1,12 +1,27 @@
 import { useRef, useEffect, useState } from 'react'
 import type { EChartsOption } from 'echarts'
 import { EChartsWrapper } from './echarts-wrapper'
-import { defaultTooltipConfig, chartColors, maxInlineLegendItems } from './chart-constants'
+import {
+  defaultTooltipConfig,
+  chartColors,
+  maxInlineLegendItems,
+  getColorFromMap,
+} from './chart-constants'
 
 export interface DonutSlice {
   name: string
   value: number
   color?: string
+}
+
+export interface DonutChartProps {
+  data: DonutSlice[]
+  height?: number | string
+  loading?: boolean
+  showLegend?: boolean
+  className?: string
+  /** Optional color map for semantic coloring based on slice name */
+  colorMap?: Record<string, string>
 }
 
 export function DonutChart({
@@ -15,13 +30,8 @@ export function DonutChart({
   loading = false,
   showLegend = true,
   className,
-}: {
-  data: DonutSlice[]
-  height?: number | string
-  loading?: boolean
-  showLegend?: boolean
-  className?: string
-}) {
+  colorMap,
+}: DonutChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 400, height: 260 })
 
@@ -136,7 +146,11 @@ export function DonutChart({
           name: d.name,
           value: d.value,
           itemStyle: {
-            color: d.color ?? Object.values(chartColors)[idx % Object.values(chartColors).length],
+            color:
+              d.color ??
+              (colorMap
+                ? getColorFromMap(d.name, colorMap, Object.values(chartColors), idx)
+                : Object.values(chartColors)[idx % Object.values(chartColors).length]),
           },
         })),
       },

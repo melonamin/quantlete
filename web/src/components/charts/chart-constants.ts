@@ -136,3 +136,188 @@ export const defaultAxisStyle = {
 // Legend configuration thresholds
 // When a chart has more than this many categories, switch from inline to scrollable legend
 export const maxInlineLegendItems = 6
+
+// When a chart has more than this many categories, group small values into "Other"
+export const maxChartCategories = 8
+
+// Comprehensive sport colors for donut/pie charts
+// Each sport type has a unique color for better differentiation
+// Related sports use similar hues with different shades
+export const sportColors: Record<string, string> = {
+  // Cycling - Green family
+  Ride: '#4ade80', // terminal green
+  VirtualRide: '#22c55e', // slightly darker green
+  MountainBikeRide: '#16a34a', // forest green
+  GravelRide: '#15803d', // dark green
+  EBikeRide: '#86efac', // light green
+  Handcycle: '#bbf7d0', // pale green
+  Velomobile: '#dcfce7', // very pale green
+
+  // Running - Orange/Amber family
+  Run: '#fb923c', // strava orange
+  VirtualRun: '#f97316', // darker orange
+  TrailRun: '#ea580c', // burnt orange
+  Walk: '#fdba74', // light orange
+  Hike: '#fed7aa', // pale orange
+
+  // Water sports - Cyan/Blue family
+  Swim: '#22d3ee', // terminal cyan
+  OpenWaterSwim: '#06b6d4', // darker cyan
+  Rowing: '#0891b2', // teal
+  Kayaking: '#0e7490', // dark teal
+  StandUpPaddling: '#67e8f9', // light cyan
+  Surfing: '#a5f3fc', // pale cyan
+  Canoeing: '#155e75', // deep teal
+  Sailing: '#164e63', // navy teal
+
+  // Winter sports - Blue family
+  AlpineSki: '#38bdf8', // sky blue
+  NordicSki: '#0ea5e9', // blue
+  BackcountrySki: '#0284c7', // darker blue
+  Snowboard: '#7dd3fc', // light blue
+  Snowshoe: '#bae6fd', // pale blue
+  IceSkate: '#e0f2fe', // very pale blue
+
+  // Gym/Indoor - Purple family
+  WeightTraining: '#a78bfa', // purple
+  Workout: '#8b5cf6', // darker purple
+  Crossfit: '#7c3aed', // violet
+  Yoga: '#c4b5fd', // light purple
+  Pilates: '#ddd6fe', // pale purple
+  Elliptical: '#ede9fe', // very pale purple
+  StairStepper: '#6d28d9', // deep purple
+
+  // Racket sports - Pink/Rose family
+  Tennis: '#f472b6', // pink
+  Pickleball: '#ec4899', // darker pink
+  Badminton: '#db2777', // magenta
+  Squash: '#be185d', // dark pink
+  TableTennis: '#fbcfe8', // light pink
+  Racquetball: '#fce7f3', // pale pink
+
+  // Team/Ball sports - Red/Coral family
+  Soccer: '#f87171', // coral red
+  Basketball: '#ef4444', // red
+  Football: '#dc2626', // darker red
+  Volleyball: '#fca5a5', // light coral
+  Hockey: '#b91c1c', // deep red
+  Lacrosse: '#991b1b', // very deep red
+  Rugby: '#fecaca', // pale red
+
+  // Golf - Lime family
+  Golf: '#a3e635', // lime
+  MiniGolf: '#84cc16', // lime green
+
+  // Equestrian - Amber family
+  Horseback: '#fbbf24', // amber
+  HorsebackRiding: '#fbbf24', // amber
+
+  // Skateboarding - Teal family
+  Skateboard: '#14b8a6', // teal
+  InlineSkate: '#0d9488', // darker teal
+  RollerSki: '#2dd4bf', // light teal
+
+  // Climbing - Stone/Slate family
+  RockClimbing: '#64748b', // slate
+  Climbing: '#475569', // dark slate
+
+  // Other/Misc - Gray family
+  Other: '#6b7280', // gray
+  Wheelchair: '#9ca3af', // light gray
+  Transition: '#d1d5db', // pale gray
+}
+
+// Weekday colors - Weekdays are cooler tones, weekends are warmer
+export const weekdayColors: string[] = [
+  '#fb923c', // Sunday - orange (weekend)
+  '#4ade80', // Monday - green
+  '#22d3ee', // Tuesday - cyan
+  '#a78bfa', // Wednesday - purple
+  '#fbbf24', // Thursday - amber
+  '#38bdf8', // Friday - sky blue
+  '#f472b6', // Saturday - pink (weekend)
+]
+
+// Map weekday labels to colors for DonutChart
+export const weekdayColorMap: Record<string, string> = {
+  Sun: weekdayColors[0],
+  Sunday: weekdayColors[0],
+  Mon: weekdayColors[1],
+  Monday: weekdayColors[1],
+  Tue: weekdayColors[2],
+  Tuesday: weekdayColors[2],
+  Wed: weekdayColors[3],
+  Wednesday: weekdayColors[3],
+  Thu: weekdayColors[4],
+  Thursday: weekdayColors[4],
+  Fri: weekdayColors[5],
+  Friday: weekdayColors[5],
+  Sat: weekdayColors[6],
+  Saturday: weekdayColors[6],
+}
+
+// Time of day colors - representing the feel of each time period
+export const daytimeColors: Record<string, string> = {
+  Night: '#6366f1', // indigo - night sky
+  Morning: '#fbbf24', // amber - sunrise
+  Afternoon: '#fb923c', // orange - bright sun
+  Evening: '#f472b6', // pink - sunset
+}
+
+// Helper function to get color for a value from a color map with fallback
+export function getColorFromMap(
+  value: string,
+  colorMap: Record<string, string>,
+  fallbackColors: string[] = Object.values(chartColors),
+  index = 0
+): string {
+  return colorMap[value] ?? fallbackColors[index % fallbackColors.length]
+}
+
+// Helper function to group small slices into "Other" for cleaner charts
+export interface ChartSlice {
+  name: string
+  value: number
+  color?: string
+}
+
+export function groupSmallSlices(
+  slices: ChartSlice[],
+  maxCategories: number = maxChartCategories,
+  colorMap?: Record<string, string>
+): ChartSlice[] {
+  if (slices.length <= maxCategories) {
+    // Apply colors from map if provided
+    if (colorMap) {
+      return slices.map((s, idx) => ({
+        ...s,
+        color: getColorFromMap(s.name, colorMap, Object.values(chartColors), idx),
+      }))
+    }
+    return slices
+  }
+
+  // Sort by value descending
+  const sorted = [...slices].sort((a, b) => b.value - a.value)
+
+  // Keep top (maxCategories - 1) and group the rest into "Other"
+  const topSlices = sorted.slice(0, maxCategories - 1)
+  const otherSlices = sorted.slice(maxCategories - 1)
+
+  const otherTotal = otherSlices.reduce((sum, s) => sum + s.value, 0)
+
+  const result: ChartSlice[] = topSlices.map((s, idx) => ({
+    ...s,
+    color: colorMap ? getColorFromMap(s.name, colorMap, Object.values(chartColors), idx) : s.color,
+  }))
+
+  if (otherTotal > 0) {
+    result.push({
+      name: 'Other',
+      value: otherTotal,
+      color: sportColors.Other,
+    })
+  }
+
+  return result
+}

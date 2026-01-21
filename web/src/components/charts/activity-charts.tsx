@@ -7,6 +7,8 @@ import {
   defaultGridConfig,
   defaultTooltipConfig,
   maxInlineLegendItems,
+  sportColors,
+  groupSmallSlices,
 } from './chart-constants'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
@@ -161,26 +163,20 @@ export function SportDistributionChart({
 
   const getValue = (d: SportData) => (metric === 'count' ? d.count : d.distance)
 
-  const sportColorMap: Record<string, string> = {
-    Ride: chartColors.ride,
-    VirtualRide: chartColors.ride,
-    MountainBikeRide: chartColors.ride,
-    GravelRide: chartColors.ride,
-    Run: chartColors.run,
-    VirtualRun: chartColors.run,
-    TrailRun: chartColors.run,
-    Walk: chartColors.walk,
-    Hike: chartColors.walk,
-    Swim: chartColors.swim,
-    AlpineSki: chartColors.winter,
-    NordicSki: chartColors.winter,
-    Snowboard: chartColors.winter,
-  }
+  // Prepare data with grouping for charts with many categories
+  const preparedData = groupSmallSlices(
+    data.map((d) => ({
+      name: d.sport_type,
+      value: getValue(d),
+    })),
+    8, // maxCategories
+    sportColors
+  )
 
   // Responsive layout logic based on container dimensions
   const isCompact = dimensions.height < 200 || dimensions.width < 280
   const isNarrow = dimensions.width < 350
-  const hasManyCategories = data.length > maxInlineLegendItems
+  const hasManyCategories = preparedData.length > maxInlineLegendItems
 
   // Adapt chart configuration based on size and number of categories
   const chartConfig = isCompact
@@ -272,13 +268,11 @@ export function SportDistributionChart({
             fontWeight: 'bold',
           },
         },
-        data: data.map((d, idx) => ({
-          name: d.sport_type.replace(/([A-Z])/g, ' $1').trim(),
-          value: getValue(d),
+        data: preparedData.map((d) => ({
+          name: d.name.replace(/([A-Z])/g, ' $1').trim(),
+          value: d.value,
           itemStyle: {
-            color:
-              sportColorMap[d.sport_type] ??
-              Object.values(chartColors)[idx % Object.values(chartColors).length],
+            color: d.color,
           },
         })),
       },

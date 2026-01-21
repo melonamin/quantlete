@@ -1,4 +1,5 @@
 import { DonutChart } from '@/components/charts'
+import { weekdayColorMap } from '@/components/charts/chart-constants'
 import { useWeekdayDistribution } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 
@@ -13,7 +14,7 @@ export function WeekdayStats() {
 
   return (
     <WidgetWrapper title="Weekday" isLoading={isLoading}>
-      <DonutChart data={slices} height="100%" loading={isLoading} />
+      <DonutChart data={slices} height="100%" loading={isLoading} colorMap={weekdayColorMap} />
     </WidgetWrapper>
   )
 }
