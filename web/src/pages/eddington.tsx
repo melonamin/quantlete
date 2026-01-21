@@ -247,7 +247,7 @@ function SportComparisonCard({
             type="button"
             onClick={() => onSelectSportGroup('')}
             className={`p-4 rounded-lg border text-center transition-colors hover:bg-accent ${
-              selectedSportGroup === undefined ? 'border-primary bg-primary/5' : 'border-border'
+              selectedSportGroup === '' ? 'border-primary bg-primary/5' : 'border-border'
             }`}
           >
             <div className="text-2xl font-bold tabular-nums">{allNumber}</div>

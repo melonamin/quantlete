@@ -1,6 +1,8 @@
 // Package analysis provides activity analysis functions.
 package analysis
 
+import "slices"
+
 // Split represents a distance-based split (e.g., per-km or per-mile).
 type Split struct {
 	Index        int     `json:"index"`       // 1-indexed split number
@@ -30,6 +32,8 @@ type SplitsResult struct {
 //   - watts: power array (optional, can be nil)
 //   - altitude: altitude array (optional, can be nil)
 //   - splitLengthM: distance per split in meters (e.g., 1000 for 1km)
+//
+//nolint:gosec // G602: bounds are checked at function entry before loop access
 func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM float64) *SplitsResult {
 	if len(distance) < 2 || len(time) < 2 || len(distance) != len(time) {
 		return nil
@@ -169,6 +173,8 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 }
 
 // calculateElevation calculates elevation gain and loss from altitude data.
+//
+//nolint:gosec // G602: bounds are checked at function entry before loop access
 func calculateElevation(altitude []float64) (gain, loss float64) {
 	if len(altitude) < 2 {
 		return 0, 0
@@ -399,7 +405,7 @@ func ComputePaceDistribution(velocity []float64, bucketSize float64) *PaceDistri
 	// Calculate median
 	sortedPaces := make([]float64, len(paces))
 	copy(sortedPaces, paces)
-	sortFloat64s(sortedPaces)
+	slices.Sort(sortedPaces)
 	medianPace := sortedPaces[len(sortedPaces)/2]
 
 	return &PaceDistributionResult{
@@ -409,16 +415,5 @@ func ComputePaceDistribution(velocity []float64, bucketSize float64) *PaceDistri
 		FastestPace:  minPace,
 		SlowestPace:  maxPace,
 		MedianPace:   medianPace,
-	}
-}
-
-// sortFloat64s sorts a slice of float64 in ascending order.
-func sortFloat64s(a []float64) {
-	for i := 0; i < len(a); i++ {
-		for j := i + 1; j < len(a); j++ {
-			if a[j] < a[i] {
-				a[i], a[j] = a[j], a[i]
-			}
-		}
 	}
 }

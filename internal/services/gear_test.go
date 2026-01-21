@@ -259,9 +259,9 @@ func TestGearService_MonthlyUsage(t *testing.T) {
 		t.Fatalf("MonthlyUsage() error = %v", err)
 	}
 
-	// Should have at least one month of usage data
+	// Should have at least one month of usage data since we created an activity
 	if len(result) == 0 {
-		t.Log("MonthlyUsage() returned empty - this is OK if no activities exist in test data")
+		t.Error("MonthlyUsage() returned empty, expected at least one month of data with the created activity")
 	}
 }
 
