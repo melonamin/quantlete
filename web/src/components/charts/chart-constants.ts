@@ -273,6 +273,34 @@ export const daytimeColors: Record<string, string> = {
   Evening: '#f472b6', // pink - sunset
 }
 
+// Year comparison colors - distinct colors for up to 10 years
+// Uses a color sequence that remains distinguishable when overlaid
+export const yearColors: string[] = [
+  '#4ade80', // terminal green - current/latest year
+  '#fb923c', // strava orange
+  '#22d3ee', // terminal cyan
+  '#a78bfa', // purple
+  '#fbbf24', // amber
+  '#f472b6', // pink
+  '#38bdf8', // sky blue
+  '#14b8a6', // teal
+  '#f87171', // coral
+  '#6366f1', // indigo
+]
+
+// Helper function to get year color by index or year value
+export function getYearColor(yearOrIndex: number, years?: number[]): string {
+  // If years array provided, find the index of the year
+  if (years) {
+    const index = years.indexOf(yearOrIndex)
+    if (index !== -1) {
+      return yearColors[index % yearColors.length]
+    }
+  }
+  // Otherwise use the value directly as index
+  return yearColors[yearOrIndex % yearColors.length]
+}
+
 // Helper function to get color for a value from a color map with fallback
 export function getColorFromMap(
   value: string,

@@ -160,3 +160,20 @@ WHERE athlete_id = ?1
     AND (?3 = '' OR sport_type = ?3)
 GROUP BY strftime('%Y-W%W', start_date_local)
 ORDER BY week ASC;
+
+-- name: GetMonthlyComparison :many
+-- Get monthly statistics grouped by year and month for cross-year comparison.
+-- Returns data for specified years (or all years if year list is empty) with optional sport type filter.
+-- Each row contains year, month (1-12), and aggregated metrics.
+SELECT
+    CAST(strftime('%Y', start_date_local) AS INTEGER) AS year,
+    CAST(strftime('%m', start_date_local) AS INTEGER) AS month,
+    COUNT(*) AS activity_count,
+    COALESCE(SUM(distance), 0) AS total_distance,
+    COALESCE(SUM(moving_time), 0) AS total_time,
+    COALESCE(SUM(total_elevation_gain), 0) AS total_elevation
+FROM activities
+WHERE athlete_id = ?1
+    AND (?2 = '' OR sport_type = ?2)
+GROUP BY year, month
+ORDER BY year ASC, month ASC;

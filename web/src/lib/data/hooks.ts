@@ -51,6 +51,7 @@ import type {
   ImportProgress,
   InsightsResponse,
   LogMaintenanceRequest,
+  MonthlyComparisonResponse,
   MonthlyStat,
   PhotosFilters,
   PhotosListResponse,
@@ -378,6 +379,24 @@ export function useWeeklyTrends(filters?: { weeks?: number; sport_type?: string 
     queryFn: async (): Promise<WeeklyTrendsResponse> => {
       if (!provider) throw new Error('Provider not ready')
       return provider.getWeeklyTrends(filters)
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+/**
+ * Hook to fetch monthly comparison data for cross-year analysis.
+ * Returns monthly aggregated stats grouped by year and month with available years list.
+ */
+export function useMonthlyComparison(filters?: { sport_type?: string }) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'stats', 'monthlyComparison', filters?.sport_type ?? ''],
+    queryFn: async (): Promise<MonthlyComparisonResponse> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getMonthlyComparison(filters)
     },
     enabled: initialized && !error && !!provider,
     staleTime: 1000 * 60 * 5, // 5 minutes

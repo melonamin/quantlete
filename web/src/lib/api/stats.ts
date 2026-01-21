@@ -68,6 +68,12 @@ export interface WeeklyTrendsResponse {
   weeks: import('@/lib/wasm/types.gen').WeeklyTrendPoint[]
 }
 
+// MonthlyComparisonResponse - cross-year monthly comparison data
+export interface MonthlyComparisonResponse {
+  months: import('@/lib/wasm/types.gen').MonthlyComparisonPoint[]
+  years: number[]
+}
+
 // ============================================================================
 // Frontend-only types - defined here for specific TS requirements
 // Safe to modify as needed

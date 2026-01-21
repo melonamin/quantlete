@@ -1592,6 +1592,16 @@ export interface GetHeatmapCountriesRow {
   count: number
 }
 
+/** GetMonthlyComparisonRow represents a row returned by GetMonthlyComparison. */
+export interface GetMonthlyComparisonRow {
+  year: string
+  month: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
 /** GetMonthlyDistributionRow represents a row returned by GetMonthlyDistribution. */
 export interface GetMonthlyDistributionRow {
   month: string
@@ -2416,6 +2426,17 @@ export interface GetHeatmapDataInput {
   offset: number
 }
 
+/** GetMonthlyComparisonInput contains parameters for getting monthly comparison data. */
+export interface GetMonthlyComparisonInput {
+  sport_type: string
+}
+
+/** GetMonthlyComparisonOutput contains the monthly comparison data. */
+export interface GetMonthlyComparisonOutput {
+  months: MonthlyComparisonPoint[]
+  years: number[]
+}
+
 /** GetPowerStatsInput contains parameters for getting power stats. */
 export interface GetPowerStatsInput {
   after?: string | null
@@ -2483,6 +2504,16 @@ export interface HeatmapOutput {
   limit?: number
   offset?: number
   countries?: HeatmapCountryStat[]
+}
+
+/** MonthlyComparisonPoint represents a single month's aggregated data for a specific year. */
+export interface MonthlyComparisonPoint {
+  year: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
 }
 
 /** MonthlyStat represents statistics for a single month. */

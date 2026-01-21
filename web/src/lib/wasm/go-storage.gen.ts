@@ -143,6 +143,8 @@ export interface GoStorageInterface {
   getHeatmapData(arg0?: string): string
   /** genGetInsights wraps InsightsService.GetInsights */
   getInsights(): string
+  /** genGetMonthlyComparison wraps StatsService.GetMonthlyComparison */
+  getMonthlyComparison(arg0?: string): string
   /** genGetPowerStats wraps StatsService.GetPowerStats */
   getPowerStats(arg0?: string): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */

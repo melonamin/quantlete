@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/shared"
@@ -1017,5 +1018,76 @@ func (s *StatsService) GetWeeklyTrends(ctx context.Context, in GetWeeklyTrendsIn
 
 	return &GetWeeklyTrendsOutput{
 		Weeks: result,
+	}, nil
+}
+
+// --- Monthly Comparison ---
+
+// GetMonthlyComparisonInput contains parameters for getting monthly comparison data.
+type GetMonthlyComparisonInput struct {
+	AthleteID int64  `json:"-" adapter:"context"`
+	SportType string `json:"sport_type" adapter:"query"` // Optional sport type filter
+}
+
+// MonthlyComparisonPoint represents a single month's aggregated data for a specific year.
+type MonthlyComparisonPoint struct {
+	Year           int     `json:"year"`
+	Month          int     `json:"month"`           // 1-12
+	ActivityCount  int     `json:"activity_count"`  // Number of activities
+	TotalDistance  float64 `json:"total_distance"`  // Total distance in meters
+	TotalTime      int     `json:"total_time"`      // Total time in seconds
+	TotalElevation float64 `json:"total_elevation"` // Total elevation gain in meters
+}
+
+// GetMonthlyComparisonOutput contains the monthly comparison data.
+type GetMonthlyComparisonOutput struct {
+	Months []MonthlyComparisonPoint `json:"months"`
+	Years  []int                    `json:"years"` // Available years in the data
+}
+
+// GetMonthlyComparison returns monthly aggregated stats for cross-year comparison.
+//
+//adapter:wasm getMonthlyComparison category=Stats
+//adapter:http GET /api/v1/stats/monthly-comparison
+func (s *StatsService) GetMonthlyComparison(ctx context.Context, in GetMonthlyComparisonInput) (*GetMonthlyComparisonOutput, error) {
+	rows, err := s.stats.GetMonthlyComparison(ctx, in.AthleteID, in.SportType)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get monthly comparison: %v", err)
+	}
+
+	result := make([]MonthlyComparisonPoint, len(rows))
+	yearsSet := make(map[int]struct{})
+
+	for i, r := range rows {
+		year, _ := strconv.Atoi(r.Year)
+		month, _ := strconv.Atoi(r.Month)
+		result[i] = MonthlyComparisonPoint{
+			Year:           year,
+			Month:          month,
+			ActivityCount:  r.ActivityCount,
+			TotalDistance:  r.TotalDistance,
+			TotalTime:      r.TotalTime,
+			TotalElevation: r.TotalElevation,
+		}
+		yearsSet[year] = struct{}{}
+	}
+
+	// Extract unique years and sort them
+	years := make([]int, 0, len(yearsSet))
+	for year := range yearsSet {
+		years = append(years, year)
+	}
+	// Sort years in ascending order
+	for i := 0; i < len(years); i++ {
+		for j := i + 1; j < len(years); j++ {
+			if years[i] > years[j] {
+				years[i], years[j] = years[j], years[i]
+			}
+		}
+	}
+
+	return &GetMonthlyComparisonOutput{
+		Months: result,
+		Years:  years,
 	}, nil
 }

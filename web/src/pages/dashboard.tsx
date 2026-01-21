@@ -39,6 +39,7 @@ import {
   KudosLeaders,
   SmartCoach,
   WeeklyTrends,
+  MonthlyComparison,
 } from '@/components/dashboard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -323,6 +324,14 @@ export function DashboardPage() {
             defaultWidth: 4,
             defaultHeight: 2,
             render: () => <WeekdayStats />,
+          },
+          // Row 6: Monthly cross-year comparison
+          {
+            id: 'monthly_comparison',
+            title: 'Monthly Comparison',
+            defaultWidth: 8,
+            defaultHeight: 2,
+            render: () => <MonthlyComparison />,
           },
           // Hidden by default: Niche or equipment-dependent widgets
           {

@@ -840,3 +840,8 @@ func (r *StatsRepository) GetEddingtonData(ctx context.Context, athleteID int64,
 func (r *StatsRepository) GetWeeklyTrends(ctx context.Context, athleteID int64, days int, sportType string) ([]GetWeeklyTrendsRow, error) {
 	return r.queries.GetWeeklyTrends(ctx, athleteID, strconv.Itoa(days), sportType)
 }
+
+// GetMonthlyComparison returns monthly aggregated stats for cross-year comparison.
+func (r *StatsRepository) GetMonthlyComparison(ctx context.Context, athleteID int64, sportType string) ([]GetMonthlyComparisonRow, error) {
+	return r.queries.GetMonthlyComparison(ctx, athleteID, sportType)
+}

@@ -35,6 +35,7 @@ import type {
   TrainingLoadResponse,
   ZoneTrendResponse,
   WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -693,6 +694,15 @@ export class GoWasmProvider implements DataProvider {
 
     return goStorage.getWeeklyTrends({
       weeks: filters?.weeks ?? 12,
+      sport_type: filters?.sport_type ?? '',
+    })
+  }
+
+  async getMonthlyComparison(filters?: { sport_type?: string }): Promise<MonthlyComparisonResponse> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    return goStorage.getMonthlyComparison({
       sport_type: filters?.sport_type ?? '',
     })
   }

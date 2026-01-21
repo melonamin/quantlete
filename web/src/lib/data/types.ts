@@ -49,6 +49,7 @@ export type {
   TrainingLoadResponse,
   ZoneTrendResponse,
   WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   WeeklyZoneDistribution,
   PowerZonesResponse,
   HrZoneDefinition,

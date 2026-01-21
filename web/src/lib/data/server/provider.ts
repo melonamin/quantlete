@@ -39,6 +39,7 @@ import type {
   TrainingLoadResponse,
   ZoneTrendResponse,
   WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -282,6 +283,13 @@ export class ServerProvider implements DataProvider {
     if (filters?.sport_type) params.set('sport_type', filters.sport_type)
     const qs = params.toString()
     return get<WeeklyTrendsResponse>(`/stats/weekly-trends${qs ? `?${qs}` : ''}`)
+  }
+
+  async getMonthlyComparison(filters?: { sport_type?: string }): Promise<MonthlyComparisonResponse> {
+    const params = new URLSearchParams()
+    if (filters?.sport_type) params.set('sport_type', filters.sport_type)
+    const qs = params.toString()
+    return get<MonthlyComparisonResponse>(`/stats/monthly-comparison${qs ? `?${qs}` : ''}`)
   }
 
   async getInsights(): Promise<InsightsResponse> {

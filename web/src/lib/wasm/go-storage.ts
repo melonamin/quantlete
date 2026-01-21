@@ -1585,6 +1585,36 @@ export function getWeeklyTrends(filters?: WeeklyTrendsFilters): WeeklyTrendsResu
 }
 
 // ============================================================================
+// Monthly Comparison
+// ============================================================================
+
+export interface MonthlyComparisonFilters {
+  sport_type?: string
+}
+
+export interface MonthlyComparisonPoint {
+  year: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface MonthlyComparisonResult {
+  months: MonthlyComparisonPoint[]
+  years: number[]
+}
+
+export function getMonthlyComparison(filters?: MonthlyComparisonFilters): MonthlyComparisonResult {
+  const result = callGoStorage<MonthlyComparisonResult>(
+    () => goStorage.getMonthlyComparison(JSON.stringify(filters || {})),
+    'getMonthlyComparison'
+  )
+  return { months: result.months || [], years: result.years || [] }
+}
+
+// ============================================================================
 // Insights
 // ============================================================================
 

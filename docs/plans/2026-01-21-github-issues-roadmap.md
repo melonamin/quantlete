@@ -86,16 +86,16 @@ Add a new dashboard widget showing rolling 12-week trends with sport type filter
 
 Add a widget showing monthly stats overlaid across multiple years to identify seasonal patterns. Users need to compare January 2024 vs January 2025 vs January 2026 on the same chart.
 
-- [ ] Add SQL query `GetMonthlyComparison` in `schema/queries/stats.sql`
-- [ ] Add service method in `internal/services/stats.go`
-- [ ] Add API endpoint with `years` and `sport_type` parameters
-- [ ] Run `just generate` to create adapters
-- [ ] Create `MonthlyComparisonChart` component (multi-series line chart)
-- [ ] Create `MonthlyComparison` widget
-- [ ] Add year toggle via legend interactions (click to show/hide years)
-- [ ] Add sport type filter
-- [ ] Add metric toggle (distance/time/elevation)
-- [ ] Define `yearColors` palette for up to 10 years
+- [x] Add SQL query `GetMonthlyComparison` in `schema/queries/stats.sql`
+- [x] Add service method in `internal/services/stats.go`
+- [x] Add API endpoint with `years` and `sport_type` parameters
+- [x] Run `just generate` to create adapters
+- [x] Create `MonthlyComparisonChart` component (multi-series line chart)
+- [x] Create `MonthlyComparison` widget
+- [x] Add year toggle via legend interactions (click to show/hide years)
+- [x] Add sport type filter
+- [x] Add metric toggle (distance/time/elevation)
+- [x] Define `yearColors` palette for up to 10 years
 
 ### Task 8: Add Activity detail analysis (#17)
 
