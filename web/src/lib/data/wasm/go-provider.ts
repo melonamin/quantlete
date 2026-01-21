@@ -731,6 +731,20 @@ export class GoWasmProvider implements DataProvider {
             tsb: result.summary.tsb,
           }
         : undefined,
+      diagnostics: result.diagnostics
+        ? {
+            total_activities: result.diagnostics.total_activities,
+            activities_with_power: result.diagnostics.activities_with_power,
+            activities_with_speed: result.diagnostics.activities_with_speed,
+            activities_with_hr: result.diagnostics.activities_with_hr,
+            activities_with_tss: result.diagnostics.activities_with_tss,
+            has_cycling_ftp: result.diagnostics.has_cycling_ftp,
+            has_running_ftp: result.diagnostics.has_running_ftp,
+            cycling_ftp_value: result.diagnostics.cycling_ftp_value,
+            running_ftp_value: result.diagnostics.running_ftp_value,
+            missing_config_warnings: result.diagnostics.missing_config_warnings,
+          }
+        : undefined,
     }
   }
 

@@ -1626,9 +1626,23 @@ export interface TrainingLoadDayData {
   tsb: number
 }
 
+export interface TrainingLoadDiagnosticsData {
+  total_activities: number
+  activities_with_power: number
+  activities_with_speed: number
+  activities_with_hr: number
+  activities_with_tss: number
+  has_cycling_ftp: boolean
+  has_running_ftp: boolean
+  cycling_ftp_value?: number | null
+  running_ftp_value?: number | null
+  missing_config_warnings?: string[]
+}
+
 export interface TrainingLoadResult {
   series: TrainingLoadDayData[]
   summary?: TrainingLoadDayData
+  diagnostics?: TrainingLoadDiagnosticsData
 }
 
 export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResult {
@@ -1636,7 +1650,7 @@ export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResu
     () => goStorage.getTrainingLoad(JSON.stringify(filters || {})),
     'getTrainingLoad'
   )
-  return { series: result.series || [], summary: result.summary }
+  return { series: result.series || [], summary: result.summary, diagnostics: result.diagnostics }
 }
 
 // ============================================================================
