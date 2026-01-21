@@ -10,6 +10,7 @@ import type { DataProvider } from '../provider'
 import type {
   // Core
   Activity,
+  ActivityAnalysis,
   ActivityFilters,
   ActivitiesResponse,
   AuthStatus,
@@ -138,6 +139,11 @@ export class ServerProvider implements DataProvider {
     return get<ActivityStream[]>(`/activities/${id}/streams`)
   }
 
+  async getActivityAnalysis(id: number, splitUnit?: 'km' | 'mi'): Promise<ActivityAnalysis> {
+    const params = splitUnit ? `?split_unit=${splitUnit}` : ''
+    return get<ActivityAnalysis>(`/activities/${id}/analysis${params}`)
+  }
+
   async getActivityWeather(id: number): Promise<ActivityWeather | null> {
     try {
       return await get<ActivityWeather>(`/activities/${id}/weather`)
@@ -185,7 +191,9 @@ export class ServerProvider implements DataProvider {
   }
 
   async getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]> {
-    return get<CalendarDay[]>(`/dashboard/calendar/range?start_date=${startDate}&end_date=${endDate}`)
+    return get<CalendarDay[]>(
+      `/dashboard/calendar/range?start_date=${startDate}&end_date=${endDate}`
+    )
   }
 
   async getCalendarActivities(year: number, month: number): Promise<CalendarActivity[]> {
@@ -285,7 +293,9 @@ export class ServerProvider implements DataProvider {
     return get<WeeklyTrendsResponse>(`/stats/weekly-trends${qs ? `?${qs}` : ''}`)
   }
 
-  async getMonthlyComparison(filters?: { sport_type?: string }): Promise<MonthlyComparisonResponse> {
+  async getMonthlyComparison(filters?: {
+    sport_type?: string
+  }): Promise<MonthlyComparisonResponse> {
     const params = new URLSearchParams()
     if (filters?.sport_type) params.set('sport_type', filters.sport_type)
     const qs = params.toString()

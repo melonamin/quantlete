@@ -10,6 +10,7 @@ import { useDataProviderStatus } from './context'
 import { STALE_TIME } from '@/lib/constants'
 import type {
   Activity,
+  ActivityAnalysis,
   ActivityFilters,
   ActivityStream,
   ActivitiesResponse,
@@ -564,6 +565,20 @@ export function useActivityWeather(id: number, enabled = true) {
     },
     enabled: enabled && id > 0 && initialized && !error && !!provider,
     staleTime: Infinity, // Weather data doesn't change, cache forever
+  })
+}
+
+export function useActivityAnalysis(id: number, splitUnit?: 'km' | 'mi', enabled = true) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'activity', id, 'analysis', splitUnit],
+    queryFn: async (): Promise<ActivityAnalysis> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getActivityAnalysis(id, splitUnit)
+    },
+    enabled: enabled && id > 0 && initialized && !error && !!provider,
+    staleTime: STALE_TIME.MEDIUM, // Analysis is computed from streams, can be cached
   })
 }
 

@@ -113,6 +113,8 @@ export interface GoStorageInterface {
   getActivities(arg0?: string): string
   /** genGetActivity wraps ActivityService.GetByID */
   getActivity(arg0?: string): string
+  /** genGetActivityAnalysis wraps ActivityService.GetAnalysis */
+  getActivityAnalysis(arg0?: string): string
   /** genGetActivityStreams wraps ActivityService.GetStreams */
   getActivityStreams(arg0?: string): string
 

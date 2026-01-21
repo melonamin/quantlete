@@ -308,6 +308,7 @@ func (r *Router) mountRoutes() {
 			router.Get("/", handlers.GenActivityServiceList(r.registry.ActivityService, r.stravaClient))
 			router.Get("/{id}", handlers.GenActivityServiceGetByID(r.registry.ActivityService, r.stravaClient))
 			router.Get("/{id}/streams", handlers.GenActivityServiceGetStreams(r.registry.ActivityService, r.stravaClient))
+			router.Get("/{id}/analysis", handlers.GenActivityServiceGetAnalysis(r.registry.ActivityService, r.stravaClient))
 			router.Get("/{id}/photos", handlers.GenPhotosServiceListByActivity(r.registry.PhotosService, r.stravaClient))
 			router.Get("/{id}/weather", r.weatherHandler.GetActivityWeather) // Manual: weather API integration
 		})

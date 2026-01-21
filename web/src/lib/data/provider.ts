@@ -13,6 +13,7 @@ import type {
   Activity,
   ActivityFilters,
   ActivitiesResponse,
+  ActivityAnalysis,
   AuthStatus,
   // Dashboard
   DashboardData,
@@ -114,6 +115,7 @@ export interface DataProvider {
   getActivities(filters: ActivityFilters): Promise<ActivitiesResponse>
   getActivity(id: number): Promise<Activity>
   getActivityStreams(id: number): Promise<ActivityStream[]>
+  getActivityAnalysis(id: number, splitUnit?: 'km' | 'mi'): Promise<ActivityAnalysis>
   getActivityWeather(id: number): Promise<ActivityWeather | null>
 
   // ============================================================================

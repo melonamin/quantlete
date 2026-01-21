@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/melonamin/quantlete/internal/analysis"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -13,13 +14,15 @@ import (
 type ActivityService struct {
 	repo    *storage.ActivityRepository
 	streams *storage.StreamRepository
+	zones   *storage.ZonesRepository
 }
 
 // NewActivityService creates a new activity service.
-func NewActivityService(repo *storage.ActivityRepository, streams *storage.StreamRepository) *ActivityService {
+func NewActivityService(repo *storage.ActivityRepository, streams *storage.StreamRepository, zones *storage.ZonesRepository) *ActivityService {
 	return &ActivityService{
 		repo:    repo,
 		streams: streams,
+		zones:   zones,
 	}
 }
 
@@ -391,6 +394,220 @@ func (s *ActivityService) SaveStream(ctx context.Context, in SaveStreamInput) (*
 	return &SaveStreamOutput{
 		Message: fmt.Sprintf("Stream %s for activity %d saved", in.StreamType, in.ActivityID),
 	}, nil
+}
+
+// ============================================================================
+// Analysis Types
+// ============================================================================
+
+// GetAnalysisInput contains parameters for getting activity analysis.
+type GetAnalysisInput struct {
+	AthleteID  int64  `json:"-" adapter:"context"`
+	ActivityID int64  `json:"activity_id" adapter:"path,param=id"`
+	SplitUnit  string `json:"split_unit" adapter:"query"` // "km" (default) or "mi"
+}
+
+// SplitItem represents a single split in the analysis output.
+type SplitItem struct {
+	Index     int     `json:"index"`
+	DistanceM float64 `json:"distance_m"`
+	DurationS int     `json:"duration_s"`
+	PaceSecKM float64 `json:"pace_sec_km"` // Pace in seconds per km
+	AvgHR     float64 `json:"avg_hr,omitempty"`
+	AvgWatts  float64 `json:"avg_watts,omitempty"`
+	ElevGain  float64 `json:"elev_gain"`
+	ElevLoss  float64 `json:"elev_loss"`
+}
+
+// SplitsOutput contains computed splits data.
+type SplitsOutput struct {
+	Splits       []SplitItem `json:"splits"`
+	SplitLengthM float64     `json:"split_length_m"`
+	TotalSplits  int         `json:"total_splits"`
+	FastestSplit int         `json:"fastest_split"`
+	SlowestSplit int         `json:"slowest_split"`
+}
+
+// ZoneItem represents time spent in a single HR zone.
+type ZoneItem struct {
+	Zone       int     `json:"zone"`
+	SecondsIn  int     `json:"seconds"`
+	Percentage float64 `json:"percentage"`
+	MinBPM     float64 `json:"min_bpm"`
+	MaxBPM     float64 `json:"max_bpm"`
+	Label      string  `json:"label"`
+}
+
+// HRZonesOutput contains HR zone distribution data.
+type HRZonesOutput struct {
+	Zones        []ZoneItem `json:"zones"`
+	TotalSeconds int        `json:"total_seconds"`
+	AvgHR        float64    `json:"avg_hr"`
+	MaxHR        float64    `json:"max_hr"`
+}
+
+// PaceBucketItem represents a pace histogram bucket.
+type PaceBucketItem struct {
+	MinPace    float64 `json:"min_pace"`
+	MaxPace    float64 `json:"max_pace"`
+	Count      int     `json:"count"`
+	Seconds    int     `json:"seconds"`
+	Percentage float64 `json:"percentage"`
+}
+
+// PaceDistributionOutput contains pace histogram data.
+type PaceDistributionOutput struct {
+	Buckets      []PaceBucketItem `json:"buckets"`
+	TotalSeconds int              `json:"total_seconds"`
+	AvgPace      float64          `json:"avg_pace"`
+	FastestPace  float64          `json:"fastest_pace"`
+	SlowestPace  float64          `json:"slowest_pace"`
+	MedianPace   float64          `json:"median_pace"`
+}
+
+// ActivityAnalysisOutput contains all analysis data for an activity.
+type ActivityAnalysisOutput struct {
+	ActivityID       int64                   `json:"activity_id"`
+	Splits           *SplitsOutput           `json:"splits,omitempty"`
+	HRZones          *HRZonesOutput          `json:"hr_zones,omitempty"`
+	PaceDistribution *PaceDistributionOutput `json:"pace_distribution,omitempty"`
+}
+
+// GetAnalysis returns detailed analysis for an activity including splits, HR zones, and pace distribution.
+//
+//adapter:wasm getActivityAnalysis category=Activities
+//adapter:http GET /api/v1/activities/{id}/analysis
+func (s *ActivityService) GetAnalysis(ctx context.Context, in GetAnalysisInput) (*ActivityAnalysisOutput, error) {
+	if in.ActivityID == 0 {
+		return nil, BadRequest("activity ID required")
+	}
+
+	// Fetch activity to verify ownership and get metadata
+	activity, err := s.repo.GetByID(ctx, in.ActivityID)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to fetch activity: %v", err)
+	}
+	if activity == nil {
+		return nil, NotFound("activity")
+	}
+
+	// Authorization: verify activity belongs to the athlete
+	if activity.AthleteID != in.AthleteID {
+		return nil, Wrap(ErrForbidden, "access denied")
+	}
+
+	// Fetch streams
+	streams, err := s.streams.GetByActivityID(ctx, in.ActivityID)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to fetch streams: %v", err)
+	}
+
+	// Extract stream data into maps
+	streamMap := make(map[string]json.RawMessage)
+	for _, stream := range streams {
+		streamMap[stream.StreamType] = stream.Data
+	}
+
+	output := &ActivityAnalysisOutput{
+		ActivityID: in.ActivityID,
+	}
+
+	// Decode required streams
+	distance, _ := storage.DecodeFloat64Array(streamMap["distance"])
+	timeArr, _ := storage.DecodeFloat64Array(streamMap["time"])
+	hr, _ := storage.DecodeFloat64Array(streamMap["heartrate"])
+	watts, _ := storage.DecodeFloat64Array(streamMap["watts"])
+	altitude, _ := storage.DecodeFloat64Array(streamMap["altitude"])
+	velocity, _ := storage.DecodeFloat64Array(streamMap["velocity_smooth"])
+
+	// Determine split length (1km = 1000m, 1mi = 1609.34m)
+	splitLengthM := 1000.0
+	if in.SplitUnit == "mi" {
+		splitLengthM = 1609.34
+	}
+
+	// Compute splits if we have distance and time
+	if len(distance) > 0 && len(timeArr) > 0 {
+		splitsResult := analysis.ComputeSplits(distance, timeArr, hr, watts, altitude, splitLengthM)
+		if splitsResult != nil {
+			output.Splits = &SplitsOutput{
+				Splits:       make([]SplitItem, len(splitsResult.Splits)),
+				SplitLengthM: splitsResult.SplitLength,
+				TotalSplits:  splitsResult.TotalSplits,
+				FastestSplit: splitsResult.FastestSplit,
+				SlowestSplit: splitsResult.SlowestSplit,
+			}
+			for i, split := range splitsResult.Splits {
+				output.Splits.Splits[i] = SplitItem{
+					Index:     split.Index,
+					DistanceM: split.DistanceM,
+					DurationS: split.DurationS,
+					PaceSecKM: split.PaceSecsPerM * 1000, // Convert sec/m to sec/km
+					AvgHR:     split.AvgHR,
+					AvgWatts:  split.AvgWatts,
+					ElevGain:  split.ElevGain,
+					ElevLoss:  split.ElevLoss,
+				}
+			}
+		}
+	}
+
+	// Compute HR zone distribution if we have HR data and zone definitions
+	if len(hr) > 0 && s.zones != nil {
+		def, cfg, err := s.zones.GetApplicableHR(ctx, in.AthleteID, activity.SportType, activity.StartDate.Time)
+		if err == nil && def != nil && cfg != nil && len(cfg.Bounds) >= 5 {
+			bounds := &analysis.ZoneBounds{
+				Method: def.Method,
+				Bounds: cfg.Bounds,
+				HRMax:  cfg.HRMax,
+			}
+			zonesResult := analysis.ComputeHRZoneDistribution(hr, bounds)
+			if zonesResult != nil {
+				output.HRZones = &HRZonesOutput{
+					Zones:        make([]ZoneItem, len(zonesResult.Zones)),
+					TotalSeconds: zonesResult.TotalSeconds,
+					AvgHR:        zonesResult.AvgHR,
+					MaxHR:        zonesResult.MaxHR,
+				}
+				for i, zone := range zonesResult.Zones {
+					output.HRZones.Zones[i] = ZoneItem{
+						Zone:       zone.Zone,
+						SecondsIn:  zone.SecondsIn,
+						Percentage: zone.Percentage,
+						MinBPM:     zone.MinBPM,
+						MaxBPM:     zone.MaxBPM,
+						Label:      zone.Label,
+					}
+				}
+			}
+		}
+	}
+
+	// Compute pace distribution if we have velocity data
+	if len(velocity) > 0 {
+		paceResult := analysis.ComputePaceDistribution(velocity, 15) // 15 sec/km buckets
+		if paceResult != nil {
+			output.PaceDistribution = &PaceDistributionOutput{
+				Buckets:      make([]PaceBucketItem, len(paceResult.Buckets)),
+				TotalSeconds: paceResult.TotalSeconds,
+				AvgPace:      paceResult.AvgPace,
+				FastestPace:  paceResult.FastestPace,
+				SlowestPace:  paceResult.SlowestPace,
+				MedianPace:   paceResult.MedianPace,
+			}
+			for i, bucket := range paceResult.Buckets {
+				output.PaceDistribution.Buckets[i] = PaceBucketItem{
+					MinPace:    bucket.MinPace,
+					MaxPace:    bucket.MaxPace,
+					Count:      bucket.Count,
+					Seconds:    bucket.Seconds,
+					Percentage: bucket.Percentage,
+				}
+			}
+		}
+	}
+
+	return output, nil
 }
 
 // ============================================================================

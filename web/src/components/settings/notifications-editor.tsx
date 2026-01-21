@@ -65,24 +65,25 @@ const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   generic: 'Generic Webhook',
 }
 
-const SERVICE_CONFIG_FIELDS: Record<ServiceType, { key: string; label: string; type?: string }[]> = {
-  telegram: [
-    { key: 'bot_token', label: 'Bot Token', type: 'password' },
-    { key: 'chat_id', label: 'Chat ID' },
-  ],
-  smtp: [
-    { key: 'host', label: 'SMTP Host' },
-    { key: 'port', label: 'Port' },
-    { key: 'username', label: 'Username' },
-    { key: 'password', label: 'Password', type: 'password' },
-    { key: 'from', label: 'From Address' },
-    { key: 'to', label: 'To Address' },
-  ],
-  generic: [
-    { key: 'url', label: 'Webhook URL' },
-    { key: 'method', label: 'Method' },
-  ],
-}
+const SERVICE_CONFIG_FIELDS: Record<ServiceType, { key: string; label: string; type?: string }[]> =
+  {
+    telegram: [
+      { key: 'bot_token', label: 'Bot Token', type: 'password' },
+      { key: 'chat_id', label: 'Chat ID' },
+    ],
+    smtp: [
+      { key: 'host', label: 'SMTP Host' },
+      { key: 'port', label: 'Port' },
+      { key: 'username', label: 'Username' },
+      { key: 'password', label: 'Password', type: 'password' },
+      { key: 'from', label: 'From Address' },
+      { key: 'to', label: 'To Address' },
+    ],
+    generic: [
+      { key: 'url', label: 'Webhook URL' },
+      { key: 'method', label: 'Method' },
+    ],
+  }
 
 interface NotificationsEditorProps {
   settings: AppSettings | undefined
@@ -301,7 +302,9 @@ export function NotificationsEditor({ settings, onSave, saving }: NotificationsE
           <div className="space-y-3">
             <div>
               <p className="font-medium">Events</p>
-              <p className="text-sm text-muted-foreground">Choose which events trigger notifications</p>
+              <p className="text-sm text-muted-foreground">
+                Choose which events trigger notifications
+              </p>
             </div>
 
             {/* Sync Events */}
@@ -348,9 +351,7 @@ export function NotificationsEditor({ settings, onSave, saving }: NotificationsE
                   <Label className="flex items-center gap-2 text-sm">
                     <Checkbox
                       checked={events.segmentPRs}
-                      onCheckedChange={(checked) =>
-                        setEvents({ ...events, segmentPRs: !!checked })
-                      }
+                      onCheckedChange={(checked) => setEvents({ ...events, segmentPRs: !!checked })}
                       disabled={saving}
                     />
                     Segment PRs
@@ -575,12 +576,8 @@ export function NotificationsEditor({ settings, onSave, saving }: NotificationsE
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingService?.id ? 'Edit Service' : 'Add Service'}
-            </DialogTitle>
-            <DialogDescription>
-              Configure a notification delivery channel
-            </DialogDescription>
+            <DialogTitle>{editingService?.id ? 'Edit Service' : 'Add Service'}</DialogTitle>
+            <DialogDescription>Configure a notification delivery channel</DialogDescription>
           </DialogHeader>
 
           {editingService && (
@@ -589,9 +586,7 @@ export function NotificationsEditor({ settings, onSave, saving }: NotificationsE
                 <Label>Name</Label>
                 <Input
                   value={editingService.name}
-                  onChange={(e) =>
-                    setEditingService({ ...editingService, name: e.target.value })
-                  }
+                  onChange={(e) => setEditingService({ ...editingService, name: e.target.value })}
                   placeholder="My Telegram Bot"
                 />
               </div>

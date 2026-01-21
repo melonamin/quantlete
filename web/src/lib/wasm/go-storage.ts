@@ -45,12 +45,7 @@ import type {
 } from './types.gen'
 
 // Import Insight types from the canonical source
-import type {
-  InsightType,
-  InsightSeverity,
-  Insight,
-  InsightsResponse,
-} from '@/lib/api/stats'
+import type { InsightType, InsightSeverity, Insight, InsightsResponse } from '@/lib/api/stats'
 
 // Re-export for consumers that import from this module
 export type { InsightType, InsightSeverity, Insight, InsightsResponse }
@@ -374,6 +369,65 @@ export const getActivityStreams = (activityId: number): ActivityStream[] =>
     'getActivityStreams'
   )
 
+export interface ActivityAnalysis {
+  activity_id: number
+  splits?: {
+    splits: {
+      index: number
+      distance_m: number
+      duration_s: number
+      pace_sec_km: number
+      avg_hr?: number
+      avg_watts?: number
+      elev_gain: number
+      elev_loss: number
+    }[]
+    split_length_m: number
+    total_splits: number
+    fastest_split: number
+    slowest_split: number
+  } | null
+  hr_zones?: {
+    zones: {
+      zone: number
+      seconds: number
+      percentage: number
+      min_bpm: number
+      max_bpm: number
+      label: string
+    }[]
+    total_seconds: number
+    avg_hr: number
+    max_hr: number
+  } | null
+  pace_distribution?: {
+    buckets: {
+      min_pace: number
+      max_pace: number
+      count: number
+      seconds: number
+      percentage: number
+    }[]
+    total_seconds: number
+    avg_pace: number
+    fastest_pace: number
+    slowest_pace: number
+    median_pace: number
+  } | null
+}
+
+export const getActivityAnalysis = (
+  activityId: number,
+  splitUnit?: 'km' | 'mi'
+): ActivityAnalysis =>
+  callGoStorage<ActivityAnalysis>(
+    () =>
+      goStorage.getActivityAnalysis(
+        JSON.stringify({ activity_id: activityId, split_unit: splitUnit })
+      ),
+    'getActivityAnalysis'
+  )
+
 // ============================================================================
 // Dashboard
 // ============================================================================
@@ -508,7 +562,10 @@ export function getCalendarData(year: number): CalendarDay[] {
 export function getCalendarDataRange(startDate: string, endDate: string): CalendarDay[] {
   return (
     callGoStorage<CalendarDay[] | undefined>(
-      () => goStorage.getCalendarDataRange(JSON.stringify({ start_date: startDate, end_date: endDate })),
+      () =>
+        goStorage.getCalendarDataRange(
+          JSON.stringify({ start_date: startDate, end_date: endDate })
+        ),
       'getCalendarDataRange'
     ) || []
   )
@@ -1619,10 +1676,7 @@ export function getMonthlyComparison(filters?: MonthlyComparisonFilters): Monthl
 // ============================================================================
 
 export function getInsights(): InsightsResponse {
-  const result = callGoStorage<InsightsResponse>(
-    () => goStorage.getInsights(),
-    'getInsights'
-  )
+  const result = callGoStorage<InsightsResponse>(() => goStorage.getInsights(), 'getInsights')
   return { insights: result.insights ?? [] }
 }
 

@@ -361,7 +361,9 @@ export function ActivityCalendarChart({
 
   // Calculate the calendar range based on rangeType
   const calendarRange =
-    rangeType === 'rolling365' && dateRange ? dateRange : year?.toString() ?? new Date().getFullYear().toString()
+    rangeType === 'rolling365' && dateRange
+      ? dateRange
+      : (year?.toString() ?? new Date().getFullYear().toString())
 
   const option: EChartsOption = {
     tooltip: {

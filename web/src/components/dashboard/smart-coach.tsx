@@ -18,7 +18,10 @@ function isValidInsightSeverity(severity: string): severity is InsightSeverity {
 }
 
 // Known insight types with icons.
-const iconMap: Record<InsightType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+const iconMap: Record<
+  InsightType,
+  React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+> = {
   fatigue: BatteryLow,
   recovery: Heart,
   fitness: TrendingUp,

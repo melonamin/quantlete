@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react'
 import type { EChartsOption } from 'echarts'
 import { EChartsWrapper } from '@/components/charts/echarts-wrapper'
-import { defaultGridConfig, defaultTooltipConfig, yearColors } from '@/components/charts/chart-constants'
+import {
+  defaultGridConfig,
+  defaultTooltipConfig,
+  yearColors,
+} from '@/components/charts/chart-constants'
 import { useMonthlyComparison } from '@/lib/data/hooks'
 import { useSportTypeStats } from '@/lib/data/hooks'
 import { formatSportType } from '@/lib/sport-types'
@@ -20,7 +24,20 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 type Metric = 'distance' | 'time' | 'elevation'
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
 
 export function MonthlyComparison() {
   const [metric, setMetric] = useState<Metric>('distance')

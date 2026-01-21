@@ -101,16 +101,16 @@ Add a widget showing monthly stats overlaid across multiple years to identify se
 
 The Activity detail page is missing splits table, HR zone distribution, and pace distribution histogram. These are key analysis features that require stream data processing.
 
-- [ ] Create `getSplits()` function to calculate per-km splits from distance/time streams
-- [ ] Create `getHRZoneDistribution()` function using heartrate stream and athlete zones
-- [ ] Create `getPaceDistribution()` function to bucket pace data into histogram
-- [ ] Add `/api/v1/activities/:id/analysis` endpoint returning splits, zones, distributions
-- [ ] Run `just generate` after adding endpoint
-- [ ] Create `ActivitySplits` component with pace bars visualization
-- [ ] Create `ActivityZoneDistribution` component (horizontal bar chart)
-- [ ] Create `ActivityPaceDistribution` histogram component
-- [ ] Integrate components into activity detail page as collapsible sections
-- [ ] Handle missing stream data gracefully with appropriate empty states
+- [x] Create `getSplits()` function to calculate per-km splits from distance/time streams
+- [x] Create `getHRZoneDistribution()` function using heartrate stream and athlete zones
+- [x] Create `getPaceDistribution()` function to bucket pace data into histogram
+- [x] Add `/api/v1/activities/:id/analysis` endpoint returning splits, zones, distributions
+- [x] Run `just generate` after adding endpoint
+- [x] Create `ActivitySplits` component with pace bars visualization
+- [x] Create `ActivityZoneDistribution` component (horizontal bar chart)
+- [x] Create `ActivityPaceDistribution` histogram component
+- [x] Integrate components into activity detail page as collapsible sections
+- [x] Handle missing stream data gracefully with appropriate empty states
 
 ### Task 9: Add distance/duration filters (#15)
 

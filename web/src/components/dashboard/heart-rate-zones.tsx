@@ -20,16 +20,10 @@ function ZoneProgressRow({ label, color, seconds, total }: ZoneProgressRowProps)
   const pct = total > 0 ? (seconds / total) * 100 : 0
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span
-        className="h-2 w-2 rounded-full flex-shrink-0"
-        style={{ backgroundColor: color }}
-      />
+      <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
       <span className="w-20 text-muted-foreground truncate flex-shrink-0">{label}</span>
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden min-w-0">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
       <span className="w-16 text-right flex-shrink-0 tabular-nums whitespace-nowrap">
         {formatDuration(seconds)}
@@ -61,9 +55,7 @@ export function HeartRateZones() {
           />
         ))}
         {defs && defs.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Configure zones in Settings.
-          </p>
+          <p className="text-xs text-muted-foreground">Configure zones in Settings.</p>
         )}
       </div>
     </WidgetWrapper>

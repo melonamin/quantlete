@@ -38,7 +38,7 @@ export function StravaCredentialsForm({ onSave }: StravaCredentialsFormProps) {
     return ''
   }, [credentials])
 
-  const clientId = (isEditing || !credentials?.configured) ? clientIdInput : credentialsClientId
+  const clientId = isEditing || !credentials?.configured ? clientIdInput : credentialsClientId
   const setClientId = (value: string) => setClientIdInput(value)
 
   // Start editing mode and initialize form with current credentials

@@ -8,6 +8,7 @@
 import type { DataProvider } from '../provider'
 import type {
   Activity,
+  ActivityAnalysis,
   ActivityFilters,
   ActivitiesResponse,
   AuthStatus,
@@ -301,6 +302,12 @@ export class GoWasmProvider implements DataProvider {
       resolution: s.resolution,
       data: s.data,
     })) as ActivityStream[]
+  }
+
+  async getActivityAnalysis(id: number, splitUnit?: 'km' | 'mi'): Promise<ActivityAnalysis> {
+    this.assertInitialized()
+    const analysis = goStorage.getActivityAnalysis(id, splitUnit)
+    return analysis as ActivityAnalysis
   }
 
   async getActivityWeather(_id: number): Promise<ActivityWeather | null> {
@@ -698,7 +705,9 @@ export class GoWasmProvider implements DataProvider {
     })
   }
 
-  async getMonthlyComparison(filters?: { sport_type?: string }): Promise<MonthlyComparisonResponse> {
+  async getMonthlyComparison(filters?: {
+    sport_type?: string
+  }): Promise<MonthlyComparisonResponse> {
     this.assertInitialized()
     this.getAthleteId()
 

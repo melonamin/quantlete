@@ -72,7 +72,9 @@ export function TrainingLoadPage() {
               <span>With power data: {diagnostics.activities_with_power}</span>
               <span>With pace data: {diagnostics.activities_with_speed}</span>
               <span>With HR data: {diagnostics.activities_with_hr}</span>
-              <span className="font-medium">With computed TSS: {diagnostics.activities_with_tss}</span>
+              <span className="font-medium">
+                With computed TSS: {diagnostics.activities_with_tss}
+              </span>
             </div>
           </AlertDescription>
         </Alert>

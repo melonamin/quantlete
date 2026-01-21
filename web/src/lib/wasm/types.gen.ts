@@ -10,6 +10,14 @@
 // From activities.go
 // ============================================================================
 
+/** ActivityAnalysisOutput contains all analysis data for an activity. */
+export interface ActivityAnalysisOutput {
+  activity_id: number
+  splits?: SplitsOutput | null
+  hr_zones?: HRZonesOutput | null
+  pace_distribution?: PaceDistributionOutput | null
+}
+
 /** ActivityItem represents an activity in responses. */
 export interface ActivityItem {
   id: number
@@ -84,6 +92,20 @@ export interface GetActivityStreamsInput {
   activity_id: number
 }
 
+/** GetAnalysisInput contains parameters for getting activity analysis. */
+export interface GetAnalysisInput {
+  activity_id: number
+  split_unit: string
+}
+
+/** HRZonesOutput contains HR zone distribution data. */
+export interface HRZonesOutput {
+  zones: ZoneItem[]
+  total_seconds: number
+  avg_hr: number
+  max_hr: number
+}
+
 /** ListActivitiesInput contains parameters for listing activities. */
 export interface ListActivitiesInput {
   sport_types: string[]
@@ -106,6 +128,25 @@ export interface ListActivitiesOutput {
   page: number
   per_page: number
   total_pages: number
+}
+
+/** PaceBucketItem represents a pace histogram bucket. */
+export interface PaceBucketItem {
+  min_pace: number
+  max_pace: number
+  count: number
+  seconds: number
+  percentage: number
+}
+
+/** PaceDistributionOutput contains pace histogram data. */
+export interface PaceDistributionOutput {
+  buckets: PaceBucketItem[]
+  total_seconds: number
+  avg_pace: number
+  fastest_pace: number
+  slowest_pace: number
+  median_pace: number
 }
 
 /** SaveActivityInput contains parameters for saving an activity. */
@@ -166,6 +207,37 @@ export interface SaveStreamInput {
 /** SaveStreamOutput contains the result of saving a stream. */
 export interface SaveStreamOutput {
   message: string
+}
+
+/** SplitItem represents a single split in the analysis output. */
+export interface SplitItem {
+  index: number
+  distance_m: number
+  duration_s: number
+  pace_sec_km: number
+  avg_hr?: number
+  avg_watts?: number
+  elev_gain: number
+  elev_loss: number
+}
+
+/** SplitsOutput contains computed splits data. */
+export interface SplitsOutput {
+  splits: SplitItem[]
+  split_length_m: number
+  total_splits: number
+  fastest_split: number
+  slowest_split: number
+}
+
+/** ZoneItem represents time spent in a single HR zone. */
+export interface ZoneItem {
+  zone: number
+  seconds: number
+  percentage: number
+  min_bpm: number
+  max_bpm: number
+  label: string
 }
 
 // ============================================================================

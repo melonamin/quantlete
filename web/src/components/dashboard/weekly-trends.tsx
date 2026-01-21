@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react'
 import type { EChartsOption } from 'echarts'
 import { EChartsWrapper } from '@/components/charts/echarts-wrapper'
-import { chartColors, defaultGridConfig, defaultTooltipConfig } from '@/components/charts/chart-constants'
+import {
+  chartColors,
+  defaultGridConfig,
+  defaultTooltipConfig,
+} from '@/components/charts/chart-constants'
 import { useWeeklyTrends } from '@/lib/data/hooks'
 import { useSportTypeStats } from '@/lib/data/hooks'
 import { formatSportType } from '@/lib/sport-types'

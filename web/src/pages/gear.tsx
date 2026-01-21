@@ -206,9 +206,7 @@ function GearCard({
   const distanceInUserUnit =
     unitSystem === 'imperial' ? gear.distance / 1609.344 : gear.distance / 1000
   const costPerDistance =
-    gear.purchase_price && distanceInUserUnit > 0
-      ? gear.purchase_price / distanceInUserUnit
-      : null
+    gear.purchase_price && distanceInUserUnit > 0 ? gear.purchase_price / distanceInUserUnit : null
   const costPerHour =
     gear.purchase_price && totalHours > 0 ? gear.purchase_price / totalHours : null
   const costPerActivity =
