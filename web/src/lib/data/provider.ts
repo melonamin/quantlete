@@ -181,6 +181,7 @@ export interface DataProvider {
   createCustomGear(req: CustomGearCreateRequest): Promise<Gear>
   updateCustomGear(id: string, patch: Partial<CustomGearCreateRequest>): Promise<Gear>
   deleteCustomGear(id: string, force?: boolean): Promise<{ deleted: boolean }>
+  updateGearPrice(id: string, price: number | null, currency: string): Promise<Gear>
   getGearMonthlyUsage(includeRetired?: boolean): Promise<GearMonthlyUsage[]>
 
   // ============================================================================

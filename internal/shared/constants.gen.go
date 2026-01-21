@@ -6,6 +6,7 @@ const (
 	EddingtonNextSteps         = 5
 	ImportEventBatchSize       = 25
 	ImportEventFlushIntervalMs = 2000
+	MaxGearPrice               = 999999.99
 	PaginationDefaultPage      = 1
 	PaginationDefaultPerPage   = 50
 	PaginationMaxPage          = 10000

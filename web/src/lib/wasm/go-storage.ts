@@ -1307,6 +1307,17 @@ export function deleteCustomGear(id: string, force?: boolean): DeleteCustomGearR
   return result
 }
 
+// Re-export generated type for consumers
+import type { UpdateGearPriceInput } from './types.gen'
+export type { UpdateGearPriceInput }
+
+export function updateGearPrice(input: UpdateGearPriceInput): GearItem {
+  return callGoStorage<GearItem>(
+    () => goStorage.updateGearPrice(JSON.stringify(input)),
+    'updateGearPrice'
+  )
+}
+
 // ============================================================================
 // Segment Efforts
 // ============================================================================

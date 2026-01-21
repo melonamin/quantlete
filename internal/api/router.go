@@ -369,6 +369,7 @@ func (r *Router) mountRoutes() {
 			router.Delete("/custom/{id}", r.gearHandler.DeleteCustom) // Manual: custom gear CRUD
 			router.Get("/stats/monthly", handlers.GenGearServiceMonthlyUsage(r.registry.GearService, r.stravaClient))
 			router.Get("/{id}", handlers.GenGearServiceGetByID(r.registry.GearService, r.stravaClient))
+			router.Put("/{id}/price", handlers.GenGearServiceUpdateGearPrice(r.registry.GearService, r.stravaClient))
 			router.Get("/{id}/components", handlers.GenMaintenanceServiceListComponents(r.registry.MaintenanceService, r.stravaClient))
 			router.Post("/{id}/components", handlers.GenMaintenanceServiceCreateComponent(r.registry.MaintenanceService, r.stravaClient))
 		})

@@ -85,6 +85,28 @@ import * as goStorage from '@/lib/wasm/go-storage'
 import { loadAuth, isAuthenticated, getAthlete, getAuthUrl, exchangeCode } from '@/lib/wasm/strava'
 import { getCredentials, saveCredentials } from '@/lib/wasm/strava/credentials'
 
+/**
+ * Maps a GearItem from goStorage to the Gear type used by the DataProvider interface.
+ * Centralizes the mapping to avoid drift when fields are added/changed.
+ */
+function mapGearItemToGear(g: goStorage.GearItem): Gear {
+  return {
+    id: g.id,
+    name: g.name,
+    primary: g.primary,
+    retired: g.retired,
+    distance: g.distance,
+    brand_name: g.brand_name,
+    model_name: g.model_name,
+    description: g.description,
+    source: g.source,
+    hashtag: g.hashtag,
+    purchase_price: g.purchase_price,
+    purchase_currency: g.purchase_currency,
+    activity_count: g.activity_count,
+  }
+}
+
 // Global callbacks for Go importer events - set up during subscribeToEvents
 let importProgressCallback: ((progressJson: string) => void) | null = null
 let importCompleteCallback: ((resultJson: string) => void) | null = null
@@ -871,21 +893,7 @@ export class GoWasmProvider implements DataProvider {
     })
 
     return {
-      data: result.data.map((g) => ({
-        id: g.id,
-        name: g.name,
-        primary: g.primary,
-        retired: g.retired,
-        distance: g.distance,
-        brand_name: g.brand_name,
-        model_name: g.model_name,
-        description: g.description,
-        source: g.source,
-        hashtag: g.hashtag,
-        purchase_price: g.purchase_price,
-        purchase_currency: g.purchase_currency,
-        activity_count: g.activity_count,
-      })),
+      data: result.data.map(mapGearItemToGear),
       total: result.total,
       page: result.page,
       per_page: result.per_page,
@@ -897,22 +905,7 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getGearDetail(id)
-    return {
-      id: result.id,
-      name: result.name,
-      primary: result.primary,
-      retired: result.retired,
-      distance: result.distance,
-      brand_name: result.brand_name,
-      model_name: result.model_name,
-      description: result.description,
-      source: result.source,
-      hashtag: result.hashtag,
-      purchase_price: result.purchase_price,
-      purchase_currency: result.purchase_currency,
-      activity_count: result.activity_count,
-    }
+    return mapGearItemToGear(goStorage.getGearDetail(id))
   }
 
   async getCustomGear(filters?: GearFilters): Promise<GearListResponse> {
@@ -1025,6 +1018,19 @@ export class GoWasmProvider implements DataProvider {
       distance: u.distance,
       moving_time: u.moving_time,
     }))
+  }
+
+  async updateGearPrice(id: string, price: number | null, currency: string): Promise<Gear> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.updateGearPrice({
+      gear_id: id,
+      purchase_price: price,
+      purchase_currency: currency,
+    })
+
+    return mapGearItemToGear(result)
   }
 
   // ============================================================================

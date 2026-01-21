@@ -974,6 +974,43 @@ export function useDeleteCustomGear() {
   })
 }
 
+/**
+ * Hook to update purchase price and currency for any gear item.
+ * Works for both Strava-imported and custom gear.
+ *
+ * @returns Mutation for updating gear price. Pass null for price to clear it.
+ *
+ * @example
+ * const updatePrice = useUpdateGearPrice()
+ * updatePrice.mutate({ id: 'b12345', price: 499.99, currency: 'USD' })
+ * updatePrice.mutate({ id: 'b12345', price: null, currency: '' }) // Clear price
+ */
+export function useUpdateGearPrice() {
+  const { provider, initialized } = useDataProviderStatus()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      price,
+      currency,
+    }: {
+      id: string
+      price: number | null
+      currency: string
+    }) => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.updateGearPrice(id, price, currency)
+    },
+    onSuccess: (_, { id }) => {
+      // Invalidate all gear queries (list, custom, monthly usage, etc.)
+      queryClient.invalidateQueries({ queryKey: ['data', 'gear'] })
+      // Also invalidate the specific gear detail query to ensure it refreshes
+      queryClient.invalidateQueries({ queryKey: ['data', 'gear', 'detail', id] })
+    },
+  })
+}
+
 export function useGearMonthlyUsage(includeRetired = true) {
   const { provider, initialized, error } = useDataProviderStatus()
 

@@ -315,14 +315,6 @@ export interface ListChallengesOutput {
   total_pages: number
 }
 
-export interface RequestInput {
-  month: string
-  page: number
-  per_page: number
-  order_by: string
-  order_dir: string
-}
-
 // ============================================================================
 // From dashboard.go
 // ============================================================================
@@ -595,6 +587,13 @@ export interface UpdateCustomGearInput {
   name?: string | null
   hashtag?: string | null
   retired?: boolean | null
+  purchase_price?: number | null
+  purchase_currency?: string | null
+}
+
+/** UpdateGearPriceInput contains parameters for updating gear price. */
+export interface UpdateGearPriceInput {
+  gear_id: string
   purchase_price?: number | null
   purchase_currency?: string | null
 }

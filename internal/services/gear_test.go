@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/melonamin/quantlete/internal/storage"
@@ -374,4 +375,195 @@ func TestGearService_ErrorTypes(t *testing.T) {
 	if !errors.Is(err, ErrConflict) {
 		t.Errorf("Conflict() should wrap ErrConflict")
 	}
+}
+
+func TestGearService_UpdateGearPrice(t *testing.T) {
+	db := testDB(t)
+	repo := storage.NewGearRepository(db)
+	svc := NewGearService(repo)
+	ctx := context.Background()
+
+	athleteID := int64(12345)
+	otherAthleteID := int64(99999)
+	createTestAthlete(t, db, athleteID)
+	createTestAthlete(t, db, otherAthleteID)
+
+	// Create test gear for this athlete and another athlete
+	createTestGear(t, db, "g1", athleteID, "My Bike", false)
+	createTestGear(t, db, "g2", otherAthleteID, "Other Bike", false)
+
+	t.Run("successful update", func(t *testing.T) {
+		price := 499.99
+		currency := "USD"
+		result, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:        athleteID,
+			GearID:           "g1",
+			PurchasePrice:    &price,
+			PurchaseCurrency: &currency,
+		})
+		if err != nil {
+			t.Fatalf("UpdateGearPrice() error = %v", err)
+		}
+		if result.PurchasePrice == nil || *result.PurchasePrice != 499.99 {
+			t.Errorf("UpdateGearPrice() price = %v, want 499.99", result.PurchasePrice)
+		}
+		if result.PurchaseCurrency != "USD" {
+			t.Errorf("UpdateGearPrice() currency = %q, want USD", result.PurchaseCurrency)
+		}
+	})
+
+	t.Run("currency normalization to uppercase", func(t *testing.T) {
+		price := 299.99
+		currency := "eur" // lowercase
+		result, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:        athleteID,
+			GearID:           "g1",
+			PurchasePrice:    &price,
+			PurchaseCurrency: &currency,
+		})
+		if err != nil {
+			t.Fatalf("UpdateGearPrice() error = %v", err)
+		}
+		if result.PurchaseCurrency != "EUR" {
+			t.Errorf("UpdateGearPrice() currency = %q, want EUR (should normalize to uppercase)", result.PurchaseCurrency)
+		}
+	})
+
+	t.Run("clear price with nil", func(t *testing.T) {
+		result, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:        athleteID,
+			GearID:           "g1",
+			PurchasePrice:    nil,
+			PurchaseCurrency: nil,
+		})
+		if err != nil {
+			t.Fatalf("UpdateGearPrice() error = %v", err)
+		}
+		if result.PurchasePrice != nil {
+			t.Errorf("UpdateGearPrice() price = %v, want nil", result.PurchasePrice)
+		}
+	})
+
+	t.Run("authorization - other athlete gear returns not found", func(t *testing.T) {
+		price := 100.0
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "g2", // belongs to otherAthleteID
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for other athlete's gear")
+		}
+		// Should return NotFound (not Forbidden) to avoid information disclosure
+		if !errors.Is(err, ErrNotFound) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrNotFound", err)
+		}
+	})
+
+	t.Run("validation - negative price", func(t *testing.T) {
+		price := -10.0
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "g1",
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for negative price")
+		}
+		if !errors.Is(err, ErrBadRequest) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrBadRequest", err)
+		}
+	})
+
+	t.Run("validation - price exceeds max", func(t *testing.T) {
+		price := 1000000.00 // exceeds MaxGearPrice (999999.99)
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "g1",
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for price exceeding max")
+		}
+		if !errors.Is(err, ErrBadRequest) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrBadRequest", err)
+		}
+	})
+
+	t.Run("validation - infinity price rejected", func(t *testing.T) {
+		price := math.Inf(1)
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "g1",
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for infinity price")
+		}
+		if !errors.Is(err, ErrBadRequest) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrBadRequest", err)
+		}
+	})
+
+	t.Run("validation - NaN price rejected", func(t *testing.T) {
+		price := math.NaN()
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "g1",
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for NaN price")
+		}
+		if !errors.Is(err, ErrBadRequest) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrBadRequest", err)
+		}
+	})
+
+	t.Run("validation - invalid currency length", func(t *testing.T) {
+		price := 100.0
+		currency := "US" // only 2 chars, not 3
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:        athleteID,
+			GearID:           "g1",
+			PurchasePrice:    &price,
+			PurchaseCurrency: &currency,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for invalid currency")
+		}
+		if !errors.Is(err, ErrBadRequest) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrBadRequest", err)
+		}
+	})
+
+	t.Run("validation - empty gear ID", func(t *testing.T) {
+		price := 100.0
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "",
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for empty gear ID")
+		}
+		if !errors.Is(err, ErrBadRequest) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrBadRequest", err)
+		}
+	})
+
+	t.Run("not found - nonexistent gear", func(t *testing.T) {
+		price := 100.0
+		_, err := svc.UpdateGearPrice(ctx, UpdateGearPriceInput{
+			AthleteID:     athleteID,
+			GearID:        "nonexistent",
+			PurchasePrice: &price,
+		})
+		if err == nil {
+			t.Fatal("UpdateGearPrice() expected error for nonexistent gear")
+		}
+		if !errors.Is(err, ErrNotFound) {
+			t.Errorf("UpdateGearPrice() error = %v, want ErrNotFound", err)
+		}
+	})
 }

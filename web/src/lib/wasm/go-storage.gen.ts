@@ -217,6 +217,8 @@ export interface GoStorageInterface {
   getGearDetail(arg0?: string): string
   /** genGetGearMonthlyUsage wraps GearService.MonthlyUsage */
   getGearMonthlyUsage(arg0?: string): string
+  /** genUpdateGearPrice wraps GearService.UpdateGearPrice */
+  updateGearPrice(arg0?: string): string
 
   // HR Zones
   /** HR Zones */

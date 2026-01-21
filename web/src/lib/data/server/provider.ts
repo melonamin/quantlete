@@ -363,6 +363,13 @@ export class ServerProvider implements DataProvider {
     return del<{ deleted: boolean }>(`/gear/custom/${id}${force ? '?force=true' : ''}`)
   }
 
+  async updateGearPrice(id: string, price: number | null, currency: string): Promise<Gear> {
+    return put<Gear>(`/gear/${id}/price`, {
+      purchase_price: price,
+      purchase_currency: currency,
+    })
+  }
+
   async getGearMonthlyUsage(includeRetired = true): Promise<GearMonthlyUsage[]> {
     return get<GearMonthlyUsage[]>(`/gear/stats/monthly?include_retired=${includeRetired}`)
   }

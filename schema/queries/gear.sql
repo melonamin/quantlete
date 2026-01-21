@@ -145,3 +145,19 @@ WHERE gear_id = ?1;
 SELECT COUNT(*) AS count
 FROM activities
 WHERE gear_id = ?1 AND athlete_id = ?2;
+
+-- name: UpdateGearPrice :one
+-- Update purchase price and currency for any gear item.
+-- Empty string means NULL (use NULLIF to convert).
+-- Returns the updated row atomically to avoid race conditions.
+UPDATE gear
+SET purchase_price = NULLIF(?1, ''), purchase_currency = NULLIF(?2, ''), updated_at = datetime('now')
+WHERE id = ?3 AND athlete_id = ?4
+RETURNING
+    id, athlete_id, name, is_primary, retired, distance,
+    brand_name, model_name, description,
+    COALESCE(source, '') AS source,
+    COALESCE(hashtag, '') AS hashtag,
+    purchase_price,
+    COALESCE(purchase_currency, '') AS purchase_currency,
+    created_at, updated_at;
