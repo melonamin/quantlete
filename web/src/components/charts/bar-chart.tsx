@@ -16,6 +16,8 @@ interface BarChartProps {
   showValues?: boolean
   barWidth?: number | string
   className?: string
+  /** When set, all bars use this single color instead of cycling through chartColors */
+  uniformColor?: string
 }
 
 export function BarChart({
@@ -26,6 +28,7 @@ export function BarChart({
   showValues = false,
   barWidth = '60%',
   className,
+  uniformColor,
 }: BarChartProps) {
   const categoryAxis = {
     type: 'category' as const,
@@ -69,7 +72,10 @@ export function BarChart({
         data: data.map((d, idx) => ({
           value: d.value,
           itemStyle: {
-            color: d.color ?? Object.values(chartColors)[idx % Object.values(chartColors).length],
+            color:
+              uniformColor ??
+              d.color ??
+              Object.values(chartColors)[idx % Object.values(chartColors).length],
             borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
           },
         })),

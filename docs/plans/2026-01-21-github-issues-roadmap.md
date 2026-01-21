@@ -144,12 +144,12 @@ The Eddington number currently calculates across all activity types combined, pr
 
 The Rewind view has UX issues: months shown as numbers instead of names, unnecessary multi-coloring on bar charts, and missing heatmap view.
 
-- [ ] Fix `monthLabels` to use month names ("Jan", "Feb") instead of numbers ("01", "02")
-- [ ] Add `uniformColor` prop to `BarChart` component for single-color bars
-- [ ] Update Wrapped page to use single color for monthly bar charts
-- [ ] Add year heatmap section using `ActivityCalendarChart` component
-- [ ] Fetch calendar data for selected year (may need new hook)
-- [ ] Reorganize page sections: Summary → Heatmap → Monthly → PRs → Donuts → Map → Biggest
+- [x] Fix `monthLabels` to use month names ("Jan", "Feb") instead of numbers ("01", "02")
+- [x] Add `uniformColor` prop to `BarChart` component for single-color bars
+- [x] Update Wrapped page to use single color for monthly bar charts
+- [x] Add year heatmap section using `ActivityCalendarChart` component
+- [x] Fetch calendar data for selected year (may need new hook)
+- [x] Reorganize page sections: Summary → Heatmap → Monthly → PRs → Donuts → Map → Biggest
 
 ### Task 12: WASM weather lookup (#3)
 
