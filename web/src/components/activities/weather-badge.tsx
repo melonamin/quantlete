@@ -7,6 +7,7 @@ import {
 } from '@/lib/api/weather'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { isWasmMode } from '@/lib/mode'
 import {
   Sun,
   Cloud,
@@ -16,6 +17,7 @@ import {
   CloudRain,
   Snowflake,
   CloudLightning,
+  CloudOff,
   Thermometer,
   Droplets,
   Wind,
@@ -86,6 +88,31 @@ export function WeatherBadge({ activityId }: WeatherBadgeProps) {
   }
 
   if (!weather) {
+    // In WASM mode, weather requires external API calls that can't work in browser
+    if (isWasmMode()) {
+      return (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Weather</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <CloudOff className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Weather data is not available in browser mode.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Use the server deployment to fetch weather from Open-Meteo.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
     return null
   }
 

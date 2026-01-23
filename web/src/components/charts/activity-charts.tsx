@@ -6,6 +6,9 @@ import {
   calendarPalettes,
   defaultGridConfig,
   defaultTooltipConfig,
+  maxInlineLegendItems,
+  sportColors,
+  groupSmallSlices,
 } from './chart-constants'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
@@ -160,27 +163,22 @@ export function SportDistributionChart({
 
   const getValue = (d: SportData) => (metric === 'count' ? d.count : d.distance)
 
-  const sportColorMap: Record<string, string> = {
-    Ride: chartColors.ride,
-    VirtualRide: chartColors.ride,
-    MountainBikeRide: chartColors.ride,
-    GravelRide: chartColors.ride,
-    Run: chartColors.run,
-    VirtualRun: chartColors.run,
-    TrailRun: chartColors.run,
-    Walk: chartColors.walk,
-    Hike: chartColors.walk,
-    Swim: chartColors.swim,
-    AlpineSki: chartColors.winter,
-    NordicSki: chartColors.winter,
-    Snowboard: chartColors.winter,
-  }
+  // Prepare data with grouping for charts with many categories
+  const preparedData = groupSmallSlices(
+    data.map((d) => ({
+      name: d.sport_type,
+      value: getValue(d),
+    })),
+    8, // maxCategories
+    sportColors
+  )
 
   // Responsive layout logic based on container dimensions
   const isCompact = dimensions.height < 200 || dimensions.width < 280
   const isNarrow = dimensions.width < 350
+  const hasManyCategories = preparedData.length > maxInlineLegendItems
 
-  // Adapt chart configuration based on size
+  // Adapt chart configuration based on size and number of categories
   const chartConfig = isCompact
     ? {
         // Compact mode: no legend, centered chart, smaller radius
@@ -188,11 +186,12 @@ export function SportDistributionChart({
         center: ['50%', '50%'] as [string, string],
         showLegend: false,
         legendPosition: {} as Record<string, unknown>,
+        legendType: 'plain' as const,
       }
-    : isNarrow
+    : isNarrow || hasManyCategories
       ? {
-          // Narrow mode: horizontal legend below chart
-          radius: ['40%', '65%'] as [string, string],
+          // Use bottom legend for narrow views or when there are many categories
+          radius: ['35%', '60%'] as [string, string],
           center: ['50%', '40%'] as [string, string],
           showLegend: true,
           legendPosition: {
@@ -200,6 +199,8 @@ export function SportDistributionChart({
             left: 'center',
             orient: 'horizontal' as const,
           },
+          // Use scrollable legend when there are many categories
+          legendType: hasManyCategories ? ('scroll' as const) : ('plain' as const),
         }
       : {
           // Full mode: vertical legend on right side
@@ -211,6 +212,7 @@ export function SportDistributionChart({
             top: 'center',
             orient: 'vertical' as const,
           },
+          legendType: 'plain' as const,
         }
 
   const option: EChartsOption = {
@@ -226,13 +228,23 @@ export function SportDistributionChart({
     legend: chartConfig.showLegend
       ? {
           ...chartConfig.legendPosition,
+          type: chartConfig.legendType,
           textStyle: {
             color: '#888',
-            fontSize: isNarrow ? 10 : 12,
+            fontSize: isNarrow || hasManyCategories ? 10 : 12,
           },
-          itemWidth: isNarrow ? 10 : 14,
-          itemHeight: isNarrow ? 10 : 14,
-          itemGap: isNarrow ? 6 : 10,
+          itemWidth: isNarrow || hasManyCategories ? 10 : 14,
+          itemHeight: isNarrow || hasManyCategories ? 10 : 14,
+          itemGap: isNarrow || hasManyCategories ? 6 : 10,
+          // Scroll legend controls
+          pageButtonItemGap: 5,
+          pageButtonGap: 5,
+          pageIconColor: '#888',
+          pageIconInactiveColor: '#444',
+          pageTextStyle: {
+            color: '#888',
+            fontSize: 10,
+          },
         }
       : undefined,
     series: [
@@ -256,13 +268,11 @@ export function SportDistributionChart({
             fontWeight: 'bold',
           },
         },
-        data: data.map((d, idx) => ({
-          name: d.sport_type.replace(/([A-Z])/g, ' $1').trim(),
-          value: getValue(d),
+        data: preparedData.map((d) => ({
+          name: d.name.replace(/([A-Z])/g, ' $1').trim(),
+          value: d.value,
           itemStyle: {
-            color:
-              sportColorMap[d.sport_type] ??
-              Object.values(chartColors)[idx % Object.values(chartColors).length],
+            color: d.color,
           },
         })),
       },
@@ -277,7 +287,8 @@ export function SportDistributionChart({
 }
 
 // Activity calendar heatmap
-export type CalendarMetric = 'count' | 'distance' | 'time' | 'calories'
+export type CalendarMetric = 'count' | 'distance' | 'time' | 'calories' | 'intensity'
+export type CalendarRange = 'year' | 'rolling365'
 
 interface CalendarData {
   date: string
@@ -285,11 +296,14 @@ interface CalendarData {
   distance?: number
   time?: number // seconds
   calories?: number
+  intensity?: number // suffer_score / relative effort
 }
 
 interface ActivityCalendarChartProps {
   data: CalendarData[]
-  year: number
+  year?: number // Used when rangeType is 'year'
+  rangeType?: CalendarRange
+  dateRange?: [string, string] // [startDate, endDate] for rolling365
   metric?: CalendarMetric
   height?: number | string
   loading?: boolean
@@ -299,6 +313,8 @@ interface ActivityCalendarChartProps {
 export function ActivityCalendarChart({
   data,
   year,
+  rangeType = 'year',
+  dateRange,
   metric = 'count',
   height = 180,
   loading = false,
@@ -315,6 +331,8 @@ export function ActivityCalendarChart({
         return (d.time ?? 0) / 60 // Convert to minutes
       case 'calories':
         return d.calories ?? 0
+      case 'intensity':
+        return d.intensity ?? 0
     }
   }
 
@@ -332,12 +350,20 @@ export function ActivityCalendarChart({
       }
       case 'calories':
         return `${date}<br/>${Math.round(value)} kcal`
+      case 'intensity':
+        return `${date}<br/>Intensity: ${Math.round(value)}`
     }
   }
 
   const values = data.map((d) => getValue(d))
   const maxValue = Math.max(...values, 1)
   const palette = calendarPalettes[metric]
+
+  // Calculate the calendar range based on rangeType
+  const calendarRange =
+    rangeType === 'rolling365' && dateRange
+      ? dateRange
+      : (year?.toString() ?? new Date().getFullYear().toString())
 
   const option: EChartsOption = {
     tooltip: {
@@ -360,7 +386,7 @@ export function ActivityCalendarChart({
       left: 30,
       right: 30,
       cellSize: ['auto', 13],
-      range: year.toString(),
+      range: calendarRange,
       itemStyle: {
         borderWidth: 2,
         borderColor: 'transparent',

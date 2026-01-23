@@ -13,6 +13,7 @@ import type {
   Activity,
   ActivityFilters,
   ActivitiesResponse,
+  ActivityAnalysis,
   AuthStatus,
   // Dashboard
   DashboardData,
@@ -29,6 +30,8 @@ import type {
   HeatmapFilters,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   // Activity streams
   ActivityStream,
@@ -39,6 +42,8 @@ import type {
   HrZonesResponse,
   TrainingLoadResponse,
   ZoneTrendResponse,
+  WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -112,6 +117,7 @@ export interface DataProvider {
   getActivities(filters: ActivityFilters): Promise<ActivitiesResponse>
   getActivity(id: number): Promise<Activity>
   getActivityStreams(id: number): Promise<ActivityStream[]>
+  getActivityAnalysis(id: number, splitUnit?: 'km' | 'mi'): Promise<ActivityAnalysis>
   getActivityWeather(id: number): Promise<ActivityWeather | null>
 
   // ============================================================================
@@ -125,6 +131,7 @@ export interface DataProvider {
   getMonthlyStats(year?: number): Promise<MonthlyStat[]>
   getYearlyStats(): Promise<YearlyStat[]>
   getCalendarData(year: number): Promise<CalendarDay[]>
+  getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]>
   getCalendarActivities(year: number, month: number): Promise<CalendarActivity[]>
   getCalendarSummary(year: number, month: number): Promise<CalendarMonthSummary>
   getDashboardConfig(): Promise<DashboardConfig>
@@ -134,8 +141,10 @@ export interface DataProvider {
   // Heatmap & Eddington
   // ============================================================================
   getHeatmapData(filters: HeatmapFilters): Promise<HeatmapResponse>
-  getEddingtonData(sportType?: string): Promise<EddingtonResult>
-  getEddingtonHistory(sportType?: string): Promise<EddingtonHistoryPoint[]>
+  getEddingtonData(sportType?: string, sportGroup?: string): Promise<EddingtonResult>
+  getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]>
+  getEddingtonCompare(): Promise<EddingtonCompareOutput>
+  getSportGroups(): Promise<SportGroup[]>
 
   // ============================================================================
   // Stats & Training
@@ -153,6 +162,8 @@ export interface DataProvider {
   }): Promise<HrZonesResponse>
   getTrainingLoad(filters?: { after?: string; before?: string }): Promise<TrainingLoadResponse>
   getZoneTrend(weeks?: number): Promise<ZoneTrendResponse>
+  getWeeklyTrends(filters?: { weeks?: number; sport_type?: string }): Promise<WeeklyTrendsResponse>
+  getMonthlyComparison(filters?: { sport_type?: string }): Promise<MonthlyComparisonResponse>
   getInsights(): Promise<InsightsResponse>
   getHrZoneDefinitions(): Promise<HrZoneDefinition[]>
   upsertHrZoneDefinition(def: HrZoneDefinition): Promise<{ status: string }>
@@ -181,6 +192,7 @@ export interface DataProvider {
   createCustomGear(req: CustomGearCreateRequest): Promise<Gear>
   updateCustomGear(id: string, patch: Partial<CustomGearCreateRequest>): Promise<Gear>
   deleteCustomGear(id: string, force?: boolean): Promise<{ deleted: boolean }>
+  updateGearPrice(id: string, price: number | null, currency: string): Promise<Gear>
   getGearMonthlyUsage(includeRetired?: boolean): Promise<GearMonthlyUsage[]>
 
   // ============================================================================

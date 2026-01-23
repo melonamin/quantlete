@@ -71,4 +71,5 @@ export {
   useUpdateCustomGear,
   useDeleteCustomGear,
   useGearMonthlyUsage,
+  useUpdateGearPrice,
 } from '@/lib/data'

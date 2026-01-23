@@ -100,7 +100,7 @@ export function IntroText() {
 
   return (
     <WidgetWrapper title="Welcome" isLoading={isLoading}>
-      <div className="h-full flex flex-col">
+      <div className="h-full flex flex-col overflow-y-auto">
         {/* Welcome Header */}
         <div className="mb-4 flex-shrink-0">
           <div className="flex items-center gap-2 mb-1">

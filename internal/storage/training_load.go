@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -15,6 +16,19 @@ type DailyTrainingLoadPoint struct {
 	CTL float64 `json:"ctl"`
 	ATL float64 `json:"atl"`
 	TSB float64 `json:"tsb"`
+}
+
+type TrainingLoadDiagnostics struct {
+	TotalActivities       int      `json:"total_activities"`
+	ActivitiesWithPower   int      `json:"activities_with_power"`
+	ActivitiesWithSpeed   int      `json:"activities_with_speed"`
+	ActivitiesWithHR      int      `json:"activities_with_hr"`
+	ActivitiesWithTSS     int      `json:"activities_with_tss"`
+	HasCyclingFTP         bool     `json:"has_cycling_ftp"`
+	HasRunningFTP         bool     `json:"has_running_ftp"`
+	CyclingFTPValue       *float64 `json:"cycling_ftp_value,omitempty"`
+	RunningFTPValue       *float64 `json:"running_ftp_value,omitempty"`
+	MissingConfigWarnings []string `json:"missing_config_warnings,omitempty"`
 }
 
 type TrainingLoadRepository struct {
@@ -99,6 +113,7 @@ func (r *TrainingLoadRepository) EnsureComputedForRange(ctx context.Context, ath
 func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, athleteID int64, a ActivityForLoad) error {
 	streams, err := r.streams.GetByActivityID(ctx, a.ID)
 	if err != nil {
+		slog.Debug("training load: failed to get streams", "activity_id", a.ID, "error", err)
 		return err
 	}
 
@@ -117,23 +132,44 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 		}
 	}
 
+	slog.Debug("training load: processing activity",
+		"activity_id", a.ID,
+		"sport_type", a.SportType,
+		"has_watts", len(wattsRaw) > 0,
+		"has_speed", len(speedRaw) > 0,
+		"has_hr", len(hrRaw) > 0,
+	)
+
 	// 1) Cycling: power-based TSS.
 	if len(wattsRaw) > 0 {
 		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_cycling_watts", a.StartDate.Time)
 		if err != nil {
+			slog.Debug("training load: failed to get cycling FTP", "activity_id", a.ID, "error", err)
 			return err
 		}
 		if ftpPoint != nil && ftpPoint.Value > 0 {
 			ftp := ftpPoint.Value
 			watts, err := decodeFloat64Array(wattsRaw)
 			if err != nil {
+				slog.Debug("training load: failed to decode watts", "activity_id", a.ID, "error", err)
 				return err
 			}
 			np := analysis.NormalizedPower(watts)
 			ifactor := analysis.IntensityFactor(np, ftp)
 			tss := analysis.TrainingStressScore(a.MovingTimeS, np, ftp)
+			slog.Debug("training load: computed cycling TSS",
+				"activity_id", a.ID,
+				"ftp", ftp,
+				"np", np,
+				"if", ifactor,
+				"tss", tss,
+			)
 			return r.upsertActivity(ctx, athleteID, a, "cycling_power", ftp, np, ifactor, tss)
 		}
+		slog.Debug("training load: skipping cycling activity, no FTP configured",
+			"activity_id", a.ID,
+			"ftp_found", ftpPoint != nil,
+		)
 	}
 
 	isRun := strings.Contains(a.SportType, "Run")
@@ -147,19 +183,32 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 	if isRun && len(speedRaw) > 0 {
 		ftpPoint, err := r.metrics.LatestBefore(ctx, athleteID, "ftp_running_mps", a.StartDate.Time)
 		if err != nil {
+			slog.Debug("training load: failed to get running FTP", "activity_id", a.ID, "error", err)
 			return err
 		}
 		if ftpPoint != nil && ftpPoint.Value > 0 {
 			ftp := ftpPoint.Value
 			speeds, err := decodeFloat64Array(speedRaw)
 			if err != nil {
+				slog.Debug("training load: failed to decode speeds", "activity_id", a.ID, "error", err)
 				return err
 			}
 			np := analysis.NormalizedPower(speeds)
 			ifactor := analysis.IntensityFactor(np, ftp)
 			tss := analysis.TrainingStressScore(a.MovingTimeS, np, ftp)
+			slog.Debug("training load: computed running pace TSS",
+				"activity_id", a.ID,
+				"ftp", ftp,
+				"np", np,
+				"if", ifactor,
+				"tss", tss,
+			)
 			return r.upsertActivity(ctx, athleteID, a, "running_pace", ftp, np, ifactor, tss)
 		}
+		slog.Debug("training load: skipping running activity, no pace FTP configured",
+			"activity_id", a.ID,
+			"ftp_found", ftpPoint != nil,
+		)
 	}
 
 	// 3) Running: HR-based TSS (approximate LTHR from HR zone definition).
@@ -169,12 +218,16 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 	if isRun && len(hrRaw) > 0 && r.zones != nil {
 		def, cfg, err := r.zones.GetApplicableHR(ctx, athleteID, a.SportType, a.StartDate.Time)
 		if err != nil {
+			slog.Debug("training load: failed to get HR zones", "activity_id", a.ID, "error", err)
 			return err
 		}
 		if cfg != nil && len(cfg.Bounds) >= 4 {
 			threshold := cfg.Bounds[3]
 			if def != nil && def.Method == "percent_hrmax" {
 				if cfg.HRMax <= 0 {
+					slog.Debug("training load: skipping HR-based TSS, no max HR configured",
+						"activity_id", a.ID,
+					)
 					return nil
 				}
 				threshold *= cfg.HRMax
@@ -182,16 +235,36 @@ func (r *TrainingLoadRepository) computeAndUpsertActivity(ctx context.Context, a
 			if threshold > 0 {
 				hrs, err := decodeFloat64Array(hrRaw)
 				if err != nil {
+					slog.Debug("training load: failed to decode heart rates", "activity_id", a.ID, "error", err)
 					return err
 				}
 				nhr := analysis.NormalizedPower(hrs)
 				ifactor := analysis.IntensityFactor(nhr, threshold)
 				tss := analysis.TrainingStressScore(a.MovingTimeS, nhr, threshold)
+				slog.Debug("training load: computed running HR TSS",
+					"activity_id", a.ID,
+					"threshold", threshold,
+					"nhr", nhr,
+					"if", ifactor,
+					"tss", tss,
+				)
 				return r.upsertActivity(ctx, athleteID, a, "running_hr", threshold, nhr, ifactor, tss)
 			}
 		}
+		slog.Debug("training load: skipping running HR activity, no valid HR zone config",
+			"activity_id", a.ID,
+			"has_config", cfg != nil,
+		)
 	}
 
+	slog.Debug("training load: no computation method matched",
+		"activity_id", a.ID,
+		"sport_type", a.SportType,
+		"is_run", isRun,
+		"has_watts", len(wattsRaw) > 0,
+		"has_speed", len(speedRaw) > 0,
+		"has_hr", len(hrRaw) > 0,
+	)
 	return nil
 }
 
@@ -367,4 +440,95 @@ func (r *TrainingLoadRepository) GetActivityTSS(ctx context.Context, athleteID, 
 		return 0, nil
 	}
 	return row.TSS, nil
+}
+
+func (r *TrainingLoadRepository) GetDiagnostics(ctx context.Context, athleteID int64) (*TrainingLoadDiagnostics, error) {
+	diag := &TrainingLoadDiagnostics{}
+
+	// Get total activity count
+	err := r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM activities WHERE athlete_id = ?
+	`, athleteID).Scan(&diag.TotalActivities)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get count of activities with power data
+	err = r.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT a.id) FROM activities a
+		JOIN activity_streams s ON s.activity_id = a.id
+		WHERE a.athlete_id = ? AND s.stream_type = 'watts'
+	`, athleteID).Scan(&diag.ActivitiesWithPower)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get count of activities with speed data
+	err = r.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT a.id) FROM activities a
+		JOIN activity_streams s ON s.activity_id = a.id
+		WHERE a.athlete_id = ? AND s.stream_type = 'velocity_smooth'
+	`, athleteID).Scan(&diag.ActivitiesWithSpeed)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get count of activities with HR data
+	err = r.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT a.id) FROM activities a
+		JOIN activity_streams s ON s.activity_id = a.id
+		WHERE a.athlete_id = ? AND s.stream_type = 'heartrate'
+	`, athleteID).Scan(&diag.ActivitiesWithHR)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get count of activities with computed TSS
+	err = r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM activity_training_load WHERE athlete_id = ?
+	`, athleteID).Scan(&diag.ActivitiesWithTSS)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for cycling FTP
+	cyclingFTP, err := r.metrics.GetCurrentFTP(ctx, athleteID, "ftp_cycling_watts")
+	if err != nil {
+		return nil, err
+	}
+	if cyclingFTP != nil && cyclingFTP.Value > 0 {
+		diag.HasCyclingFTP = true
+		diag.CyclingFTPValue = &cyclingFTP.Value
+	}
+
+	// Check for running FTP
+	runningFTP, err := r.metrics.GetCurrentFTP(ctx, athleteID, "ftp_running_mps")
+	if err != nil {
+		return nil, err
+	}
+	if runningFTP != nil && runningFTP.Value > 0 {
+		diag.HasRunningFTP = true
+		diag.RunningFTPValue = &runningFTP.Value
+	}
+
+	// Generate warnings
+	if diag.ActivitiesWithPower > 0 && !diag.HasCyclingFTP {
+		diag.MissingConfigWarnings = append(diag.MissingConfigWarnings,
+			"You have activities with power data but no cycling FTP configured. Set your FTP in Settings to enable TSS calculation.")
+	}
+	if diag.ActivitiesWithSpeed > 0 && !diag.HasRunningFTP {
+		// Count running activities specifically
+		var runningWithSpeed int
+		_ = r.db.QueryRowContext(ctx, `
+			SELECT COUNT(DISTINCT a.id) FROM activities a
+			JOIN activity_streams s ON s.activity_id = a.id
+			WHERE a.athlete_id = ? AND s.stream_type = 'velocity_smooth' AND a.sport_type LIKE '%Run%'
+		`, athleteID).Scan(&runningWithSpeed)
+		if runningWithSpeed > 0 {
+			diag.MissingConfigWarnings = append(diag.MissingConfigWarnings,
+				"You have running activities with pace data but no running threshold pace configured. Set your threshold pace in Settings to enable TSS calculation.")
+		}
+	}
+
+	return diag, nil
 }

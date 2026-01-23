@@ -10,6 +10,7 @@ import type { DataProvider } from '../provider'
 import type {
   // Core
   Activity,
+  ActivityAnalysis,
   ActivityFilters,
   ActivitiesResponse,
   AuthStatus,
@@ -28,6 +29,8 @@ import type {
   HeatmapFilters,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   // Activity streams
   ActivityStream,
@@ -38,6 +41,8 @@ import type {
   HrZonesResponse,
   TrainingLoadResponse,
   ZoneTrendResponse,
+  WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -121,6 +126,10 @@ export class ServerProvider implements DataProvider {
       search: filters.search,
       commute: filters.commute,
       trainer: filters.trainer,
+      min_distance_m: filters.min_distance_m,
+      max_distance_m: filters.max_distance_m,
+      min_duration_s: filters.min_duration_s,
+      max_duration_s: filters.max_duration_s,
       page: filters.page,
       per_page: filters.per_page,
       order_by: filters.order_by,
@@ -134,6 +143,11 @@ export class ServerProvider implements DataProvider {
 
   async getActivityStreams(id: number): Promise<ActivityStream[]> {
     return get<ActivityStream[]>(`/activities/${id}/streams`)
+  }
+
+  async getActivityAnalysis(id: number, splitUnit?: 'km' | 'mi'): Promise<ActivityAnalysis> {
+    const params = splitUnit ? `?split_unit=${splitUnit}` : ''
+    return get<ActivityAnalysis>(`/activities/${id}/analysis${params}`)
   }
 
   async getActivityWeather(id: number): Promise<ActivityWeather | null> {
@@ -182,6 +196,12 @@ export class ServerProvider implements DataProvider {
     return get<CalendarDay[]>(`/dashboard/calendar?year=${year}`)
   }
 
+  async getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]> {
+    return get<CalendarDay[]>(
+      `/dashboard/calendar/range?start_date=${startDate}&end_date=${endDate}`
+    )
+  }
+
   async getCalendarActivities(year: number, month: number): Promise<CalendarActivity[]> {
     return get<CalendarActivity[]>(`/dashboard/calendar/activities?year=${year}&month=${month}`)
   }
@@ -212,14 +232,28 @@ export class ServerProvider implements DataProvider {
     return get<HeatmapResponse>(`/stats/heatmap${qs ? `?${qs}` : ''}`)
   }
 
-  async getEddingtonData(sportType?: string): Promise<EddingtonResult> {
-    const params = sportType ? `?sport_type=${sportType}` : ''
-    return get<EddingtonResult>(`/stats/eddington${params}`)
+  async getEddingtonData(sportType?: string, sportGroup?: string): Promise<EddingtonResult> {
+    const params = new URLSearchParams()
+    if (sportType) params.set('sport_type', sportType)
+    if (sportGroup) params.set('sport_group', sportGroup)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return get<EddingtonResult>(`/stats/eddington${query}`)
   }
 
-  async getEddingtonHistory(sportType?: string): Promise<EddingtonHistoryPoint[]> {
-    const params = sportType ? `?sport_type=${sportType}` : ''
-    return get<EddingtonHistoryPoint[]>(`/stats/eddington/history${params}`)
+  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
+    const params = new URLSearchParams()
+    if (sportType) params.set('sport_type', sportType)
+    if (sportGroup) params.set('sport_group', sportGroup)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return get<EddingtonHistoryPoint[]>(`/stats/eddington/history${query}`)
+  }
+
+  async getEddingtonCompare(): Promise<EddingtonCompareOutput> {
+    return get<EddingtonCompareOutput>('/stats/eddington/compare')
+  }
+
+  async getSportGroups(): Promise<SportGroup[]> {
+    return get<SportGroup[]>('/stats/sport-groups')
   }
 
   // ============================================================================
@@ -266,6 +300,26 @@ export class ServerProvider implements DataProvider {
     if (weeks) params.set('weeks', String(weeks))
     const qs = params.toString()
     return get<ZoneTrendResponse>(`/stats/zone-trend${qs ? `?${qs}` : ''}`)
+  }
+
+  async getWeeklyTrends(filters?: {
+    weeks?: number
+    sport_type?: string
+  }): Promise<WeeklyTrendsResponse> {
+    const params = new URLSearchParams()
+    if (filters?.weeks) params.set('weeks', String(filters.weeks))
+    if (filters?.sport_type) params.set('sport_type', filters.sport_type)
+    const qs = params.toString()
+    return get<WeeklyTrendsResponse>(`/stats/weekly-trends${qs ? `?${qs}` : ''}`)
+  }
+
+  async getMonthlyComparison(filters?: {
+    sport_type?: string
+  }): Promise<MonthlyComparisonResponse> {
+    const params = new URLSearchParams()
+    if (filters?.sport_type) params.set('sport_type', filters.sport_type)
+    const qs = params.toString()
+    return get<MonthlyComparisonResponse>(`/stats/monthly-comparison${qs ? `?${qs}` : ''}`)
   }
 
   async getInsights(): Promise<InsightsResponse> {
@@ -361,6 +415,13 @@ export class ServerProvider implements DataProvider {
 
   async deleteCustomGear(id: string, force?: boolean): Promise<{ deleted: boolean }> {
     return del<{ deleted: boolean }>(`/gear/custom/${id}${force ? '?force=true' : ''}`)
+  }
+
+  async updateGearPrice(id: string, price: number | null, currency: string): Promise<Gear> {
+    return put<Gear>(`/gear/${id}/price`, {
+      purchase_price: price,
+      purchase_currency: currency,
+    })
   }
 
   async getGearMonthlyUsage(includeRetired = true): Promise<GearMonthlyUsage[]> {

@@ -10,6 +10,7 @@ import { useDataProviderStatus } from './context'
 import { STALE_TIME } from '@/lib/constants'
 import type {
   Activity,
+  ActivityAnalysis,
   ActivityFilters,
   ActivityStream,
   ActivitiesResponse,
@@ -36,6 +37,7 @@ import type {
   DashboardStats,
   DistributionSlice,
   DueComponent,
+  EddingtonCompareOutput,
   EddingtonHistoryPoint,
   EddingtonResult,
   ExportStats,
@@ -51,6 +53,7 @@ import type {
   ImportProgress,
   InsightsResponse,
   LogMaintenanceRequest,
+  MonthlyComparisonResponse,
   MonthlyStat,
   PhotosFilters,
   PhotosListResponse,
@@ -65,6 +68,7 @@ import type {
   SegmentEffortsResponse,
   SegmentsFilters,
   SegmentsResponse,
+  SportGroup,
   SportTypeStat,
   StartImportRequest,
   SyncWatermark,
@@ -73,6 +77,7 @@ import type {
   TrainingLoadResponse,
   UpdateCredentialsRequest,
   WeeklyStat,
+  WeeklyTrendsResponse,
   WeightHistoryResponse,
   YearlyStat,
   ZoneTrendResponse,
@@ -256,6 +261,19 @@ export function useCalendarData(year: number) {
   })
 }
 
+export function useCalendarDataRange(startDate: string, endDate: string) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'calendar', 'range', startDate, endDate],
+    queryFn: async (): Promise<CalendarDay[]> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getCalendarDataRange(startDate, endDate)
+    },
+    enabled: initialized && !error && !!provider && !!startDate && !!endDate,
+  })
+}
+
 export function useCalendarActivities(year: number, month: number) {
   const { provider, initialized, error } = useDataProviderStatus()
 
@@ -349,6 +367,42 @@ export function useZoneTrend(weeks = 52) {
     },
     enabled: initialized && !error && !!provider,
     staleTime: 1000 * 60 * 5, // 5 minutes - zone data is expensive to compute
+  })
+}
+
+/**
+ * Hook to fetch weekly trends data for trend analysis widgets.
+ * Returns rolling N weeks of activity statistics with optional sport type filter.
+ */
+export function useWeeklyTrends(filters?: { weeks?: number; sport_type?: string }) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'stats', 'weeklyTrends', filters?.weeks ?? 12, filters?.sport_type ?? ''],
+    queryFn: async (): Promise<WeeklyTrendsResponse> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getWeeklyTrends(filters)
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+/**
+ * Hook to fetch monthly comparison data for cross-year analysis.
+ * Returns monthly aggregated stats grouped by year and month with available years list.
+ */
+export function useMonthlyComparison(filters?: { sport_type?: string }) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'stats', 'monthlyComparison', filters?.sport_type ?? ''],
+    queryFn: async (): Promise<MonthlyComparisonResponse> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getMonthlyComparison(filters)
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
 
@@ -516,6 +570,20 @@ export function useActivityWeather(id: number, enabled = true) {
   })
 }
 
+export function useActivityAnalysis(id: number, splitUnit?: 'km' | 'mi', enabled = true) {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'activity', id, 'analysis', splitUnit],
+    queryFn: async (): Promise<ActivityAnalysis> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getActivityAnalysis(id, splitUnit)
+    },
+    enabled: enabled && id > 0 && initialized && !error && !!provider,
+    staleTime: STALE_TIME.MEDIUM, // Analysis is computed from streams, can be cached
+  })
+}
+
 // ============================================================================
 // Heatmap & Eddington
 // ============================================================================
@@ -533,29 +601,56 @@ export function useHeatmap(filters: HeatmapFilters) {
   })
 }
 
-export function useEddington(sportType?: string) {
+export function useEddington(sportType?: string, sportGroup?: string) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
-    queryKey: ['data', 'eddington', sportType],
+    queryKey: ['data', 'eddington', sportType, sportGroup],
     queryFn: async (): Promise<EddingtonResult> => {
       if (!provider) throw new Error('Provider not ready')
-      return provider.getEddingtonData(sportType)
+      return provider.getEddingtonData(sportType, sportGroup)
     },
     enabled: initialized && !error && !!provider,
   })
 }
 
-export function useEddingtonHistory(sportType?: string) {
+export function useEddingtonHistory(sportType?: string, sportGroup?: string) {
   const { provider, initialized, error } = useDataProviderStatus()
 
   return useQuery({
-    queryKey: ['data', 'eddington', 'history', sportType],
+    queryKey: ['data', 'eddington', 'history', sportType, sportGroup],
     queryFn: async (): Promise<EddingtonHistoryPoint[]> => {
       if (!provider) throw new Error('Provider not ready')
-      return provider.getEddingtonHistory(sportType)
+      return provider.getEddingtonHistory(sportType, sportGroup)
     },
     enabled: initialized && !error && !!provider,
+  })
+}
+
+export function useEddingtonCompare() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'eddington', 'compare'],
+    queryFn: async (): Promise<EddingtonCompareOutput> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getEddingtonCompare()
+    },
+    enabled: initialized && !error && !!provider,
+  })
+}
+
+export function useSportGroups() {
+  const { provider, initialized, error } = useDataProviderStatus()
+
+  return useQuery({
+    queryKey: ['data', 'sportGroups'],
+    queryFn: async (): Promise<SportGroup[]> => {
+      if (!provider) throw new Error('Provider not ready')
+      return provider.getSportGroups()
+    },
+    enabled: initialized && !error && !!provider,
+    staleTime: Infinity, // Sport groups don't change
   })
 }
 
@@ -970,6 +1065,43 @@ export function useDeleteCustomGear() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data', 'gear'] })
+    },
+  })
+}
+
+/**
+ * Hook to update purchase price and currency for any gear item.
+ * Works for both Strava-imported and custom gear.
+ *
+ * @returns Mutation for updating gear price. Pass null for price to clear it.
+ *
+ * @example
+ * const updatePrice = useUpdateGearPrice()
+ * updatePrice.mutate({ id: 'b12345', price: 499.99, currency: 'USD' })
+ * updatePrice.mutate({ id: 'b12345', price: null, currency: '' }) // Clear price
+ */
+export function useUpdateGearPrice() {
+  const { provider, initialized } = useDataProviderStatus()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      price,
+      currency,
+    }: {
+      id: string
+      price: number | null
+      currency: string
+    }) => {
+      if (!provider || !initialized) throw new Error('Provider not ready')
+      return provider.updateGearPrice(id, price, currency)
+    },
+    onSuccess: (_, { id }) => {
+      // Invalidate all gear queries (list, custom, monthly usage, etc.)
+      queryClient.invalidateQueries({ queryKey: ['data', 'gear'] })
+      // Also invalidate the specific gear detail query to ensure it refreshes
+      queryClient.invalidateQueries({ queryKey: ['data', 'gear', 'detail', id] })
     },
   })
 }

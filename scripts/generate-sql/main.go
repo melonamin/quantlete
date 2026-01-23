@@ -132,6 +132,9 @@ var (
 	nameRe  = regexp.MustCompile(`^--\s*name:\s*(\w+)\s+(:one|:many|:exec)`)
 	sliceRe = regexp.MustCompile(`/\*SLICE:(\w+)\*/`)
 	paramRe = regexp.MustCompile(`\?(\d+)`)
+	// gearQueryRe matches queries that operate on the gear table (gear IDs are strings like "b12345")
+	// Uses word boundaries to avoid false positives (e.g., "gearbox" or "some_gear_table")
+	gearQueryRe = regexp.MustCompile(`(?i)\b(from\s+gear|from\s+v_gear|update\s+gear)\b`)
 )
 
 func parseQueryFile(path string) ([]Query, error) {
@@ -236,25 +239,35 @@ func extractParams(sql string) []string {
 	return params
 }
 
-// parseSelectColumns extracts columns from a SELECT statement.
+// parseSelectColumns extracts columns from a SELECT statement or RETURNING clause.
 func parseSelectColumns(sql string) []Column {
-	// Find SELECT ... FROM portion (FROM must be at depth 0, not inside subquery)
 	upperSQL := strings.ToUpper(sql)
+
+	// First, try to parse SELECT ... FROM
 	selectIdx := strings.Index(upperSQL, "SELECT")
-	if selectIdx == -1 {
-		return nil
+	if selectIdx != -1 {
+		fromIdx := findFromOutsideParens(upperSQL, selectIdx+6)
+		if fromIdx != -1 {
+			columnPart := strings.TrimSpace(sql[selectIdx+6 : fromIdx])
+			return parseColumnList(columnPart, sql)
+		}
 	}
 
-	// Find FROM that is not inside parentheses
-	fromIdx := findFromOutsideParens(upperSQL, selectIdx+6)
-	if fromIdx == -1 {
-		return nil
+	// If no SELECT, try to parse RETURNING clause (for UPDATE/INSERT/DELETE ... RETURNING)
+	returningIdx := strings.Index(upperSQL, "RETURNING")
+	if returningIdx != -1 {
+		// RETURNING clause goes to end of statement (or semicolon)
+		columnPart := strings.TrimSpace(sql[returningIdx+9:])
+		// Remove trailing semicolon if present
+		columnPart = strings.TrimSuffix(strings.TrimSpace(columnPart), ";")
+		return parseColumnList(columnPart, sql)
 	}
 
-	// Extract column list
-	columnPart := strings.TrimSpace(sql[selectIdx+6 : fromIdx])
+	return nil
+}
 
-	// Split by comma, handling nested parentheses
+// parseColumnList parses a comma-separated list of columns.
+func parseColumnList(columnPart, fullSQL string) []Column {
 	columns := splitColumns(columnPart)
 
 	var result []Column
@@ -264,7 +277,7 @@ func parseSelectColumns(sql string) []Column {
 			continue
 		}
 
-		c := parseColumn(col, sql)
+		c := parseColumn(col, fullSQL)
 		if c.SQLName != "" {
 			result = append(result, c)
 		}
@@ -403,14 +416,12 @@ func findASOutsideParens(col string) int {
 func inferGoType(name, expr, fullSQL string) string {
 	lowerName := strings.ToLower(name)
 	lowerExpr := strings.ToLower(expr)
-	lowerSQL := strings.ToLower(fullSQL)
 
 	// Check if wrapped in COALESCE - makes it non-nullable
 	hasCoalesce := strings.Contains(lowerExpr, "coalesce(")
 
 	// Check if this is a gear table query (gear IDs are strings like "b12345")
-	isGearQuery := strings.Contains(lowerSQL, "from gear") ||
-		strings.Contains(lowerSQL, "from v_gear")
+	isGearQuery := gearQueryRe.MatchString(fullSQL)
 
 	// ID fields - gear IDs are strings (Strava format: "b12345")
 	if lowerName == "id" {
@@ -634,12 +645,10 @@ func inferParamName(pos, context string) string {
 // fullSQL is provided for additional context (e.g., to detect gear table queries).
 func inferParamType(pos, context, fullSQL string) string {
 	lowerCtx := strings.ToLower(context)
-	lowerSQL := strings.ToLower(fullSQL)
 	placeholder := "?" + pos
 
 	// Check if this is a gear table query (gear IDs are strings like "b12345")
-	isGearQuery := strings.Contains(lowerSQL, "from gear") ||
-		strings.Contains(lowerSQL, "from v_gear")
+	isGearQuery := gearQueryRe.MatchString(fullSQL)
 
 	// For INSERT statements, infer type from column name at corresponding position
 	if insertType := inferInsertParamType(pos, fullSQL); insertType != "" {

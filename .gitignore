@@ -105,3 +105,6 @@ wasm
 
 # Git worktrees
 .worktrees/
+
+# ralphex progress logs
+progress-*.txt

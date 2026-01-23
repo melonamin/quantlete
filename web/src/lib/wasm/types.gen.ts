@@ -10,6 +10,14 @@
 // From activities.go
 // ============================================================================
 
+/** ActivityAnalysisOutput contains all analysis data for an activity. */
+export interface ActivityAnalysisOutput {
+  activity_id: number
+  splits?: SplitsOutput | null
+  hr_zones?: HRZonesOutput | null
+  pace_distribution?: PaceDistributionOutput | null
+}
+
 /** ActivityItem represents an activity in responses. */
 export interface ActivityItem {
   id: number
@@ -84,6 +92,20 @@ export interface GetActivityStreamsInput {
   activity_id: number
 }
 
+/** GetAnalysisInput contains parameters for getting activity analysis. */
+export interface GetAnalysisInput {
+  activity_id: number
+  split_unit: string
+}
+
+/** HRZonesOutput contains HR zone distribution data. */
+export interface HRZonesOutput {
+  zones: ZoneItem[]
+  total_seconds: number
+  avg_hr: number
+  max_hr: number
+}
+
 /** ListActivitiesInput contains parameters for listing activities. */
 export interface ListActivitiesInput {
   sport_types: string[]
@@ -93,6 +115,10 @@ export interface ListActivitiesInput {
   commute?: boolean | null
   trainer?: boolean | null
   search: string
+  min_distance_m?: number | null
+  max_distance_m?: number | null
+  min_duration_s?: number | null
+  max_duration_s?: number | null
   page: number
   per_page: number
   order_by: string
@@ -106,6 +132,25 @@ export interface ListActivitiesOutput {
   page: number
   per_page: number
   total_pages: number
+}
+
+/** PaceBucketItem represents a pace histogram bucket. */
+export interface PaceBucketItem {
+  min_pace: number
+  max_pace: number
+  count: number
+  seconds: number
+  percentage: number
+}
+
+/** PaceDistributionOutput contains pace histogram data. */
+export interface PaceDistributionOutput {
+  buckets: PaceBucketItem[]
+  total_seconds: number
+  avg_pace: number
+  fastest_pace: number
+  slowest_pace: number
+  median_pace: number
 }
 
 /** SaveActivityInput contains parameters for saving an activity. */
@@ -166,6 +211,37 @@ export interface SaveStreamInput {
 /** SaveStreamOutput contains the result of saving a stream. */
 export interface SaveStreamOutput {
   message: string
+}
+
+/** SplitItem represents a single split in the analysis output. */
+export interface SplitItem {
+  index: number
+  distance_m: number
+  duration_s: number
+  pace_sec_km: number
+  avg_hr?: number
+  avg_watts?: number
+  elev_gain: number
+  elev_loss: number
+}
+
+/** SplitsOutput contains computed splits data. */
+export interface SplitsOutput {
+  splits: SplitItem[]
+  split_length_m: number
+  total_splits: number
+  fastest_split: number
+  slowest_split: number
+}
+
+/** ZoneItem represents time spent in a single HR zone. */
+export interface ZoneItem {
+  zone: number
+  seconds: number
+  percentage: number
+  min_bpm: number
+  max_bpm: number
+  label: string
 }
 
 // ============================================================================
@@ -337,6 +413,7 @@ export interface CalendarDayOutput {
   total_distance: number
   total_time: number
   total_calories: number
+  total_intensity: number
 }
 
 /** CalendarMonthSummaryOutput represents a monthly summary for the calendar. */
@@ -414,6 +491,12 @@ export interface GetCalendarActivitiesInput {
 /** GetCalendarDataInput contains parameters for getting calendar data. */
 export interface GetCalendarDataInput {
   year: number
+}
+
+/** GetCalendarDataRangeInput contains parameters for getting calendar data by date range. */
+export interface GetCalendarDataRangeInput {
+  start_date: string
+  end_date: string
 }
 
 /** GetDistributionInput contains parameters for distribution queries. */
@@ -587,6 +670,13 @@ export interface UpdateCustomGearInput {
   name?: string | null
   hashtag?: string | null
   retired?: boolean | null
+  purchase_price?: number | null
+  purchase_currency?: string | null
+}
+
+/** UpdateGearPriceInput contains parameters for updating gear price. */
+export interface UpdateGearPriceInput {
+  gear_id: string
   purchase_price?: number | null
   purchase_currency?: string | null
 }
@@ -1345,6 +1435,16 @@ export interface GetCalendarActivitiesRow {
   total_elevation_gain: number
 }
 
+/** GetCalendarDataRangeRow represents a row returned by GetCalendarDataRange. */
+export interface GetCalendarDataRangeRow {
+  date: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_calories: number
+  total_intensity: number
+}
+
 /** GetCalendarDataRow represents a row returned by GetCalendarData. */
 export interface GetCalendarDataRow {
   date: string
@@ -1352,6 +1452,7 @@ export interface GetCalendarDataRow {
   total_distance: number
   total_time: number
   total_calories: number
+  total_intensity: number
 }
 
 /** GetCalendarSummaryRow represents a row returned by GetCalendarSummary. */
@@ -1567,6 +1668,16 @@ export interface GetHeatmapCountriesRow {
   count: number
 }
 
+/** GetMonthlyComparisonRow represents a row returned by GetMonthlyComparison. */
+export interface GetMonthlyComparisonRow {
+  year: string
+  month: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
 /** GetMonthlyDistributionRow represents a row returned by GetMonthlyDistribution. */
 export interface GetMonthlyDistributionRow {
   month: string
@@ -1635,6 +1746,108 @@ export interface GetRecentActivitiesRow {
   total_elevation_gain: number
   average_speed: number
   max_speed: number
+}
+
+/** GetRewindActiveDayListRow represents a row returned by GetRewindActiveDayList. */
+export interface GetRewindActiveDayListRow {
+  day: string
+}
+
+/** GetRewindActiveDaysRow represents a row returned by GetRewindActiveDays. */
+export interface GetRewindActiveDaysRow {
+  count: number
+}
+
+/** GetRewindBiggestDistanceRow represents a row returned by GetRewindBiggestDistance. */
+export interface GetRewindBiggestDistanceRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  distance: number
+}
+
+/** GetRewindBiggestDurationRow represents a row returned by GetRewindBiggestDuration. */
+export interface GetRewindBiggestDurationRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  moving_time: number
+}
+
+/** GetRewindBiggestElevationRow represents a row returned by GetRewindBiggestElevation. */
+export interface GetRewindBiggestElevationRow {
+  id: number
+  name: string
+  sport_type: string
+  start_date_local: string
+  total_elevation_gain: number
+}
+
+/** GetRewindDateRangeRow represents a row returned by GetRewindDateRange. */
+export interface GetRewindDateRangeRow {
+  min_day: number
+  max_day: number
+}
+
+/** GetRewindLocationsRow represents a row returned by GetRewindLocations. */
+export interface GetRewindLocationsRow {
+  start_lat: number
+  start_lng: number
+  count: number
+}
+
+/** GetRewindMonthsRow represents a row returned by GetRewindMonths. */
+export interface GetRewindMonthsRow {
+  month: string
+  activity_count: number
+  distance_m: number
+  elevation_m: number
+}
+
+/** GetRewindMovingTimeBySportRow represents a row returned by GetRewindMovingTimeBySport. */
+export interface GetRewindMovingTimeBySportRow {
+  sport_type: string
+  moving_time: number
+}
+
+/** GetRewindPRsByMonthRow represents a row returned by GetRewindPRsByMonth. */
+export interface GetRewindPRsByMonthRow {
+  distance_type: number
+  dt: string
+  elapsed_time: number
+  best_so_far: number
+}
+
+/** GetRewindRandomPhotoRow represents a row returned by GetRewindRandomPhoto. */
+export interface GetRewindRandomPhotoRow {
+  id: number
+  activity_id: number
+  url: string
+  thumbnail_url: string
+  caption: string
+}
+
+/** GetRewindStartTimesByHourRow represents a row returned by GetRewindStartTimesByHour. */
+export interface GetRewindStartTimesByHourRow {
+  hour: string
+  count: number
+}
+
+/** GetRewindTotalsRow represents a row returned by GetRewindTotals. */
+export interface GetRewindTotalsRow {
+  activity_count: number
+  distance_m: number
+  elevation_m: number
+  total_time: number
+  kudos_count: number
+  commute_distance_m: number
+}
+
+/** GetRewindYearsRow represents a row returned by GetRewindYears. */
+export interface GetRewindYearsRow {
+  year: string
 }
 
 /** GetSegmentByIDRow represents a row returned by GetSegmentByID. */
@@ -1829,6 +2042,16 @@ export interface GetWeeklyStatsRow {
   total_elevation: number
 }
 
+/** GetWeeklyTrendsRow represents a row returned by GetWeeklyTrends. */
+export interface GetWeeklyTrendsRow {
+  week: string
+  week_start: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
 /** GetWeeklyZoneDistributionRow represents a row returned by GetWeeklyZoneDistribution. */
 export interface GetWeeklyZoneDistributionRow {
   week: string
@@ -1852,6 +2075,25 @@ export interface GetYearlyStatsRow {
 /** HasBeenNotifiedRow represents a row returned by HasBeenNotified. */
 export interface HasBeenNotifiedRow {
   count: number
+}
+
+/** UpdateGearPriceRow represents a row returned by UpdateGearPrice. */
+export interface UpdateGearPriceRow {
+  id: string
+  athlete_id: number
+  name: string
+  is_primary: boolean
+  retired: boolean
+  distance: number
+  brand_name: string
+  model_name: string
+  description: string
+  source: string
+  hashtag: string
+  purchase_price?: number | null
+  purchase_currency: string
+  created_at: string
+  updated_at: string
 }
 
 // ============================================================================
@@ -2134,6 +2376,7 @@ export interface CalendarDay {
   total_distance: number
   total_time: number
   total_calories: number
+  total_intensity: number
 }
 
 export interface CalendarMonthSummary {
@@ -2195,6 +2438,19 @@ export interface DistributionSlice {
   count: number
 }
 
+/** EddingtonCompareItem represents Eddington data for a single sport group. */
+export interface EddingtonCompareItem {
+  sport_group: string
+  name: string
+  number: number
+}
+
+/** EddingtonCompareOutput contains Eddington numbers for all predefined sport groups. */
+export interface EddingtonCompareOutput {
+  groups: EddingtonCompareItem[]
+  all_number: number
+}
+
 /** EddingtonDay represents a day's distance for Eddington calculation. */
 export interface EddingtonDay {
   date: string
@@ -2241,11 +2497,13 @@ export interface GetBestEffortsForTypeInput {
 /** GetEddingtonDataInput contains parameters for getting Eddington data. */
 export interface GetEddingtonDataInput {
   sport_types: string[]
+  sport_group: string
 }
 
 /** GetEddingtonHistoryInput contains parameters for getting Eddington history. */
 export interface GetEddingtonHistoryInput {
   sport_types: string[]
+  sport_group: string
 }
 
 /** GetHeatmapDataInput contains parameters for getting heatmap data. */
@@ -2259,6 +2517,17 @@ export interface GetHeatmapDataInput {
   offset: number
 }
 
+/** GetMonthlyComparisonInput contains parameters for getting monthly comparison data. */
+export interface GetMonthlyComparisonInput {
+  sport_type: string
+}
+
+/** GetMonthlyComparisonOutput contains the monthly comparison data. */
+export interface GetMonthlyComparisonOutput {
+  months: MonthlyComparisonPoint[]
+  years: number[]
+}
+
 /** GetPowerStatsInput contains parameters for getting power stats. */
 export interface GetPowerStatsInput {
   after?: string | null
@@ -2270,6 +2539,17 @@ export interface GetPowerStatsInput {
 export interface GetTrainingLoadInput {
   after?: string | null
   before?: string | null
+}
+
+/** GetWeeklyTrendsInput contains parameters for getting weekly trends data. */
+export interface GetWeeklyTrendsInput {
+  weeks: number
+  sport_type: string
+}
+
+/** GetWeeklyTrendsOutput contains the weekly trends data. */
+export interface GetWeeklyTrendsOutput {
+  weeks: WeeklyTrendPoint[]
 }
 
 /** GetWrappedInput contains parameters for getting wrapped data. */
@@ -2315,6 +2595,16 @@ export interface HeatmapOutput {
   limit?: number
   offset?: number
   countries?: HeatmapCountryStat[]
+}
+
+/** MonthlyComparisonPoint represents a single month's aggregated data for a specific year. */
+export interface MonthlyComparisonPoint {
+  year: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
 }
 
 /** MonthlyStat represents statistics for a single month. */
@@ -2392,6 +2682,13 @@ export interface SaveBestEffortsOutput {
   message: string
 }
 
+/** SportGroup represents a predefined group of related sport types. */
+export interface SportGroup {
+  id: string
+  name: string
+  sport_types: string[]
+}
+
 /** SportTypeStat represents statistics for a single sport type. */
 export interface SportTypeStat {
   sport_type: string
@@ -2401,15 +2698,40 @@ export interface SportTypeStat {
   total_elevation: number
 }
 
+/** TrainingLoadDiagnostics provides insights into why TSS might be zero or missing. */
+export interface TrainingLoadDiagnostics {
+  total_activities: number
+  activities_with_power: number
+  activities_with_speed: number
+  activities_with_hr: number
+  activities_with_tss: number
+  has_cycling_ftp: boolean
+  has_running_ftp: boolean
+  cycling_ftp_value?: number | null
+  running_ftp_value?: number | null
+  missing_config_warnings?: string[]
+}
+
 /** TrainingLoadOutput contains training load data. */
 export interface TrainingLoadOutput {
   series: DailyTrainingLoadPoint[]
   summary?: DailyTrainingLoadPoint | null
+  diagnostics?: TrainingLoadDiagnostics | null
 }
 
 /** WeeklyStat represents statistics for a single sport type in the current week. */
 export interface WeeklyStat {
   sport_type: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+/** WeeklyTrendPoint represents a single week's aggregated data. */
+export interface WeeklyTrendPoint {
+  week: string
+  week_start: string
   activity_count: number
   total_distance: number
   total_time: number

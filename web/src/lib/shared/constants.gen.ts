@@ -3,6 +3,7 @@
 export const EddingtonNextSteps = 5
 export const ImportEventBatchSize = 25
 export const ImportEventFlushIntervalMs = 2000
+export const MaxGearPrice = 999999.99
 export const PaginationDefaultPage = 1
 export const PaginationDefaultPerPage = 50
 export const PaginationMaxPage = 10000

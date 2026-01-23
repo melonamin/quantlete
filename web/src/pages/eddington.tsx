@@ -4,9 +4,12 @@ import {
   useAuthStatus,
   useEddington,
   useEddingtonHistory,
+  useEddingtonCompare,
+  useSportGroups,
   type EddingtonResult,
+  type EddingtonCompareItem,
 } from '@/lib/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -14,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -36,10 +40,15 @@ const DEFAULT_DEFS = [
   { id: 'runs', name: 'Runs', sport_types: ['Run', 'TrailRun', 'VirtualRun'] },
 ]
 
+type ViewMode = 'all' | 'sport-group' | 'custom'
+
 export function EddingtonPage() {
   const { data: auth } = useAuthStatus()
   const isAuthenticated = auth?.authenticated
   const { data: settings } = useAppSettings({ enabled: !!isAuthenticated })
+  const { data: sportGroups } = useSportGroups()
+  const { data: compareData, isLoading: compareLoading } = useEddingtonCompare()
+
   const defs = (
     settings?.eddington_definitions && settings.eddington_definitions.length
       ? settings.eddington_definitions
@@ -50,9 +59,11 @@ export function EddingtonPage() {
     sport_types?: string[]
   }[]
 
+  const [viewMode, setViewMode] = useState<ViewMode>('all')
+  const [selectedSportGroup, setSelectedSportGroup] = useState<string>('')
   const [defId, setDefId] = useState(defs[0]?.id ?? 'all')
 
-  // Derive effective defId - falls back to first definition if current selection is invalid
+  // Derive effective defId for custom definitions
   const effectiveDefId = useMemo(() => {
     if (!defs.length) return 'all'
     if (defs.some((d) => d.id === defId)) return defId
@@ -60,10 +71,29 @@ export function EddingtonPage() {
   }, [defs, defId])
 
   const def = defs.find((d) => d.id === effectiveDefId) ?? defs[0]
-  const sportType = def?.sport_types?.length ? def.sport_types.join(',') : undefined
 
-  const { data, isLoading, error } = useEddington(sportType)
-  const { data: history, isLoading: historyLoading } = useEddingtonHistory(sportType)
+  // Determine sport type and sport group based on view mode
+  const sportType = viewMode === 'custom' && def?.sport_types?.length
+    ? def.sport_types.join(',')
+    : undefined
+  const sportGroup = viewMode === 'sport-group' ? selectedSportGroup : undefined
+
+  const { data, isLoading, error } = useEddington(sportType, sportGroup)
+  const { data: history, isLoading: historyLoading } = useEddingtonHistory(sportType, sportGroup)
+
+  // Select first sport group with data when sport groups load
+  const availableSportGroups = useMemo(() => {
+    if (!compareData?.groups) return []
+    return compareData.groups
+  }, [compareData])
+
+  // Auto-select first sport group when switching to sport-group mode
+  const handleViewModeChange = (mode: string) => {
+    setViewMode(mode as ViewMode)
+    if (mode === 'sport-group' && availableSportGroups.length > 0 && !selectedSportGroup) {
+      setSelectedSportGroup(availableSportGroups[0].sport_group)
+    }
+  }
 
   const historySeries = useMemo(() => {
     const pts = (history ?? []).map((p) => ({ x: p.date, y: p.number }))
@@ -77,28 +107,80 @@ export function EddingtonPage() {
     ]
   }, [history])
 
+  // Get display title based on view mode
+  const displayTitle = useMemo(() => {
+    if (viewMode === 'all') return 'All Activities'
+    if (viewMode === 'sport-group') {
+      const group = sportGroups?.find((g) => g.id === selectedSportGroup)
+      return group?.name ?? 'Sport Group'
+    }
+    return def?.name ?? 'Custom'
+  }, [viewMode, selectedSportGroup, sportGroups, def])
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Eddington Number</h1>
-          <p className="text-muted-foreground">Track your Eddington number progress</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Eddington Number</h1>
+            <p className="text-muted-foreground">Track your Eddington number progress</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={effectiveDefId} onValueChange={setDefId}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {defs.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <Tabs value={viewMode} onValueChange={handleViewModeChange} className="w-full sm:w-auto">
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="sport-group">By Sport</TabsTrigger>
+              <TabsTrigger value="custom">Custom</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {viewMode === 'sport-group' && availableSportGroups.length > 0 && (
+            <Select value={selectedSportGroup} onValueChange={setSelectedSportGroup}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select sport" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSportGroups.map((g) => (
+                  <SelectItem key={g.sport_group} value={g.sport_group}>
+                    {g.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {viewMode === 'custom' && (
+            <Select value={effectiveDefId} onValueChange={setDefId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {defs.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
+
+      {/* Sport Comparison Table - always visible */}
+      {viewMode !== 'custom' && (
+        <SportComparisonCard
+          data={compareData?.groups ?? []}
+          allNumber={compareData?.all_number ?? 0}
+          isLoading={compareLoading}
+          selectedSportGroup={viewMode === 'sport-group' ? selectedSportGroup : undefined}
+          onSelectSportGroup={(id) => {
+            setViewMode('sport-group')
+            setSelectedSportGroup(id)
+          }}
+        />
+      )}
 
       {isLoading ? (
         <EddingtonSkeleton />
@@ -109,12 +191,86 @@ export function EddingtonPage() {
       ) : data ? (
         <EddingtonDisplay
           data={data}
-          title={def?.name ?? 'Eddington'}
+          title={displayTitle}
           historySeries={historySeries}
           historyLoading={historyLoading}
         />
       ) : null}
     </div>
+  )
+}
+
+function SportComparisonCard({
+  data,
+  allNumber,
+  isLoading,
+  selectedSportGroup,
+  onSelectSportGroup,
+}: {
+  data: EddingtonCompareItem[]
+  allNumber: number
+  isLoading: boolean
+  selectedSportGroup?: string
+  onSelectSportGroup: (id: string) => void
+}) {
+  if (isLoading) {
+    return (
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Sport Comparison</CardTitle>
+          <CardDescription>Eddington numbers across sport groups</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-20" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (data.length === 0) {
+    return null
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>Sport Comparison</CardTitle>
+        <CardDescription>Eddington numbers across sport groups (click to view details)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <button
+            type="button"
+            onClick={() => onSelectSportGroup('')}
+            className={`p-4 rounded-lg border text-center transition-colors hover:bg-accent ${
+              selectedSportGroup === '' ? 'border-primary bg-primary/5' : 'border-border'
+            }`}
+          >
+            <div className="text-2xl font-bold tabular-nums">{allNumber}</div>
+            <div className="text-sm text-muted-foreground">All</div>
+          </button>
+          {data.map((item) => (
+            <button
+              key={item.sport_group}
+              type="button"
+              onClick={() => onSelectSportGroup(item.sport_group)}
+              className={`p-4 rounded-lg border text-center transition-colors hover:bg-accent ${
+                selectedSportGroup === item.sport_group
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border'
+              }`}
+            >
+              <div className="text-2xl font-bold tabular-nums">{item.number}</div>
+              <div className="text-sm text-muted-foreground truncate">{item.name}</div>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

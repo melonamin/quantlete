@@ -109,7 +109,7 @@ func NewServiceRegistry(db *storage.DB, logger *slog.Logger) *ServiceRegistry {
 	r.zoneDistribution = storage.NewZoneDistributionRepository(db, r.streams, r.zones)
 
 	// Phase 3: Services
-	r.ActivityService = NewActivityService(r.activities, r.streams)
+	r.ActivityService = NewActivityService(r.activities, r.streams, r.zones)
 	r.GearService = NewGearService(r.gear)
 	r.SegmentsService = NewSegmentsService(r.segments)
 	r.PhotosService = NewPhotosService(r.photos)

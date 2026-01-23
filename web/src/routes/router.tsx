@@ -1,4 +1,10 @@
-import { createRouter, createRootRoute, createRoute, Outlet, redirect } from '@tanstack/react-router'
+import {
+  createRouter,
+  createRootRoute,
+  createRoute,
+  Outlet,
+  redirect,
+} from '@tanstack/react-router'
 import { RootLayout } from '@/components/layout/root-layout'
 import { DashboardPage } from '@/pages/dashboard'
 import { ActivitiesPage } from '@/pages/activities'

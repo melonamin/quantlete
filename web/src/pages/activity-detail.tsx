@@ -1,16 +1,24 @@
 import { useParams, Link } from '@tanstack/react-router'
 import {
   useActivity,
+  useActivityAnalysis,
   useActivityPhotos,
   useActivityStreams,
   useAppSettings,
   useAuthStatus,
 } from '@/lib/api'
-import { ActivityHeader, ActivityStats, WeatherBadge } from '@/components/activities'
+import {
+  ActivityHeader,
+  ActivityStats,
+  WeatherBadge,
+  ActivitySplits,
+  ActivityZoneDistribution,
+  ActivityPaceDistribution,
+} from '@/components/activities'
 import { ActivityMap } from '@/components/maps'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { ActivityStreamProfileChart, ElevationProfileChart } from '@/components/charts'
 import type { TileLayer } from '@/lib/maps'
 import { Button } from '@/components/ui/button'
@@ -23,8 +31,15 @@ export function ActivityDetailPage() {
   const isAuthenticated = authStatus?.authenticated
   const { data: activity, isLoading, error } = useActivity(activityNum)
   const { data: streams, isLoading: streamsLoading } = useActivityStreams(activityNum)
+  const { data: analysis, isLoading: analysisLoading } = useActivityAnalysis(
+    activityNum,
+    'km',
+    activityNum > 0
+  )
   const { data: photos, isLoading: photosLoading } = useActivityPhotos(activityNum, activityNum > 0)
   const { data: settings } = useAppSettings({ enabled: !!isAuthenticated })
+
+  const [showAnalysis, setShowAnalysis] = useState(true)
 
   const streamMap = useMemo(
     () =>
@@ -192,6 +207,51 @@ export function ActivityDetailPage() {
               loading={streamsLoading}
             />
           </div>
+        </div>
+      )}
+
+      {/* Analysis Section - Splits, HR Zones, Pace Distribution */}
+      {(analysisLoading || analysis) && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowAnalysis(!showAnalysis)}
+            className="flex w-full items-center justify-between rounded-lg border border-border bg-card p-4 text-left hover:bg-accent/50"
+          >
+            <h2 className="text-sm font-medium">Activity Analysis</h2>
+            {showAnalysis ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+
+          {showAnalysis && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {analysisLoading ? (
+                <>
+                  <Skeleton className="h-64 rounded-lg" />
+                  <Skeleton className="h-64 rounded-lg" />
+                  <Skeleton className="h-64 rounded-lg" />
+                </>
+              ) : (
+                <>
+                  {analysis?.splits && <ActivitySplits splits={analysis.splits} />}
+                  {analysis?.hr_zones && <ActivityZoneDistribution hrZones={analysis.hr_zones} />}
+                  {analysis?.pace_distribution && (
+                    <ActivityPaceDistribution paceDistribution={analysis.pace_distribution} />
+                  )}
+                  {!analysis?.splits && !analysis?.hr_zones && !analysis?.pace_distribution && (
+                    <div className="col-span-full rounded-lg border border-border bg-card p-8 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No analysis data available for this activity. Stream data may be missing or
+                        the activity type may not support analysis.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 

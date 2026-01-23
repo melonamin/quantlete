@@ -1,4 +1,5 @@
 import { DonutChart } from '@/components/charts'
+import { daytimeColors } from '@/components/charts/chart-constants'
 import { useDaytimeDistribution } from '@/lib/api'
 import { WidgetWrapper } from './widget-wrapper'
 
@@ -13,7 +14,7 @@ export function DaytimeStats() {
 
   return (
     <WidgetWrapper title="Time of Day" isLoading={isLoading}>
-      <DonutChart data={slices} height="100%" loading={isLoading} />
+      <DonutChart data={slices} height="100%" loading={isLoading} colorMap={daytimeColors} />
     </WidgetWrapper>
   )
 }

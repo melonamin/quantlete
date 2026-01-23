@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"regexp"
 	"strings"
 
 	"github.com/melonamin/quantlete/internal/pagination"
+	"github.com/melonamin/quantlete/internal/shared"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -132,6 +134,14 @@ type SaveGearInput struct {
 // SaveGearOutput contains the result of saving gear.
 type SaveGearOutput struct {
 	Message string `json:"message"`
+}
+
+// UpdateGearPriceInput contains parameters for updating gear price.
+type UpdateGearPriceInput struct {
+	AthleteID        int64    `json:"-" adapter:"context"`
+	GearID           string   `json:"gear_id" adapter:"path,param=id"`
+	PurchasePrice    *float64 `json:"purchase_price" adapter:"body"`
+	PurchaseCurrency *string  `json:"purchase_currency" adapter:"body"`
 }
 
 // ============================================================================
@@ -378,6 +388,78 @@ func (s *GearService) SaveGear(ctx context.Context, in SaveGearInput) (*SaveGear
 	return &SaveGearOutput{
 		Message: fmt.Sprintf("Gear %s saved", in.ID),
 	}, nil
+}
+
+// UpdateGearPrice updates only the purchase price and currency for any gear item.
+// This works for both Strava-imported and custom gear.
+//
+// Semantics (REPLACE, not PATCH):
+//   - This is a full replacement of price/currency fields, not a partial update.
+//   - PurchasePrice: Pass nil to clear (sets to NULL in database).
+//   - PurchaseCurrency: Pass nil or empty string "" to clear (both become NULL).
+//   - There is no "leave unchanged" option; both fields are always overwritten.
+//
+// Note: Price values are rounded to 2 decimal places (e.g., 499.995 -> 500.00).
+//
+//adapter:wasm updateGearPrice category=Gear
+//adapter:http PUT /api/v1/gear/{id}/price
+func (s *GearService) UpdateGearPrice(ctx context.Context, in UpdateGearPriceInput) (*GearItem, error) {
+	if in.GearID == "" {
+		return nil, BadRequest("gear ID required")
+	}
+
+	// Validate price if provided
+	if in.PurchasePrice != nil {
+		// Check for Inf/NaN first - these bypass numeric comparisons
+		if math.IsInf(*in.PurchasePrice, 0) || math.IsNaN(*in.PurchasePrice) {
+			return nil, BadRequest("purchase price must be a finite number")
+		}
+		if *in.PurchasePrice < 0 {
+			return nil, BadRequest("purchase price cannot be negative")
+		}
+		if *in.PurchasePrice > shared.MaxGearPrice {
+			return nil, BadRequest(fmt.Sprintf("purchase price cannot exceed %.2f", shared.MaxGearPrice))
+		}
+	}
+
+	// Validate and normalize currency if provided (empty string is allowed for clearing)
+	var normalizedCurrency *string
+	if in.PurchaseCurrency != nil {
+		trimmed := strings.TrimSpace(*in.PurchaseCurrency)
+		if trimmed != "" {
+			if currErr := validatePurchaseCurrency(trimmed); currErr != nil {
+				return nil, currErr
+			}
+			// Normalize to uppercase for consistent storage
+			upper := strings.ToUpper(trimmed)
+			normalizedCurrency = &upper
+		} else {
+			normalizedCurrency = &trimmed // empty string for clearing
+		}
+	}
+
+	// Single atomic UPDATE ... WHERE id AND athlete_id RETURNING query.
+	// Returns nil if gear doesn't exist OR doesn't belong to this athlete.
+	// This prevents gear ID enumeration attacks (both cases return NotFound).
+	updated, err := s.repo.UpdatePrice(ctx, in.AthleteID, in.GearID, in.PurchasePrice, normalizedCurrency)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to update gear price: %v", err)
+	}
+	if updated == nil {
+		return nil, NotFound("gear")
+	}
+
+	slog.Info("gear price updated", "gear_id", in.GearID, "price_set", in.PurchasePrice != nil)
+
+	count, err := s.repo.GetActivityCount(ctx, in.AthleteID, in.GearID)
+	if err != nil {
+		// Activity count is non-critical metadata; log and continue with 0
+		slog.Warn("failed to get activity count for gear", "gear_id", in.GearID, "error", err)
+		count = 0
+	}
+
+	item := gearToItem(*updated, count)
+	return &item, nil
 }
 
 // ============================================================================

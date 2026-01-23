@@ -30,6 +30,9 @@ export type {
   EddingtonStep,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareItem,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   DashboardWidgetConfig,
   WidgetWidth,
@@ -38,6 +41,17 @@ export type {
 
 // Activity stream types
 export type { ActivityStream } from '@/lib/api/activities'
+
+// Activity analysis types
+export type {
+  SplitItem,
+  SplitsOutput,
+  ZoneItem,
+  HRZonesOutput,
+  PaceBucketItem,
+  PaceDistributionOutput,
+  ActivityAnalysis,
+} from '@/lib/api/activities'
 
 // Stats types
 export type {
@@ -48,6 +62,8 @@ export type {
   DailyTrainingLoadPoint,
   TrainingLoadResponse,
   ZoneTrendResponse,
+  WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   WeeklyZoneDistribution,
   PowerZonesResponse,
   HrZoneDefinition,

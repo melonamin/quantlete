@@ -15,6 +15,7 @@ Core business logic resides in `internal/services` and is decoupled from the tra
 - `cmd/quantlete/` - Go CLI entry points (main, serve, import commands)
 - `cmd/wasm/` - WASM entry points and bridge code
 - `internal/` - Go internal packages
+    - `analysis/` - Activity analysis functions (splits, HR zones, pace distribution)
     - `api/` - HTTP handlers (Server mode)
     - `services/` - Core business logic (Shared)
     - `storage/` - Database repositories (Shared)

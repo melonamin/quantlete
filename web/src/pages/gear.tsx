@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import type React from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   useCreateComponent,
   useCreateCustomGear,
@@ -11,12 +12,14 @@ import {
   useMaintenanceDue,
   useUpdateComponent,
   useUpdateCustomGear,
+  useUpdateGearPrice,
   type ComponentWithRules,
   type CreateComponentRequest,
   type Gear,
   type GearMonthlyUsage,
   type UpdateComponentRequest,
 } from '@/lib/api'
+import { MaxGearPrice } from '@/lib/shared/constants.gen'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -45,9 +48,11 @@ export function GearPage() {
   const [customModal, setCustomModal] = useState<{ mode: 'create' | 'edit'; gear?: Gear } | null>(
     null
   )
+  const [priceModal, setPriceModal] = useState<Gear | null>(null)
   const createCustom = useCreateCustomGear()
   const updateCustom = useUpdateCustomGear()
   const deleteCustom = useDeleteCustomGear()
+  const updatePrice = useUpdateGearPrice()
 
   const totalsByGear = useMemo(() => {
     const totals = new Map<string, { movingTime: number; distance: number }>()
@@ -119,6 +124,7 @@ export function GearPage() {
                       ? () => setCustomModal({ mode: 'edit', gear: item })
                       : undefined
                   }
+                  onEditPrice={() => setPriceModal(item)}
                 />
               ))}
             </div>
@@ -149,6 +155,21 @@ export function GearPage() {
               isPending={createCustom.isPending || updateCustom.isPending || deleteCustom.isPending}
             />
           )}
+
+          {priceModal && (
+            <PriceEditModal
+              gear={priceModal}
+              onClose={() => setPriceModal(null)}
+              onSave={(id, price, currency) =>
+                updatePrice.mutate(
+                  { id, price, currency },
+                  { onSuccess: () => setPriceModal(null) }
+                )
+              }
+              error={updatePrice.error as ApiError | null}
+              isPending={updatePrice.isPending}
+            />
+          )}
         </>
       ) : (
         <MaintenancePanel gear={Array.isArray(gear) ? gear : []} />
@@ -168,16 +189,24 @@ function GearCard({
   gear,
   totals,
   onEdit,
+  onEditPrice,
 }: {
   gear: Gear
   totals?: { movingTime: number; distance: number }
   onEdit?: () => void
+  onEditPrice?: () => void
 }) {
-  const { formatDistance } = useFormattedMetrics()
+  const { formatDistance, distanceUnit, unitSystem } = useFormattedMetrics()
   const isBike = gear.id.startsWith('b') || gear.source === 'strava'
   const isCustom = gear.source === 'custom'
   const totalHours = totals ? totals.movingTime / 3600 : 0
   const activityCount = gear.activity_count ?? 0
+
+  // Calculate distance in user's preferred unit (km or mi)
+  const distanceInUserUnit =
+    unitSystem === 'imperial' ? gear.distance / 1609.344 : gear.distance / 1000
+  const costPerDistance =
+    gear.purchase_price && distanceInUserUnit > 0 ? gear.purchase_price / distanceInUserUnit : null
   const costPerHour =
     gear.purchase_price && totalHours > 0 ? gear.purchase_price / totalHours : null
   const costPerActivity =
@@ -234,6 +263,14 @@ function GearCard({
                 </span>
               </div>
               <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Cost / {distanceUnit}</span>
+                <span className="font-medium">
+                  {costPerDistance != null
+                    ? formatMoney(costPerDistance, gear.purchase_currency)
+                    : '–'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Cost / hour</span>
                 <span className="font-medium">
                   {costPerHour != null ? formatMoney(costPerHour, gear.purchase_currency) : '–'}
@@ -249,13 +286,18 @@ function GearCard({
               </div>
             </>
           )}
-          {onEdit && (
-            <div className="pt-2">
+          <div className="flex gap-2 pt-2">
+            {onEdit && (
               <Button variant="outline" size="sm" onClick={onEdit}>
                 Edit
               </Button>
-            </div>
-          )}
+            )}
+            {onEditPrice && (
+              <Button variant="outline" size="sm" onClick={onEditPrice}>
+                {gear.purchase_price != null ? 'Edit Price' : 'Add Price'}
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -554,6 +596,161 @@ function CustomGearModal({
                 Create
               </Button>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PriceEditModal({
+  gear,
+  onClose,
+  onSave,
+  error,
+  isPending,
+}: {
+  gear: Gear
+  onClose: () => void
+  onSave: (id: string, price: number | null, currency: string) => void
+  error: ApiError | null
+  isPending: boolean
+}) {
+  const [price, setPrice] = useState(gear.purchase_price != null ? String(gear.purchase_price) : '')
+  const [currency, setCurrency] = useState(gear.purchase_currency ?? '')
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Close on Escape key
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isPending) {
+        onClose()
+      }
+    },
+    [onClose, isPending]
+  )
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  const handleSave = () => {
+    setValidationError(null)
+
+    // Use parseFloat instead of Number - Number("") returns 0, parseFloat("") returns NaN
+    const parsedPrice = price.trim() === '' ? null : parseFloat(price)
+
+    // Validate price using shared constant
+    if (parsedPrice !== null) {
+      if (!Number.isFinite(parsedPrice) || Number.isNaN(parsedPrice)) {
+        setValidationError('Price must be a valid number')
+        return
+      }
+      if (parsedPrice < 0) {
+        setValidationError('Price cannot be negative')
+        return
+      }
+      if (parsedPrice > MaxGearPrice) {
+        setValidationError(`Price cannot exceed ${MaxGearPrice.toLocaleString()}`)
+        return
+      }
+    }
+
+    // Clear currency when price is null (semantically, currency without price is meaningless)
+    const trimmedCurrency = parsedPrice === null ? '' : currency.trim().toUpperCase()
+
+    // Currency is required when price is set
+    if (parsedPrice !== null) {
+      if (!trimmedCurrency) {
+        setValidationError('Currency is required when setting a price')
+        return
+      }
+      if (!/^[A-Z]{3}$/.test(trimmedCurrency)) {
+        setValidationError('Currency must be a 3-letter code (e.g., USD)')
+        return
+      }
+    }
+
+    onSave(gear.id, parsedPrice, trimmedCurrency)
+  }
+
+  const displayError = validationError || error?.message
+
+  // Close on overlay click (not when clicking modal content)
+  const handleOverlayClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget && !isPending) {
+        onClose()
+      }
+    },
+    [onClose, isPending]
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-16"
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="price-modal-title"
+    >
+      <div className="w-[calc(100%-2rem)] max-w-sm rounded-lg border border-border bg-background shadow-lg">
+        <div className="border-b border-border px-4 py-3">
+          <div id="price-modal-title" className="font-semibold">
+            Edit Price
+          </div>
+        </div>
+        <div className="space-y-3 p-4">
+          {displayError && (
+            <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              {displayError}
+            </div>
+          )}
+          <div className="text-sm text-muted-foreground">{gear.name}</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-sm text-muted-foreground mb-1">Price</Label>
+              <Input
+                className="h-9"
+                type="number"
+                step="0.01"
+                min="0"
+                value={price}
+                onChange={(e) => {
+                  setPrice(e.target.value)
+                  setValidationError(null)
+                }}
+                placeholder="e.g. 499.99"
+                disabled={isPending}
+              />
+            </div>
+            <div>
+              <Label className="text-sm text-muted-foreground mb-1">Currency</Label>
+              <Input
+                className="h-9"
+                value={currency}
+                onChange={(e) => {
+                  setCurrency(e.target.value)
+                  setValidationError(null)
+                }}
+                placeholder="USD"
+                maxLength={3}
+                disabled={isPending}
+              />
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Leave price empty to remove. Currency (3-letter code like USD, EUR) is required when
+            setting a price.
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSave} disabled={isPending}>
+              Save
+            </Button>
+            <Button variant="outline" onClick={onClose} disabled={isPending}>
+              Cancel
+            </Button>
           </div>
         </div>
       </div>

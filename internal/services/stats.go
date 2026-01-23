@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/shared"
@@ -132,6 +133,7 @@ type BestEffortListItem struct {
 type GetEddingtonDataInput struct {
 	AthleteID  int64    `json:"-" adapter:"context"`
 	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	SportGroup string   `json:"sport_group" adapter:"query"` // Predefined sport group ID (e.g., "cycling", "running")
 }
 
 // EddingtonDay represents a day's distance for Eddington calculation.
@@ -157,6 +159,7 @@ type EddingtonOutput struct {
 type GetEddingtonHistoryInput struct {
 	AthleteID  int64    `json:"-" adapter:"context"`
 	SportTypes []string `json:"sport_types" adapter:"query,name=sport_type,split=,"`
+	SportGroup string   `json:"sport_group" adapter:"query"` // Predefined sport group ID (e.g., "cycling", "running")
 }
 
 // EddingtonHistoryPoint represents a milestone point where the Eddington number increases.
@@ -214,10 +217,25 @@ type DailyTrainingLoadPoint struct {
 	TSB float64 `json:"tsb"`
 }
 
+// TrainingLoadDiagnostics provides insights into why TSS might be zero or missing.
+type TrainingLoadDiagnostics struct {
+	TotalActivities       int      `json:"total_activities"`
+	ActivitiesWithPower   int      `json:"activities_with_power"`
+	ActivitiesWithSpeed   int      `json:"activities_with_speed"`
+	ActivitiesWithHR      int      `json:"activities_with_hr"`
+	ActivitiesWithTSS     int      `json:"activities_with_tss"`
+	HasCyclingFTP         bool     `json:"has_cycling_ftp"`
+	HasRunningFTP         bool     `json:"has_running_ftp"`
+	CyclingFTPValue       *float64 `json:"cycling_ftp_value,omitempty"`
+	RunningFTPValue       *float64 `json:"running_ftp_value,omitempty"`
+	MissingConfigWarnings []string `json:"missing_config_warnings,omitempty"`
+}
+
 // TrainingLoadOutput contains training load data.
 type TrainingLoadOutput struct {
-	Series  []DailyTrainingLoadPoint `json:"series"`
-	Summary *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+	Series      []DailyTrainingLoadPoint `json:"series"`
+	Summary     *DailyTrainingLoadPoint  `json:"summary,omitempty"`
+	Diagnostics *TrainingLoadDiagnostics `json:"diagnostics,omitempty"`
 }
 
 // --- Zone Trend ---
@@ -526,7 +544,16 @@ func (s *StatsService) GetBestEffortsForType(ctx context.Context, in GetBestEffo
 //adapter:wasm getEddingtonData category=Stats
 //adapter:http GET /api/v1/stats/eddington
 func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonDataInput) (*EddingtonOutput, error) {
-	result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, in.SportTypes)
+	// Resolve sport types from sport_group if provided and sport_types is empty
+	sportTypes := in.SportTypes
+	if len(sportTypes) == 0 && in.SportGroup != "" {
+		group := shared.SportGroupByID(in.SportGroup)
+		if group != nil {
+			sportTypes = group.SportTypes
+		}
+	}
+
+	result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, sportTypes)
 	if err != nil {
 		return nil, Wrapf(ErrInternal, "failed to get eddington data: %v", err)
 	}
@@ -559,7 +586,16 @@ func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonData
 //adapter:wasm getEddingtonHistory category=Stats
 //adapter:http GET /api/v1/stats/eddington/history
 func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonHistoryInput) ([]EddingtonHistoryPoint, error) {
-	points, err := s.stats.GetEddingtonHistory(ctx, in.AthleteID, in.SportTypes)
+	// Resolve sport types from sport_group if provided and sport_types is empty
+	sportTypes := in.SportTypes
+	if len(sportTypes) == 0 && in.SportGroup != "" {
+		group := shared.SportGroupByID(in.SportGroup)
+		if group != nil {
+			sportTypes = group.SportTypes
+		}
+	}
+
+	points, err := s.stats.GetEddingtonHistory(ctx, in.AthleteID, sportTypes)
 	if err != nil {
 		return nil, Wrapf(ErrInternal, "failed to get eddington history: %v", err)
 	}
@@ -573,6 +609,91 @@ func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonH
 		result[i] = EddingtonHistoryPoint{
 			Date:   p.Date,
 			Number: p.Number,
+		}
+	}
+	return result, nil
+}
+
+// --- Eddington Compare ---
+
+// GetEddingtonCompareInput contains parameters for comparing Eddington across sport groups.
+type GetEddingtonCompareInput struct {
+	AthleteID int64 `json:"-" adapter:"context"`
+}
+
+// EddingtonCompareItem represents Eddington data for a single sport group.
+type EddingtonCompareItem struct {
+	SportGroup string `json:"sport_group"` // e.g., "cycling", "running"
+	Name       string `json:"name"`        // e.g., "Cycling", "Running"
+	Number     int    `json:"number"`      // The Eddington number
+}
+
+// EddingtonCompareOutput contains Eddington numbers for all predefined sport groups.
+type EddingtonCompareOutput struct {
+	Groups    []EddingtonCompareItem `json:"groups"`
+	AllNumber int                    `json:"all_number"` // Eddington for all activities
+}
+
+// GetEddingtonCompare returns Eddington numbers for all predefined sport groups at once.
+//
+//adapter:wasm getEddingtonCompare category=Stats
+//adapter:http GET /api/v1/stats/eddington/compare
+func (s *StatsService) GetEddingtonCompare(ctx context.Context, in GetEddingtonCompareInput) (*EddingtonCompareOutput, error) {
+	// Get Eddington for all activities
+	allResult, err := s.stats.GetEddingtonData(ctx, in.AthleteID, nil)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get eddington for all activities: %v", err)
+	}
+
+	// Get Eddington for each sport group
+	groups := shared.PredefinedSportGroups()
+	items := make([]EddingtonCompareItem, 0, len(groups))
+
+	for _, group := range groups {
+		result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, group.SportTypes)
+		if err != nil {
+			return nil, Wrapf(ErrInternal, "failed to get eddington for %s: %v", group.ID, err)
+		}
+		// Only include groups that have at least some activity
+		if result.Number > 0 {
+			items = append(items, EddingtonCompareItem{
+				SportGroup: group.ID,
+				Name:       group.Name,
+				Number:     result.Number,
+			})
+		}
+	}
+
+	return &EddingtonCompareOutput{
+		Groups:    items,
+		AllNumber: allResult.Number,
+	}, nil
+}
+
+// GetSportGroupsInput is an empty input for GetSportGroups.
+type GetSportGroupsInput struct {
+	AthleteID int64 `json:"-" adapter:"context"`
+}
+
+// SportGroup represents a predefined group of related sport types.
+type SportGroup struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	SportTypes []string `json:"sport_types"`
+}
+
+// GetSportGroups returns the list of predefined sport groups.
+//
+//adapter:wasm getSportGroups category=Stats
+//adapter:http GET /api/v1/stats/sport-groups
+func (s *StatsService) GetSportGroups(ctx context.Context, in GetSportGroupsInput) ([]SportGroup, error) {
+	groups := shared.PredefinedSportGroups()
+	result := make([]SportGroup, len(groups))
+	for i, g := range groups {
+		result[i] = SportGroup{
+			ID:         g.ID,
+			Name:       g.Name,
+			SportTypes: g.SportTypes,
 		}
 	}
 	return result, nil
@@ -684,9 +805,28 @@ func (s *StatsService) GetTrainingLoad(ctx context.Context, in GetTrainingLoadIn
 		}
 	}
 
+	// Get diagnostics to help users understand why TSS might be zero
+	storageDiag, _ := s.trainingLoad.GetDiagnostics(ctx, in.AthleteID)
+	var diagOut *TrainingLoadDiagnostics
+	if storageDiag != nil {
+		diagOut = &TrainingLoadDiagnostics{
+			TotalActivities:       storageDiag.TotalActivities,
+			ActivitiesWithPower:   storageDiag.ActivitiesWithPower,
+			ActivitiesWithSpeed:   storageDiag.ActivitiesWithSpeed,
+			ActivitiesWithHR:      storageDiag.ActivitiesWithHR,
+			ActivitiesWithTSS:     storageDiag.ActivitiesWithTSS,
+			HasCyclingFTP:         storageDiag.HasCyclingFTP,
+			HasRunningFTP:         storageDiag.HasRunningFTP,
+			CyclingFTPValue:       storageDiag.CyclingFTPValue,
+			RunningFTPValue:       storageDiag.RunningFTPValue,
+			MissingConfigWarnings: storageDiag.MissingConfigWarnings,
+		}
+	}
+
 	return &TrainingLoadOutput{
-		Series:  seriesOut,
-		Summary: summaryOut,
+		Series:      seriesOut,
+		Summary:     summaryOut,
+		Diagnostics: diagOut,
 	}, nil
 }
 
@@ -916,5 +1056,143 @@ func (s *StatsService) SaveBestEfforts(ctx context.Context, in SaveBestEffortsIn
 
 	return &SaveBestEffortsOutput{
 		Message: fmt.Sprintf("Best efforts for activity %d saved (%d efforts)", in.ActivityID, len(efforts)),
+	}, nil
+}
+
+// --- Weekly Trends ---
+
+// GetWeeklyTrendsInput contains parameters for getting weekly trends data.
+type GetWeeklyTrendsInput struct {
+	AthleteID int64  `json:"-" adapter:"context"`
+	Weeks     int    `json:"weeks" adapter:"query"`      // Number of weeks to include (default: 12, max: 52)
+	SportType string `json:"sport_type" adapter:"query"` // Optional sport type filter
+}
+
+// WeeklyTrendPoint represents a single week's aggregated data.
+type WeeklyTrendPoint struct {
+	Week           string  `json:"week"`            // ISO week format "YYYY-WNN"
+	WeekStart      string  `json:"week_start"`      // Date of week start "YYYY-MM-DD"
+	ActivityCount  int     `json:"activity_count"`  // Number of activities
+	TotalDistance  float64 `json:"total_distance"`  // Total distance in meters
+	TotalTime      int     `json:"total_time"`      // Total time in seconds
+	TotalElevation float64 `json:"total_elevation"` // Total elevation gain in meters
+}
+
+// GetWeeklyTrendsOutput contains the weekly trends data.
+type GetWeeklyTrendsOutput struct {
+	Weeks []WeeklyTrendPoint `json:"weeks"`
+}
+
+const (
+	defaultWeeklyTrendsWeeks = 12
+	maxWeeklyTrendsWeeks     = 52
+)
+
+// GetWeeklyTrends returns weekly aggregated stats for trend analysis.
+//
+//adapter:wasm getWeeklyTrends category=Stats
+//adapter:http GET /api/v1/stats/weekly-trends
+func (s *StatsService) GetWeeklyTrends(ctx context.Context, in GetWeeklyTrendsInput) (*GetWeeklyTrendsOutput, error) {
+	// Validate and normalize weeks parameter
+	weeks := in.Weeks
+	if weeks <= 0 {
+		weeks = defaultWeeklyTrendsWeeks
+	} else if weeks > maxWeeklyTrendsWeeks {
+		weeks = maxWeeklyTrendsWeeks
+	}
+
+	// Convert weeks to days for the SQL query
+	days := weeks * 7
+
+	rows, err := s.stats.GetWeeklyTrends(ctx, in.AthleteID, days, in.SportType)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get weekly trends: %v", err)
+	}
+
+	result := make([]WeeklyTrendPoint, len(rows))
+	for i, r := range rows {
+		result[i] = WeeklyTrendPoint{
+			Week:           r.Week,
+			WeekStart:      r.WeekStart,
+			ActivityCount:  r.ActivityCount,
+			TotalDistance:  r.TotalDistance,
+			TotalTime:      r.TotalTime,
+			TotalElevation: r.TotalElevation,
+		}
+	}
+
+	return &GetWeeklyTrendsOutput{
+		Weeks: result,
+	}, nil
+}
+
+// --- Monthly Comparison ---
+
+// GetMonthlyComparisonInput contains parameters for getting monthly comparison data.
+type GetMonthlyComparisonInput struct {
+	AthleteID int64  `json:"-" adapter:"context"`
+	SportType string `json:"sport_type" adapter:"query"` // Optional sport type filter
+}
+
+// MonthlyComparisonPoint represents a single month's aggregated data for a specific year.
+type MonthlyComparisonPoint struct {
+	Year           int     `json:"year"`
+	Month          int     `json:"month"`           // 1-12
+	ActivityCount  int     `json:"activity_count"`  // Number of activities
+	TotalDistance  float64 `json:"total_distance"`  // Total distance in meters
+	TotalTime      int     `json:"total_time"`      // Total time in seconds
+	TotalElevation float64 `json:"total_elevation"` // Total elevation gain in meters
+}
+
+// GetMonthlyComparisonOutput contains the monthly comparison data.
+type GetMonthlyComparisonOutput struct {
+	Months []MonthlyComparisonPoint `json:"months"`
+	Years  []int                    `json:"years"` // Available years in the data
+}
+
+// GetMonthlyComparison returns monthly aggregated stats for cross-year comparison.
+//
+//adapter:wasm getMonthlyComparison category=Stats
+//adapter:http GET /api/v1/stats/monthly-comparison
+func (s *StatsService) GetMonthlyComparison(ctx context.Context, in GetMonthlyComparisonInput) (*GetMonthlyComparisonOutput, error) {
+	rows, err := s.stats.GetMonthlyComparison(ctx, in.AthleteID, in.SportType)
+	if err != nil {
+		return nil, Wrapf(ErrInternal, "failed to get monthly comparison: %v", err)
+	}
+
+	result := make([]MonthlyComparisonPoint, len(rows))
+	yearsSet := make(map[int]struct{})
+
+	for i, r := range rows {
+		year, _ := strconv.Atoi(r.Year)
+		month, _ := strconv.Atoi(r.Month)
+		result[i] = MonthlyComparisonPoint{
+			Year:           year,
+			Month:          month,
+			ActivityCount:  r.ActivityCount,
+			TotalDistance:  r.TotalDistance,
+			TotalTime:      r.TotalTime,
+			TotalElevation: r.TotalElevation,
+		}
+		yearsSet[year] = struct{}{}
+	}
+
+	// Extract unique years and sort them
+	years := make([]int, 0, len(yearsSet))
+	for year := range yearsSet {
+		years = append(years, year)
+	}
+	// Sort years in ascending order
+	for i := 0; i < len(years); i++ {
+		for j := i + 1; j < len(years); j++ {
+			if years[i] > years[j] {
+				years[i], years[j] = years[j], years[i]
+			}
+		}
+	}
+
+	return &GetMonthlyComparisonOutput{
+		Months: result,
+		Years:  years,
 	}, nil
 }

@@ -126,9 +126,7 @@ export function ZwiftStats() {
               <Mountain className="h-3.5 w-3.5 text-muted-foreground" />
               <div>
                 <div className="text-xs text-muted-foreground">Elevation</div>
-                <div className="font-semibold">
-                  {formatElevation(totals.elevation)}
-                </div>
+                <div className="font-semibold">{formatElevation(totals.elevation)}</div>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
@@ -156,12 +154,8 @@ export function ZwiftStats() {
                   <TableRow key={w.world}>
                     <TableCell>{w.world}</TableCell>
                     <TableCell className="text-right">{w.count}</TableCell>
-                    <TableCell className="text-right">
-                      {formatDistance(w.distance)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatElevation(w.elevation)}
-                    </TableCell>
+                    <TableCell className="text-right">{formatDistance(w.distance)}</TableCell>
+                    <TableCell className="text-right">{formatElevation(w.elevation)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

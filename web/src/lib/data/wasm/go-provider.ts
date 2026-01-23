@@ -8,6 +8,7 @@
 import type { DataProvider } from '../provider'
 import type {
   Activity,
+  ActivityAnalysis,
   ActivityFilters,
   ActivitiesResponse,
   AuthStatus,
@@ -25,6 +26,8 @@ import type {
   HeatmapFilters,
   EddingtonResult,
   EddingtonHistoryPoint,
+  EddingtonCompareOutput,
+  SportGroup,
   DashboardConfig,
   WidgetWidth,
   WidgetHeight,
@@ -34,6 +37,8 @@ import type {
   HrZonesResponse,
   TrainingLoadResponse,
   ZoneTrendResponse,
+  WeeklyTrendsResponse,
+  MonthlyComparisonResponse,
   PowerZonesResponse,
   HrZoneDefinition,
   DistributionSlice,
@@ -84,6 +89,28 @@ import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 import * as goStorage from '@/lib/wasm/go-storage'
 import { loadAuth, isAuthenticated, getAthlete, getAuthUrl, exchangeCode } from '@/lib/wasm/strava'
 import { getCredentials, saveCredentials } from '@/lib/wasm/strava/credentials'
+
+/**
+ * Maps a GearItem from goStorage to the Gear type used by the DataProvider interface.
+ * Centralizes the mapping to avoid drift when fields are added/changed.
+ */
+function mapGearItemToGear(g: goStorage.GearItem): Gear {
+  return {
+    id: g.id,
+    name: g.name,
+    primary: g.primary,
+    retired: g.retired,
+    distance: g.distance,
+    brand_name: g.brand_name,
+    model_name: g.model_name,
+    description: g.description,
+    source: g.source,
+    hashtag: g.hashtag,
+    purchase_price: g.purchase_price,
+    purchase_currency: g.purchase_currency,
+    activity_count: g.activity_count,
+  }
+}
 
 // Global callbacks for Go importer events - set up during subscribeToEvents
 let importProgressCallback: ((progressJson: string) => void) | null = null
@@ -248,6 +275,10 @@ export class GoWasmProvider implements DataProvider {
       commute: filters.commute,
       trainer: filters.trainer,
       search: filters.search,
+      min_distance_m: filters.min_distance_m,
+      max_distance_m: filters.max_distance_m,
+      min_duration_s: filters.min_duration_s,
+      max_duration_s: filters.max_duration_s,
       order_by: filters.order_by,
       order_dir: filters.order_dir,
     })
@@ -279,9 +310,30 @@ export class GoWasmProvider implements DataProvider {
     })) as ActivityStream[]
   }
 
+  async getActivityAnalysis(id: number, splitUnit?: 'km' | 'mi'): Promise<ActivityAnalysis> {
+    this.assertInitialized()
+    const analysis = goStorage.getActivityAnalysis(id, splitUnit)
+    return analysis as ActivityAnalysis
+  }
+
   async getActivityWeather(_id: number): Promise<ActivityWeather | null> {
-    // Weather lookup is server-only: requires external API calls (Open-Meteo)
-    // that cannot work in browser WASM mode due to CORS and API key exposure.
+    // Weather lookup is server-only - permanent WASM limitation.
+    //
+    // Options considered:
+    // 1. Accept limitation (CHOSEN): Show clear UI message explaining weather
+    //    is unavailable in browser mode. This is the simplest and most honest
+    //    approach - no proxy complexity, no additional infrastructure.
+    //
+    // 2. Proxy through backend: Would require a separate server deployment,
+    //    defeating the purpose of the browser-only WASM mode.
+    //
+    // 3. Direct Open-Meteo from browser: The Open-Meteo API is CORS-enabled,
+    //    but requires activity location/date which we'd need to fetch first.
+    //    This adds complexity and still requires storing Strava temperature
+    //    streams which are only available in server mode.
+    //
+    // The UI (WeatherBadge component) shows a clear message when in WASM mode
+    // explaining that weather data requires server deployment.
     return null
   }
 
@@ -369,6 +421,22 @@ export class GoWasmProvider implements DataProvider {
       total_distance: d.total_distance,
       total_time: d.total_time,
       total_calories: d.total_calories,
+      total_intensity: d.total_intensity,
+    }))
+  }
+
+  async getCalendarDataRange(startDate: string, endDate: string): Promise<CalendarDay[]> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getCalendarDataRange(startDate, endDate)
+    return result.map((d) => ({
+      date: d.date,
+      activity_count: d.activity_count,
+      total_distance: d.total_distance,
+      total_time: d.total_time,
+      total_calories: d.total_calories,
+      total_intensity: d.total_intensity,
     }))
   }
 
@@ -479,11 +547,14 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getEddingtonData(sportType?: string): Promise<EddingtonResult> {
+  async getEddingtonData(sportType?: string, sportGroup?: string): Promise<EddingtonResult> {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getEddingtonData({ sport_types: sportType ? [sportType] : undefined })
+    const result = goStorage.getEddingtonData({
+      sport_types: sportType ? sportType.split(',') : undefined,
+      sport_group: sportGroup,
+    })
     return {
       number: result.number,
       distribution: result.distribution.map((d) => ({
@@ -497,14 +568,44 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getEddingtonHistory(sportType?: string): Promise<EddingtonHistoryPoint[]> {
+  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getEddingtonData({ sport_types: sportType ? [sportType] : undefined })
-    return result.history.map((h) => ({
+    const result = goStorage.getEddingtonHistory({
+      sport_types: sportType ? sportType.split(',') : undefined,
+      sport_group: sportGroup,
+    })
+    return result.map((h) => ({
       date: h.date,
       number: h.number,
+    }))
+  }
+
+  async getEddingtonCompare(): Promise<EddingtonCompareOutput> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getEddingtonCompare()
+    return {
+      groups: result.groups.map((g) => ({
+        sport_group: g.sport_group,
+        name: g.name,
+        number: g.number,
+      })),
+      all_number: result.all_number,
+    }
+  }
+
+  async getSportGroups(): Promise<SportGroup[]> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.getSportGroups()
+    return result.map((g) => ({
+      id: g.id,
+      name: g.name,
+      sport_types: g.sport_types,
     }))
   }
 
@@ -634,6 +735,20 @@ export class GoWasmProvider implements DataProvider {
             tsb: result.summary.tsb,
           }
         : undefined,
+      diagnostics: result.diagnostics
+        ? {
+            total_activities: result.diagnostics.total_activities,
+            activities_with_power: result.diagnostics.activities_with_power,
+            activities_with_speed: result.diagnostics.activities_with_speed,
+            activities_with_hr: result.diagnostics.activities_with_hr,
+            activities_with_tss: result.diagnostics.activities_with_tss,
+            has_cycling_ftp: result.diagnostics.has_cycling_ftp,
+            has_running_ftp: result.diagnostics.has_running_ftp,
+            cycling_ftp_value: result.diagnostics.cycling_ftp_value,
+            running_ftp_value: result.diagnostics.running_ftp_value,
+            missing_config_warnings: result.diagnostics.missing_config_warnings,
+          }
+        : undefined,
     }
   }
 
@@ -643,6 +758,30 @@ export class GoWasmProvider implements DataProvider {
 
     // Result shape matches ZoneTrendResponse directly
     return goStorage.getZoneTrend({ weeks })
+  }
+
+  async getWeeklyTrends(filters?: {
+    weeks?: number
+    sport_type?: string
+  }): Promise<WeeklyTrendsResponse> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    return goStorage.getWeeklyTrends({
+      weeks: filters?.weeks ?? 12,
+      sport_type: filters?.sport_type ?? '',
+    })
+  }
+
+  async getMonthlyComparison(filters?: {
+    sport_type?: string
+  }): Promise<MonthlyComparisonResponse> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    return goStorage.getMonthlyComparison({
+      sport_type: filters?.sport_type ?? '',
+    })
   }
 
   async getInsights(): Promise<InsightsResponse> {
@@ -871,21 +1010,7 @@ export class GoWasmProvider implements DataProvider {
     })
 
     return {
-      data: result.data.map((g) => ({
-        id: g.id,
-        name: g.name,
-        primary: g.primary,
-        retired: g.retired,
-        distance: g.distance,
-        brand_name: g.brand_name,
-        model_name: g.model_name,
-        description: g.description,
-        source: g.source,
-        hashtag: g.hashtag,
-        purchase_price: g.purchase_price,
-        purchase_currency: g.purchase_currency,
-        activity_count: g.activity_count,
-      })),
+      data: result.data.map(mapGearItemToGear),
       total: result.total,
       page: result.page,
       per_page: result.per_page,
@@ -897,22 +1022,7 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.getGearDetail(id)
-    return {
-      id: result.id,
-      name: result.name,
-      primary: result.primary,
-      retired: result.retired,
-      distance: result.distance,
-      brand_name: result.brand_name,
-      model_name: result.model_name,
-      description: result.description,
-      source: result.source,
-      hashtag: result.hashtag,
-      purchase_price: result.purchase_price,
-      purchase_currency: result.purchase_currency,
-      activity_count: result.activity_count,
-    }
+    return mapGearItemToGear(goStorage.getGearDetail(id))
   }
 
   async getCustomGear(filters?: GearFilters): Promise<GearListResponse> {
@@ -1025,6 +1135,19 @@ export class GoWasmProvider implements DataProvider {
       distance: u.distance,
       moving_time: u.moving_time,
     }))
+  }
+
+  async updateGearPrice(id: string, price: number | null, currency: string): Promise<Gear> {
+    this.assertInitialized()
+    this.getAthleteId()
+
+    const result = goStorage.updateGearPrice({
+      gear_id: id,
+      purchase_price: price,
+      purchase_currency: currency,
+    })
+
+    return mapGearItemToGear(result)
   }
 
   // ============================================================================

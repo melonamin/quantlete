@@ -17,6 +17,7 @@ export type {
   PowerZonesResponse,
   DistributionSlice,
   WeeklyZoneDistribution,
+  TrainingLoadDiagnostics,
 } from '@/lib/wasm/types.gen'
 
 // ============================================================================
@@ -54,11 +55,23 @@ export interface PowerStatsResponse {
 export interface TrainingLoadResponse {
   series: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint[]
   summary?: import('@/lib/wasm/types.gen').DailyTrainingLoadPoint
+  diagnostics?: import('@/lib/wasm/types.gen').TrainingLoadDiagnostics
 }
 
 // ZoneTrendResponse - zone distribution data over time
 export interface ZoneTrendResponse {
   weeks: import('@/lib/wasm/types.gen').WeeklyZoneDistribution[]
+}
+
+// WeeklyTrendsResponse - rolling weekly trends data
+export interface WeeklyTrendsResponse {
+  weeks: import('@/lib/wasm/types.gen').WeeklyTrendPoint[]
+}
+
+// MonthlyComparisonResponse - cross-year monthly comparison data
+export interface MonthlyComparisonResponse {
+  months: import('@/lib/wasm/types.gen').MonthlyComparisonPoint[]
+  years: number[]
 }
 
 // ============================================================================

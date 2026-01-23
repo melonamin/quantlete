@@ -1,8 +1,67 @@
 import type { UnitSystem } from '@/stores/settings'
 
-// Distance formatting
+// Conversion constants
 const METERS_PER_MILE = 1609.344
+const METERS_PER_KM = 1000
 const METERS_PER_FOOT = 0.3048
+
+/**
+ * Convert distance from display units to meters.
+ * @param value Distance in km (metric) or miles (imperial)
+ * @param unitSystem The unit system being used
+ * @returns Distance in meters
+ */
+export function distanceToMeters(value: number, unitSystem: UnitSystem): number {
+  return unitSystem === 'imperial' ? value * METERS_PER_MILE : value * METERS_PER_KM
+}
+
+/**
+ * Convert distance from meters to display units.
+ * @param meters Distance in meters
+ * @param unitSystem The unit system being used
+ * @returns Distance in km (metric) or miles (imperial)
+ */
+export function metersToDisplayUnit(meters: number, unitSystem: UnitSystem): number {
+  return unitSystem === 'imperial' ? meters / METERS_PER_MILE : meters / METERS_PER_KM
+}
+
+/**
+ * Parse duration input in HH:MM or H:MM or MM format to seconds.
+ * @param value Duration string (e.g., "1:30" for 1h30m, "45" for 45m)
+ * @returns Duration in seconds, or null if invalid
+ */
+export function parseDurationInput(value: string): number | null {
+  if (!value.trim()) return null
+
+  // Handle HH:MM format
+  if (value.includes(':')) {
+    const parts = value.split(':')
+    if (parts.length !== 2) return null
+    const hours = parseInt(parts[0], 10)
+    const minutes = parseInt(parts[1], 10)
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || minutes < 0 || minutes >= 60) return null
+    return hours * 3600 + minutes * 60
+  }
+
+  // Handle plain minutes
+  const minutes = parseFloat(value)
+  if (isNaN(minutes) || minutes < 0) return null
+  return Math.round(minutes * 60)
+}
+
+/**
+ * Format seconds to HH:MM or MM format for input display.
+ * @param seconds Duration in seconds
+ * @returns Formatted duration string (e.g., "1:30" for 1h30m)
+ */
+export function formatDurationInput(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}`
+  }
+  return minutes.toString()
+}
 
 export function formatDistance(meters: number, unitSystem: UnitSystem = 'metric'): string {
   if (unitSystem === 'imperial') {

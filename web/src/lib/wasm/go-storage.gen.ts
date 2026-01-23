@@ -113,6 +113,8 @@ export interface GoStorageInterface {
   getActivities(arg0?: string): string
   /** genGetActivity wraps ActivityService.GetByID */
   getActivity(arg0?: string): string
+  /** genGetActivityAnalysis wraps ActivityService.GetAnalysis */
+  getActivityAnalysis(arg0?: string): string
   /** genGetActivityStreams wraps ActivityService.GetStreams */
   getActivityStreams(arg0?: string): string
 
@@ -135,6 +137,8 @@ export interface GoStorageInterface {
   getBestEffortPRs(arg0?: string): string
   /** genGetBestEffortsForType wraps StatsService.GetBestEffortsForType */
   getBestEffortsForType(arg0?: string): string
+  /** genGetEddingtonCompare wraps StatsService.GetEddingtonCompare */
+  getEddingtonCompare(): string
   /** genGetEddingtonData wraps StatsService.GetEddingtonData */
   getEddingtonData(arg0?: string): string
   /** genGetEddingtonHistory wraps StatsService.GetEddingtonHistory */
@@ -143,10 +147,16 @@ export interface GoStorageInterface {
   getHeatmapData(arg0?: string): string
   /** genGetInsights wraps InsightsService.GetInsights */
   getInsights(): string
+  /** genGetMonthlyComparison wraps StatsService.GetMonthlyComparison */
+  getMonthlyComparison(arg0?: string): string
   /** genGetPowerStats wraps StatsService.GetPowerStats */
   getPowerStats(arg0?: string): string
+  /** genGetSportGroups wraps StatsService.GetSportGroups */
+  getSportGroups(): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */
   getTrainingLoad(arg0?: string): string
+  /** genGetWeeklyTrends wraps StatsService.GetWeeklyTrends */
+  getWeeklyTrends(arg0?: string): string
   /** genGetWrapped wraps StatsService.GetWrapped */
   getWrapped(arg0?: string): string
   /** genGetWrappedYears wraps StatsService.GetWrappedYears */
@@ -159,6 +169,8 @@ export interface GoStorageInterface {
   getCalendarActivities(arg0?: string): string
   /** genGetCalendarData wraps DashboardService.GetCalendarData */
   getCalendarData(arg0?: string): string
+  /** genGetCalendarDataRange wraps DashboardService.GetCalendarDataRange */
+  getCalendarDataRange(arg0?: string): string
   /** genGetCalendarSummary wraps DashboardService.GetCalendarSummary */
   getCalendarSummary(arg0?: string): string
 
@@ -217,6 +229,8 @@ export interface GoStorageInterface {
   getGearDetail(arg0?: string): string
   /** genGetGearMonthlyUsage wraps GearService.MonthlyUsage */
   getGearMonthlyUsage(arg0?: string): string
+  /** genUpdateGearPrice wraps GearService.UpdateGearPrice */
+  updateGearPrice(arg0?: string): string
 
   // HR Zones
   /** HR Zones */

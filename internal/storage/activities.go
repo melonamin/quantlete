@@ -61,14 +61,18 @@ type Activity struct {
 
 // ActivityFilters defines query filters for activities.
 type ActivityFilters struct {
-	AthleteID   int64
-	SportTypes  []string
-	StartAfter  *time.Time
-	StartBefore *time.Time
-	GearID      string
-	Commute     *bool
-	Trainer     *bool
-	Search      string
+	AthleteID    int64
+	SportTypes   []string
+	StartAfter   *time.Time
+	StartBefore  *time.Time
+	GearID       string
+	Commute      *bool
+	Trainer      *bool
+	Search       string
+	MinDistanceM *float64
+	MaxDistanceM *float64
+	MinDurationS *int
+	MaxDurationS *int
 }
 
 // Pagination defines pagination parameters.
@@ -269,6 +273,26 @@ func (r *ActivityRepository) List(ctx context.Context, filters ActivityFilters, 
 	if filters.Search != "" {
 		conditions = append(conditions, "name LIKE ? COLLATE NOCASE")
 		args = append(args, "%"+filters.Search+"%")
+	}
+
+	// Distance filters (distance is stored in meters)
+	if filters.MinDistanceM != nil {
+		conditions = append(conditions, "distance >= ?")
+		args = append(args, *filters.MinDistanceM)
+	}
+	if filters.MaxDistanceM != nil {
+		conditions = append(conditions, "distance <= ?")
+		args = append(args, *filters.MaxDistanceM)
+	}
+
+	// Duration filters (moving_time is stored in seconds)
+	if filters.MinDurationS != nil {
+		conditions = append(conditions, "moving_time >= ?")
+		args = append(args, *filters.MinDurationS)
+	}
+	if filters.MaxDurationS != nil {
+		conditions = append(conditions, "moving_time <= ?")
+		args = append(args, *filters.MaxDurationS)
 	}
 
 	where := ""

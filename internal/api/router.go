@@ -308,6 +308,7 @@ func (r *Router) mountRoutes() {
 			router.Get("/", handlers.GenActivityServiceList(r.registry.ActivityService, r.stravaClient))
 			router.Get("/{id}", handlers.GenActivityServiceGetByID(r.registry.ActivityService, r.stravaClient))
 			router.Get("/{id}/streams", handlers.GenActivityServiceGetStreams(r.registry.ActivityService, r.stravaClient))
+			router.Get("/{id}/analysis", handlers.GenActivityServiceGetAnalysis(r.registry.ActivityService, r.stravaClient))
 			router.Get("/{id}/photos", handlers.GenPhotosServiceListByActivity(r.registry.PhotosService, r.stravaClient))
 			router.Get("/{id}/weather", r.weatherHandler.GetActivityWeather) // Manual: weather API integration
 		})
@@ -339,6 +340,7 @@ func (r *Router) mountRoutes() {
 			router.Get("/calendar", handlers.GenDashboardServiceGetCalendarData(r.registry.DashboardService, r.stravaClient))
 			router.Get("/calendar/summary", handlers.GenDashboardServiceGetCalendarSummary(r.registry.DashboardService, r.stravaClient))
 			router.Get("/calendar/activities", handlers.GenDashboardServiceGetCalendarActivities(r.registry.DashboardService, r.stravaClient))
+			router.Get("/calendar/range", handlers.GenDashboardServiceGetCalendarDataRange(r.registry.DashboardService, r.stravaClient))
 		})
 
 		// Stats routes (using generated adapters where available)
@@ -358,6 +360,10 @@ func (r *Router) mountRoutes() {
 			router.Get("/insights", handlers.GenInsightsServiceGetInsights(r.registry.InsightsService, r.stravaClient))
 			router.Get("/daytime", handlers.GenDashboardServiceGetDaytimeDistribution(r.registry.DashboardService, r.stravaClient))
 			router.Get("/weekday", handlers.GenDashboardServiceGetWeekdayDistribution(r.registry.DashboardService, r.stravaClient))
+			router.Get("/eddington/compare", handlers.GenStatsServiceGetEddingtonCompare(r.registry.StatsService, r.stravaClient))
+			router.Get("/sport-groups", handlers.GenStatsServiceGetSportGroups(r.registry.StatsService, r.stravaClient))
+			router.Get("/weekly-trends", handlers.GenStatsServiceGetWeeklyTrends(r.registry.StatsService, r.stravaClient))
+			router.Get("/monthly-comparison", handlers.GenStatsServiceGetMonthlyComparison(r.registry.StatsService, r.stravaClient))
 		})
 
 		// Gear routes (using generated adapters where available)
@@ -369,6 +375,7 @@ func (r *Router) mountRoutes() {
 			router.Delete("/custom/{id}", r.gearHandler.DeleteCustom) // Manual: custom gear CRUD
 			router.Get("/stats/monthly", handlers.GenGearServiceMonthlyUsage(r.registry.GearService, r.stravaClient))
 			router.Get("/{id}", handlers.GenGearServiceGetByID(r.registry.GearService, r.stravaClient))
+			router.Put("/{id}/price", handlers.GenGearServiceUpdateGearPrice(r.registry.GearService, r.stravaClient))
 			router.Get("/{id}/components", handlers.GenMaintenanceServiceListComponents(r.registry.MaintenanceService, r.stravaClient))
 			router.Post("/{id}/components", handlers.GenMaintenanceServiceCreateComponent(r.registry.MaintenanceService, r.stravaClient))
 		})

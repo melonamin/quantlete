@@ -4,11 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/pagination"
 )
+
+// isFiniteFloat checks if a float64 is neither Inf nor NaN.
+func isFiniteFloat(f float64) bool {
+	return !math.IsInf(f, 0) && !math.IsNaN(f)
+}
 
 // Gear represents a stored gear record.
 type Gear struct {
@@ -355,5 +361,69 @@ func (r *GearRepository) ListPaginated(ctx context.Context, athleteID int64, f G
 		Page:       p.Page,
 		PerPage:    p.PerPage,
 		TotalPages: p.TotalPages(total),
+	}, nil
+}
+
+// UpdatePrice updates only the purchase price and currency for any gear item.
+// This works for both Strava-imported and custom gear.
+//
+// Semantics (REPLACE, not PATCH):
+//   - Pass nil for price or currency to set them to NULL in the database.
+//   - Empty string for currency also clears it (converted to NULL via NULLIF).
+//   - Both fields are always overwritten; there is no "leave unchanged" option.
+//
+// Returns (nil, nil) if gear not found or not owned by athlete.
+//
+// IMPORTANT: Caller must validate price with math.IsFinite() before calling.
+// This function will return an error for Inf/NaN values as a safety check.
+func (r *GearRepository) UpdatePrice(ctx context.Context, athleteID int64, gearID string, price *float64, currency *string) (*Gear, error) {
+	q := NewQueries(r.db.Conn())
+
+	// Convert to string for SQL (empty string becomes NULL via NULLIF).
+	// Uses %.2f for monetary precision (rounds to 2 decimal places).
+	var priceStr string
+	if price != nil {
+		// Defense in depth: reject Inf/NaN even though service should validate
+		if !isFiniteFloat(*price) {
+			return nil, fmt.Errorf("invalid price: must be a finite number")
+		}
+		priceStr = fmt.Sprintf("%.2f", *price)
+	}
+
+	var currencyStr string
+	if currency != nil {
+		currencyStr = strings.TrimSpace(*currency)
+	}
+
+	// The UPDATE ... RETURNING query atomically updates and returns the row.
+	// Returns nil if gear doesn't exist or isn't owned by the athlete.
+	row, err := q.UpdateGearPrice(ctx, priceStr, currencyStr, gearID, athleteID)
+	if err != nil {
+		return nil, fmt.Errorf("updating gear price: %w", err)
+	}
+	if row == nil {
+		return nil, nil // Not found or not owned
+	}
+
+	var createdAt, updatedAt SQLiteTime
+	_ = createdAt.Scan(row.CreatedAt)
+	_ = updatedAt.Scan(row.UpdatedAt)
+
+	return &Gear{
+		ID:               row.ID,
+		AthleteID:        row.AthleteID,
+		Name:             row.Name,
+		Primary:          row.IsPrimary,
+		Retired:          row.Retired,
+		Distance:         row.Distance,
+		BrandName:        row.BrandName,
+		ModelName:        row.ModelName,
+		Description:      row.Description,
+		Source:           row.Source,
+		Hashtag:          row.Hashtag,
+		PurchasePrice:    row.PurchasePrice,
+		PurchaseCurrency: row.PurchaseCurrency,
+		CreatedAt:        createdAt,
+		UpdatedAt:        updatedAt,
 	}, nil
 }

@@ -87,6 +87,7 @@ interface EChartsWrapperProps {
   height?: number | string
   loading?: boolean
   className?: string
+  onEvents?: Record<string, (params: unknown) => void>
 }
 
 export function EChartsWrapper({
@@ -94,6 +95,7 @@ export function EChartsWrapper({
   height = 300,
   loading = false,
   className,
+  onEvents,
 }: EChartsWrapperProps) {
   const chartRef = useRef<ReactEChartsCore>(null)
 
@@ -124,6 +126,7 @@ export function EChartsWrapper({
       className={className}
       notMerge={true}
       lazyUpdate={true}
+      onEvents={onEvents}
     />
   )
 }

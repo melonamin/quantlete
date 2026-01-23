@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Search, X, Filter, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -12,6 +12,14 @@ import {
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { ActivityFilters as Filters } from '@/lib/api'
+import { useSettingsStore } from '@/stores/settings'
+import {
+  distanceToMeters,
+  metersToDisplayUnit,
+  parseDurationInput,
+  formatDurationInput,
+  getDistanceUnit,
+} from '@/lib/format'
 
 interface ActivityFiltersProps {
   filters: Filters
@@ -32,9 +40,59 @@ const SPORT_TYPES = [
   'Yoga',
 ]
 
+// Helper to get initial display value for distance
+function getDisplayDistance(meters: number | undefined, unitSystem: 'metric' | 'imperial'): string {
+  if (meters === undefined) return ''
+  return metersToDisplayUnit(meters, unitSystem).toString()
+}
+
+// Helper to get initial display value for duration
+function getDisplayDuration(seconds: number | undefined): string {
+  if (seconds === undefined) return ''
+  return formatDurationInput(seconds)
+}
+
 export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: ActivityFiltersProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [localSearch, setLocalSearch] = useState(filters.search ?? '')
+  const unitSystem = useSettingsStore((s) => s.unitSystem)
+
+  // Local state for distance/duration inputs (for debouncing)
+  // Use key to reset state when filters change from external reset
+  const [localMinDistance, setLocalMinDistance] = useState(() =>
+    getDisplayDistance(filters.min_distance_m, unitSystem)
+  )
+  const [localMaxDistance, setLocalMaxDistance] = useState(() =>
+    getDisplayDistance(filters.max_distance_m, unitSystem)
+  )
+  const [localMinDuration, setLocalMinDuration] = useState(() =>
+    getDisplayDuration(filters.min_duration_s)
+  )
+  const [localMaxDuration, setLocalMaxDuration] = useState(() =>
+    getDisplayDuration(filters.max_duration_s)
+  )
+
+  // Reset local state when filters are cleared externally (e.g., via "Clear filters" button)
+  useEffect(() => {
+    if (filters.min_distance_m === undefined && localMinDistance !== '') {
+      setLocalMinDistance('')
+    }
+    if (filters.max_distance_m === undefined && localMaxDistance !== '') {
+      setLocalMaxDistance('')
+    }
+    if (filters.min_duration_s === undefined && localMinDuration !== '') {
+      setLocalMinDuration('')
+    }
+    if (filters.max_duration_s === undefined && localMaxDuration !== '') {
+      setLocalMaxDuration('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.min_distance_m,
+    filters.max_distance_m,
+    filters.min_duration_s,
+    filters.max_duration_s,
+  ])
 
   // Debounce search
   useEffect(() => {
@@ -46,6 +104,66 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
     return () => clearTimeout(timer)
   }, [localSearch, filters.search, onFiltersChange])
 
+  // Handle distance filter changes with validation
+  const handleDistanceChange = useCallback(
+    (field: 'min_distance_m' | 'max_distance_m', value: string) => {
+      const parsed = parseFloat(value)
+      if (value === '' || isNaN(parsed)) {
+        onFiltersChange({ [field]: undefined, page: 1 })
+        return
+      }
+      if (parsed < 0) return // Ignore negative values
+      const meters = distanceToMeters(parsed, unitSystem)
+      onFiltersChange({ [field]: meters, page: 1 })
+    },
+    [onFiltersChange, unitSystem]
+  )
+
+  // Handle duration filter changes with validation
+  const handleDurationChange = useCallback(
+    (field: 'min_duration_s' | 'max_duration_s', value: string) => {
+      const parsed = parseDurationInput(value)
+      if (value === '' || parsed === null) {
+        onFiltersChange({ [field]: undefined, page: 1 })
+        return
+      }
+      if (parsed < 0) return // Ignore negative values
+      onFiltersChange({ [field]: parsed, page: 1 })
+    },
+    [onFiltersChange]
+  )
+
+  // Debounce distance/duration filters
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleDistanceChange('min_distance_m', localMinDistance)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [localMinDistance, handleDistanceChange])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleDistanceChange('max_distance_m', localMaxDistance)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [localMaxDistance, handleDistanceChange])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleDurationChange('min_duration_s', localMinDuration)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [localMinDuration, handleDurationChange])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleDurationChange('max_duration_s', localMaxDuration)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [localMaxDuration, handleDurationChange])
+
+  const distanceUnit = getDistanceUnit(unitSystem)
+
   const hasActiveFilters =
     filters.sport_type ||
     filters.after ||
@@ -53,7 +171,11 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
     filters.search ||
     filters.commute !== undefined ||
     filters.trainer !== undefined ||
-    filters.gear_id
+    filters.gear_id ||
+    filters.min_distance_m !== undefined ||
+    filters.max_distance_m !== undefined ||
+    filters.min_duration_s !== undefined ||
+    filters.max_duration_s !== undefined
 
   return (
     <div className="space-y-4 rounded-lg border border-border bg-card p-4 mb-6">
@@ -114,78 +236,140 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
 
       {/* Advanced filters */}
       {showAdvanced && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 border-t border-border">
-          {/* Sport type dropdown */}
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Sport Type</label>
-            <Select
-              value={filters.sport_type ?? '__all__'}
-              onValueChange={(value) =>
-                onFiltersChange({ sport_type: value === '__all__' ? undefined : value, page: 1 })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All types</SelectItem>
-                {SPORT_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="space-y-4 pt-2 border-t border-border">
+          {/* Row 1: Sport type, Date from, Date to, Options */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Sport type dropdown */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Sport Type</label>
+              <Select
+                value={filters.sport_type ?? '__all__'}
+                onValueChange={(value) =>
+                  onFiltersChange({ sport_type: value === '__all__' ? undefined : value, page: 1 })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All types</SelectItem>
+                  {SPORT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date from */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">From</label>
+              <Input
+                type="date"
+                value={filters.after ?? ''}
+                onChange={(e) => onFiltersChange({ after: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Date to */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">To</label>
+              <Input
+                type="date"
+                value={filters.before ?? ''}
+                onChange={(e) => onFiltersChange({ before: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Toggles */}
+            <div className="space-y-2">
+              <label className="text-xs text-muted-foreground block">Options</label>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={filters.commute === true}
+                    onCheckedChange={(checked) =>
+                      onFiltersChange({
+                        commute: checked === true ? true : undefined,
+                        page: 1,
+                      })
+                    }
+                  />
+                  Commute
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={filters.trainer === true}
+                    onCheckedChange={(checked) =>
+                      onFiltersChange({
+                        trainer: checked === true ? true : undefined,
+                        page: 1,
+                      })
+                    }
+                  />
+                  Trainer
+                </label>
+              </div>
+            </div>
           </div>
 
-          {/* Date from */}
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">From</label>
-            <Input
-              type="date"
-              value={filters.after ?? ''}
-              onChange={(e) => onFiltersChange({ after: e.target.value || undefined, page: 1 })}
-            />
-          </div>
-
-          {/* Date to */}
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">To</label>
-            <Input
-              type="date"
-              value={filters.before ?? ''}
-              onChange={(e) => onFiltersChange({ before: e.target.value || undefined, page: 1 })}
-            />
-          </div>
-
-          {/* Toggles */}
-          <div className="space-y-2">
-            <label className="text-xs text-muted-foreground block">Options</label>
-            <div className="flex flex-wrap gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={filters.commute === true}
-                  onCheckedChange={(checked) =>
-                    onFiltersChange({
-                      commute: checked === true ? true : undefined,
-                      page: 1,
-                    })
-                  }
-                />
-                Commute
+          {/* Row 2: Distance and Duration filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Min Distance */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">
+                Min Distance ({distanceUnit})
               </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={filters.trainer === true}
-                  onCheckedChange={(checked) =>
-                    onFiltersChange({
-                      trainer: checked === true ? true : undefined,
-                      page: 1,
-                    })
-                  }
-                />
-                Trainer
+              <Input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder={`e.g., 10`}
+                value={localMinDistance}
+                onChange={(e) => setLocalMinDistance(e.target.value)}
+              />
+            </div>
+
+            {/* Max Distance */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">
+                Max Distance ({distanceUnit})
               </label>
+              <Input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder={`e.g., 50`}
+                value={localMaxDistance}
+                onChange={(e) => setLocalMaxDistance(e.target.value)}
+              />
+            </div>
+
+            {/* Min Duration */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">
+                Min Duration (h:mm)
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g., 1:00 or 30"
+                value={localMinDuration}
+                onChange={(e) => setLocalMinDuration(e.target.value)}
+              />
+            </div>
+
+            {/* Max Duration */}
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">
+                Max Duration (h:mm)
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g., 2:30 or 120"
+                value={localMaxDuration}
+                onChange={(e) => setLocalMaxDuration(e.target.value)}
+              />
             </div>
           </div>
         </div>

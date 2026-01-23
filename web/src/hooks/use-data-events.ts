@@ -112,5 +112,13 @@ export function useDataEvents(): void {
     }
 
     return provider.subscribeToEvents(handleEvent)
-  }, [provider, initialized, error, authLoading, isAuthenticated, queryClient, invalidateForChanges])
+  }, [
+    provider,
+    initialized,
+    error,
+    authLoading,
+    isAuthenticated,
+    queryClient,
+    invalidateForChanges,
+  ])
 }

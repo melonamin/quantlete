@@ -10,8 +10,15 @@ This document tracks remaining implementation work. Completed phases (0-11) have
 | ----- | ------------------------------ | ------ |
 | 0-11  | Core Implementation            | ✓      |
 | 12    | Polish                         | ~90%   |
-| 13    | Advanced Analytics             | Planned |
+| 13    | Advanced Analytics             | ~25%   |
 | 14    | Explorer Tiles                 | Planned |
+
+### Active Feature Branches
+
+| Branch | Feature | Status |
+| ------ | ------- | ------ |
+| `zone_trend_analysis` | Zone Trend Analysis (13.3) | Ready to merge |
+| `insights_rule_engine` | Advanced Smart Coach rules | In progress |
 
 ---
 
@@ -54,6 +61,8 @@ Add UI to input gear purchase prices and display cost/km.
 
 Rule-based text alerts from training data (TSB, streaks, CTL trends).
 
+**Status**: Basic implementation exists as `ActivityInsights` component. Advanced rule engine in `insights_rule_engine` branch.
+
 **Backend**:
 - [x] Create `internal/services/insights.go` with rule engine
 - [x] Implement insight rules:
@@ -77,6 +86,8 @@ Rule-based text alerts from training data (TSB, streaks, CTL trends).
 ### 13.3 Zone Trend Analysis ✓
 
 Stacked area chart showing % training time in HR zones over 52 weeks.
+
+**Status**: Fully implemented in `zone_trend_analysis` branch. Needs merge to master.
 
 **Database**:
 - [x] Create migration `005_zone_distribution.sql`
@@ -157,7 +168,7 @@ Track NP/AvgHR (cycling) or NGP/AvgHR (running) over time.
 Full-featured tile tracking with counting, max cluster detection, and map overlay.
 
 ### 14.1 Database Schema
-- [ ] Create migration `005_explorer_tiles.sql`
+- [ ] Create migration `006_explorer_tiles.sql`
 - [ ] Add `explorer_tiles` table (athlete_id, tile_x, tile_y, first_visit_date, first_activity_id)
 - [ ] Add `explorer_clusters` cache table (max_cluster_size, cluster_x, cluster_y)
 

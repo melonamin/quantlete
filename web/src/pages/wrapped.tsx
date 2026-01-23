@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useWrapped, useWrappedYears } from '@/lib/api'
+import { useWrapped, useWrappedYears, useCalendarData } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -11,7 +11,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { BarChart, DonutChart, LineChart, WorldLocationsChart } from '@/components/charts'
+import {
+  BarChart,
+  DonutChart,
+  LineChart,
+  WorldLocationsChart,
+  ActivityCalendarChart,
+} from '@/components/charts'
+import { CalendarLegend } from '@/components/charts/calendar-legend'
+import { chartColors } from '@/components/charts/chart-constants'
 import { formatDurationLong } from '@/lib/format'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
@@ -46,8 +54,20 @@ export function WrappedPage() {
     compareYear !== null
   )
 
+  // Fetch calendar data for year heatmap (only when a specific year is selected)
+  const { data: calendarData, isLoading: calendarLoading } = useCalendarData(
+    effectiveYear > 0 ? effectiveYear : new Date().getFullYear()
+  )
+
   const months = useMemo(() => report?.months ?? [], [report?.months])
-  const monthLabels = useMemo(() => months.map((m) => m.month.slice(5)), [months])
+  // Convert month format "YYYY-MM" to abbreviated month names ("Jan", "Feb", etc.)
+  const monthLabels = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return months.map((m) => {
+      const monthIndex = parseInt(m.month.slice(5), 10) - 1
+      return monthNames[monthIndex] ?? m.month.slice(5)
+    })
+  }, [months])
   const activitiesData = months.map((m, idx) => ({ label: monthLabels[idx], value: m.activities }))
   const distanceData = months.map((m, idx) => ({
     label: monthLabels[idx],
@@ -92,6 +112,25 @@ export function WrappedPage() {
       { name: 'Rest days', value: report.rest_days },
     ]
   }, [report])
+
+  // Transform calendar data for the heatmap chart
+  const calendarChartData = useMemo(() => {
+    if (!calendarData) return []
+    return calendarData.map((d) => ({
+      date: d.date,
+      count: d.activity_count,
+      distance: d.total_distance,
+      time: d.total_time,
+      calories: d.total_calories,
+      intensity: d.total_intensity,
+    }))
+  }, [calendarData])
+
+  // Calculate max value for calendar legend
+  const calendarMaxValue = useMemo(() => {
+    if (!calendarChartData.length) return 1
+    return Math.max(...calendarChartData.map((d) => d.count), 1)
+  }, [calendarChartData])
 
   const showMonths = effectiveYear > 0
 
@@ -173,6 +212,73 @@ export function WrappedPage() {
             />
           </div>
 
+          {showMonths && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Year Activity Heatmap</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ActivityCalendarChart
+                  data={calendarChartData}
+                  year={effectiveYear}
+                  metric="count"
+                  height={180}
+                  loading={calendarLoading}
+                />
+                <CalendarLegend
+                  metric="count"
+                  maxValue={calendarMaxValue}
+                  className="mt-2 justify-center"
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {showMonths && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Activities by Month</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BarChart
+                    data={activitiesData}
+                    height={260}
+                    uniformColor={chartColors.primary}
+                  />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distance by Month (km)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BarChart data={distanceData} height={260} uniformColor={chartColors.info} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Elevation by Month (m)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BarChart
+                    data={elevationData}
+                    height={260}
+                    uniformColor={chartColors.elevation}
+                  />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Personal Records by Month</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <LineChart series={prsSeries} height={260} showLegend={false} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Summary</CardTitle>
@@ -192,43 +298,6 @@ export function WrappedPage() {
               </div>
             </CardContent>
           </Card>
-
-          {showMonths && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Activities by Month</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <BarChart data={activitiesData} height={260} />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Distance by Month (km)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <BarChart data={distanceData} height={260} />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Elevation by Month (m)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <BarChart data={elevationData} height={260} />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Personal Records by Month</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <LineChart series={prsSeries} height={260} showLegend={false} />
-                </CardContent>
-              </Card>
-            </div>
-          )}
 
           <Card>
             <CardHeader>

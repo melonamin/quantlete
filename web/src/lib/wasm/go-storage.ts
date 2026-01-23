@@ -45,12 +45,7 @@ import type {
 } from './types.gen'
 
 // Import Insight types from the canonical source
-import type {
-  InsightType,
-  InsightSeverity,
-  Insight,
-  InsightsResponse,
-} from '@/lib/api/stats'
+import type { InsightType, InsightSeverity, Insight, InsightsResponse } from '@/lib/api/stats'
 
 // Re-export for consumers that import from this module
 export type { InsightType, InsightSeverity, Insight, InsightsResponse }
@@ -290,6 +285,10 @@ export interface ActivityFilters {
   commute?: boolean
   trainer?: boolean
   search?: string
+  min_distance_m?: number
+  max_distance_m?: number
+  min_duration_s?: number
+  max_duration_s?: number
   order_by?: string
   order_dir?: string
 }
@@ -372,6 +371,65 @@ export const getActivityStreams = (activityId: number): ActivityStream[] =>
   callGoStorageArray<ActivityStream>(
     () => goStorage.getActivityStreams(JSON.stringify({ activity_id: activityId })),
     'getActivityStreams'
+  )
+
+export interface ActivityAnalysis {
+  activity_id: number
+  splits?: {
+    splits: {
+      index: number
+      distance_m: number
+      duration_s: number
+      pace_sec_km: number
+      avg_hr?: number
+      avg_watts?: number
+      elev_gain: number
+      elev_loss: number
+    }[]
+    split_length_m: number
+    total_splits: number
+    fastest_split: number
+    slowest_split: number
+  } | null
+  hr_zones?: {
+    zones: {
+      zone: number
+      seconds: number
+      percentage: number
+      min_bpm: number
+      max_bpm: number
+      label: string
+    }[]
+    total_seconds: number
+    avg_hr: number
+    max_hr: number
+  } | null
+  pace_distribution?: {
+    buckets: {
+      min_pace: number
+      max_pace: number
+      count: number
+      seconds: number
+      percentage: number
+    }[]
+    total_seconds: number
+    avg_pace: number
+    fastest_pace: number
+    slowest_pace: number
+    median_pace: number
+  } | null
+}
+
+export const getActivityAnalysis = (
+  activityId: number,
+  splitUnit?: 'km' | 'mi'
+): ActivityAnalysis =>
+  callGoStorage<ActivityAnalysis>(
+    () =>
+      goStorage.getActivityAnalysis(
+        JSON.stringify({ activity_id: activityId, split_unit: splitUnit })
+      ),
+    'getActivityAnalysis'
   )
 
 // ============================================================================
@@ -501,6 +559,18 @@ export function getCalendarData(year: number): CalendarDay[] {
     callGoStorage<CalendarDay[] | undefined>(
       () => goStorage.getCalendarData(JSON.stringify({ year })),
       'getCalendarData'
+    ) || []
+  )
+}
+
+export function getCalendarDataRange(startDate: string, endDate: string): CalendarDay[] {
+  return (
+    callGoStorage<CalendarDay[] | undefined>(
+      () =>
+        goStorage.getCalendarDataRange(
+          JSON.stringify({ start_date: startDate, end_date: endDate })
+        ),
+      'getCalendarDataRange'
     ) || []
   )
 }
@@ -1153,6 +1223,7 @@ export const tssForTargetTsb = (
 
 export interface EddingtonFilters {
   sport_types?: string[]
+  sport_group?: string
 }
 
 // EddingtonHistoryPoint imported from types.gen.ts
@@ -1181,6 +1252,53 @@ export function getEddingtonData(filters?: EddingtonFilters): EddingtonDataResul
     distribution: result.distribution || [],
     next_steps: result.next_steps || [],
   } as EddingtonDataResult
+}
+
+export function getEddingtonHistory(filters?: EddingtonFilters): EddingtonHistoryPoint[] {
+  const result = callGoStorage<EddingtonHistoryPoint[] | undefined>(
+    () => goStorage.getEddingtonHistory(JSON.stringify(filters || {})),
+    'getEddingtonHistory'
+  )
+  return result || []
+}
+
+// EddingtonCompareItem represents Eddington data for a single sport group
+export interface EddingtonCompareItem {
+  sport_group: string
+  name: string
+  number: number
+}
+
+// EddingtonCompareResult contains Eddington numbers for all predefined sport groups
+export interface EddingtonCompareResult {
+  groups: EddingtonCompareItem[]
+  all_number: number
+}
+
+export function getEddingtonCompare(): EddingtonCompareResult {
+  const result = callGoStorage<EddingtonCompareResult>(
+    () => goStorage.getEddingtonCompare(),
+    'getEddingtonCompare'
+  )
+  return {
+    groups: result.groups || [],
+    all_number: result.all_number,
+  }
+}
+
+// SportGroup represents a predefined group of related sport types
+export interface SportGroup {
+  id: string
+  name: string
+  sport_types: string[]
+}
+
+export function getSportGroups(): SportGroup[] {
+  const result = callGoStorage<SportGroup[] | undefined>(
+    () => goStorage.getSportGroups(),
+    'getSportGroups'
+  )
+  return result || []
 }
 
 // ============================================================================
@@ -1305,6 +1423,17 @@ export function deleteCustomGear(id: string, force?: boolean): DeleteCustomGearR
     throw new Error(result.error || 'Failed to delete custom gear')
   }
   return result
+}
+
+// Re-export generated type for consumers
+import type { UpdateGearPriceInput } from './types.gen'
+export type { UpdateGearPriceInput }
+
+export function updateGearPrice(input: UpdateGearPriceInput): GearItem {
+  return callGoStorage<GearItem>(
+    () => goStorage.updateGearPrice(JSON.stringify(input)),
+    'updateGearPrice'
+  )
 }
 
 // ============================================================================
@@ -1501,9 +1630,23 @@ export interface TrainingLoadDayData {
   tsb: number
 }
 
+export interface TrainingLoadDiagnosticsData {
+  total_activities: number
+  activities_with_power: number
+  activities_with_speed: number
+  activities_with_hr: number
+  activities_with_tss: number
+  has_cycling_ftp: boolean
+  has_running_ftp: boolean
+  cycling_ftp_value?: number | null
+  running_ftp_value?: number | null
+  missing_config_warnings?: string[]
+}
+
 export interface TrainingLoadResult {
   series: TrainingLoadDayData[]
   summary?: TrainingLoadDayData
+  diagnostics?: TrainingLoadDiagnosticsData
 }
 
 export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResult {
@@ -1511,7 +1654,7 @@ export function getTrainingLoad(filters?: TrainingLoadFilters): TrainingLoadResu
     () => goStorage.getTrainingLoad(JSON.stringify(filters || {})),
     'getTrainingLoad'
   )
-  return { series: result.series || [], summary: result.summary }
+  return { series: result.series || [], summary: result.summary, diagnostics: result.diagnostics }
 }
 
 // ============================================================================
@@ -1535,14 +1678,71 @@ export function getZoneTrend(filters?: ZoneTrendFilters): ZoneTrendResult {
 }
 
 // ============================================================================
+// Weekly Trends
+// ============================================================================
+
+export interface WeeklyTrendsFilters {
+  weeks?: number
+  sport_type?: string
+}
+
+export interface WeeklyTrendPoint {
+  week: string
+  week_start: string
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface WeeklyTrendsResult {
+  weeks: WeeklyTrendPoint[]
+}
+
+export function getWeeklyTrends(filters?: WeeklyTrendsFilters): WeeklyTrendsResult {
+  const result = callGoStorage<WeeklyTrendsResult>(
+    () => goStorage.getWeeklyTrends(JSON.stringify(filters || {})),
+    'getWeeklyTrends'
+  )
+  return { weeks: result.weeks || [] }
+}
+
+// ============================================================================
+// Monthly Comparison
+// ============================================================================
+
+export interface MonthlyComparisonFilters {
+  sport_type?: string
+}
+
+export interface MonthlyComparisonPoint {
+  year: number
+  month: number
+  activity_count: number
+  total_distance: number
+  total_time: number
+  total_elevation: number
+}
+
+export interface MonthlyComparisonResult {
+  months: MonthlyComparisonPoint[]
+  years: number[]
+}
+
+export function getMonthlyComparison(filters?: MonthlyComparisonFilters): MonthlyComparisonResult {
+  const result = callGoStorage<MonthlyComparisonResult>(
+    () => goStorage.getMonthlyComparison(JSON.stringify(filters || {})),
+    'getMonthlyComparison'
+  )
+  return { months: result.months || [], years: result.years || [] }
+}
+
+// ============================================================================
 // Insights
 // ============================================================================
 
 export function getInsights(): InsightsResponse {
-  const result = callGoStorage<InsightsResponse>(
-    () => goStorage.getInsights(),
-    'getInsights'
-  )
+  const result = callGoStorage<InsightsResponse>(() => goStorage.getInsights(), 'getInsights')
   return { insights: result.insights ?? [] }
 }
 
