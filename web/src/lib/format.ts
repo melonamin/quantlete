@@ -115,6 +115,15 @@ export function formatPace(metersPerSecond: number, unitSystem: UnitSystem): str
   return `${minutes}:${seconds.toString().padStart(2, '0')}/km`
 }
 
+export function formatPaceFromSecondsPerKm(
+  secondsPerKm: number,
+  unitSystem: UnitSystem
+): string {
+  if (!secondsPerKm || secondsPerKm <= 0 || !isFinite(secondsPerKm)) return '-'
+  const metersPerSecond = METERS_PER_KM / secondsPerKm
+  return formatPace(metersPerSecond, unitSystem)
+}
+
 // Duration formatting
 export function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600)

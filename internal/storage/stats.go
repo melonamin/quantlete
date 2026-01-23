@@ -304,7 +304,7 @@ func (r *StatsRepository) GetMonthlyStats(ctx context.Context, athleteID int64, 
 
 	if year > 0 {
 		query += ` AND strftime('%Y', start_date_local) = ?`
-		args = append(args, fmt.Sprintf("%d", year))
+		args = append(args, strconv.Itoa(year))
 	}
 
 	query += `
@@ -365,7 +365,7 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 		WHERE athlete_id = ? AND strftime('%Y', start_date_local) = ?
 		GROUP BY date
 		ORDER BY date ASC
-	`, athleteID, fmt.Sprintf("%d", year))
+	`, athleteID, strconv.Itoa(year))
 	if err != nil {
 		return nil, err
 	}
@@ -384,37 +384,26 @@ func (r *StatsRepository) GetCalendarData(ctx context.Context, athleteID int64, 
 }
 
 // GetCalendarDataRange returns daily activity counts for a date range.
+// Uses the generated query from v_calendar_days view to ensure consistency.
 func (r *StatsRepository) GetCalendarDataRange(ctx context.Context, athleteID int64, startDate, endDate string) ([]CalendarDay, error) {
-	rows, err := r.db.Query(`
-		SELECT
-			strftime('%Y-%m-%d', start_date_local) as date,
-			COUNT(*) as activity_count,
-			COALESCE(SUM(distance), 0) as total_distance,
-			COALESCE(SUM(moving_time), 0) as total_time,
-			COALESCE(SUM(calories), 0) as total_calories,
-			COALESCE(SUM(suffer_score), 0) as total_intensity
-		FROM activities
-		WHERE athlete_id = ?
-			AND date(start_date_local) >= ?
-			AND date(start_date_local) <= ?
-		GROUP BY date
-		ORDER BY date ASC
-	`, athleteID, startDate, endDate)
+	rows, err := r.queries.GetCalendarDataRange(ctx, athleteID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	var days []CalendarDay
-	for rows.Next() {
-		var d CalendarDay
-		if err := rows.Scan(&d.Date, &d.ActivityCount, &d.TotalDistance, &d.TotalTime, &d.TotalCalories, &d.TotalIntensity); err != nil {
-			return nil, err
+	days := make([]CalendarDay, len(rows))
+	for i, row := range rows {
+		days[i] = CalendarDay{
+			Date:           row.Date,
+			ActivityCount:  row.ActivityCount,
+			TotalDistance:  row.TotalDistance,
+			TotalTime:      row.TotalTime,
+			TotalCalories:  float64(row.TotalCalories),
+			TotalIntensity: row.TotalIntensity,
 		}
-		days = append(days, d)
 	}
 
-	return days, rows.Err()
+	return days, nil
 }
 
 // GetCalendarActivities returns activities for a specific month.
@@ -576,11 +565,11 @@ func (r *StatsRepository) GetHeatmapData(ctx context.Context, athleteID int64, f
 
 	if filters.StartAfter != nil {
 		query += " AND start_date >= ?"
-		args = append(args, SQLiteTime{Time: *filters.StartAfter})
+		args = append(args, TimeToSQL(*filters.StartAfter))
 	}
 	if filters.StartBefore != nil {
 		query += " AND start_date <= ?"
-		args = append(args, SQLiteTime{Time: *filters.StartBefore})
+		args = append(args, TimeToSQL(*filters.StartBefore))
 	}
 	if filters.Commute != nil {
 		query += " AND commute = ?"
@@ -640,12 +629,12 @@ func (r *StatsRepository) CountHeatmapActivities(ctx context.Context, athleteID 
 
 	if filters.StartAfter != nil {
 		query += " AND start_date >= ?"
-		args = append(args, SQLiteTime{Time: *filters.StartAfter})
+		args = append(args, TimeToSQL(*filters.StartAfter))
 	}
 
 	if filters.StartBefore != nil {
 		query += " AND start_date <= ?"
-		args = append(args, SQLiteTime{Time: *filters.StartBefore})
+		args = append(args, TimeToSQL(*filters.StartBefore))
 	}
 
 	if filters.Commute != nil {
@@ -689,11 +678,11 @@ func (r *StatsRepository) GetHeatmapCountries(ctx context.Context, athleteID int
 	}
 	if filters.StartAfter != nil {
 		query += " AND start_date >= ?"
-		args = append(args, SQLiteTime{Time: *filters.StartAfter})
+		args = append(args, TimeToSQL(*filters.StartAfter))
 	}
 	if filters.StartBefore != nil {
 		query += " AND start_date <= ?"
-		args = append(args, SQLiteTime{Time: *filters.StartBefore})
+		args = append(args, TimeToSQL(*filters.StartBefore))
 	}
 	if filters.Commute != nil {
 		query += " AND commute = ?"

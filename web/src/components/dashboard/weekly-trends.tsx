@@ -26,14 +26,14 @@ type Metric = 'distance' | 'time' | 'elevation'
 
 export function WeeklyTrends() {
   const [metric, setMetric] = useState<Metric>('distance')
-  const [sportType, setSportType] = useState<string>('')
+  const [sportType, setSportType] = useState<string>('all')
   const { formatDistance, formatElevation, distanceUnit, elevationUnit, unitSystem } =
     useFormattedMetrics()
 
   const { data: sportStats } = useSportTypeStats()
   const { data, isLoading, error } = useWeeklyTrends({
     weeks: 12,
-    sport_type: sportType,
+    sport_type: sportType === 'all' ? '' : sportType,
   })
 
   const sportOptions = useMemo(() => {
@@ -188,7 +188,7 @@ export function WeeklyTrends() {
             <SelectValue placeholder="All Sports" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Sports</SelectItem>
+            <SelectItem value="all">All Sports</SelectItem>
             {sportOptions.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}

@@ -112,7 +112,7 @@ func (r *GoalsRepository) UpsertConfig(ctx context.Context, athleteID int64, cfg
 		ON CONFLICT (athlete_id) DO UPDATE SET
 			config = EXCLUDED.config,
 			updated_at = EXCLUDED.updated_at
-	`, athleteID, b, SQLiteTime{Time: time.Now()})
+	`, athleteID, b, TimeToSQL(time.Now()))
 	return err
 }
 
@@ -139,7 +139,7 @@ func (r *GoalsRepository) GetProgress(ctx context.Context, athleteID int64, spor
 
 	if start := periodStart(time.Now(), period); start != nil {
 		query += " AND start_date >= ?"
-		args = append(args, SQLiteTime{Time: *start})
+		args = append(args, TimeToSQL(*start))
 	}
 
 	var p GoalsProgress

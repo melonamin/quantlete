@@ -105,6 +105,6 @@ func (r *DashboardConfigRepository) Upsert(ctx context.Context, athleteID int64,
 		ON CONFLICT (athlete_id) DO UPDATE SET
 			config = EXCLUDED.config,
 			updated_at = EXCLUDED.updated_at
-	`, athleteID, b, SQLiteTime{Time: time.Now()})
+	`, athleteID, b, TimeToSQL(time.Now()))
 	return err
 }

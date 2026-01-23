@@ -200,7 +200,7 @@ func (r *ActivityRepository) Upsert(ctx context.Context, a *Activity) error {
 		a.DeviceName, a.GearID,
 		a.StartLat, a.StartLng, a.EndLat, a.EndLng,
 		a.Polyline, a.SummaryPolyline,
-		SQLiteTime{Time: time.Now()}, SQLiteTime{Time: time.Now()},
+		TimeToSQL(time.Now()), TimeToSQL(time.Now()),
 	)
 	return err
 }
@@ -588,7 +588,7 @@ func (r *StreamRepository) Upsert(ctx context.Context, s *ActivityStream) error 
 			series_type = EXCLUDED.series_type,
 			data = EXCLUDED.data
 	`,
-		s.ActivityID, s.StreamType, s.OriginalSize, s.Resolution, s.SeriesType, s.Data, SQLiteTime{Time: time.Now()},
+		s.ActivityID, s.StreamType, s.OriginalSize, s.Resolution, s.SeriesType, s.Data, TimeToSQL(time.Now()),
 	)
 	return err
 }
@@ -621,4 +621,49 @@ func (r *StreamRepository) GetByActivityID(ctx context.Context, activityID int64
 func (r *StreamRepository) DeleteByActivityID(ctx context.Context, activityID int64) error {
 	_, err := r.db.Exec("DELETE FROM activity_streams WHERE activity_id = ?", activityID)
 	return err
+}
+
+// GetStreamTypeByActivityIDs retrieves a specific stream type for multiple activities in a single query.
+// Returns a map from activity ID to the stream data (raw JSON bytes).
+// This is an optimization to avoid N+1 queries when processing many activities.
+func (r *StreamRepository) GetStreamTypeByActivityIDs(ctx context.Context, activityIDs []int64, streamType string) (map[int64][]byte, error) {
+	if len(activityIDs) == 0 {
+		return make(map[int64][]byte), nil
+	}
+
+	// Build query with IN clause
+	query := `
+		SELECT activity_id, data
+		FROM activity_streams
+		WHERE stream_type = ? AND activity_id IN (`
+
+	args := make([]any, 0, len(activityIDs)+1)
+	args = append(args, streamType)
+
+	for i, id := range activityIDs {
+		if i > 0 {
+			query += ", "
+		}
+		query += "?"
+		args = append(args, id)
+	}
+	query += ")"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[int64][]byte, len(activityIDs))
+	for rows.Next() {
+		var activityID int64
+		var data []byte
+		if err := rows.Scan(&activityID, &data); err != nil {
+			return nil, fmt.Errorf("scanning stream: %w", err)
+		}
+		result[activityID] = data
+	}
+
+	return result, rows.Err()
 }

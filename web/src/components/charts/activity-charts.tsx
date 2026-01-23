@@ -4,12 +4,14 @@ import { EChartsWrapper } from './echarts-wrapper'
 import {
   chartColors,
   calendarPalettes,
+  calendarCellBackground,
   defaultGridConfig,
   defaultTooltipConfig,
   maxInlineLegendItems,
   sportColors,
   groupSmallSlices,
 } from './chart-constants'
+import { useEffectiveTheme } from '@/hooks/use-effective-theme'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 
 // Monthly activity summary chart
@@ -320,6 +322,8 @@ export function ActivityCalendarChart({
   loading = false,
   className,
 }: ActivityCalendarChartProps) {
+  const effectiveTheme = useEffectiveTheme()
+
   // Get value based on selected metric
   const getValue = (d: CalendarData): number => {
     switch (metric) {
@@ -382,7 +386,7 @@ export function ActivityCalendarChart({
       },
     },
     calendar: {
-      top: 30,
+      top: 20,
       left: 30,
       right: 30,
       cellSize: ['auto', 13],
@@ -390,6 +394,7 @@ export function ActivityCalendarChart({
       itemStyle: {
         borderWidth: 2,
         borderColor: 'transparent',
+        color: calendarCellBackground[effectiveTheme],
       },
       yearLabel: { show: false },
       dayLabel: {

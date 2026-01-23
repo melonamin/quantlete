@@ -57,8 +57,11 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
   const [localSearch, setLocalSearch] = useState(filters.search ?? '')
   const unitSystem = useSettingsStore((s) => s.unitSystem)
 
-  // Local state for distance/duration inputs (for debouncing)
-  // Use key to reset state when filters change from external reset
+  // Local state for debounced inputs - we use state (not useMemo) because:
+  // 1. User types → updates local state (allows typing without immediate filter updates)
+  // 2. Debounce timer fires → updates parent filter
+  // 3. External changes (reset, unit change) → useEffect syncs back to local state
+  // useMemo would make inputs read-only, breaking the debounce pattern
   const [localMinDistance, setLocalMinDistance] = useState(() =>
     getDisplayDistance(filters.min_distance_m, unitSystem)
   )
@@ -72,26 +75,33 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
     getDisplayDuration(filters.max_duration_s)
   )
 
-  // Reset local state when filters are cleared externally (e.g., via "Clear filters" button)
+  // Sync distance inputs when parent filters change (external reset) or unit system changes.
+  // This setState-in-effect is intentional: we need to sync external changes to local state
+  // for debounced controlled inputs. Alternative patterns (useMemo, key reset) don't support
+  // bidirectional data flow needed for user typing + external sync.
   useEffect(() => {
-    if (filters.min_distance_m === undefined && localMinDistance !== '') {
-      setLocalMinDistance('')
-    }
-    if (filters.max_distance_m === undefined && localMaxDistance !== '') {
-      setLocalMaxDistance('')
-    }
+    const nextMinDistance = getDisplayDistance(filters.min_distance_m, unitSystem)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalMinDistance((prev) => (prev === nextMinDistance ? prev : nextMinDistance))
+
+    const nextMaxDistance = getDisplayDistance(filters.max_distance_m, unitSystem)
+    setLocalMaxDistance((prev) => (prev === nextMaxDistance ? prev : nextMaxDistance))
+  }, [filters.min_distance_m, filters.max_distance_m, unitSystem])
+
+  // Sync duration inputs when parent filters are cleared externally
+  useEffect(() => {
     if (filters.min_duration_s === undefined && localMinDuration !== '') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalMinDuration('')
     }
     if (filters.max_duration_s === undefined && localMaxDuration !== '') {
       setLocalMaxDuration('')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    filters.min_distance_m,
-    filters.max_distance_m,
     filters.min_duration_s,
     filters.max_duration_s,
+    localMinDuration,
+    localMaxDuration,
   ])
 
   // Debounce search

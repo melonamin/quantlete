@@ -47,7 +47,7 @@ func NewGearRepository(db *DB) *GearRepository {
 
 // Upsert inserts or updates gear using INSERT ON CONFLICT to avoid race conditions.
 func (r *GearRepository) Upsert(ctx context.Context, g *Gear) error {
-	now := SQLiteTime{Time: time.Now()}
+	now := TimeToSQL(time.Now())
 
 	source := g.Source
 	if source == "" {

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -548,9 +549,10 @@ func (s *StatsService) GetEddingtonData(ctx context.Context, in GetEddingtonData
 	sportTypes := in.SportTypes
 	if len(sportTypes) == 0 && in.SportGroup != "" {
 		group := shared.SportGroupByID(in.SportGroup)
-		if group != nil {
-			sportTypes = group.SportTypes
+		if group == nil {
+			return nil, BadRequestf("unknown sport_group: %s", in.SportGroup)
 		}
+		sportTypes = group.SportTypes
 	}
 
 	result, err := s.stats.GetEddingtonData(ctx, in.AthleteID, sportTypes)
@@ -590,9 +592,10 @@ func (s *StatsService) GetEddingtonHistory(ctx context.Context, in GetEddingtonH
 	sportTypes := in.SportTypes
 	if len(sportTypes) == 0 && in.SportGroup != "" {
 		group := shared.SportGroupByID(in.SportGroup)
-		if group != nil {
-			sportTypes = group.SportTypes
+		if group == nil {
+			return nil, BadRequestf("unknown sport_group: %s", in.SportGroup)
 		}
+		sportTypes = group.SportTypes
 	}
 
 	points, err := s.stats.GetEddingtonHistory(ctx, in.AthleteID, sportTypes)
@@ -1164,8 +1167,14 @@ func (s *StatsService) GetMonthlyComparison(ctx context.Context, in GetMonthlyCo
 	yearsSet := make(map[int]struct{})
 
 	for i, r := range rows {
-		year, _ := strconv.Atoi(r.Year)
-		month, _ := strconv.Atoi(r.Month)
+		year, err := strconv.Atoi(r.Year)
+		if err != nil {
+			return nil, Wrapf(ErrInternal, "invalid year value %q: %v", r.Year, err)
+		}
+		month, err := strconv.Atoi(r.Month)
+		if err != nil {
+			return nil, Wrapf(ErrInternal, "invalid month value %q: %v", r.Month, err)
+		}
 		result[i] = MonthlyComparisonPoint{
 			Year:           year,
 			Month:          month,
@@ -1182,14 +1191,7 @@ func (s *StatsService) GetMonthlyComparison(ctx context.Context, in GetMonthlyCo
 	for year := range yearsSet {
 		years = append(years, year)
 	}
-	// Sort years in ascending order
-	for i := 0; i < len(years); i++ {
-		for j := i + 1; j < len(years); j++ {
-			if years[i] > years[j] {
-				years[i], years[j] = years[j], years[i]
-			}
-		}
-	}
+	sort.Ints(years)
 
 	return &GetMonthlyComparisonOutput{
 		Months: result,

@@ -1,7 +1,23 @@
 // Package analysis provides activity analysis functions.
 package analysis
 
-import "slices"
+import (
+	"slices"
+)
+
+// Split calculation constants.
+const (
+	// minPartialSplitRatio is the minimum ratio of a partial split to include (10% of full split).
+	minPartialSplitRatio = 0.1
+	// fullSplitThreshold is the threshold ratio to consider a split as "full" for comparison (90%).
+	fullSplitThreshold = 0.9
+	// defaultSplitLengthM is the default split length in meters (1km).
+	defaultSplitLengthM = 1000.0
+	// maxSplitDuration is the maximum reasonable duration for a single split (24 hours).
+	// Durations exceeding this indicate corrupt stream data (e.g., GPS gaps, clock drift).
+	// This prevents both integer overflow and nonsensical values in analysis output.
+	maxSplitDuration = 24 * 60 * 60 // 86400 seconds = 24 hours
+)
 
 // Split represents a distance-based split (e.g., per-km or per-mile).
 type Split struct {
@@ -40,7 +56,7 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 	}
 
 	if splitLengthM <= 0 {
-		splitLengthM = 1000 // Default to 1km splits
+		splitLengthM = defaultSplitLengthM
 	}
 
 	hasHR := len(hr) == len(distance)
@@ -84,11 +100,24 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 			fraction := (nextSplitDist - prevDist) / (currDist - prevDist)
 			splitEndTime := prevTime + fraction*(currTime-prevTime)
 
+			// Calculate duration - skip splits with unreasonable durations (indicates corrupt data)
+			duration := splitEndTime - splitStartTime
+			if duration <= 0 || duration > maxSplitDuration {
+				// Skip this split but continue processing - likely GPS gap or clock drift
+				splitIndex++
+				splitStartTime = splitEndTime
+				nextSplitDist += splitLengthM
+				splitStart = i
+				hrSum, wattsSum = 0, 0
+				hrCount, wattsCount = 0, 0
+				continue
+			}
+
 			split := Split{
 				Index:        splitIndex,
 				DistanceM:    splitLengthM,
-				DurationS:    int(splitEndTime - splitStartTime),
-				PaceSecsPerM: (splitEndTime - splitStartTime) / splitLengthM,
+				DurationS:    int(duration),
+				PaceSecsPerM: duration / splitLengthM,
 			}
 
 			// Calculate averages
@@ -124,7 +153,9 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 		partialDist := lastDist - (float64(splitIndex)-1)*splitLengthM
 		partialTime := time[len(time)-1] - splitStartTime
 
-		if partialDist > splitLengthM*0.1 && partialDist > 0 { // Only include if > 10% of a split
+		// Include partial split only if it meets minimum ratio and has valid duration
+		if partialDist > splitLengthM*minPartialSplitRatio && partialDist > 0 &&
+			partialTime > 0 && partialTime <= maxSplitDuration {
 			split := Split{
 				Index:        splitIndex,
 				DistanceM:    partialDist,
@@ -157,7 +188,7 @@ func ComputeSplits(distance, time, hr, watts, altitude []float64, splitLengthM f
 	fastestIdx, slowestIdx := -1, -1
 	for i, s := range splits {
 		// Skip partial splits for comparison
-		if s.DistanceM < splitLengthM*0.9 {
+		if s.DistanceM < splitLengthM*fullSplitThreshold {
 			continue
 		}
 		if fastestIdx == -1 || s.PaceSecsPerM < splits[fastestIdx].PaceSecsPerM {

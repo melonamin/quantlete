@@ -41,14 +41,14 @@ const MONTH_LABELS = [
 
 export function MonthlyComparison() {
   const [metric, setMetric] = useState<Metric>('distance')
-  const [sportType, setSportType] = useState<string>('')
+  const [sportType, setSportType] = useState<string>('all')
   const [hiddenYears, setHiddenYears] = useState<Set<number>>(new Set())
   const { formatDistance, formatElevation, distanceUnit, elevationUnit, unitSystem } =
     useFormattedMetrics()
 
   const { data: sportStats } = useSportTypeStats()
   const { data, isLoading, error } = useMonthlyComparison({
-    sport_type: sportType,
+    sport_type: sportType === 'all' ? '' : sportType,
   })
 
   const sportOptions = useMemo(() => {
@@ -274,7 +274,7 @@ export function MonthlyComparison() {
             <SelectValue placeholder="All Sports" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Sports</SelectItem>
+            <SelectItem value="all">All Sports</SelectItem>
             {sportOptions.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}

@@ -1,6 +1,13 @@
 import type { EChartsOption } from 'echarts'
 import { EChartsWrapper } from './echarts-wrapper'
-import { chartColors, defaultGridConfig, defaultTooltipConfig } from './chart-constants'
+import {
+  chartColors,
+  defaultGridConfig,
+  defaultTooltipConfig,
+  inlineLegendConfig,
+  maxInlineLegendItems,
+  scrollLegendConfig,
+} from './chart-constants'
 
 interface BarChartData {
   label: string
@@ -108,6 +115,7 @@ interface StackedBarChartProps {
   horizontal?: boolean
   height?: number | string
   loading?: boolean
+  showLegend?: boolean
   className?: string
 }
 
@@ -117,8 +125,11 @@ export function StackedBarChart({
   horizontal = false,
   height = 300,
   loading = false,
+  showLegend = true,
   className,
 }: StackedBarChartProps) {
+  const needsScrollLegend = series.length > maxInlineLegendItems
+
   const categoryAxis = {
     type: 'category' as const,
     data: categories,
@@ -144,16 +155,22 @@ export function StackedBarChart({
   }
 
   const option: EChartsOption = {
-    grid: defaultGridConfig,
+    grid: {
+      ...defaultGridConfig,
+      bottom: showLegend ? (needsScrollLegend ? '18%' : '15%') : '3%',
+    },
     tooltip: {
       ...defaultTooltipConfig,
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
     },
-    legend: {
-      data: series.map((s) => s.name),
-      bottom: 0,
-    },
+    legend: showLegend
+      ? {
+          data: series.map((s) => s.name),
+          bottom: 0,
+          ...(needsScrollLegend ? scrollLegendConfig : inlineLegendConfig),
+        }
+      : undefined,
     xAxis: horizontal ? valueAxis : categoryAxis,
     yAxis: horizontal ? categoryAxis : valueAxis,
     series: series.map((s, idx) => ({

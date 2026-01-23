@@ -1,5 +1,6 @@
 import type { PaceDistributionOutput, PaceBucketItem } from '@/lib/api/activities'
-import { formatDuration } from '@/lib/format'
+import { formatDuration, formatPaceFromSecondsPerKm } from '@/lib/format'
+import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { cn } from '@/lib/utils'
 
 interface ActivityPaceDistributionProps {
@@ -11,8 +12,12 @@ export function ActivityPaceDistribution({
   paceDistribution,
   className,
 }: ActivityPaceDistributionProps) {
+  const { unitSystem } = useFormattedMetrics()
+
   // Find the bucket with most time for bar scaling
   const maxPercentage = Math.max(...paceDistribution.buckets.map((b) => b.percentage))
+  const formatSecondsPerKm = (secondsPerKm: number) =>
+    formatPaceFromSecondsPerKm(secondsPerKm, unitSystem)
 
   return (
     <div className={cn('rounded-lg border border-border bg-card p-4', className)}>
@@ -30,15 +35,16 @@ export function ActivityPaceDistribution({
             bucket={bucket}
             maxPercentage={maxPercentage}
             avgPace={paceDistribution.avg_pace}
+            formatPaceValue={formatSecondsPerKm}
           />
         ))}
       </div>
 
       <div className="mt-4 flex justify-between border-t border-border pt-3 text-xs">
-        <StatBlock label="Fastest" value={formatPace(paceDistribution.fastest_pace)} />
-        <StatBlock label="Average" value={formatPace(paceDistribution.avg_pace)} />
-        <StatBlock label="Median" value={formatPace(paceDistribution.median_pace)} />
-        <StatBlock label="Slowest" value={formatPace(paceDistribution.slowest_pace)} />
+        <StatBlock label="Fastest" value={formatSecondsPerKm(paceDistribution.fastest_pace)} />
+        <StatBlock label="Average" value={formatSecondsPerKm(paceDistribution.avg_pace)} />
+        <StatBlock label="Median" value={formatSecondsPerKm(paceDistribution.median_pace)} />
+        <StatBlock label="Slowest" value={formatSecondsPerKm(paceDistribution.slowest_pace)} />
       </div>
     </div>
   )
@@ -48,9 +54,10 @@ interface PaceBucketProps {
   bucket: PaceBucketItem
   maxPercentage: number
   avgPace: number
+  formatPaceValue: (secondsPerKm: number) => string
 }
 
-function PaceBucket({ bucket, maxPercentage, avgPace }: PaceBucketProps) {
+function PaceBucket({ bucket, maxPercentage, avgPace, formatPaceValue }: PaceBucketProps) {
   const barHeight = maxPercentage > 0 ? (bucket.percentage / maxPercentage) * 100 : 0
   const midPace = (bucket.min_pace + bucket.max_pace) / 2
 
@@ -77,7 +84,7 @@ function PaceBucket({ bucket, maxPercentage, avgPace }: PaceBucketProps) {
       {/* Tooltip on hover */}
       <div className="pointer-events-none absolute bottom-full mb-2 hidden rounded bg-popover px-2 py-1 text-xs shadow-md group-hover:block">
         <div className="whitespace-nowrap font-medium">
-          {formatPace(bucket.min_pace)} - {formatPace(bucket.max_pace)}
+          {formatPaceValue(bucket.min_pace)} - {formatPaceValue(bucket.max_pace)}
         </div>
         <div className="text-muted-foreground">
           {bucket.percentage.toFixed(1)}% ({formatDuration(bucket.seconds)})
@@ -99,11 +106,4 @@ function StatBlock({ label, value }: StatBlockProps) {
       <div className="font-medium text-foreground">{value}</div>
     </div>
   )
-}
-
-function formatPace(secondsPerKm: number): string {
-  if (!secondsPerKm || secondsPerKm <= 0 || !isFinite(secondsPerKm)) return '-'
-  const minutes = Math.floor(secondsPerKm / 60)
-  const seconds = Math.round(secondsPerKm % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')}/km`
 }

@@ -1,6 +1,13 @@
 import type { EChartsOption } from 'echarts'
 import { EChartsWrapper } from './echarts-wrapper'
-import { chartColors, defaultGridConfig, defaultTooltipConfig } from './chart-constants'
+import {
+  chartColors,
+  defaultGridConfig,
+  defaultTooltipConfig,
+  inlineLegendConfig,
+  maxInlineLegendItems,
+  scrollLegendConfig,
+} from './chart-constants'
 
 interface DataPoint {
   x: number | string
@@ -39,21 +46,32 @@ export function LineChart({
   showDataZoom = false,
   className,
 }: LineChartProps) {
+  const hasLegend = showLegend && series.length > 1
+  const needsScrollLegend = hasLegend && series.length > maxInlineLegendItems
+
+  // Calculate proper grid bottom spacing for legend + dataZoom combo
+  const gridBottom = (() => {
+    if (hasLegend && showDataZoom) return '28%'
+    if (hasLegend) return '15%'
+    if (showDataZoom) return '15%'
+    return '3%'
+  })()
+
   const option: EChartsOption = {
-    grid: defaultGridConfig,
+    grid: { ...defaultGridConfig, bottom: gridBottom },
     tooltip: {
       ...defaultTooltipConfig,
       axisPointer: {
         type: 'cross',
       },
     },
-    legend:
-      showLegend && series.length > 1
-        ? {
-            data: series.map((s) => s.name),
-            bottom: 0,
-          }
-        : undefined,
+    legend: hasLegend
+      ? {
+          data: series.map((s) => s.name),
+          bottom: 0,
+          ...(needsScrollLegend ? scrollLegendConfig : inlineLegendConfig),
+        }
+      : undefined,
     xAxis: {
       type: xAxisType,
       name: xAxisLabel,
@@ -94,7 +112,7 @@ export function LineChart({
             start: 0,
             end: 100,
             height: 20,
-            bottom: showLegend && series.length > 1 ? 30 : 10,
+            bottom: hasLegend ? (needsScrollLegend ? 65 : 45) : 10,
           },
         ]
       : undefined,

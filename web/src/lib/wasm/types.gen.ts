@@ -2535,6 +2535,11 @@ export interface GetPowerStatsInput {
   sport_types: string[]
 }
 
+export interface GetPowerZonesRequest {
+  after?: string | null
+  before?: string | null
+}
+
 /** GetTrainingLoadInput contains parameters for getting training load data. */
 export interface GetTrainingLoadInput {
   after?: string | null

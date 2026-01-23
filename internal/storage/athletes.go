@@ -72,7 +72,7 @@ func (r *AthleteRepository) Upsert(ctx context.Context, a *Athlete) error {
 	`,
 		a.ID, a.Username, a.FirstName, a.LastName, a.City, a.State, a.Country,
 		a.Sex, a.Premium, a.Summit, a.ProfileMedium, a.Profile, a.Weight,
-		SQLiteTime{Time: time.Now()}, SQLiteTime{Time: time.Now()},
+		TimeToSQL(time.Now()), TimeToSQL(time.Now()),
 	)
 	return err
 }
@@ -172,7 +172,7 @@ func NewTokenRepository(db *DB) *TokenRepository {
 
 // Upsert inserts or updates an auth token using ON CONFLICT for atomic upsert.
 func (r *TokenRepository) Upsert(ctx context.Context, t *AuthToken) error {
-	now := SQLiteTime{Time: time.Now()}
+	now := TimeToSQL(time.Now())
 	_, err := r.db.Exec(`
 		INSERT INTO auth_tokens (
 			athlete_id, access_token, refresh_token, token_type,

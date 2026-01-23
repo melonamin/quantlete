@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"math"
 	"time"
 )
@@ -151,7 +152,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 			SUM(CASE WHEN commute AND sport_type LIKE '%Ride%' THEN distance ELSE 0 END) AS commute_distance_m
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end}).Scan(&activities, &dist, &elev, &moving, &kudos, &commute); err != nil {
+	`, athleteID, TimeToSQL(start), TimeToSQL(end)).Scan(&activities, &dist, &elev, &moving, &kudos, &commute); err != nil {
 		return nil, err
 	}
 	totals.Activities = activities
@@ -180,7 +181,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 		SELECT COUNT(DISTINCT date(start_date_local))
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end}).Scan(&activeDays); err != nil {
+	`, athleteID, TimeToSQL(start), TimeToSQL(end)).Scan(&activeDays); err != nil {
 		return nil, err
 	}
 
@@ -228,7 +229,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 			WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 			GROUP BY m
 			ORDER BY m ASC
-		`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
+		`, athleteID, TimeToSQL(start), TimeToSQL(end))
 		if err != nil {
 			return nil, err
 		}
@@ -283,12 +284,19 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 			WHERE dt >= ? AND (prev_best IS NULL OR best_so_far < prev_best)
 			GROUP BY mon
 			ORDER BY mon ASC
-		`, athleteID, SQLiteTime{Time: end}, SQLiteTime{Time: start})
-		if err == nil {
+		`, athleteID, TimeToSQL(end), TimeToSQL(start))
+		if err != nil {
+			slog.Warn("failed to fetch PRs for wrapped report",
+				"athlete_id", athleteID,
+				"error", err)
+		} else {
 			for prRows.Next() {
 				var mon int
 				var prs int
 				if err := prRows.Scan(&mon, &prs); err != nil {
+					slog.Warn("failed to scan PR row in wrapped report",
+						"athlete_id", athleteID,
+						"error", err)
 					continue
 				}
 				if mon >= 1 && mon <= 12 {
@@ -308,7 +316,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		GROUP BY sport_type
 		ORDER BY seconds DESC
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
+	`, athleteID, TimeToSQL(start), TimeToSQL(end))
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +343,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		GROUP BY h
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
+	`, athleteID, TimeToSQL(start), TimeToSQL(end))
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +374,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 		GROUP BY lat, lng
 		ORDER BY c DESC
 		LIMIT 2000
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
+	`, athleteID, TimeToSQL(start), TimeToSQL(end))
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +410,7 @@ func (r *StatsRepository) GetWrapped(ctx context.Context, athleteID int64, year 
 		WHERE a.start_date_local >= ? AND a.start_date_local < ?
 		ORDER BY random()
 		LIMIT 1
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end}).Scan(&photo.ID, &photo.ActivityID, &photo.URL, &photo.ThumbnailURL, &photo.Caption)
+	`, athleteID, TimeToSQL(start), TimeToSQL(end)).Scan(&photo.ID, &photo.ActivityID, &photo.URL, &photo.ThumbnailURL, &photo.Caption)
 	if err == nil && photo.ID != "" && photo.URL != "" {
 		report.RandomPhoto = &photo
 	}
@@ -416,7 +424,7 @@ func computeWrappedStreaks(ctx context.Context, db *DB, athleteID int64, start, 
 		FROM activities
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		ORDER BY day ASC
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
+	`, athleteID, TimeToSQL(start), TimeToSQL(end))
 	if err != nil {
 		return WrappedStreaks{}
 	}
@@ -468,7 +476,7 @@ func queryBiggest(ctx context.Context, db *DB, athleteID int64, start, end time.
 		WHERE athlete_id = ? AND start_date_local >= ? AND start_date_local < ?
 		ORDER BY `+orderBy+` DESC
 		LIMIT 1
-	`, athleteID, SQLiteTime{Time: start}, SQLiteTime{Time: end})
+	`, athleteID, TimeToSQL(start), TimeToSQL(end))
 
 	var a WrappedBiggestActivity
 	var startLocal SQLiteTime

@@ -1771,8 +1771,9 @@ export interface PowerHistoryPoint {
 }
 
 export interface PowerStatsResult {
+  durations_s: number[]
   best: PowerBest[]
-  history: PowerHistoryPoint[]
+  history: Record<string, PowerHistoryPoint[]>
 }
 
 export function getPowerStats(filters?: PowerStatsFilters): PowerStatsResult {
@@ -1780,7 +1781,37 @@ export function getPowerStats(filters?: PowerStatsFilters): PowerStatsResult {
     () => goStorage.getPowerStats(JSON.stringify(filters || {})),
     'getPowerStats'
   )
-  return { best: result.best || [], history: result.history || [] }
+  return {
+    durations_s: result.durations_s || [],
+    best: result.best || [],
+    history: result.history || {},
+  }
+}
+
+// Power Zones
+export interface PowerZonesFilters {
+  after?: string
+  before?: string
+}
+
+export interface PowerZonesResult {
+  ftp_watts?: number
+  seconds_by_zone: number[]
+  total_seconds: number
+  bounds: number[]
+}
+
+export function getPowerZones(filters?: PowerZonesFilters): PowerZonesResult {
+  const result = callGoStorage<PowerZonesResult>(
+    () => goStorage.getPowerZones(JSON.stringify(filters || {})),
+    'getPowerZones'
+  )
+  return {
+    ftp_watts: result.ftp_watts,
+    seconds_by_zone: result.seconds_by_zone || [],
+    total_seconds: result.total_seconds || 0,
+    bounds: result.bounds || [],
+  }
 }
 
 // ============================================================================

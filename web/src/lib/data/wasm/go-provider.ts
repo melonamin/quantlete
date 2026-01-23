@@ -620,32 +620,23 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    // Default history duration is 300s (5 min) - matches Go backend default
-    const historyDuration = 300
-
     const result = goStorage.getPowerStats({
       after: filters?.after,
       before: filters?.before,
       sport_types: filters?.sport_type ? [filters.sport_type] : undefined,
-      history_duration: historyDuration,
     })
 
-    // Build durations from best array
-    const durationsSet = new Set(result.best.map((b) => b.duration_s))
-    const durations = Array.from(durationsSet).sort((a, b) => a - b)
-
-    // History is returned for a single duration (historyDuration)
-    // Key all history points under that duration
+    // Map history from backend format (string keys from JSON) to response format
     const historyByDuration: Record<string, { date: string; watts: number }[]> = {}
-    if (result.history.length > 0) {
-      historyByDuration[String(historyDuration)] = result.history.map((point) => ({
+    for (const [durationKey, points] of Object.entries(result.history)) {
+      historyByDuration[durationKey] = points.map((point) => ({
         date: point.date,
         watts: point.watts,
       }))
     }
 
     return {
-      durations_s: durations,
+      durations_s: result.durations_s,
       best: result.best.map((b) => ({
         duration_s: b.duration_s,
         watts: b.watts,
@@ -657,33 +648,16 @@ export class GoWasmProvider implements DataProvider {
   }
 
   async getPowerZones(): Promise<PowerZonesResponse> {
-    // Power zone calculation is partially supported: we can compute zone bounds from FTP,
-    // but seconds_by_zone requires processing all activity power streams which is
-    // computationally expensive and server-only. Zone bounds are calculated here.
     this.assertInitialized()
     this.getAthleteId()
 
-    const ftpHistory = goStorage.getFtpHistory()
-    const latestFtp = ftpHistory.length > 0 ? ftpHistory[ftpHistory.length - 1].value : undefined
-
-    // Standard 7-zone power model based on FTP
-    const bounds = latestFtp
-      ? [
-          0,
-          Math.round(latestFtp * 0.55),
-          Math.round(latestFtp * 0.75),
-          Math.round(latestFtp * 0.9),
-          Math.round(latestFtp * 1.05),
-          Math.round(latestFtp * 1.2),
-          Math.round(latestFtp * 1.5),
-        ]
-      : [0, 100, 150, 200, 250, 300, 400]
+    const result = goStorage.getPowerZones()
 
     return {
-      ftp_watts: latestFtp,
-      seconds_by_zone: [], // Server-only: requires stream processing
-      total_seconds: 0,
-      bounds,
+      ftp_watts: result.ftp_watts,
+      seconds_by_zone: result.seconds_by_zone,
+      total_seconds: result.total_seconds,
+      bounds: result.bounds,
     }
   }
 
