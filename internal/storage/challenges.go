@@ -49,7 +49,7 @@ func (r *ChallengeRepository) Upsert(ctx context.Context, c *Challenge) error {
 			local_badge_url = COALESCE(NULLIF(EXCLUDED.local_badge_url, ''), challenges.local_badge_url),
 			completion_date = EXCLUDED.completion_date,
 			month = EXCLUDED.month
-	`, c.ID, c.AthleteID, c.Name, c.Slug, c.BadgeURL, c.LocalBadgeURL, c.CompletionDate, c.Month, SQLiteTime{Time: time.Now()})
+	`, c.ID, c.AthleteID, c.Name, c.Slug, c.BadgeURL, c.LocalBadgeURL, c.CompletionDate, c.Month, TimeToSQL(time.Now()))
 	return err
 }
 

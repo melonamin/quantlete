@@ -84,17 +84,36 @@ func (t SQLiteTime) Value() (driver.Value, error) {
 	return t.Format("2006-01-02 15:04:05-07:00"), nil
 }
 
-// SQLiteTimePtr wraps a *time.Time into an SQLiteTime value suitable for SQL parameters.
+// TimeToSQL formats a time.Time as a string for SQLite queries.
+// go-sqlite3-js can't serialize time.Time or SQLiteTime structs, so we must use strings.
+func TimeToSQL(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05-07:00")
+}
+
+// SQLiteTimePtr wraps a *time.Time into a string value suitable for SQL parameters.
 // Returns nil if the pointer is nil, avoiding nil pointer dereference.
+// Uses string format because go-sqlite3-js can't serialize time.Time or SQLiteTime structs.
 func SQLiteTimePtr(t *time.Time) any {
 	if t == nil {
 		return nil
 	}
-	return SQLiteTime{Time: *t}
+	return TimeToSQL(*t)
+}
+
+// SQLiteTimeToSQL converts *SQLiteTime to a SQL-compatible value (string or nil).
+// go-sqlite3-js can't serialize SQLiteTime structs, so we must use strings.
+func SQLiteTimeToSQL(t *SQLiteTime) any {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	return TimeToSQL(t.Time)
 }
 
 // AddTimeRangeFilter appends time range conditions to a WHERE clause builder.
-// It handles both start (>=) and end (<=) bounds, wrapping times in SQLiteTime.
+// It handles both start (>=) and end (<=) bounds, formatting times as strings.
 //
 // Example usage:
 //
@@ -104,11 +123,11 @@ func SQLiteTimePtr(t *time.Time) any {
 func AddTimeRangeFilter(conditions []string, args []any, column string, start, end *time.Time) ([]string, []any) {
 	if start != nil {
 		conditions = append(conditions, column+" >= ?")
-		args = append(args, SQLiteTime{Time: *start})
+		args = append(args, TimeToSQL(*start))
 	}
 	if end != nil {
 		conditions = append(conditions, column+" <= ?")
-		args = append(args, SQLiteTime{Time: *end})
+		args = append(args, TimeToSQL(*end))
 	}
 	return conditions, args
 }

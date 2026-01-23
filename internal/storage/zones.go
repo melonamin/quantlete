@@ -88,8 +88,8 @@ func (r *ZonesRepository) UpsertHR(ctx context.Context, athleteID int64, def HRZ
 	if def.EffectiveFrom == "" {
 		def.EffectiveFrom = "1970-01-01"
 	}
-	eff, err := time.Parse("2006-01-02", def.EffectiveFrom)
-	if err != nil {
+	// Validate date format but use string directly (go-sqlite3-js can't serialize time.Time)
+	if _, err := time.Parse("2006-01-02", def.EffectiveFrom); err != nil {
 		return fmt.Errorf("invalid effective_from")
 	}
 	if def.Method != "absolute_bpm" && def.Method != "percent_hrmax" {
@@ -99,13 +99,13 @@ func (r *ZonesRepository) UpsertHR(ctx context.Context, athleteID int64, def HRZ
 		return fmt.Errorf("zones is required")
 	}
 
-	_, err = r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO hr_zone_definitions (athlete_id, sport_type, effective_from, method, zones)
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (athlete_id, sport_type, effective_from) DO UPDATE SET
 			method = EXCLUDED.method,
 			zones = EXCLUDED.zones
-	`, athleteID, def.SportType, eff, def.Method, def.Zones)
+	`, athleteID, def.SportType, def.EffectiveFrom, def.Method, def.Zones)
 	if err != nil && isMissingTable(err, hrZoneDefinitionsTable) {
 		if err2 := r.ensureHRZoneDefinitionsTable(ctx); err2 != nil {
 			return err2
@@ -116,7 +116,7 @@ func (r *ZonesRepository) UpsertHR(ctx context.Context, athleteID int64, def HRZ
 			ON CONFLICT (athlete_id, sport_type, effective_from) DO UPDATE SET
 				method = EXCLUDED.method,
 				zones = EXCLUDED.zones
-		`, athleteID, def.SportType, eff, def.Method, def.Zones)
+		`, athleteID, def.SportType, def.EffectiveFrom, def.Method, def.Zones)
 	}
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func (r *ZonesRepository) UpsertHR(ctx context.Context, athleteID int64, def HRZ
 	// Invalidate zone distributions for affected activities.
 	// This triggers recomputation on next zone trend access.
 	q := NewQueries(r.db.Conn())
-	if err := q.DeleteZoneDistributionsForSportType(ctx, athleteID, def.SportType, eff.Format("2006-01-02")); err != nil {
+	if err := q.DeleteZoneDistributionsForSportType(ctx, athleteID, def.SportType, def.EffectiveFrom); err != nil {
 		return fmt.Errorf("invalidate zone distributions: %w", err)
 	}
 
@@ -136,14 +136,14 @@ func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportTy
 	if sportType == "" || effectiveFrom == "" {
 		return fmt.Errorf("sport_type and effective_from are required")
 	}
-	eff, err := time.Parse("2006-01-02", effectiveFrom)
-	if err != nil {
+	// Validate date format but use string directly (go-sqlite3-js can't serialize time.Time)
+	if _, err := time.Parse("2006-01-02", effectiveFrom); err != nil {
 		return fmt.Errorf("invalid effective_from")
 	}
-	_, err = r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
 		DELETE FROM hr_zone_definitions
 		WHERE athlete_id = ? AND sport_type = ? AND effective_from = ?
-	`, athleteID, sportType, eff)
+	`, athleteID, sportType, effectiveFrom)
 	if err != nil && isMissingTable(err, hrZoneDefinitionsTable) {
 		if err2 := r.ensureHRZoneDefinitionsTable(ctx); err2 != nil {
 			return err2
@@ -151,7 +151,7 @@ func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportTy
 		_, err = r.db.ExecContext(ctx, `
 			DELETE FROM hr_zone_definitions
 			WHERE athlete_id = ? AND sport_type = ? AND effective_from = ?
-		`, athleteID, sportType, eff)
+		`, athleteID, sportType, effectiveFrom)
 	}
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func (r *ZonesRepository) DeleteHR(ctx context.Context, athleteID int64, sportTy
 	// Invalidate zone distributions for affected activities.
 	// Activities from effective_from onwards may now use a different zone definition.
 	q := NewQueries(r.db.Conn())
-	if err := q.DeleteZoneDistributionsForSportType(ctx, athleteID, sportType, eff.Format("2006-01-02")); err != nil {
+	if err := q.DeleteZoneDistributionsForSportType(ctx, athleteID, sportType, effectiveFrom); err != nil {
 		return fmt.Errorf("invalidate zone distributions: %w", err)
 	}
 

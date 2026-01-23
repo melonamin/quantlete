@@ -94,7 +94,7 @@ func (r *SegmentRepository) UpsertSegment(ctx context.Context, s *Segment) error
 		s.StartLat, s.StartLng, s.EndLat, s.EndLng,
 		s.Starred, s.Polyline,
 		s.AthleteKOMRank, s.AthleteEffortCount, s.AthletePRElapsedTime, s.AthletePRDate,
-		SQLiteTime{Time: time.Now()},
+		TimeToSQL(time.Now()),
 	)
 	return err
 }
@@ -143,7 +143,7 @@ func (r *SegmentRepository) UpsertSegmentWithEffort(ctx context.Context, s *Segm
 		s.StartLat, s.StartLng, s.EndLat, s.EndLng,
 		s.Starred, s.Polyline,
 		s.AthleteKOMRank, s.AthleteEffortCount, s.AthletePRElapsedTime, s.AthletePRDate,
-		SQLiteTime{Time: time.Now()},
+		TimeToSQL(time.Now()),
 	)
 	if err != nil {
 		return fmt.Errorf("upserting segment: %w", err)
@@ -172,7 +172,7 @@ func (r *SegmentRepository) UpsertSegmentWithEffort(ctx context.Context, s *Segm
 			country = EXCLUDED.country
 	`, e.ID, e.SegmentID, e.ActivityID, e.AthleteID,
 		e.Name, e.ElapsedTime, e.MovingTime,
-		e.StartDate, e.StartDateLocal,
+		SQLiteTimeToSQL(e.StartDate), SQLiteTimeToSQL(e.StartDateLocal),
 		e.Distance, e.AverageWatts, e.AverageHeartrate, e.MaxHeartrate,
 		e.PRRank, e.Country,
 	)
@@ -206,7 +206,7 @@ func (r *SegmentRepository) UpsertEffort(ctx context.Context, e *SegmentEffort) 
 			country = EXCLUDED.country
 	`, e.ID, e.SegmentID, e.ActivityID, e.AthleteID,
 		e.Name, e.ElapsedTime, e.MovingTime,
-		e.StartDate, e.StartDateLocal,
+		SQLiteTimeToSQL(e.StartDate), SQLiteTimeToSQL(e.StartDateLocal),
 		e.Distance, e.AverageWatts, e.AverageHeartrate, e.MaxHeartrate,
 		e.PRRank, e.Country,
 	)

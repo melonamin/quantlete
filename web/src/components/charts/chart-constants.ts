@@ -63,6 +63,12 @@ export const calendarPalettes = {
   ],
 }
 
+// Calendar cell background colors for empty cells (theme-aware)
+export const calendarCellBackground = {
+  dark: 'rgba(30, 30, 40, 0.8)', // Subtle dark cell background
+  light: 'rgba(240, 240, 245, 0.8)', // Subtle light cell background
+}
+
 // Zone colors for training zones (Recovery → VO2max)
 export const zoneColors = {
   z1: 'rgba(74, 222, 128, 0.4)', // Light terminal green - Recovery
@@ -142,6 +148,41 @@ export const maxInlineLegendItems = 6
 
 // When a chart has more than this many categories, group small values into "Other"
 export const maxChartCategories = 8
+
+// Legend text styling (terminal aesthetic)
+export const defaultLegendTextStyle = {
+  color: 'rgba(160, 160, 180, 0.8)',
+  fontFamily: "'JetBrains Mono', monospace",
+  fontSize: 10,
+}
+
+// Compact style for scroll legends
+export const compactLegendTextStyle = {
+  ...defaultLegendTextStyle,
+  fontSize: 9,
+}
+
+// Inline legend (<=6 items)
+export const inlineLegendConfig = {
+  textStyle: defaultLegendTextStyle,
+  itemWidth: 12,
+  itemHeight: 10,
+  itemGap: 12,
+}
+
+// Scroll legend (>6 items)
+export const scrollLegendConfig = {
+  type: 'scroll' as const,
+  textStyle: compactLegendTextStyle,
+  itemWidth: 10,
+  itemHeight: 8,
+  itemGap: 8,
+  pageButtonItemGap: 5,
+  pageButtonGap: 5,
+  pageIconColor: 'rgba(160, 160, 180, 0.8)',
+  pageIconInactiveColor: 'rgba(100, 100, 120, 0.4)',
+  pageTextStyle: { color: 'rgba(160, 160, 180, 0.8)', fontSize: 9 },
+}
 
 // Comprehensive sport colors for donut/pie charts
 // Each sport type has a unique color for better differentiation

@@ -25,6 +25,13 @@ const RANGE_OPTIONS: { value: CalendarRange; label: string }[] = [
   { value: 'rolling365', label: '365 Days' },
 ]
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function ActivityCalendar() {
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(currentYear)
@@ -37,10 +44,10 @@ export function ActivityCalendar() {
   // Calculate rolling 365 date range
   const rolling365Range = useMemo(() => {
     const now = new Date()
-    const endDate = now.toISOString().split('T')[0]
-    const startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0]
+    const startDateObj = new Date(now)
+    startDateObj.setDate(startDateObj.getDate() - 365)
+    const endDate = formatLocalDate(now)
+    const startDate = formatLocalDate(startDateObj)
     return { startDate, endDate }
   }, [])
 

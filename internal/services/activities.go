@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/melonamin/quantlete/internal/analysis"
@@ -184,8 +185,23 @@ type SaveStreamOutput struct {
 	Message string `json:"message"`
 }
 
-// Maximum allowed stream data size to prevent memory exhaustion.
-const maxStreamDataSize = 100000
+// Stream size limits to prevent memory exhaustion in WASM/browser environments.
+const (
+	// maxStreamDataSize is the maximum number of decoded elements (float64 values) allowed
+	// in a single stream array. This prevents memory exhaustion when processing streams.
+	// 100,000 elements at 8 bytes each = 800KB per stream, which is reasonable for:
+	// - A 27+ hour activity at 1Hz sampling (unusual but possible for ultra-endurance)
+	// - Multiple streams (distance, time, HR, watts, altitude) per activity
+	// Streams exceeding this are rejected with a BadRequest error.
+	maxStreamDataSize = 100000
+
+	// maxStreamRawSize is a secondary limit on raw JSON byte size before decoding.
+	// Set to 10x maxStreamDataSize to account for JSON overhead (numbers as strings,
+	// brackets, commas). This provides an early rejection of oversized data before
+	// we allocate memory for the decoded array.
+	// Used in GetAnalysis: if len(stream.Data) > maxStreamRawSize { skip }
+	maxStreamRawSize = maxStreamDataSize * 10 // ~1MB
+)
 
 // ============================================================================
 // Service Methods
@@ -196,6 +212,14 @@ const maxStreamDataSize = 100000
 //adapter:wasm getActivities category=Activities
 //adapter:http GET /api/v1/activities
 func (s *ActivityService) List(ctx context.Context, in ListActivitiesInput) (*ListActivitiesOutput, error) {
+	// Validate min/max cross-field constraints
+	if in.MinDistanceM != nil && in.MaxDistanceM != nil && *in.MinDistanceM > *in.MaxDistanceM {
+		return nil, BadRequest("min_distance_m cannot be greater than max_distance_m")
+	}
+	if in.MinDurationS != nil && in.MaxDurationS != nil && *in.MinDurationS > *in.MaxDurationS {
+		return nil, BadRequest("min_duration_s cannot be greater than max_duration_s")
+	}
+
 	filters := storage.ActivityFilters{
 		AthleteID:    in.AthleteID,
 		SportTypes:   in.SportTypes,
@@ -490,6 +514,11 @@ func (s *ActivityService) GetAnalysis(ctx context.Context, in GetAnalysisInput) 
 		return nil, BadRequest("activity ID required")
 	}
 
+	// Validate split_unit if provided
+	if in.SplitUnit != "" && in.SplitUnit != "km" && in.SplitUnit != "mi" {
+		return nil, BadRequest("split_unit must be 'km' or 'mi'")
+	}
+
 	// Fetch activity to verify ownership and get metadata
 	activity, err := s.repo.GetByID(ctx, in.ActivityID)
 	if err != nil {
@@ -510,9 +539,18 @@ func (s *ActivityService) GetAnalysis(ctx context.Context, in GetAnalysisInput) 
 		return nil, Wrapf(ErrInternal, "failed to fetch streams: %v", err)
 	}
 
-	// Extract stream data into maps
+	// Extract stream data into maps with size validation
 	streamMap := make(map[string]json.RawMessage)
 	for _, stream := range streams {
+		// Guard against excessively large streams to prevent memory exhaustion
+		if len(stream.Data) > maxStreamRawSize {
+			slog.Warn("skipping oversized stream",
+				"activity_id", in.ActivityID,
+				"stream_type", stream.StreamType,
+				"size_bytes", len(stream.Data),
+				"limit_bytes", maxStreamRawSize)
+			continue
+		}
 		streamMap[stream.StreamType] = stream.Data
 	}
 
@@ -520,13 +558,46 @@ func (s *ActivityService) GetAnalysis(ctx context.Context, in GetAnalysisInput) 
 		ActivityID: in.ActivityID,
 	}
 
-	// Decode required streams
-	distance, _ := storage.DecodeFloat64Array(streamMap["distance"])
-	timeArr, _ := storage.DecodeFloat64Array(streamMap["time"])
-	hr, _ := storage.DecodeFloat64Array(streamMap["heartrate"])
-	watts, _ := storage.DecodeFloat64Array(streamMap["watts"])
-	altitude, _ := storage.DecodeFloat64Array(streamMap["altitude"])
-	velocity, _ := storage.DecodeFloat64Array(streamMap["velocity_smooth"])
+	// Decode required streams with size guard
+	decodeWithLimit := func(data json.RawMessage) ([]float64, error) {
+		arr, decodeErr := storage.DecodeFloat64Array(data)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		if len(arr) > maxStreamDataSize {
+			return nil, BadRequestf("stream data exceeds maximum size: %d > %d", len(arr), maxStreamDataSize)
+		}
+		return arr, nil
+	}
+
+	// Decode required streams (distance, time) - errors propagate to client
+	// Missing streams return (nil, nil) which is fine; only corrupt/oversized streams error
+	distance, err := decodeWithLimit(streamMap["distance"])
+	if err != nil {
+		return nil, Wrapf(err, "decoding distance stream")
+	}
+	timeArr, err := decodeWithLimit(streamMap["time"])
+	if err != nil {
+		return nil, Wrapf(err, "decoding time stream")
+	}
+
+	// Decode optional streams - missing or invalid data is acceptable, but log decode errors
+	hr, hrErr := decodeWithLimit(streamMap["heartrate"])
+	if hrErr != nil && streamMap["heartrate"] != nil {
+		slog.Debug("failed to decode heartrate stream", "activity_id", in.ActivityID, "error", hrErr)
+	}
+	watts, wattsErr := decodeWithLimit(streamMap["watts"])
+	if wattsErr != nil && streamMap["watts"] != nil {
+		slog.Debug("failed to decode watts stream", "activity_id", in.ActivityID, "error", wattsErr)
+	}
+	altitude, altErr := decodeWithLimit(streamMap["altitude"])
+	if altErr != nil && streamMap["altitude"] != nil {
+		slog.Debug("failed to decode altitude stream", "activity_id", in.ActivityID, "error", altErr)
+	}
+	velocity, velErr := decodeWithLimit(streamMap["velocity_smooth"])
+	if velErr != nil && streamMap["velocity_smooth"] != nil {
+		slog.Debug("failed to decode velocity_smooth stream", "activity_id", in.ActivityID, "error", velErr)
+	}
 
 	// Determine split length (1km = 1000m, 1mi = 1609.34m)
 	splitLengthM := 1000.0
@@ -564,27 +635,33 @@ func (s *ActivityService) GetAnalysis(ctx context.Context, in GetAnalysisInput) 
 	if len(hr) > 0 && s.zones != nil {
 		def, cfg, err := s.zones.GetApplicableHR(ctx, in.AthleteID, activity.SportType, activity.StartDate.Time)
 		if err == nil && def != nil && cfg != nil && len(cfg.Bounds) >= 5 {
-			bounds := &analysis.ZoneBounds{
-				Method: def.Method,
-				Bounds: cfg.Bounds,
-				HRMax:  cfg.HRMax,
-			}
-			zonesResult := analysis.ComputeHRZoneDistribution(hr, bounds)
-			if zonesResult != nil {
-				output.HRZones = &HRZonesOutput{
-					Zones:        make([]ZoneItem, len(zonesResult.Zones)),
-					TotalSeconds: zonesResult.TotalSeconds,
-					AvgHR:        zonesResult.AvgHR,
-					MaxHR:        zonesResult.MaxHR,
+			// Validate zone configuration based on method:
+			// - absolute_bpm: doesn't require HRMax
+			// - percent_hrmax: requires HRMax > 0 to compute zone boundaries
+			validConfig := def.Method == "absolute_bpm" || (def.Method == "percent_hrmax" && cfg.HRMax > 0)
+			if validConfig {
+				bounds := &analysis.ZoneBounds{
+					Method: def.Method,
+					Bounds: cfg.Bounds,
+					HRMax:  cfg.HRMax,
 				}
-				for i, zone := range zonesResult.Zones {
-					output.HRZones.Zones[i] = ZoneItem{
-						Zone:       zone.Zone,
-						SecondsIn:  zone.SecondsIn,
-						Percentage: zone.Percentage,
-						MinBPM:     zone.MinBPM,
-						MaxBPM:     zone.MaxBPM,
-						Label:      zone.Label,
+				zonesResult := analysis.ComputeHRZoneDistribution(hr, bounds)
+				if zonesResult != nil {
+					output.HRZones = &HRZonesOutput{
+						Zones:        make([]ZoneItem, len(zonesResult.Zones)),
+						TotalSeconds: zonesResult.TotalSeconds,
+						AvgHR:        zonesResult.AvgHR,
+						MaxHR:        zonesResult.MaxHR,
+					}
+					for i, zone := range zonesResult.Zones {
+						output.HRZones.Zones[i] = ZoneItem{
+							Zone:       zone.Zone,
+							SecondsIn:  zone.SecondsIn,
+							Percentage: zone.Percentage,
+							MinBPM:     zone.MinBPM,
+							MaxBPM:     zone.MaxBPM,
+							Label:      zone.Label,
+						}
 					}
 				}
 			}

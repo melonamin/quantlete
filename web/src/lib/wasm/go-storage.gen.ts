@@ -151,6 +151,8 @@ export interface GoStorageInterface {
   getMonthlyComparison(arg0?: string): string
   /** genGetPowerStats wraps StatsService.GetPowerStats */
   getPowerStats(arg0?: string): string
+  /** getPowerZones computes time spent in each power zone across all activities */
+  getPowerZones(optionalFiltersJSON: string): string
   /** genGetSportGroups wraps StatsService.GetSportGroups */
   getSportGroups(): string
   /** genGetTrainingLoad wraps StatsService.GetTrainingLoad */

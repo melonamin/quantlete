@@ -154,7 +154,7 @@ func (r *SettingsRepository) Upsert(ctx context.Context, athleteID int64, s Athl
 		ON CONFLICT (athlete_id) DO UPDATE SET
 			settings = EXCLUDED.settings,
 			updated_at = EXCLUDED.updated_at
-	`, athleteID, b, SQLiteTime{Time: time.Now()})
+	`, athleteID, b, TimeToSQL(time.Now()))
 	return err
 }
 

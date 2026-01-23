@@ -67,7 +67,7 @@ func (r *SyncHistoryRepository) StartRun(ctx context.Context, athleteID int64, o
 			athlete_id, started_at, status,
 			full_sync, skip_streams, skip_segments, skip_best_efforts, skip_photos
 		) VALUES (?, ?, 'running', ?, ?, ?, ?, ?)
-	`, athleteID, SQLiteTime{Time: now},
+	`, athleteID, TimeToSQL(now),
 		boolToInt(opts.FullSync), boolToInt(opts.SkipStreams), boolToInt(opts.SkipSegments),
 		boolToInt(opts.SkipBestEfforts), boolToInt(opts.SkipPhotos))
 	if err != nil {
@@ -136,8 +136,8 @@ func (r *SyncHistoryRepository) updateRunStatus(
 			status = ?,`
 
 	args := []interface{}{
-		SQLiteTime{Time: now},
-		SQLiteTime{Time: now},
+		TimeToSQL(now),
+		TimeToSQL(now),
 		runID,
 		status,
 	}
@@ -325,5 +325,5 @@ func nullableSQLiteTime(t *time.Time) interface{} {
 	if t == nil || t.IsZero() {
 		return nil
 	}
-	return SQLiteTime{Time: *t}
+	return TimeToSQL(*t)
 }

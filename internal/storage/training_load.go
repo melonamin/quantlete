@@ -71,11 +71,11 @@ func (r *TrainingLoadRepository) EnsureComputedForRange(ctx context.Context, ath
 	args := []any{athleteID}
 	if after != nil {
 		query += " AND a.start_date >= ?"
-		args = append(args, SQLiteTime{Time: *after})
+		args = append(args, TimeToSQL(*after))
 	}
 	if before != nil {
 		query += " AND a.start_date <= ?"
-		args = append(args, SQLiteTime{Time: *before})
+		args = append(args, TimeToSQL(*before))
 	}
 	query += " ORDER BY a.start_date ASC"
 
@@ -279,7 +279,7 @@ func (r *TrainingLoadRepository) upsertActivity(ctx context.Context, athleteID i
 			intensity_factor = EXCLUDED.intensity_factor,
 			tss = EXCLUDED.tss,
 			computed_at = EXCLUDED.computed_at
-	`, a.ID, athleteID, a.SportType, method, ftpUsed, normalized, ifactor, tss, SQLiteTime{Time: time.Now()})
+	`, a.ID, athleteID, a.SportType, method, ftpUsed, normalized, ifactor, tss, TimeToSQL(time.Now()))
 	return err
 }
 
@@ -296,11 +296,11 @@ func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID i
 	args := []any{athleteID}
 	if after != nil {
 		query += " AND a.start_date_local >= ?"
-		args = append(args, SQLiteTime{Time: *after})
+		args = append(args, TimeToSQL(*after))
 	}
 	if before != nil {
 		query += " AND a.start_date_local <= ?"
-		args = append(args, SQLiteTime{Time: *before})
+		args = append(args, TimeToSQL(*before))
 	}
 	query += `
 		GROUP BY day
@@ -388,11 +388,11 @@ func (r *TrainingLoadRepository) GetDailySeries(ctx context.Context, athleteID i
 
 func (r *TrainingLoadRepository) upsertDaily(ctx context.Context, athleteID int64, series []DailyTrainingLoadPoint) error {
 	for _, p := range series {
-		day, err := time.Parse("2006-01-02", p.Day)
-		if err != nil {
+		// Validate date format but use the string directly (go-sqlite3-js can't serialize time.Time)
+		if _, err := time.Parse("2006-01-02", p.Day); err != nil {
 			continue
 		}
-		_, err = r.db.ExecContext(ctx, `
+		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO daily_training_load (athlete_id, day, tss, ctl, atl, tsb)
 			VALUES (?, ?, ?, ?, ?, ?)
 			ON CONFLICT (athlete_id, day) DO UPDATE SET
@@ -400,7 +400,7 @@ func (r *TrainingLoadRepository) upsertDaily(ctx context.Context, athleteID int6
 				ctl = EXCLUDED.ctl,
 				atl = EXCLUDED.atl,
 				tsb = EXCLUDED.tsb
-		`, athleteID, day, p.TSS, p.CTL, p.ATL, p.TSB)
+		`, athleteID, p.Day, p.TSS, p.CTL, p.ATL, p.TSB)
 		if err != nil {
 			return err
 		}

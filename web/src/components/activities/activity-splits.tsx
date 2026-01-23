@@ -1,5 +1,5 @@
 import type { SplitsOutput, SplitItem } from '@/lib/api/activities'
-import { formatDuration } from '@/lib/format'
+import { formatDuration, formatPaceFromSecondsPerKm } from '@/lib/format'
 import { useFormattedMetrics } from '@/hooks/use-formatted-metrics'
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
@@ -10,7 +10,10 @@ interface ActivitySplitsProps {
 }
 
 export function ActivitySplits({ splits, className }: ActivitySplitsProps) {
-  const { formatDistance } = useFormattedMetrics()
+  const { formatDistance, formatElevation, unitSystem } = useFormattedMetrics()
+
+  const formatSplitPace = (secondsPerKm: number) =>
+    formatPaceFromSecondsPerKm(secondsPerKm, unitSystem)
 
   // Calculate min/max pace for visualization scale
   const paces = splits.splits.map((s) => s.pace_sec_km)
@@ -69,6 +72,8 @@ export function ActivitySplits({ splits, className }: ActivitySplitsProps) {
             barColor={getPaceColor(split.pace_sec_km, index)}
             paceIndicator={getPaceIndicator(split.pace_sec_km)}
             isPartial={split.distance_m < splits.split_length_m * 0.95}
+            formattedPace={formatSplitPace(split.pace_sec_km)}
+            formatElevation={formatElevation}
           />
         ))}
       </div>
@@ -76,7 +81,7 @@ export function ActivitySplits({ splits, className }: ActivitySplitsProps) {
       <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
         <div className="flex justify-between">
           <span>Average Pace</span>
-          <span className="font-medium text-foreground">{formatPaceFromSeconds(avgPace)}</span>
+          <span className="font-medium text-foreground">{formatSplitPace(avgPace)}</span>
         </div>
       </div>
     </div>
@@ -89,10 +94,19 @@ interface SplitRowProps {
   barColor: string
   paceIndicator: React.ReactNode
   isPartial: boolean
+  formattedPace: string
+  formatElevation: (meters: number) => string
 }
 
-function SplitRow({ split, barWidth, barColor, paceIndicator, isPartial }: SplitRowProps) {
-  const { formatElevation } = useFormattedMetrics()
+function SplitRow({
+  split,
+  barWidth,
+  barColor,
+  paceIndicator,
+  isPartial,
+  formattedPace,
+  formatElevation,
+}: SplitRowProps) {
   const elevChange = split.elev_gain - split.elev_loss
 
   return (
@@ -108,7 +122,7 @@ function SplitRow({ split, barWidth, barColor, paceIndicator, isPartial }: Split
       </div>
 
       <div className="flex w-36 items-center justify-end gap-2 tabular-nums">
-        <span className="font-medium">{formatPaceFromSeconds(split.pace_sec_km)}</span>
+        <span className="font-medium">{formattedPace}</span>
         <span className="text-xs text-muted-foreground">({formatDuration(split.duration_s)})</span>
       </div>
 
@@ -141,11 +155,4 @@ function SplitRow({ split, barWidth, barColor, paceIndicator, isPartial }: Split
       )}
     </div>
   )
-}
-
-function formatPaceFromSeconds(secondsPerKm: number): string {
-  if (!secondsPerKm || secondsPerKm <= 0 || !isFinite(secondsPerKm)) return '-'
-  const minutes = Math.floor(secondsPerKm / 60)
-  const seconds = Math.round(secondsPerKm % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')}/km`
 }

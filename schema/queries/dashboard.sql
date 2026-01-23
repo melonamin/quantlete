@@ -148,7 +148,7 @@ ON CONFLICT (athlete_id) DO UPDATE SET
 -- Get weekly trends for rolling N weeks with optional sport type filter.
 -- Uses ISO week numbering for consistent week boundaries.
 SELECT
-    strftime('%Y-W%W', start_date_local) AS week,
+    strftime('%Y-W%W', start_date_local, 'weekday 0', '-6 days') AS week,
     strftime('%Y-%m-%d', start_date_local, 'weekday 0', '-6 days') AS week_start,
     COUNT(*) AS activity_count,
     COALESCE(SUM(distance), 0) AS total_distance,
@@ -158,7 +158,7 @@ FROM activities
 WHERE athlete_id = ?1
     AND DATE(start_date_local) >= DATE('now', '-' || ?2 || ' days')
     AND (?3 = '' OR sport_type = ?3)
-GROUP BY strftime('%Y-W%W', start_date_local)
+GROUP BY week
 ORDER BY week ASC;
 
 -- name: GetMonthlyComparison :many
