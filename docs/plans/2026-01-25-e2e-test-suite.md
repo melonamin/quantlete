@@ -66,20 +66,20 @@ Individual activity view showing maps, elevation profiles, stream charts, and se
 
 Map visualization showing all activity routes and calendar view with activity dots. These pages test Leaflet map integration and date-based navigation.
 
-- [ ] Create `web/tests/e2e/pages/heatmap.page.ts` with map and filter selectors
-- [ ] Test: Heatmap loads with activity routes rendered on map
-- [ ] Test: Sport type quick filters (All, Ride, Run, Walk) update map display
-- [ ] Test: Country dropdown lists visited countries with activity counts
-- [ ] Test: Country selection flies map to selected country bounds
-- [ ] Test: Advanced filters (date range, commute) filter routes
-- [ ] Test: Clear filters resets map to default view
-- [ ] Create `web/tests/e2e/pages/calendar.page.ts` with calendar grid selectors
-- [ ] Test: Calendar grid renders with current month
-- [ ] Test: Activity dots appear on days with activities
-- [ ] Test: Month navigation (prev/next buttons) works
-- [ ] Test: "Today" button returns to current month
-- [ ] Test: Stats cards update when navigating months
-- [ ] Test: Click day with activities shows activity info
+- [x] Create `web/tests/e2e/pages/heatmap.page.ts` with map and filter selectors
+- [x] Test: Heatmap loads with activity routes rendered on map
+- [x] Test: Sport type quick filters (All, Ride, Run, Walk) update map display
+- [x] Test: Country dropdown lists visited countries with activity counts
+- [x] Test: Country selection flies map to selected country bounds
+- [x] Test: Advanced filters (date range, commute) filter routes
+- [x] Test: Clear filters resets map to default view
+- [x] Create `web/tests/e2e/pages/calendar.page.ts` with calendar grid selectors
+- [x] Test: Calendar grid renders with current month
+- [x] Test: Activity dots appear on days with activities
+- [x] Test: Month navigation (prev/next buttons) works
+- [x] Test: "Today" button returns to current month
+- [x] Test: Stats cards update when navigating months
+- [x] Test: Click day with activities shows activity info
 
 ### Task 6: Analytics Pages Tests (Power, Training Load, Best Efforts, Eddington)
 
