@@ -24,13 +24,13 @@ Establish the foundation for running Playwright tests in Docker since Playwright
 
 The dashboard is the main entry point with 25+ configurable widgets displaying stats, charts, and activity summaries. Testing it ensures the core data display and widget system works correctly.
 
-- [ ] Create `web/tests/e2e/pages/dashboard.page.ts` with widget and stats selectors
-- [ ] Test: Dashboard loads with stats summary (activities, distance, elevation, time)
-- [ ] Test: Visible widgets render with data (weekly stats, recent activities, sport breakdown)
-- [ ] Test: Monthly chart and activity calendar widgets render
-- [ ] Test: Widget visibility toggle works (show/hide widgets)
-- [ ] Test: Time period filters update chart data
-- [ ] Test: Navigation to activity detail from "recent activities" widget works
+- [x] Create `web/tests/e2e/pages/dashboard.page.ts` with widget and stats selectors
+- [x] Test: Dashboard loads with stats summary (activities, distance, elevation, time)
+- [x] Test: Visible widgets render with data (weekly stats, recent activities, sport breakdown)
+- [x] Test: Monthly chart and activity calendar widgets render
+- [x] Test: Widget visibility toggle works (show/hide widgets)
+- [x] Test: Time period filters update chart data
+- [x] Test: Navigation to activity detail from "recent activities" widget works
 
 ### Task 3: Activities Page Tests
 
