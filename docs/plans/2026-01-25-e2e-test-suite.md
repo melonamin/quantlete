@@ -52,15 +52,15 @@ The activities page is the main data table with extensive filtering, sorting, an
 
 Individual activity view showing maps, elevation profiles, stream charts, and segment efforts. This page combines multiple complex visualizations that need to render correctly with activity data.
 
-- [ ] Create `web/tests/e2e/pages/activity-detail.page.ts` with stats, chart, and map selectors
-- [ ] Test: Activity detail page loads with correct activity data
-- [ ] Test: Stats cards display correctly (distance, elevation, duration, avg pace/HR/power)
-- [ ] Test: Elevation profile chart renders
-- [ ] Test: Activity stream chart renders (speed/HR/power over distance)
-- [ ] Test: GPS map renders with route polyline
-- [ ] Test: Segment efforts table displays when activity has segments
-- [ ] Test: Photos gallery displays when activity has photos
-- [ ] Test: Back navigation returns to activities list
+- [x] Create `web/tests/e2e/pages/activity-detail.page.ts` with stats, chart, and map selectors
+- [x] Test: Activity detail page loads with correct activity data
+- [x] Test: Stats cards display correctly (distance, elevation, duration, avg pace/HR/power)
+- [x] Test: Elevation profile chart renders
+- [x] Test: Activity stream chart renders (speed/HR/power over distance)
+- [x] Test: GPS map renders with route polyline
+- [x] Test: Segment efforts table displays when activity has segments
+- [x] Test: Photos gallery displays when activity has photos
+- [x] Test: Back navigation returns to activities list
 
 ### Task 5: Heatmap & Calendar Page Tests
 
