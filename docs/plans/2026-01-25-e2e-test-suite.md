@@ -36,17 +36,17 @@ The dashboard is the main entry point with 25+ configurable widgets displaying s
 
 The activities page is the main data table with extensive filtering, sorting, and pagination. This is one of the most interactive pages requiring thorough testing of all filter combinations.
 
-- [ ] Create `web/tests/e2e/pages/activities.page.ts` with filter and table selectors
-- [ ] Test: Activity table loads with paginated data
-- [ ] Test: Sorting by columns (date, distance, elevation, duration) works
-- [ ] Test: Filter by sport type narrows results
-- [ ] Test: Filter by date range works
-- [ ] Test: Filter by gear works
-- [ ] Test: Commute filter toggle works
-- [ ] Test: Combined filters work together correctly
-- [ ] Test: Filter reset clears all filters and shows all data
-- [ ] Test: Click row navigates to activity detail page
-- [ ] Test: Pagination controls (next/prev/jump to page) work
+- [x] Create `web/tests/e2e/pages/activities.page.ts` with filter and table selectors
+- [x] Test: Activity table loads with paginated data
+- [x] Test: Sorting by columns (date, distance, elevation, duration) works
+- [x] Test: Filter by sport type narrows results
+- [x] Test: Filter by date range works
+- [x] Test: Filter by gear works
+- [x] Test: Commute filter toggle works
+- [x] Test: Combined filters work together correctly
+- [x] Test: Filter reset clears all filters and shows all data
+- [x] Test: Click row navigates to activity detail page
+- [x] Test: Pagination controls (next/prev/jump to page) work
 
 ### Task 4: Activity Detail Page Tests
 
