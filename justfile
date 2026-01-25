@@ -140,9 +140,55 @@ test-go-cover:
 test-web:
     cd web && yarn test:unit
 
-# Run Playwright E2E tests
+# Run Playwright E2E tests in Docker
+# seeds demo database, starts Go server, runs Playwright tests, cleans up
 test-e2e:
-    cd web && yarn test
+    #!/usr/bin/env bash
+    set -e
+
+    # ensure we have a built web frontend for server mode
+    echo "Building web frontend..."
+    cd web && yarn build:server && cd ..
+
+    # build Go binary
+    echo "Building Go binary..."
+    go build -o bin/quantlete ./cmd/quantlete
+
+    # set up test data directory
+    TEST_DATA_DIR=$(mktemp -d)
+    trap "rm -rf $TEST_DATA_DIR; kill 0 2>/dev/null" EXIT
+
+    # generate demo database
+    echo "Generating demo database..."
+    QUANTLETE_STORAGE_DATA_DIR="$TEST_DATA_DIR" QUANTLETE_STORAGE_DB_FILE=test.db \
+        ./bin/quantlete demo --activities=50 --months=6 --athlete="E2E Test User"
+
+    # start Go server in background
+    echo "Starting Go server..."
+    QUANTLETE_STORAGE_DATA_DIR="$TEST_DATA_DIR" QUANTLETE_STORAGE_DB_FILE=test.db \
+    QUANTLETE_SERVER_PORT=8081 QUANTLETE_SERVER_DEV_MODE=true \
+        ./bin/quantlete serve &
+    SERVER_PID=$!
+
+    # wait for server to be ready
+    echo "Waiting for server..."
+    for i in {1..30}; do
+        if curl -s http://localhost:8081/api/v1/auth/status > /dev/null 2>&1; then
+            echo "Server ready"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "Server failed to start"
+            exit 1
+        fi
+        sleep 1
+    done
+
+    # run Playwright tests in Docker
+    echo "Running Playwright tests..."
+    ./docker-playwright.sh test
+
+    echo "E2E tests completed successfully"
 
 # ============================================================================
 # Linting & Formatting
