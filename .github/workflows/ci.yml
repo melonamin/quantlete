@@ -159,6 +159,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: web
+        timeout-minutes: 15
         run: npx playwright test
         env:
           CI: true
