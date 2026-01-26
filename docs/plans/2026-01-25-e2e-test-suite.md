@@ -145,37 +145,37 @@ Content browsing pages for segments, photos, challenges, yearly wrapped summarie
 
 User settings and data management pages for configuring the app, managing gear, editing athlete metrics, and exporting data.
 
-- [ ] Create `web/tests/e2e/pages/settings.page.ts` with form and toggle selectors
-- [ ] Test: Strava connection status displays correctly (connected with athlete name)
-- [ ] Test: Unit system toggle (Metric/Imperial) changes and persists
-- [ ] Test: Theme selector (System/Light/Dark) changes theme
-- [ ] Test: Import options checkboxes toggle correctly
-- [ ] Test: Sync history modal opens and displays past sync records
-- [ ] Create `web/tests/e2e/pages/gear.page.ts` with list and modal selectors
-- [ ] Test: Gear list displays bikes and shoes with usage statistics
-- [ ] Test: Show/Hide Retired toggle filters gear list
-- [ ] Test: Maintenance tab switch displays maintenance view
-- [ ] Test: Gear usage chart renders
-- [ ] Test: Add custom gear modal opens, accepts input, and submits
-- [ ] Create `web/tests/e2e/pages/athlete.page.ts` with editor table selectors
-- [ ] Test: Athlete info card displays profile information
-- [ ] Test: FTP history table displays existing entries
-- [ ] Test: Add FTP entry form works (date + watts)
-- [ ] Test: Edit existing FTP entry works
-- [ ] Test: Delete FTP entry works with confirmation
-- [ ] Test: Weight history table displays existing entries
-- [ ] Test: Add/edit/delete weight entries work
-- [ ] Test: HR zones editor displays zone configuration
-- [ ] Create `web/tests/e2e/pages/export.page.ts` with form selectors
-- [ ] Test: Data stats card shows activity count and date range
-- [ ] Test: Format selector toggles between CSV and JSON
-- [ ] Test: Date range filter inputs accept values
-- [ ] Test: Download button triggers file export
-- [ ] Create `web/tests/e2e/pages/monthly-stats.page.ts` with table selectors
-- [ ] Test: Year navigation (prev/next) changes displayed year
-- [ ] Test: Yearly summary cards display correct totals
-- [ ] Test: Accordion table rows expand and collapse
-- [ ] Test: Export CSV button triggers download
+- [x] Create `web/tests/e2e/pages/settings.page.ts` with form and toggle selectors
+- [x] Test: Strava connection status displays correctly (connected with athlete name)
+- [x] Test: Unit system toggle (Metric/Imperial) changes and persists
+- [x] Test: Theme selector (System/Light/Dark) changes theme
+- [x] Test: Import options checkboxes toggle correctly
+- [x] Test: Sync history modal opens and displays past sync records
+- [x] Create `web/tests/e2e/pages/gear.page.ts` with list and modal selectors
+- [x] Test: Gear list displays bikes and shoes with usage statistics
+- [x] Test: Show/Hide Retired toggle filters gear list
+- [x] Test: Maintenance tab switch displays maintenance view
+- [x] Test: Gear usage chart renders
+- [x] Test: Add custom gear modal opens, accepts input, and submits
+- [x] Create `web/tests/e2e/pages/athlete.page.ts` with editor table selectors
+- [x] Test: Athlete info card displays profile information
+- [x] Test: FTP history table displays existing entries
+- [x] Test: Add FTP entry form works (date + watts)
+- [x] Test: Edit existing FTP entry works
+- [x] Test: Delete FTP entry works with confirmation
+- [x] Test: Weight history table displays existing entries
+- [x] Test: Add/edit/delete weight entries work
+- [x] Test: HR zones editor displays zone configuration
+- [x] Create `web/tests/e2e/pages/export.page.ts` with form selectors
+- [x] Test: Data stats card shows activity count and date range
+- [x] Test: Format selector toggles between CSV and JSON
+- [x] Test: Date range filter inputs accept values
+- [x] Test: Download button triggers file export
+- [x] Create `web/tests/e2e/pages/monthly-stats.page.ts` with table selectors
+- [x] Test: Year navigation (prev/next) changes displayed year
+- [x] Test: Yearly summary cards display correct totals
+- [x] Test: Accordion table rows expand and collapse
+- [x] Test: Export CSV button triggers download
 
 ### Task 9: Cross-Page User Journey Tests
 
