@@ -181,13 +181,13 @@ User settings and data management pages for configuring the app, managing gear, 
 
 End-to-end user flows that span multiple pages to catch integration issues and verify navigation state is preserved correctly across the application.
 
-- [ ] Create `web/tests/e2e/journeys/` directory for journey test files
-- [ ] Journey: Dashboard to Activity Deep Dive - dashboard → click recent activity → view detail → check segments → back to dashboard
-- [ ] Journey: Activity Exploration Flow - activities list → apply filters → click activity → view segments → return to filtered list (verify filters preserved)
-- [ ] Journey: Settings and Data Refresh - settings → change unit system → activities page → verify units changed → dashboard → verify widget units
-- [ ] Journey: Analytics Navigation - dashboard → power page → verify charts → training load → best efforts → back to dashboard
-- [ ] Journey: Content Browsing - heatmap → select country → calendar → navigate months → photos → browse gallery → wrapped → compare years
-- [ ] Journey: Configuration Round Trip - athlete → edit FTP → gear → check usage stats → settings → verify connection → export → download data
+- [x] Create `web/tests/e2e/journeys/` directory for journey test files
+- [x] Journey: Dashboard to Activity Deep Dive - dashboard → click recent activity → view detail → check segments → back to dashboard
+- [x] Journey: Activity Exploration Flow - activities list → apply filters → click activity → view segments → return to filtered list (verify filters preserved)
+- [x] Journey: Settings and Data Refresh - settings → change unit system → activities page → verify units changed → dashboard → verify widget units
+- [x] Journey: Analytics Navigation - dashboard → power page → verify charts → training load → best efforts → back to dashboard
+- [x] Journey: Content Browsing - heatmap → select country → calendar → navigate months → photos → browse gallery → wrapped → compare years
+- [x] Journey: Configuration Round Trip - athlete → edit FTP → gear → check usage stats → settings → verify connection → export → download data
 
 ### Task 10: CI/CD Integration & Documentation
 
