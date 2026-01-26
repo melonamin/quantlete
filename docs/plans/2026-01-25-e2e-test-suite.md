@@ -110,36 +110,36 @@ Performance analytics pages showing power curves, training stress, personal reco
 
 Content browsing pages for segments, photos, challenges, yearly wrapped summaries, and shareable badges. These pages test galleries, modals, external links, and download functionality.
 
-- [ ] Create `web/tests/e2e/pages/segments.page.ts` with table and modal selectors
-- [ ] Test: Segment table loads with segment data
-- [ ] Test: Search by name filters results with debounce
-- [ ] Test: Sport type quick filters (All, Ride, Run) work
-- [ ] Test: Starred and KOM toggles filter results
-- [ ] Test: Column header sorting works
-- [ ] Test: Click row opens segment detail modal
-- [ ] Test: Modal shows map, PR progression chart, and efforts table
-- [ ] Create `web/tests/e2e/pages/photos.page.ts` with gallery and lightbox selectors
-- [ ] Test: Photo gallery loads with images in masonry grid
-- [ ] Test: Sport filter buttons update gallery contents
-- [ ] Test: Country dropdown filters photos by location
-- [ ] Test: Click photo opens lightbox modal
-- [ ] Test: Lightbox prev/next navigation works
-- [ ] Test: "Load more" pagination loads additional photos
-- [ ] Create `web/tests/e2e/pages/challenges.page.ts` with badge grid selectors
-- [ ] Test: Challenges display grouped by month
-- [ ] Test: Badge images load correctly
-- [ ] Test: Badge click opens external Strava link (verify href)
-- [ ] Create `web/tests/e2e/pages/wrapped.page.ts` with year selector and chart selectors
-- [ ] Test: Year selector dropdown changes displayed data
-- [ ] Test: Metric cards display correct stats for selected year
-- [ ] Test: All charts render (heatmap calendar, monthly bars, donut charts)
-- [ ] Test: Comparison year selector shows delta comparison table
-- [ ] Create `web/tests/e2e/pages/badges.page.ts` with customizer and preview selectors
-- [ ] Test: Badge previews render with default styling
-- [ ] Test: Theme selector updates badge preview
-- [ ] Test: Size selector updates badge preview
-- [ ] Test: Background selector updates badge preview
-- [ ] Test: Download button triggers file download
+- [x] Create `web/tests/e2e/pages/segments.page.ts` with table and modal selectors
+- [x] Test: Segment table loads with segment data
+- [x] Test: Search by name filters results with debounce
+- [x] Test: Sport type quick filters (All, Ride, Run) work
+- [x] Test: Starred and KOM toggles filter results
+- [x] Test: Column header sorting works
+- [x] Test: Click row opens segment detail modal
+- [x] Test: Modal shows map, PR progression chart, and efforts table
+- [x] Create `web/tests/e2e/pages/photos.page.ts` with gallery and lightbox selectors
+- [x] Test: Photo gallery loads with images in masonry grid
+- [x] Test: Sport filter buttons update gallery contents
+- [x] Test: Country dropdown filters photos by location
+- [x] Test: Click photo opens lightbox modal
+- [x] Test: Lightbox prev/next navigation works
+- [x] Test: "Load more" pagination loads additional photos
+- [x] Create `web/tests/e2e/pages/challenges.page.ts` with badge grid selectors
+- [x] Test: Challenges display grouped by month
+- [x] Test: Badge images load correctly
+- [x] Test: Badge click opens external Strava link (verify href)
+- [x] Create `web/tests/e2e/pages/wrapped.page.ts` with year selector and chart selectors
+- [x] Test: Year selector dropdown changes displayed data
+- [x] Test: Metric cards display correct stats for selected year
+- [x] Test: All charts render (heatmap calendar, monthly bars, donut charts)
+- [x] Test: Comparison year selector shows delta comparison table
+- [x] Create `web/tests/e2e/pages/badges.page.ts` with customizer and preview selectors
+- [x] Test: Badge previews render with default styling
+- [x] Test: Theme selector updates badge preview
+- [x] Test: Size selector updates badge preview
+- [x] Test: Background selector updates badge preview
+- [x] Test: Download button triggers file download
 
 ### Task 8: Configuration Pages Tests (Settings, Gear, Athlete, Export, Monthly Stats)
 
