@@ -151,7 +151,7 @@ test.describe('Dashboard to Activity Journey', () => {
     await dashboard.clickRecentActivity(0)
 
     await expect(activityDetail.getPageIdentifier()).toBeVisible()
-    await activityDetail.goBack()
+    await activityDetail.goBackToActivities()
 
     await expect(dashboard.getPageIdentifier()).toBeVisible()
   })
@@ -165,7 +165,7 @@ test.describe('Dashboard to Activity Journey', () => {
 After test failure, check the HTML report:
 
 ```bash
-cd web && npx playwright show-report playwright-report/html
+cd web && npx playwright show-report playwright-report
 ```
 
 ### Check Artifacts

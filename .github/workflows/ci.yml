@@ -153,6 +153,10 @@ jobs:
         working-directory: web
         run: yarn install --immutable
 
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+
       - name: Run E2E tests
         working-directory: web
         run: npx playwright test
