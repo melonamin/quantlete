@@ -150,11 +150,9 @@ test.describe('Export Page', () => {
         const filename = download.suggestedFilename()
         expect(filename).toContain('quantlete')
         expect(filename).toMatch(/\.(csv|json)$/)
-      } else {
-        // download may not trigger in headless mode without data
-        // but button should be clickable without errors
-        expect(true).toBe(true)
       }
+      // download may not trigger in headless mode without data
+      // but button should be clickable without errors - no assertion needed
     })
 
     test('download button shows correct format label', async ({ page }) => {

@@ -156,7 +156,8 @@ test-e2e:
 
     # set up test data directory
     TEST_DATA_DIR=$(mktemp -d)
-    trap "rm -rf $TEST_DATA_DIR; kill 0 2>/dev/null" EXIT
+    SERVER_PID=""
+    trap 'rm -rf "$TEST_DATA_DIR"; [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; wait' EXIT
 
     # generate demo database
     echo "Generating demo database..."

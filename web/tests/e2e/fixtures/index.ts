@@ -56,14 +56,3 @@ async function waitForAppReady(page: Page): Promise<void> {
   await page.waitForTimeout(100)
 }
 
-// helper to check if element contains text (case insensitive)
-export async function hasText(page: Page, selector: string, text: string): Promise<boolean> {
-  const element = page.locator(selector)
-  const content = await element.textContent()
-  return content?.toLowerCase().includes(text.toLowerCase()) ?? false
-}
-
-// helper to wait for network to be idle
-export async function waitForNetworkIdle(page: Page, timeout = 5000): Promise<void> {
-  await page.waitForLoadState('networkidle', { timeout })
-}

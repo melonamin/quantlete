@@ -17,6 +17,10 @@ E2E tests use Playwright running in Docker against a demo-seeded database. The t
 
 ### Running E2E Tests Locally
 
+**Prerequisites:**
+- Docker must be installed and running
+- Port 8081 must be available
+
 ```bash
 # run full E2E suite
 just test-e2e

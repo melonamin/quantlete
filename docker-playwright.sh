@@ -18,7 +18,7 @@ NETWORK_FLAGS="--add-host=host.docker.internal:host-gateway"
 
 run_in_container() {
   local command="$1"
-  docker run --rm ${TTY_FLAGS} ${NETWORK_FLAGS} \
+  docker run --rm --init ${TTY_FLAGS} ${NETWORK_FLAGS} \
     -e PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS}" \
     -e PLAYWRIGHT_TIMEOUT \
     -e CI="${CI:-true}" \
