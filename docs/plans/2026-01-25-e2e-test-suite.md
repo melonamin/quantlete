@@ -85,26 +85,26 @@ Map visualization showing all activity routes and calendar view with activity do
 
 Performance analytics pages showing power curves, training stress, personal records, and Eddington numbers. These pages have complex charts and require data from multiple sources.
 
-- [ ] Create `web/tests/e2e/pages/power.page.ts` with chart selectors
-- [ ] Test: All-time best power outputs bar chart renders
-- [ ] Test: Duration selector dropdown changes progression chart view
-- [ ] Test: Power curve comparison chart (all-time vs 90 days) renders
-- [ ] Test: Power zones breakdown chart renders with zone colors
-- [ ] Create `web/tests/e2e/pages/training-load.page.ts` with chart and card selectors
-- [ ] Test: Training load chart (CTL/ATL/TSB curves) renders
-- [ ] Test: Date range filters update chart data
-- [ ] Test: Summary cards display current CTL/ATL/TSB values
-- [ ] Test: Configuration warning shows when FTP not configured
-- [ ] Create `web/tests/e2e/pages/best-efforts.page.ts` with distance list and modal selectors
-- [ ] Test: Standard distances list renders with times or "No data"
-- [ ] Test: Sport filter (All/Runs/Rides) updates distance list
-- [ ] Test: Click distance row opens PR progression modal
-- [ ] Test: Modal shows PR chart and efforts table
-- [ ] Test: Modal close button works
-- [ ] Create `web/tests/e2e/pages/eddington.page.ts` with number and chart selectors
-- [ ] Test: Current Eddington number displays prominently
-- [ ] Test: History progression chart renders
-- [ ] Test: View mode tabs (All/Sport group/Custom) switch correctly
+- [x] Create `web/tests/e2e/pages/power.page.ts` with chart selectors
+- [x] Test: All-time best power outputs bar chart renders
+- [x] Test: Duration selector dropdown changes progression chart view
+- [x] Test: Power curve comparison chart (all-time vs 90 days) renders
+- [x] Test: Power zones breakdown chart renders with zone colors
+- [x] Create `web/tests/e2e/pages/training-load.page.ts` with chart and card selectors
+- [x] Test: Training load chart (CTL/ATL/TSB curves) renders
+- [x] Test: Date range filters update chart data
+- [x] Test: Summary cards display current CTL/ATL/TSB values
+- [x] Test: Configuration warning shows when FTP not configured
+- [x] Create `web/tests/e2e/pages/best-efforts.page.ts` with distance list and modal selectors
+- [x] Test: Standard distances list renders with times or "No data"
+- [x] Test: Sport filter (All/Runs/Rides) updates distance list
+- [x] Test: Click distance row opens PR progression modal
+- [x] Test: Modal shows PR chart and efforts table
+- [x] Test: Modal close button works
+- [x] Create `web/tests/e2e/pages/eddington.page.ts` with number and chart selectors
+- [x] Test: Current Eddington number displays prominently
+- [x] Test: History progression chart renders
+- [x] Test: View mode tabs (All/Sport group/Custom) switch correctly
 
 ### Task 7: Content Pages Tests (Segments, Photos, Challenges, Wrapped, Badges)
 
