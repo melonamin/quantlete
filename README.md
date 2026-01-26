@@ -86,6 +86,17 @@ Full documentation is available at **[docs.quantlete.fit](https://docs.quantlete
 **Frontend:** React, TypeScript, Tailwind CSS, shadcn/ui, ECharts, Leaflet
 **WASM:** Go → WebAssembly, sql.js, OPFS
 
+## Development
+
+```bash
+just dev        # run Go API + React dev server
+just test       # run all tests
+just test-e2e   # run E2E tests (Playwright in Docker)
+just lint       # run linters
+```
+
+See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
+
 ## Contributing
 
 Contributions are welcome! Please see the [contributing guide](https://docs.quantlete.fit/contributing) for details.

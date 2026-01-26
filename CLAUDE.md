@@ -395,8 +395,33 @@ func (h *AthleteHandler) GetFTP(w http.ResponseWriter, r *http.Request) {
 ## Testing
 
 - Go: `go test` with testify
-- React: Jest/Vitest for unit tests, Playwright for E2E
+- React: Vitest for unit tests, Playwright for E2E
 - Always run tests before pushing
+
+### E2E Testing
+
+E2E tests use Playwright running in Docker against a demo-seeded database.
+
+**Commands:**
+```bash
+just test-e2e    # run full E2E suite
+```
+
+**Test organization:**
+- `web/tests/e2e/pages/` - page object classes with selectors and actions
+- `web/tests/e2e/*.spec.ts` - page-centric test files
+- `web/tests/e2e/journeys/` - cross-page user flow tests
+- `web/tests/e2e/fixtures/` - test utilities and setup
+
+**Adding new tests:**
+1. Create or extend a page object in `pages/` for selectors
+2. Write tests in a `*.spec.ts` file using the page object
+3. For cross-page flows, add to `journeys/` directory
+
+**Debugging:**
+- Use `just test-e2e` with `PLAYWRIGHT_WORKERS=1` for sequential execution
+- Check `web/playwright-report/` for traces and screenshots on failure
+- Run individual tests: `cd web && npx playwright test <test-file>`
 
 ## Key Dependencies
 

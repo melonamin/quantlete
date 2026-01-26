@@ -94,3 +94,77 @@ jobs:
           name: web-dist
           path: web/dist/
           retention-days: 7
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [go, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Download web build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
+
+      - name: Build Go binary
+        run: go build -o bin/quantlete ./cmd/quantlete
+
+      - name: Generate demo database
+        run: |
+          mkdir -p /tmp/e2e-data
+          QUANTLETE_STORAGE_DATA_DIR=/tmp/e2e-data QUANTLETE_STORAGE_DB_FILE=test.db \
+            ./bin/quantlete demo --activities=50 --months=6 --athlete="E2E Test User"
+
+      - name: Start Go server
+        run: |
+          QUANTLETE_STORAGE_DATA_DIR=/tmp/e2e-data QUANTLETE_STORAGE_DB_FILE=test.db \
+          QUANTLETE_SERVER_PORT=8081 QUANTLETE_SERVER_DEV_MODE=true \
+            ./bin/quantlete serve &
+          echo "Waiting for server to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8081/api/v1/auth/status > /dev/null 2>&1; then
+              echo "Server ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Server failed to start"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Install Playwright dependencies
+        working-directory: web
+        run: yarn install --immutable
+
+      - name: Run E2E tests
+        working-directory: web
+        run: npx playwright test
+        env:
+          CI: true
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7

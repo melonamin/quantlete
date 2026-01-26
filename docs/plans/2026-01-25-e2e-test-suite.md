@@ -193,13 +193,13 @@ End-to-end user flows that span multiple pages to catch integration issues and v
 
 Make E2E tests run automatically in GitHub Actions and document the test suite for future contributors.
 
-- [ ] Add E2E test job to `.github/workflows/ci.yml` using Docker Playwright image
-- [ ] Configure CI job to seed demo database before tests
-- [ ] Configure CI job to start Go server and wait for readiness
-- [ ] Configure CI job to upload test artifacts (screenshots, videos) on failure
-- [ ] Add JUnit XML reporter for CI test result parsing
-- [ ] Update `CLAUDE.md` with E2E testing section (commands, patterns)
-- [ ] Update project `README.md` with E2E test commands
-- [ ] Create `docs/testing.md` documenting how to run tests locally
-- [ ] Document how to add new E2E tests with page object examples
-- [ ] Document debugging strategies for failed tests
+- [x] Add E2E test job to `.github/workflows/ci.yml` using Docker Playwright image
+- [x] Configure CI job to seed demo database before tests
+- [x] Configure CI job to start Go server and wait for readiness
+- [x] Configure CI job to upload test artifacts (screenshots, videos) on failure
+- [x] Add JUnit XML reporter for CI test result parsing
+- [x] Update `CLAUDE.md` with E2E testing section (commands, patterns)
+- [x] Update project `README.md` with E2E test commands
+- [x] Create `docs/testing.md` documenting how to run tests locally
+- [x] Document how to add new E2E tests with page object examples
+- [x] Document debugging strategies for failed tests
