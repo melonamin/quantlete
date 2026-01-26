@@ -70,8 +70,9 @@ export abstract class BasePage {
 
   // helper to click and wait for navigation
   async clickAndWaitForNavigation(locator: Locator): Promise<void> {
+    const currentURL = this.page.url()
     await Promise.all([
-      this.page.waitForURL(/.*/, { timeout: 10000 }),
+      this.page.waitForURL((url) => url.toString() !== currentURL, { timeout: 10000 }),
       locator.click(),
     ])
   }
