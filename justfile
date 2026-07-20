@@ -129,11 +129,11 @@ test: test-go test-web
 
 # Run Go tests
 test-go:
-    go test -v ./cmd/... ./internal/...
+    go test -v ./...
 
 # Run Go tests with coverage
 test-go-cover:
-    go test -v -coverprofile=coverage.out ./cmd/... ./internal/...
+    go test -v -coverprofile=coverage.out ./...
     go tool cover -html=coverage.out -o coverage.html
 
 # Run React unit tests
@@ -142,7 +142,7 @@ test-web:
 
 # Run Playwright E2E tests in Docker
 # seeds demo database, starts Go server, runs Playwright tests, cleans up
-test-e2e:
+test-e2e: generate-sql generate-adapters generate-wasm-registration
     #!/usr/bin/env bash
     set -e
 
@@ -150,44 +150,7 @@ test-e2e:
     echo "Building web frontend..."
     cd web && yarn build:server && cd ..
 
-    # build Go binary
-    echo "Building Go binary..."
-    go build -o bin/quantlete ./cmd/quantlete
-
-    # set up test data directory
-    TEST_DATA_DIR=$(mktemp -d)
-    SERVER_PID=""
-    trap 'rm -rf "$TEST_DATA_DIR"; [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; wait' EXIT
-
-    # generate demo database
-    echo "Generating demo database..."
-    QUANTLETE_STORAGE_DATA_DIR="$TEST_DATA_DIR" QUANTLETE_STORAGE_DB_FILE=test.db \
-        ./bin/quantlete demo --activities=50 --months=6 --athlete="E2E Test User"
-
-    # start Go server in background
-    echo "Starting Go server..."
-    QUANTLETE_STORAGE_DATA_DIR="$TEST_DATA_DIR" QUANTLETE_STORAGE_DB_FILE=test.db \
-    QUANTLETE_SERVER_PORT=8081 QUANTLETE_SERVER_DEV_MODE=true \
-        ./bin/quantlete serve &
-    SERVER_PID=$!
-
-    # wait for server to be ready
-    echo "Waiting for server..."
-    for i in {1..30}; do
-        if curl -s http://localhost:8081/api/v1/auth/status > /dev/null 2>&1; then
-            echo "Server ready"
-            break
-        fi
-        if [ $i -eq 30 ]; then
-            echo "Server failed to start"
-            exit 1
-        fi
-        sleep 1
-    done
-
-    # run Playwright tests in Docker
-    echo "Running Playwright tests..."
-    ./docker-playwright.sh test
+    ./scripts/e2e-setup.sh ./docker-playwright.sh test
 
     echo "E2E tests completed successfully"
 
@@ -200,7 +163,7 @@ lint: lint-go lint-web
 
 # Lint Go code
 lint-go:
-    golangci-lint run ./cmd/... ./internal/...
+    golangci-lint run ./...
 
 # Lint React code
 lint-web:

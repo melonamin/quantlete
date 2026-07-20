@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   go:
@@ -22,8 +22,21 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Generate Go code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
+
+      # embed.go requires web/dist to exist for any build of the root package;
+      # this job never builds the real web bundle, so stub it
+      - name: Stub web assets for go:embed
+        run: |
+          mkdir -p web/dist
+          echo '<!doctype html><!-- placeholder for go:embed; real assets are built in the web job -->' > web/dist/index.html
+
       - name: Build
-        run: CGO_ENABLED=1 go build -v ./...
+        run: go build -v ./...
 
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
@@ -47,6 +60,12 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+
+      - name: Generate Go code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
 
       - name: Build WASM
         run: |
@@ -75,6 +94,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --immutable
+
+      - name: Unit tests
+        run: yarn test:unit
 
       - name: Typecheck
         run: yarn typecheck
@@ -108,6 +130,12 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
+      - name: Generate Go code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -122,33 +150,6 @@ jobs:
           name: web-dist
           path: web/dist/
 
-      - name: Build Go binary
-        run: go build -o bin/quantlete ./cmd/quantlete
-
-      - name: Generate demo database
-        run: |
-          mkdir -p /tmp/e2e-data
-          QUANTLETE_STORAGE_DATA_DIR=/tmp/e2e-data QUANTLETE_STORAGE_DB_FILE=test.db \
-            ./bin/quantlete demo --activities=50 --months=6 --athlete="E2E Test User"
-
-      - name: Start Go server
-        run: |
-          QUANTLETE_STORAGE_DATA_DIR=/tmp/e2e-data QUANTLETE_STORAGE_DB_FILE=test.db \
-          QUANTLETE_SERVER_PORT=8081 QUANTLETE_SERVER_DEV_MODE=true \
-            ./bin/quantlete serve &
-          echo "Waiting for server to be ready..."
-          for i in {1..30}; do
-            if curl -s http://localhost:8081/api/v1/auth/status > /dev/null 2>&1; then
-              echo "Server ready"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Server failed to start"
-              exit 1
-            fi
-            sleep 1
-          done
-
       - name: Install Playwright dependencies
         working-directory: web
         run: yarn install --immutable
@@ -158,9 +159,8 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run E2E tests
-        working-directory: web
         timeout-minutes: 15
-        run: npx playwright test
+        run: ./scripts/e2e-setup.sh bash -c 'cd web && npx playwright test'
         env:
           CI: true
 
