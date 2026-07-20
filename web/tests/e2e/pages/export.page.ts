@@ -56,47 +56,69 @@ export class ExportPage extends BasePage {
     this.pageSubtitle = page.locator('text=Download your activity data in various formats')
 
     // stats card
-    this.statsCard = page.locator('[class*="card"]').filter({
+    this.statsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Your Data'),
     })
-    this.statsCardTitle = this.statsCard.locator('[class*="CardTitle"]')
+    this.statsCardTitle = this.statsCard.locator('[data-slot="card-title"]')
     this.totalActivitiesValue = this.statsCard.locator('.text-xl.font-bold')
-    this.firstActivityDate = this.statsCard.locator('text=First Activity').locator('..').locator('.text-sm').last()
-    this.lastActivityDate = this.statsCard.locator('text=Last Activity').locator('..').locator('.text-sm').last()
+    this.firstActivityDate = this.statsCard
+      .locator('text=First Activity')
+      .locator('..')
+      .locator('.text-sm')
+      .last()
+    this.lastActivityDate = this.statsCard
+      .locator('text=Last Activity')
+      .locator('..')
+      .locator('.text-sm')
+      .last()
 
     // export options card
-    this.exportOptionsCard = page.locator('[class*="card"]').filter({
+    this.exportOptionsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Export Options'),
     })
-    this.exportOptionsCardTitle = this.exportOptionsCard.locator('[class*="CardTitle"]')
+    this.exportOptionsCardTitle = this.exportOptionsCard.locator('[data-slot="card-title"]')
 
     // format selector
     this.formatLabel = this.exportOptionsCard.locator('label:has-text("Format")')
-    this.csvButton = this.exportOptionsCard.locator('button:has-text("CSV")')
-    this.jsonButton = this.exportOptionsCard.locator('button:has-text("JSON")')
+    this.csvButton = this.exportOptionsCard.getByRole('button', { name: 'CSV', exact: true })
+    this.jsonButton = this.exportOptionsCard.getByRole('button', { name: 'JSON', exact: true })
     this.formatDescription = this.exportOptionsCard.locator('.mt-1.text-xs')
 
     // date range filters
     this.dateRangeLabel = this.exportOptionsCard.locator('label').filter({
       has: page.locator('text=Date Range'),
     })
-    this.fromDateInput = this.exportOptionsCard.locator('label:has-text("From")').locator('..').locator('input[type="date"]')
-    this.toDateInput = this.exportOptionsCard.locator('label:has-text("To")').locator('..').locator('input[type="date"]')
+    this.fromDateInput = this.exportOptionsCard
+      .locator('label:has-text("From")')
+      .locator('..')
+      .locator('input[type="date"]')
+    this.toDateInput = this.exportOptionsCard
+      .locator('label:has-text("To")')
+      .locator('..')
+      .locator('input[type="date"]')
 
     // sport type filter
     this.sportTypeLabel = this.exportOptionsCard.locator('label:has-text("Sport Type")')
     this.sportTypeInput = this.exportOptionsCard.locator('input[placeholder*="Ride"]')
 
     // download button
-    this.downloadButton = this.exportOptionsCard.locator('button:has-text("Download")')
+    this.downloadButton = this.exportOptionsCard.getByRole('button', {
+      name: /^Download (CSV|JSON)$/,
+    })
 
     // what's included card
-    this.whatsIncludedCard = page.locator('[class*="card"]').filter({
+    this.whatsIncludedCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text="What\'s Included"'),
     })
-    this.activityDetailsSection = this.whatsIncludedCard.locator('h4:has-text("Activity Details")').locator('..')
-    this.performanceMetricsSection = this.whatsIncludedCard.locator('h4:has-text("Performance Metrics")').locator('..')
-    this.locationGearSection = this.whatsIncludedCard.locator('h4:has-text("Location")').locator('..')
+    this.activityDetailsSection = this.whatsIncludedCard
+      .locator('h4:has-text("Activity Details")')
+      .locator('..')
+    this.performanceMetricsSection = this.whatsIncludedCard
+      .locator('h4:has-text("Performance Metrics")')
+      .locator('..')
+    this.locationGearSection = this.whatsIncludedCard
+      .locator('h4:has-text("Location")')
+      .locator('..')
 
     // loading and error states
     this.loadingSkeletons = page.locator('[class*="animate-pulse"]')
@@ -171,13 +193,13 @@ export class ExportPage extends BasePage {
   // select CSV format
   async selectCsvFormat(): Promise<void> {
     await this.csvButton.click()
-    await this.page.waitForTimeout(200)
+    await this.downloadButton.filter({ hasText: 'Download CSV' }).waitFor({ state: 'visible' })
   }
 
   // select JSON format
   async selectJsonFormat(): Promise<void> {
     await this.jsonButton.click()
-    await this.page.waitForTimeout(200)
+    await this.downloadButton.filter({ hasText: 'Download JSON' }).waitFor({ state: 'visible' })
   }
 
   // get selected format from download button text

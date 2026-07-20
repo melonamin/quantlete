@@ -164,9 +164,8 @@ test.describe('Activity Detail Page', () => {
 
       const hasElevation = await activityDetailPage.hasElevationProfile()
       if (hasElevation) {
-        const gradientCheckbox = activityDetailPage.elevationProfileSection.locator(
-          'button[role="checkbox"]'
-        )
+        const gradientCheckbox =
+          activityDetailPage.elevationProfileSection.locator('button[role="checkbox"]')
         if (await gradientCheckbox.isVisible()) {
           const initialState = await gradientCheckbox.getAttribute('data-state')
           await gradientCheckbox.click()
@@ -191,7 +190,9 @@ test.describe('Activity Detail Page', () => {
         await expect(activityDetailPage.streamChartTitle).toBeVisible()
 
         // checkboxes for series should be present
-        await expect(activityDetailPage.activityStreamsSection.locator('label:has-text("HR")')).toBeVisible()
+        await expect(
+          activityDetailPage.activityStreamsSection.locator('label:has-text("HR")')
+        ).toBeVisible()
         await expect(
           activityDetailPage.activityStreamsSection.locator('label:has-text("Power")')
         ).toBeVisible()
@@ -212,7 +213,8 @@ test.describe('Activity Detail Page', () => {
 
       const hasStreams = await activityDetailPage.hasActivityStreams()
       if (hasStreams) {
-        const checkboxes = activityDetailPage.activityStreamsSection.locator('button[role="checkbox"]')
+        const checkboxes =
+          activityDetailPage.activityStreamsSection.locator('button[role="checkbox"]')
         const count = await checkboxes.count()
 
         for (let i = 0; i < count; i++) {
@@ -242,12 +244,17 @@ test.describe('Activity Detail Page', () => {
       if (hasMap) {
         await expect(activityDetailPage.activityMap).toBeVisible()
 
-        // map should have tiles loaded
-        await expect(activityDetailPage.activityMap.locator('.leaflet-tile-container')).toBeVisible()
+        // Leaflet keeps the tile container as a zero-sized positioning layer, so it is
+        // attached but not "visible" by Playwright's bounding-box definition.
+        await expect(
+          activityDetailPage.activityMap.locator('.leaflet-tile-container')
+        ).toBeAttached()
 
-        // map should have a polyline/path for the route
-        const svgOverlay = activityDetailPage.activityMap.locator('svg')
-        await expect(svgOverlay).toBeVisible()
+        // React Leaflet renders the route as an interactive path in the overlay pane
+        const routePath = activityDetailPage.activityMap.locator(
+          '.leaflet-overlay-pane path.leaflet-interactive'
+        )
+        await expect(routePath.first()).toBeVisible()
       }
       // indoor activities or activities without GPS won't have a map - that's expected
     })

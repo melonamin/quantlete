@@ -73,7 +73,7 @@ export class EddingtonPage extends BasePage {
     this.customDefTrigger = page.locator('button[role="combobox"]')
 
     // sport comparison card (with clickable buttons for each sport group)
-    this.sportComparisonCard = page.locator('[class*="card"]').filter({
+    this.sportComparisonCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Sport Comparison'),
     })
     this.sportComparisonButtons = this.sportComparisonCard.locator('button[type="button"]')
@@ -81,7 +81,7 @@ export class EddingtonPage extends BasePage {
 
     // main eddington number card
     this.eddingtonCard = page
-      .locator('[class*="card"]')
+      .locator('[data-slot="card"]')
       .filter({
         has: page.locator('.text-7xl.font-bold'),
       })
@@ -90,25 +90,25 @@ export class EddingtonPage extends BasePage {
     this.eddingtonDescription = this.eddingtonCard.locator('p.text-muted-foreground')
 
     // history card
-    this.historyCard = page.locator('[class*="card"]').filter({
+    this.historyCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=History'),
     })
     this.historyChart = this.historyCard.locator('canvas, svg').first()
 
     // next goals card
-    this.nextGoalsCard = page.locator('[class*="card"]').filter({
+    this.nextGoalsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Next Goals'),
     })
     this.nextGoalsTable = this.nextGoalsCard.locator('table')
 
     // top distance days card
-    this.topDaysCard = page.locator('[class*="card"]').filter({
+    this.topDaysCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Top Distance Days'),
     })
     this.topDaysTable = this.topDaysCard.locator('table')
 
     // loading and error states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.errorMessage = page.locator('text=Failed to load Eddington data')
   }
 

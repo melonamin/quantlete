@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { BasePage } from './base.page'
 
 // page object for the best efforts (personal records) page
@@ -37,12 +37,12 @@ export class BestEffortsPage extends BasePage {
     this.pageSubtitle = page.locator('text=Your personal records by distance')
 
     // sport filter buttons (in header area)
-    this.allSportButton = page.locator('button').filter({ hasText: 'All' })
-    this.runsSportButton = page.locator('button').filter({ hasText: 'Runs' })
-    this.ridesSportButton = page.locator('button').filter({ hasText: 'Rides' })
+    this.allSportButton = page.getByRole('button', { name: 'All', exact: true })
+    this.runsSportButton = page.getByRole('button', { name: 'Runs', exact: true })
+    this.ridesSportButton = page.getByRole('button', { name: 'Rides', exact: true })
 
     // personal records card
-    this.prsCard = page.locator('[class*="card"]').filter({
+    this.prsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Personal Records'),
     })
     this.distanceRows = page.locator('button.flex.w-full.items-center.justify-between')
@@ -94,15 +94,11 @@ export class BestEffortsPage extends BasePage {
 
   // get currently selected sport filter
   async getSelectedSportFilter(): Promise<'all' | 'runs' | 'rides' | null> {
-    // check which button has the default variant (not outline)
-    const allClasses = await this.allSportButton.getAttribute('class')
-    const runsClasses = await this.runsSportButton.getAttribute('class')
-    const ridesClasses = await this.ridesSportButton.getAttribute('class')
-
-    // default variant doesn't have "outline" in classes
-    if (allClasses && !allClasses.includes('outline')) return 'all'
-    if (runsClasses && !runsClasses.includes('outline')) return 'runs'
-    if (ridesClasses && !ridesClasses.includes('outline')) return 'rides'
+    // The Button component exposes its semantic variant directly. Looking for the
+    // word "outline" in class names also matches the shared "outline-none" class.
+    if ((await this.allSportButton.getAttribute('data-variant')) === 'default') return 'all'
+    if ((await this.runsSportButton.getAttribute('data-variant')) === 'default') return 'runs'
+    if ((await this.ridesSportButton.getAttribute('data-variant')) === 'default') return 'rides'
     return null
   }
 
@@ -115,7 +111,7 @@ export class BestEffortsPage extends BasePage {
           ? this.runsSportButton
           : this.ridesSportButton
     await button.click()
-    await this.page.waitForTimeout(500) // wait for data to reload
+    await expect(button).toHaveAttribute('data-variant', 'default')
   }
 
   // get list of distances with their PR times

@@ -52,7 +52,7 @@ test.describe('Challenges Page', () => {
       }
 
       // month card titles should include count in parentheses
-      const titles = page.locator('[class*="CardTitle"]:not(:has-text("Import"))')
+      const titles = page.locator('[data-slot="card-title"]:not(:has-text("Import"))')
       const count = await titles.count()
 
       if (count > 0) {

@@ -89,48 +89,51 @@ export class WrappedPage extends BasePage {
     this.noComparisonOption = page.locator('[role="option"]:has-text("No comparison")')
 
     // metric cards (in grid)
-    this.metricCards = page.locator('.grid.gap-4.md\\:grid-cols-3 [class*="card"]')
-    this.activitiesCard = page.locator('[class*="card"]').filter({
+    this.metricCards = page
+      .locator('.grid.gap-4.md\\:grid-cols-3')
+      .first()
+      .locator('[data-slot="card"]')
+    this.activitiesCard = this.metricCards.filter({
       has: page.locator('text=Activities'),
     })
-    this.distanceCard = page.locator('[class*="card"]').filter({
+    this.distanceCard = this.metricCards.filter({
       has: page.locator('text=Distance'),
     })
-    this.elevationCard = page.locator('[class*="card"]').filter({
+    this.elevationCard = this.metricCards.filter({
       has: page.locator('text=Elevation'),
     })
-    this.movingTimeCard = page.locator('[class*="card"]').filter({
+    this.movingTimeCard = this.metricCards.filter({
       has: page.locator('text=Moving Time'),
     })
-    this.kudosCard = page.locator('[class*="card"]').filter({
+    this.kudosCard = this.metricCards.filter({
       has: page.locator('text=Kudos Received'),
     })
-    this.carbonCard = page.locator('[class*="card"]').filter({
+    this.carbonCard = this.metricCards.filter({
       has: page.locator('text=CO₂ Saved'),
     })
 
     // year activity heatmap
-    this.yearHeatmapCard = page.locator('[class*="card"]').filter({
+    this.yearHeatmapCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Year Activity Heatmap'),
     })
     this.yearHeatmapChart = this.yearHeatmapCard.locator('canvas, svg').first()
 
     // monthly bar charts
-    this.activitiesByMonthCard = page.locator('[class*="card"]').filter({
+    this.activitiesByMonthCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Activities by Month'),
     })
-    this.distanceByMonthCard = page.locator('[class*="card"]').filter({
+    this.distanceByMonthCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Distance by Month'),
     })
-    this.elevationByMonthCard = page.locator('[class*="card"]').filter({
+    this.elevationByMonthCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Elevation by Month'),
     })
-    this.prsByMonthCard = page.locator('[class*="card"]').filter({
+    this.prsByMonthCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Personal Records by Month'),
     })
 
     // summary section
-    this.summaryCard = page.locator('[class*="card"]').filter({
+    this.summaryCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Summary'),
     })
     this.activeVsRestDonut = page.locator('.rounded-md.border').filter({
@@ -141,35 +144,35 @@ export class WrappedPage extends BasePage {
     })
 
     // start times chart
-    this.startTimesCard = page.locator('[class*="card"]').filter({
+    this.startTimesCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Start Times'),
     })
     this.startTimesChart = this.startTimesCard.locator('canvas, svg').first()
 
     // locations chart
-    this.locationsCard = page.locator('[class*="card"]').filter({
+    this.locationsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Locations'),
     })
     this.locationsChart = this.locationsCard.locator('canvas, svg').first()
 
     // biggest cards
-    this.longestDistanceCard = page.locator('[class*="card"]').filter({
+    this.longestDistanceCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Longest Distance'),
     })
-    this.mostElevationCard = page.locator('[class*="card"]').filter({
+    this.mostElevationCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Most Elevation'),
     })
-    this.longestDurationCard = page.locator('[class*="card"]').filter({
+    this.longestDurationCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Longest Duration'),
     })
 
     // random photo card
-    this.randomPhotoCard = page.locator('[class*="card"]').filter({
+    this.randomPhotoCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Random Photo'),
     })
 
     // comparison card
-    this.comparisonCard = page.locator('[class*="card"]').filter({
+    this.comparisonCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Comparison'),
     })
     this.comparisonTable = this.comparisonCard.locator('.rounded-md.border').filter({
@@ -177,7 +180,7 @@ export class WrappedPage extends BasePage {
     })
 
     // loading and empty states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.emptyState = page.locator('text=No activity data available')
     this.errorMessage = page.locator('text=Failed to load')
   }
@@ -285,7 +288,9 @@ export class WrappedPage extends BasePage {
   }
 
   // get metric card value
-  async getMetricValue(metric: 'activities' | 'distance' | 'elevation' | 'movingTime' | 'kudos' | 'carbon'): Promise<string | null> {
+  async getMetricValue(
+    metric: 'activities' | 'distance' | 'elevation' | 'movingTime' | 'kudos' | 'carbon'
+  ): Promise<string | null> {
     const cards: Record<string, Locator> = {
       activities: this.activitiesCard,
       distance: this.distanceCard,

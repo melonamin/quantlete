@@ -122,12 +122,10 @@ test.describe('Best Efforts Page', () => {
       await bestEffortsPage.waitForDataLoad()
 
       // runs should be selected by default
-      const runsClasses = await bestEffortsPage.runsSportButton.getAttribute('class')
-      expect(runsClasses).not.toContain('outline')
+      await expect(bestEffortsPage.runsSportButton).toHaveAttribute('data-variant', 'default')
 
       // all should not be selected
-      const allClasses = await bestEffortsPage.allSportButton.getAttribute('class')
-      expect(allClasses).toContain('outline')
+      await expect(bestEffortsPage.allSportButton).toHaveAttribute('data-variant', 'outline')
     })
   })
 

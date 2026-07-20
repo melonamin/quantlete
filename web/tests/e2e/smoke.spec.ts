@@ -17,7 +17,7 @@ test.describe('Smoke Tests', () => {
 
     // verify there are some stats cards with numbers
     // demo data should have generated activities, so we expect non-zero values
-    const statsCards = page.locator('[class*="card"]').filter({
+    const statsCards = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=/\\d+/'),
     })
     await expect(statsCards.first()).toBeVisible()

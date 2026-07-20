@@ -131,6 +131,12 @@ test.describe('Settings Page', () => {
         return
       }
 
+      // Demo mode intentionally replaces the import controls with an explanatory notice.
+      if (await settingsPage.demoModeSyncMessage.isVisible()) {
+        await expect(settingsPage.demoModeSyncMessage).toBeVisible()
+        return
+      }
+
       // import card should be visible
       await expect(settingsPage.importCard).toBeVisible()
 

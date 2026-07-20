@@ -45,9 +45,10 @@ export class MonthlyStatsPage extends BasePage {
     this.pageSubtitle = page.locator('text=Detailed monthly breakdown of your activities')
 
     // year navigation
-    this.prevYearButton = page.locator('button').filter({ has: page.locator('svg') }).first()
-    this.nextYearButton = page.locator('button').filter({ has: page.locator('svg') }).nth(1)
     this.yearDisplay = page.locator('.w-16.text-center.font-medium')
+    const yearControls = this.yearDisplay.locator('..')
+    this.prevYearButton = yearControls.locator('button').first()
+    this.nextYearButton = yearControls.locator('button').nth(1)
     this.exportButton = page.locator('button:has-text("Export")')
 
     // yearly summary cards
@@ -79,7 +80,7 @@ export class MonthlyStatsPage extends BasePage {
     this.expandedContent = page.locator('[data-state="open"], .accordion-content')
 
     // loading and empty states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.emptyState = page.locator('text=No activities recorded')
     this.errorMessage = page.locator('text=Failed to load')
   }

@@ -55,7 +55,7 @@ test.describe('Gear Page', () => {
       await expect(firstCard).toBeVisible()
 
       // should have a title
-      const title = firstCard.locator('.text-lg, [class*="CardTitle"]')
+      const title = firstCard.locator('[data-slot="card-title"]')
       await expect(title).toBeVisible()
 
       // should have distance row

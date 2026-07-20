@@ -35,7 +35,7 @@ export class ChallengesPage extends BasePage {
     this.pageSubtitle = page.locator('text=Completed Strava challenges')
 
     // import card
-    this.importCard = page.locator('[class*="card"]').filter({
+    this.importCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Import'),
     })
     this.importFileInput = this.importCard.locator('input[type="file"]')
@@ -43,8 +43,8 @@ export class ChallengesPage extends BasePage {
     this.importMessage = this.importCard.locator('.text-sm.text-muted-foreground').last()
 
     // month cards (each card has a month title)
-    this.monthCards = page.locator('[class*="card"]').filter({
-      has: page.locator('[class*="CardTitle"]'),
+    this.monthCards = page.locator('[data-slot="card"]').filter({
+      has: page.locator('[data-slot="card-title"]'),
     })
 
     // challenge badges (links inside month cards, excluding import card)
@@ -53,7 +53,7 @@ export class ChallengesPage extends BasePage {
     this.badgeLinks = this.challengeBadges
 
     // loading and empty states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.emptyState = page.locator('text=No challenges imported yet')
     this.errorMessage = page.locator('text=Failed to load challenges')
   }
@@ -100,15 +100,15 @@ export class ChallengesPage extends BasePage {
   // get month cards count (excluding import card)
   async getMonthCardsCount(): Promise<number> {
     // count cards that have month titles (e.g., "January 2024")
-    const cards = this.page.locator('[class*="card"]').filter({
-      has: this.page.locator('[class*="CardTitle"]:not(:has-text("Import"))'),
+    const cards = this.page.locator('[data-slot="card"]').filter({
+      has: this.page.locator('[data-slot="card-title"]:not(:has-text("Import"))'),
     })
     return await cards.count()
   }
 
   // get month labels
   async getMonthLabels(): Promise<string[]> {
-    const titles = this.page.locator('[class*="CardTitle"]:not(:has-text("Import"))')
+    const titles = this.page.locator('[data-slot="card-title"]:not(:has-text("Import"))')
     const count = await titles.count()
     const labels: string[] = []
     for (let i = 0; i < count; i++) {

@@ -80,7 +80,10 @@ export class GearPage extends BasePage {
     this.pageSubtitle = page.locator('text=Manage your equipment and track usage')
 
     // tab buttons
-    this.gearTabButton = page.locator('button').filter({ hasText: /^Gear$/ }).first()
+    this.gearTabButton = page
+      .locator('button')
+      .filter({ hasText: /^Gear$/ })
+      .first()
     this.maintenanceTabButton = page.locator('button').filter({ hasText: 'Maintenance' }).first()
 
     // filter controls
@@ -90,15 +93,19 @@ export class GearPage extends BasePage {
     this.addCustomGearButton = page.locator('button:has-text("Add Custom Gear")')
 
     // gear cards grid
-    this.gearGrid = page.locator('.grid.gap-4')
-    this.gearCards = page.locator('[class*="card"]').filter({
-      has: page.locator('text=Distance'),
-    })
+    this.gearGrid = page.locator('.grid.gap-4.md\\:grid-cols-2.lg\\:grid-cols-3')
+    this.gearCards = this.gearGrid.locator('[data-slot="card"]')
 
     // individual gear card elements (within cards)
-    this.gearCardTitle = this.gearCards.locator('.text-lg, [class*="CardTitle"]')
-    this.gearCardDistance = this.gearCards.locator('text=Distance').locator('..').locator('.font-medium')
-    this.gearCardActivities = this.gearCards.locator('text=Activities').locator('..').locator('.font-medium')
+    this.gearCardTitle = this.gearCards.locator('[data-slot="card-title"]')
+    this.gearCardDistance = this.gearCards
+      .locator('text=Distance')
+      .locator('..')
+      .locator('.font-medium')
+    this.gearCardActivities = this.gearCards
+      .locator('text=Activities')
+      .locator('..')
+      .locator('.font-medium')
     this.gearCardEditButton = this.gearCards.locator('button:has-text("Edit")')
     this.gearCardPriceButton = this.gearCards.locator(
       'button:has-text("Edit Price"), button:has-text("Add Price")'
@@ -106,13 +113,13 @@ export class GearPage extends BasePage {
 
     // charts section
     this.chartsSection = page.locator('.mb-6.grid')
-    this.distancePerMonthChart = page.locator('[class*="card"]').filter({
+    this.distancePerMonthChart = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Distance per month'),
     })
-    this.cumulativeDistanceChart = page.locator('[class*="card"]').filter({
+    this.cumulativeDistanceChart = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Cumulative distance'),
     })
-    this.movingTimeShareChart = page.locator('[class*="card"]').filter({
+    this.movingTimeShareChart = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Moving time share'),
     })
 
@@ -122,7 +129,9 @@ export class GearPage extends BasePage {
     })
     this.customGearModalTitle = this.customGearModal.locator('.font-semibold').first()
     this.customGearNameInput = this.customGearModal.locator('input').first()
-    this.customGearHashtagInput = this.customGearModal.locator('input[placeholder*="hashtag"], input[placeholder*="skateboard"]')
+    this.customGearHashtagInput = this.customGearModal.locator(
+      'input[placeholder*="hashtag"], input[placeholder*="skateboard"]'
+    )
     this.customGearPriceInput = this.customGearModal.locator('input[placeholder*="499"]')
     this.customGearCurrencyInput = this.customGearModal.locator('input[placeholder="USD"]')
     this.customGearRetiredCheckbox = this.customGearModal.locator('[role="checkbox"]')
@@ -141,10 +150,10 @@ export class GearPage extends BasePage {
     this.priceCancelButton = this.priceModal.locator('button:has-text("Cancel")')
 
     // maintenance panel
-    this.maintenanceDueCard = page.locator('[class*="card"]').filter({
+    this.maintenanceDueCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Maintenance due'),
     })
-    this.manageComponentsCard = page.locator('[class*="card"]').filter({
+    this.manageComponentsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Manage components'),
     })
     this.componentList = this.manageComponentsCard.locator('.space-y-2')
@@ -161,7 +170,7 @@ export class GearPage extends BasePage {
     this.componentCloseButton = this.componentModal.locator('button:has-text("Close")')
 
     // loading and error states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.emptyState = page.locator('text=No gear found')
     this.errorMessage = page.locator('text=Failed to load gear')
   }
@@ -214,7 +223,7 @@ export class GearPage extends BasePage {
     const names: string[] = []
     for (let i = 0; i < count; i++) {
       const card = this.gearCards.nth(i)
-      const title = await card.locator('.text-lg, [class*="CardTitle"]').textContent()
+      const title = await card.locator('[data-slot="card-title"]').textContent()
       if (title) names.push(title.trim())
     }
     return names
@@ -247,16 +256,14 @@ export class GearPage extends BasePage {
 
   // check if gear tab is active
   async isGearTabActive(): Promise<boolean> {
-    const classes = await this.gearTabButton.getAttribute('class')
-    const variant = await this.gearTabButton.getAttribute('data-state')
-    return classes?.includes('bg-primary') || variant === 'active' || !classes?.includes('outline') || false
+    const variant = await this.gearTabButton.getAttribute('data-variant')
+    return variant === 'default'
   }
 
   // check if maintenance tab is active
   async isMaintenanceTabActive(): Promise<boolean> {
-    const classes = await this.maintenanceTabButton.getAttribute('class')
-    const variant = await this.maintenanceTabButton.getAttribute('data-state')
-    return classes?.includes('bg-primary') || variant === 'active' || !classes?.includes('outline') || false
+    const variant = await this.maintenanceTabButton.getAttribute('data-variant')
+    return variant === 'default'
   }
 
   // check if charts are visible

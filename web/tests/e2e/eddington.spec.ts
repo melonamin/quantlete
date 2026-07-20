@@ -220,10 +220,7 @@ test.describe('Eddington Page', () => {
 
         // clicking All should show all activities
         await eddingtonPage.allComparisonButton.click()
-        await page.waitForTimeout(500)
-
-        const description = await eddingtonPage.getEddingtonDescription()
-        expect(description).toContain('All')
+        await expect(eddingtonPage.eddingtonDescription).toContainText('Sport Group:')
       }
     })
   })

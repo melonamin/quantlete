@@ -37,10 +37,18 @@ export class DashboardPage extends BasePage {
 
     // stats summary cards at the top
     this.statsSummary = page.locator('.grid.gap-3.md\\:grid-cols-2.lg\\:grid-cols-4').first()
-    this.totalActivitiesCard = page.locator('text=Total Activities').locator('..').locator('..')
-    this.totalDistanceCard = page.locator('text=Total Distance').locator('..').locator('..')
-    this.totalTimeCard = page.locator('text=Total Time').locator('..').locator('..')
-    this.totalElevationCard = page.locator('text=Total Elevation').locator('..').locator('..')
+    this.totalActivitiesCard = this.statsSummary.locator('[data-slot="card"]').filter({
+      has: page.locator('[data-slot="card-title"]').filter({ hasText: /^Total Activities$/ }),
+    })
+    this.totalDistanceCard = this.statsSummary.locator('[data-slot="card"]').filter({
+      has: page.locator('[data-slot="card-title"]').filter({ hasText: /^Total Distance$/ }),
+    })
+    this.totalTimeCard = this.statsSummary.locator('[data-slot="card"]').filter({
+      has: page.locator('[data-slot="card-title"]').filter({ hasText: /^Total Time$/ }),
+    })
+    this.totalElevationCard = this.statsSummary.locator('[data-slot="card"]').filter({
+      has: page.locator('[data-slot="card-title"]').filter({ hasText: /^Total Elevation$/ }),
+    })
 
     // widget grid
     this.widgetGrid = page.locator('.grid.gap-4.md\\:grid-cols-12')
@@ -53,19 +61,19 @@ export class DashboardPage extends BasePage {
     this.widgetPanelDoneButton = page.locator('button:has-text("Done")')
 
     // widgets by title (these are within the widget grid)
-    this.recentActivitiesWidget = page.locator('[class*="widget"]').filter({
+    this.recentActivitiesWidget = this.widgetGrid.locator('[data-slot="card"]').filter({
       has: page.locator('text=Recent Activities'),
     })
-    this.weeklyStatsWidget = page.locator('[class*="widget"]').filter({
+    this.weeklyStatsWidget = this.widgetGrid.locator('[data-slot="card"]').filter({
       has: page.locator('text=This Week'),
     })
-    this.sportBreakdownWidget = page.locator('[class*="widget"]').filter({
+    this.sportBreakdownWidget = this.widgetGrid.locator('[data-slot="card"]').filter({
       has: page.locator('text=By Sport'),
     })
-    this.monthlyChartWidget = page.locator('[class*="widget"]').filter({
+    this.monthlyChartWidget = this.widgetGrid.locator('[data-slot="card"]').filter({
       has: page.locator('text=Monthly Activity'),
     })
-    this.activityCalendarWidget = page.locator('[class*="widget"]').filter({
+    this.activityCalendarWidget = this.widgetGrid.locator('[data-slot="card"]').filter({
       has: page.locator('text=Activity Calendar'),
     })
 
@@ -121,16 +129,12 @@ export class DashboardPage extends BasePage {
 
   async clickRecentActivity(index: number = 0): Promise<void> {
     // recent activities are links in the Recent Activities widget
-    const activityLinks = this.page.locator(
-      'a[href*="/activities/"]:has(.truncate)'
-    )
+    const activityLinks = this.page.locator('a[href*="/activities/"]:has(.truncate)')
     await activityLinks.nth(index).click()
   }
 
   async getRecentActivityCount(): Promise<number> {
-    const activityLinks = this.page.locator(
-      'a[href*="/activities/"]:has(.truncate)'
-    )
+    const activityLinks = this.page.locator('a[href*="/activities/"]:has(.truncate)')
     return await activityLinks.count()
   }
 

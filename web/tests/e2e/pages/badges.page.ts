@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { BasePage } from './base.page'
 
 // page object for the badges customizer page
@@ -62,34 +62,43 @@ export class BadgesPage extends BasePage {
     this.pageSubtitle = page.locator('text=Generate SVG badges from your stats')
 
     // public access card
-    this.publicAccessCard = page.locator('[class*="card"]').filter({
+    this.publicAccessCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Public Access'),
     })
     this.publicBadgesCheckbox = this.publicAccessCard.locator('button[role="checkbox"]')
 
     // style customizer card
-    this.styleCard = page.locator('[class*="card"]').filter({
+    this.styleCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Style'),
     })
     this.customizer = this.styleCard.locator('.flex.flex-wrap.gap-4')
 
     // theme selector (Accent section)
-    this.themeButtons = page.locator('.space-y-2').filter({
-      has: page.locator('text=Accent'),
-    }).locator('button')
+    this.themeButtons = page
+      .locator('.space-y-2')
+      .filter({
+        has: page.locator('text=Accent'),
+      })
+      .locator('button')
 
     // background selector
-    this.backgroundButtons = page.locator('.space-y-2').filter({
-      has: page.locator('text=Background'),
-    }).locator('button')
+    this.backgroundButtons = page
+      .locator('.space-y-2')
+      .filter({
+        has: page.locator('text=Background'),
+      })
+      .locator('button')
 
     // size selector
-    this.sizeButtons = page.locator('.space-y-2').filter({
-      has: page.locator('text=Size'),
-    }).locator('button')
+    this.sizeButtons = page
+      .locator('.space-y-2')
+      .filter({
+        has: page.locator('text=Size'),
+      })
+      .locator('button')
 
     // overall stats card
-    this.overallStatsCard = page.locator('[class*="card"]').filter({
+    this.overallStatsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Overall Stats'),
     })
     this.distanceBadge = this.overallStatsCard.locator('.flex.flex-col.gap-3').first()
@@ -98,14 +107,14 @@ export class BadgesPage extends BasePage {
     this.activitiesBadge = this.overallStatsCard.locator('.flex.flex-col.gap-3').nth(3)
 
     // achievements card
-    this.achievementsCard = page.locator('[class*="card"]').filter({
+    this.achievementsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Achievements'),
     })
     this.eddingtonBadge = this.achievementsCard.locator('.flex.flex-col.gap-3').first()
     this.prBadge = this.achievementsCard.locator('.flex.flex-col.gap-3').nth(1)
 
     // time periods card
-    this.timePeriodsCard = page.locator('[class*="card"]').filter({
+    this.timePeriodsCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Time Periods'),
     })
     this.yearlyBadge = this.timePeriodsCard.locator('.flex.flex-col.gap-3').first()
@@ -120,7 +129,7 @@ export class BadgesPage extends BasePage {
     this.copyButtons = page.locator('button:has-text("Copy")')
 
     // loading and empty states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.emptyState = page.locator('text=No stats data available')
   }
 
@@ -129,7 +138,11 @@ export class BadgesPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await super.goto('/badges')
+    await this.page
+      .locator('aside[aria-label="Main navigation"]')
+      .getByRole('link', { name: 'Badges', exact: true })
+      .click()
+    await this.waitForPageLoad()
   }
 
   // wait for data to load
@@ -163,7 +176,7 @@ export class BadgesPage extends BasePage {
     const count = await buttons.count()
     for (let i = 0; i < count; i++) {
       const classes = await buttons.nth(i).getAttribute('class')
-      if (classes?.includes('border-primary')) {
+      if (classes?.split(/\s+/).includes('border-primary')) {
         return await buttons.nth(i).textContent()
       }
     }
@@ -174,7 +187,7 @@ export class BadgesPage extends BasePage {
   async selectTheme(themeName: string): Promise<void> {
     const button = this.themeButtons.filter({ hasText: themeName })
     await button.click()
-    await this.page.waitForTimeout(200)
+    await expect(button).toHaveClass(/(^|\s)border-primary(\s|$)/)
   }
 
   // get available themes
@@ -195,7 +208,7 @@ export class BadgesPage extends BasePage {
     const count = await buttons.count()
     for (let i = 0; i < count; i++) {
       const classes = await buttons.nth(i).getAttribute('class')
-      if (classes?.includes('border-primary')) {
+      if (classes?.split(/\s+/).includes('border-primary')) {
         return await buttons.nth(i).textContent()
       }
     }
@@ -206,7 +219,7 @@ export class BadgesPage extends BasePage {
   async selectBackground(bgName: string): Promise<void> {
     const button = this.backgroundButtons.filter({ hasText: bgName })
     await button.click()
-    await this.page.waitForTimeout(200)
+    await expect(button).toHaveClass(/(^|\s)border-primary(\s|$)/)
   }
 
   // get available backgrounds
@@ -227,7 +240,7 @@ export class BadgesPage extends BasePage {
     const count = await buttons.count()
     for (let i = 0; i < count; i++) {
       const classes = await buttons.nth(i).getAttribute('class')
-      if (classes?.includes('border-primary')) {
+      if (classes?.split(/\s+/).includes('border-primary')) {
         return await buttons.nth(i).textContent()
       }
     }
@@ -238,7 +251,7 @@ export class BadgesPage extends BasePage {
   async selectSize(sizeName: string): Promise<void> {
     const button = this.sizeButtons.filter({ hasText: sizeName })
     await button.click()
-    await this.page.waitForTimeout(200)
+    await expect(button).toHaveClass(/(^|\s)border-primary(\s|$)/)
   }
 
   // get available sizes

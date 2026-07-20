@@ -21,6 +21,7 @@ export class SettingsPage extends BasePage {
   readonly startImportButton: Locator
   readonly resumeImportButton: Locator
   readonly cancelImportButton: Locator
+  readonly demoModeSyncMessage: Locator
   readonly advancedOptionsButton: Locator
   readonly advancedOptionsPanel: Locator
 
@@ -69,34 +70,47 @@ export class SettingsPage extends BasePage {
     this.connectionSection = page.locator('section').filter({
       has: page.locator('text=Connection'),
     })
-    this.stravaConnectionCard = page.locator('[class*="card"]').filter({
+    this.stravaConnectionCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Strava Connection'),
     })
     this.connectionStatus = this.stravaConnectionCard.locator('p.font-medium').first()
     this.athleteName = this.stravaConnectionCard.locator('.text-sm.text-muted-foreground').first()
-    this.connectButton = page.locator('a:has-text("Connect Strava"), button:has-text("Connect Strava")')
+    this.connectButton = page.locator(
+      'a:has-text("Connect Strava"), button:has-text("Connect Strava")'
+    )
 
     // data sync section
     this.dataSyncSection = page.locator('section').filter({
       has: page.locator('text=Data Sync'),
     })
-    this.importCard = page.locator('[class*="card"]').filter({
-      has: page.locator('text=Import'),
-    }).first()
-    this.startImportButton = page.locator('button:has-text("Start Import"), button:has-text("Start New Import")')
+    this.importCard = page
+      .locator('[data-slot="card"]')
+      .filter({
+        has: page.getByText('Import', { exact: true }),
+      })
+      .first()
+    this.startImportButton = page.locator(
+      'button:has-text("Start Import"), button:has-text("Start New Import")'
+    )
     this.resumeImportButton = page.locator('button:has-text("Resume Previous Sync")')
     this.cancelImportButton = page.locator('button:has-text("Cancel")')
-    this.advancedOptionsButton = page.locator('button:has-text("Advanced options")')
-    this.advancedOptionsPanel = page.locator('#import-advanced-options')
+    this.demoModeSyncMessage = this.dataSyncSection.getByText(
+      'Data sync is disabled in demo mode. Demo data is pre-generated and cannot be modified.'
+    )
+    this.advancedOptionsButton = this.importCard.getByRole('button', {
+      name: 'Advanced options',
+      exact: true,
+    })
+    this.advancedOptionsPanel = this.importCard.locator('#import-advanced-options')
 
     // import options checkboxes
-    this.includeStreamsCheckbox = page.locator('#include-streams')
-    this.includeSegmentsCheckbox = page.locator('#include-segments')
-    this.includeBestEffortsCheckbox = page.locator('#include-best-efforts')
-    this.includePhotosCheckbox = page.locator('#include-photos')
+    this.includeStreamsCheckbox = this.importCard.locator('#include-streams')
+    this.includeSegmentsCheckbox = this.importCard.locator('#include-segments')
+    this.includeBestEffortsCheckbox = this.importCard.locator('#include-best-efforts')
+    this.includePhotosCheckbox = this.importCard.locator('#include-photos')
 
     // last sync card
-    this.lastSyncCard = page.locator('[class*="card"]').filter({
+    this.lastSyncCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Last Sync'),
     })
     this.historyButton = page.locator('button:has-text("History")')
@@ -105,14 +119,16 @@ export class SettingsPage extends BasePage {
     this.syncHistoryModal = page.locator('[role="dialog"]').filter({
       has: page.locator('text=Sync History'),
     })
-    this.syncHistoryCloseButton = this.syncHistoryModal.locator('button[aria-label="Close"], button:has-text("Close")').first()
+    this.syncHistoryCloseButton = this.syncHistoryModal
+      .locator('button[aria-label="Close"], button:has-text("Close")')
+      .first()
     this.syncHistoryTable = this.syncHistoryModal.locator('table, .space-y-2')
 
     // display section
     this.displaySection = page.locator('section').filter({
       has: page.locator('text=Display'),
     })
-    this.preferencesCard = page.locator('[class*="card"]').filter({
+    this.preferencesCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Preferences'),
     })
 
@@ -128,7 +144,7 @@ export class SettingsPage extends BasePage {
     this.darkThemeButton = page.locator('button:has-text("Dark")')
 
     // loading and error states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.errorMessage = page.locator('text=Failed to load settings')
   }
 
@@ -173,6 +189,7 @@ export class SettingsPage extends BasePage {
     return (
       dataState === 'on' ||
       dataState === 'active' ||
+      classes?.includes('bg-background') ||
       classes?.includes('bg-primary') ||
       classes?.includes('text-primary-foreground') ||
       false
@@ -206,6 +223,7 @@ export class SettingsPage extends BasePage {
     return (
       dataState === 'on' ||
       dataState === 'active' ||
+      classes?.includes('bg-background') ||
       classes?.includes('bg-primary') ||
       classes?.includes('text-primary-foreground') ||
       false
@@ -252,7 +270,9 @@ export class SettingsPage extends BasePage {
   }
 
   // check if import checkbox is checked
-  async isImportOptionChecked(option: 'streams' | 'segments' | 'bestEfforts' | 'photos'): Promise<boolean> {
+  async isImportOptionChecked(
+    option: 'streams' | 'segments' | 'bestEfforts' | 'photos'
+  ): Promise<boolean> {
     const checkbox =
       option === 'streams'
         ? this.includeStreamsCheckbox
@@ -267,7 +287,9 @@ export class SettingsPage extends BasePage {
   }
 
   // toggle import checkbox
-  async toggleImportOption(option: 'streams' | 'segments' | 'bestEfforts' | 'photos'): Promise<void> {
+  async toggleImportOption(
+    option: 'streams' | 'segments' | 'bestEfforts' | 'photos'
+  ): Promise<void> {
     const checkbox =
       option === 'streams'
         ? this.includeStreamsCheckbox

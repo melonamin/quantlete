@@ -45,7 +45,7 @@ export class TrainingLoadPage extends BasePage {
     this.backButton = page.locator('a:has-text("Back")')
 
     // date range card and inputs
-    this.rangeCard = page.locator('[class*="card"]').filter({
+    this.rangeCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Range'),
     })
     this.afterDateInput = this.rangeCard.locator('input[type="date"]').first()
@@ -55,13 +55,13 @@ export class TrainingLoadPage extends BasePage {
     this.trainingLoadChart = this.rangeCard.locator('canvas, svg').first()
 
     // summary cards (CTL, ATL, TSB)
-    this.ctlCard = page.locator('[class*="card"]').filter({
+    this.ctlCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=CTL'),
     })
-    this.atlCard = page.locator('[class*="card"]').filter({
+    this.atlCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=ATL'),
     })
-    this.tsbCard = page.locator('[class*="card"]').filter({
+    this.tsbCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=TSB'),
     })
 
@@ -76,7 +76,7 @@ export class TrainingLoadPage extends BasePage {
     this.activitiesWithTss = page.locator('text=With computed TSS:')
 
     // loading and error states
-    this.loadingState = page.locator('[class*="animate-pulse"], [class*="skeleton"]').first()
+    this.loadingState = page.locator('[data-slot="skeleton"], [class*="animate-pulse"]').first()
     this.errorMessage = page.locator('text=Failed to load training load')
   }
 

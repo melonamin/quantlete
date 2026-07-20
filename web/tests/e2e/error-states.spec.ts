@@ -18,19 +18,8 @@ test.describe('Error States & Edge Cases', () => {
       // navigate to a non-existent activity
       await page.goto('/activities/999999999')
 
-      // wait for the page to settle
-      await page.waitForTimeout(1000)
-
-      // should show error state or redirect to activities list
-      const hasError = await page.locator('text=/not found|error|does not exist/i').isVisible()
-      const isActivitiesList = await page
-        .locator('h1')
-        .filter({ hasText: 'Activities' })
-        .isVisible()
-      const isActivityPage = await page.locator('a:has-text("Back to Activities")').isVisible()
-
-      // one of these should be true
-      expect(hasError || isActivitiesList || isActivityPage).toBe(true)
+      // the current detail page keeps its route and renders an inline load/not-found error
+      await expect(page.getByText(/Failed to load activity|Activity not found/i)).toBeVisible()
     })
   })
 
@@ -136,7 +125,10 @@ test.describe('Error States & Edge Cases', () => {
       })
 
       // navigate to activities page
-      await page.locator('a[href="/activities"]').click()
+      await page
+        .locator('aside[aria-label="Main navigation"]')
+        .getByRole('link', { name: 'Activities', exact: true })
+        .click()
 
       // wait for some response - either error or the cached/old data
       await page.waitForTimeout(2000)

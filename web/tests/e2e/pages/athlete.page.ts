@@ -74,7 +74,7 @@ export class AthletePage extends BasePage {
     this.pageSubtitle = page.locator('text=Your training metrics and zones')
 
     // athlete info card (first card without a CardTitle, just has avatar and name)
-    this.athleteInfoCard = page.locator('[class*="card"]').first()
+    this.athleteInfoCard = page.locator('[data-slot="card"]').first()
     this.athleteAvatar = this.athleteInfoCard.locator('img, .rounded-full').first()
     this.athleteName = this.athleteInfoCard.locator('.text-xl.font-semibold')
     this.athleteUsername = this.athleteInfoCard.locator('p:has-text("@")')
@@ -83,20 +83,20 @@ export class AthletePage extends BasePage {
     })
 
     // not authenticated state
-    this.notAuthenticatedCard = page.locator('[class*="card"]').filter({
+    this.notAuthenticatedCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Connect your Strava account'),
     })
     this.notAuthenticatedMessage = page.locator('text=Connect your Strava account in Settings')
 
     // FTP card
-    this.ftpCard = page.locator('[class*="card"]').filter({
+    this.ftpCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Functional Threshold Power'),
     })
-    this.ftpCardTitle = this.ftpCard.locator('[class*="CardTitle"]')
+    this.ftpCardTitle = this.ftpCard.locator('[data-slot="card-title"]')
     this.ftpHistoryHeader = this.ftpCard.locator('h3:has-text("FTP History")')
 
     // FTP cycling form (first set of inputs in FTP card)
-    const ftpContent = this.ftpCard.locator('[class*="CardContent"]')
+    const ftpContent = this.ftpCard.locator('[data-slot="card-content"]')
     this.ftpCyclingDateInput = ftpContent.locator('input[type="date"]').first()
     this.ftpCyclingValueInput = ftpContent.locator('input[placeholder*="Cycling FTP"]')
     this.ftpCyclingAddButton = ftpContent.locator('button:has-text("Add")').first()
@@ -109,31 +109,33 @@ export class AthletePage extends BasePage {
     this.ftpRunningChart = ftpContent.locator('canvas, svg').nth(1)
 
     // Weight card
-    this.weightCard = page.locator('[class*="card"]').filter({
+    this.weightCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Weight History').first(),
     })
-    this.weightCardTitle = this.weightCard.locator('[class*="CardTitle"]')
+    this.weightCardTitle = this.weightCard.locator('[data-slot="card-title"]')
     this.weightHistoryHeader = this.weightCard.locator('h3:has-text("Weight History")')
-    const weightContent = this.weightCard.locator('[class*="CardContent"]')
+    const weightContent = this.weightCard.locator('[data-slot="card-content"]')
     this.weightDateInput = weightContent.locator('input[type="date"]')
     this.weightValueInput = weightContent.locator('input[placeholder*="Weight"]')
     this.weightAddButton = weightContent.locator('button:has-text("Add")')
     this.weightChart = weightContent.locator('canvas, svg').first()
 
     // HR zones card
-    this.hrZonesCard = page.locator('[class*="card"]').filter({
+    this.hrZonesCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Heart Rate Zones').first(),
     })
-    this.hrZonesCardTitle = this.hrZonesCard.locator('[class*="CardTitle"]')
+    this.hrZonesCardTitle = this.hrZonesCard.locator('[data-slot="card-title"]')
     this.hrZonesHeader = this.hrZonesCard.locator('h3:has-text("Heart Rate Zones")')
-    const hrZonesContent = this.hrZonesCard.locator('[class*="CardContent"]')
+    const hrZonesContent = this.hrZonesCard.locator('[data-slot="card-content"]')
     this.hrZonesSportSelect = hrZonesContent.locator('[role="combobox"]').first()
     this.hrZonesEffectiveFromInput = hrZonesContent.locator('input[type="date"]')
     this.hrZonesMethodSelect = hrZonesContent.locator('[role="combobox"]').nth(1)
     this.hrZonesHrMaxInput = hrZonesContent.locator('input[inputmode="numeric"]')
     this.hrZonesBoundsInputs = hrZonesContent.locator('input[inputmode="decimal"]')
     this.hrZonesSaveButton = hrZonesContent.locator('button:has-text("Save Definition")')
-    this.hrZonesExistingDefs = hrZonesContent.locator('.rounded-md.border')
+    this.hrZonesExistingDefs = hrZonesContent.locator(
+      '.flex.items-center.justify-between.rounded-md.border'
+    )
     this.hrZonesEditButtons = this.hrZonesExistingDefs.locator('button:has-text("Edit")')
     this.hrZonesDeleteButtons = this.hrZonesExistingDefs.locator('button:has-text("Delete")')
 
@@ -141,7 +143,7 @@ export class AthletePage extends BasePage {
     this.savingIndicator = page.locator('text=Saving…')
 
     // loading and error states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.errorMessage = page.locator('text=Failed to load')
   }
 
@@ -202,8 +204,7 @@ export class AthletePage extends BasePage {
   // check if athlete avatar is visible
   async hasAthleteAvatar(): Promise<boolean> {
     try {
-      const img = this.athleteInfoCard.locator('img').first()
-      return await img.isVisible()
+      return await this.athleteAvatar.isVisible()
     } catch {
       return false
     }

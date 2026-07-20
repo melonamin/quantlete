@@ -70,9 +70,12 @@ export class SegmentsPage extends BasePage {
 
     // search input
     this.searchInput = page.locator('input[placeholder*="Search segments"]')
-    this.searchClearButton = this.searchInput.locator('..').locator('button').filter({
-      has: page.locator('svg'),
-    })
+    this.searchClearButton = this.searchInput
+      .locator('..')
+      .locator('button')
+      .filter({
+        has: page.locator('svg'),
+      })
 
     // sport type quick filters (in toggle group)
     this.allSportToggle = page.locator('[role="group"] button').filter({ hasText: /^All$/ })
@@ -111,21 +114,21 @@ export class SegmentsPage extends BasePage {
     this.modalSubtitle = this.modal.locator('.text-sm.text-muted-foreground').first()
     this.modalCloseButton = this.modal.locator('button:has-text("Close")')
     this.modalStravaLink = this.modal.locator('a:has-text("View on Strava")')
-    this.modalRouteCard = this.modal.locator('[class*="card"]').filter({
+    this.modalRouteCard = this.modal.locator('[data-slot="card"]').filter({
       has: page.locator('text=Route'),
     })
     this.modalRouteMap = this.modalRouteCard.locator('.leaflet-container, [class*="map"]')
-    this.modalPrCard = this.modal.locator('[class*="card"]').filter({
+    this.modalPrCard = this.modal.locator('[data-slot="card"]').filter({
       has: page.locator('text=Best time progression'),
     })
     this.modalPrChart = this.modalPrCard.locator('canvas, svg').first()
-    this.modalEffortsCard = this.modal.locator('[class*="card"]').filter({
+    this.modalEffortsCard = this.modal.locator('[data-slot="card"]').filter({
       has: page.locator('text=Efforts'),
     })
     this.modalEffortsTable = this.modalEffortsCard.locator('table')
 
     // loading and empty states
-    this.loadingSkeletons = page.locator('[class*="skeleton"]')
+    this.loadingSkeletons = page.locator('[data-slot="skeleton"]')
     this.emptyState = page.locator('text=No segments found')
     this.errorMessage = page.locator('text=Failed to load segments')
   }
@@ -200,12 +203,13 @@ export class SegmentsPage extends BasePage {
 
   // check if sport filter is selected
   async isSportFilterSelected(filter: 'all' | 'ride' | 'run'): Promise<boolean> {
-    const button =
-      filter === 'all'
-        ? this.allSportToggle
-        : filter === 'ride'
-          ? this.rideSportToggle
-          : this.runSportToggle
+    if (filter === 'all') {
+      const rideState = await this.rideSportToggle.getAttribute('data-state')
+      const runState = await this.runSportToggle.getAttribute('data-state')
+      return rideState !== 'on' && runState !== 'on'
+    }
+
+    const button = filter === 'ride' ? this.rideSportToggle : this.runSportToggle
     const dataState = await button.getAttribute('data-state')
     return dataState === 'on'
   }
@@ -306,7 +310,9 @@ export class SegmentsPage extends BasePage {
       // wait for either a leaflet container or any map-like element
       await this.modalRouteCard.waitFor({ state: 'visible', timeout: 5000 })
       // check for any content in the route card
-      const hasContent = await this.modalRouteCard.locator('.leaflet-container, svg, canvas').count()
+      const hasContent = await this.modalRouteCard
+        .locator('.leaflet-container, svg, canvas')
+        .count()
       return hasContent > 0
     } catch {
       return false

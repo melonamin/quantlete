@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { BasePage } from './base.page'
 
 // page object for the power analytics page
@@ -41,13 +41,13 @@ export class PowerPage extends BasePage {
     this.backButton = page.locator('a:has-text("Back")')
 
     // all-time best card (first card with bar chart)
-    this.allTimeBestCard = page.locator('[class*="card"]').filter({
+    this.allTimeBestCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=All-time Best'),
     })
     this.allTimeBestChart = this.allTimeBestCard.locator('canvas, svg').first()
 
     // progression card (has duration selector)
-    this.progressionCard = page.locator('[class*="card"]').filter({
+    this.progressionCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Progression'),
     })
     this.progressionChart = this.progressionCard.locator('canvas, svg').first()
@@ -55,20 +55,20 @@ export class PowerPage extends BasePage {
     this.durationSelector = page.locator('[role="listbox"]')
 
     // power curve comparison card
-    this.powerCurveCard = page.locator('[class*="card"]').filter({
+    this.powerCurveCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Power Curve Comparison'),
     })
     this.powerCurveChart = this.powerCurveCard.locator('canvas, svg').first()
 
     // power zones card
-    this.powerZonesCard = page.locator('[class*="card"]').filter({
+    this.powerZonesCard = page.locator('[data-slot="card"]').filter({
       has: page.locator('text=Power Zones'),
     })
     this.powerZonesChart = this.powerZonesCard.locator('canvas, svg, [class*="zone"]').first()
     this.ftpDisplay = page.locator('text=/Based on FTP/')
 
     // loading and error states
-    this.loadingState = page.locator('[class*="animate-pulse"], [class*="skeleton"]').first()
+    this.loadingState = page.locator('[data-slot="skeleton"], [class*="animate-pulse"]').first()
     this.errorMessage = page.locator('text=Failed to load power stats')
   }
 
@@ -146,15 +146,18 @@ export class PowerPage extends BasePage {
       const text = await options.nth(i).textContent()
       if (text) values.push(text.trim())
     }
+
+    await this.page.keyboard.press('Escape')
+    await this.durationSelector.waitFor({ state: 'hidden', timeout: 5000 })
     return values
   }
 
   // select a duration from the dropdown
   async selectDuration(duration: string): Promise<void> {
     await this.openDurationSelector()
-    await this.page.locator(`[role="option"]:has-text("${duration}")`).click()
+    await this.page.getByRole('option', { name: duration, exact: true }).click()
     await this.durationSelector.waitFor({ state: 'hidden', timeout: 5000 })
-    await this.page.waitForTimeout(500) // wait for chart to update
+    await expect(this.durationSelectorTrigger).toContainText(duration)
   }
 
   // get currently selected duration
