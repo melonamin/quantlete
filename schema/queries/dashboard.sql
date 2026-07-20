@@ -7,7 +7,7 @@ SELECT
     COALESCE(SUM(distance), 0) AS total_distance,
     COALESCE(SUM(moving_time), 0) AS total_time,
     COALESCE(SUM(total_elevation_gain), 0) AS total_elevation,
-    COALESCE(SUM(calories), 0) AS total_calories
+    CAST(COALESCE(SUM(calories), 0) AS INTEGER) AS total_calories
 FROM activities
 WHERE athlete_id = ?1;
 

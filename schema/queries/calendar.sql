@@ -7,7 +7,7 @@ SELECT
     activity_count,
     total_distance,
     total_time,
-    total_calories,
+    CAST(total_calories AS INTEGER) AS total_calories,
     total_intensity
 FROM v_calendar_days
 WHERE athlete_id = ?1
@@ -22,7 +22,7 @@ SELECT
     activity_count,
     total_distance,
     total_time,
-    total_calories,
+    CAST(total_calories AS INTEGER) AS total_calories,
     total_intensity
 FROM v_calendar_days
 WHERE athlete_id = ?1
@@ -54,7 +54,7 @@ SELECT
     COALESCE(SUM(distance), 0) AS total_distance,
     COALESCE(SUM(total_elevation_gain), 0) AS total_elevation,
     COALESCE(SUM(moving_time), 0) AS total_time,
-    COALESCE(SUM(calories), 0) AS total_calories,
+    CAST(COALESCE(SUM(calories), 0) AS INTEGER) AS total_calories,
     COALESCE(SUM(CASE WHEN workout_type IS NOT NULL AND workout_type != 0 THEN 1 ELSE 0 END), 0) AS workout_count
 FROM activities
 WHERE athlete_id = ?1
