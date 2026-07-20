@@ -94,12 +94,11 @@ func TestScheduler_ClearJobs(t *testing.T) {
 
 	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
-	ctx := context.Background()
-
-	// Start the scheduler
-	if err := sched.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
+	// Run against a real cron without Start's reconcile loop: with no athlete
+	// connected the loop clears jobs, racing entry-identity assertions.
+	sched.cron = newCronRunner(logger)
+	sched.cron.Start()
+	t.Cleanup(func() { sched.cron.Stop() })
 
 	// Manually add a job for testing
 	sched.mu.Lock()
@@ -126,11 +125,6 @@ func TestScheduler_ClearJobs(t *testing.T) {
 	if lastConfig != nil {
 		t.Error("lastConfig should be nil after clearJobs")
 	}
-
-	// Cleanup
-	stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	_ = sched.Stop(stopCtx)
 }
 
 func TestScheduler_SetJobLocked(t *testing.T) {
@@ -138,17 +132,11 @@ func TestScheduler_SetJobLocked(t *testing.T) {
 
 	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
-	ctx := context.Background()
-
-	if err := sched.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-
-	defer func() {
-		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		_ = sched.Stop(stopCtx)
-	}()
+	// Run against a real cron without Start's reconcile loop: with no athlete
+	// connected the loop clears jobs, racing entry-identity assertions.
+	sched.cron = newCronRunner(logger)
+	sched.cron.Start()
+	t.Cleanup(func() { sched.cron.Stop() })
 
 	tests := []struct {
 		name      string
@@ -207,17 +195,11 @@ func TestScheduler_ConfigurePullSyncLocked(t *testing.T) {
 
 	sched := New(logger, nil, nil, nil, nil, nil, nil)
 
-	ctx := context.Background()
-
-	if err := sched.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-
-	defer func() {
-		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		_ = sched.Stop(stopCtx)
-	}()
+	// Run against a real cron without Start's reconcile loop: with no athlete
+	// connected the loop clears jobs, racing entry-identity assertions.
+	sched.cron = newCronRunner(logger)
+	sched.cron.Start()
+	t.Cleanup(func() { sched.cron.Stop() })
 
 	tests := []struct {
 		name      string
@@ -272,15 +254,11 @@ func TestScheduler_ApplyConfig_NoChurn(t *testing.T) {
 
 	ctx := context.Background()
 
-	if err := sched.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-
-	defer func() {
-		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		_ = sched.Stop(stopCtx)
-	}()
+	// Run against a real cron without Start's reconcile loop: with no athlete
+	// connected the loop clears jobs, racing entry-identity assertions.
+	sched.cron = newCronRunner(logger)
+	sched.cron.Start()
+	t.Cleanup(func() { sched.cron.Stop() })
 
 	settings := &storage.AthleteSettings{
 		Scheduler: storage.SchedulerSettings{
