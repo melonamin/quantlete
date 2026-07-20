@@ -75,8 +75,11 @@ export class CalendarPage extends BasePage {
     this.dayModalTotalsCard = this.dayModal.locator('[data-slot="card"]').filter({
       hasText: 'Totals',
     })
+    // Filter on the card title, not card text: on multi-activity days the
+    // Totals card also contains an "Activities" count row, and the substring
+    // match becomes a strict-mode violation.
     this.dayModalActivitiesCard = this.dayModal.locator('[data-slot="card"]').filter({
-      hasText: 'Activities',
+      has: page.locator('[data-slot="card-title"]', { hasText: 'Activities' }),
     })
   }
 
@@ -91,9 +94,12 @@ export class CalendarPage extends BasePage {
   // wait for calendar to be loaded
   async waitForCalendarLoad(): Promise<void> {
     // wait for loading skeleton to disappear
-    await this.calendarSkeleton.first().waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
-      // skeleton may not exist if data loads fast
-    })
+    await this.calendarSkeleton
+      .first()
+      .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {
+        // skeleton may not exist if data loads fast
+      })
     // wait for calendar grid to be visible
     await this.calendarGrid.waitFor({ state: 'visible', timeout: 10000 })
   }
