@@ -86,7 +86,7 @@ Findings come from the 2026-07-19 review; all file references below were re-veri
 - [x] ➕ fix 43 pre-existing lint issues in `scripts/*` surfaced by the `./...` widening (errcheck, gosec, gocritic, staticcheck, gofmt, unused, ineffassign) — CI lint job fails without this; 6 were in `internal/` (OAuth redirect leak, cookie Secure, multipart cap, path containment, importer ctx annotation) and shipped with tests
 - [x] ➕ first-run CI fixes: pin golangci-lint-action@v8 + linter v2.10.1 (v6/latest installs a Go 1.24-built v1.x that rejects go.mod 1.25.4); prettier --write 14 web files that never had `prettier --check` enforced (includes committed `*.gen.ts` — generators emitting non-prettier output is a latent issue for Task 12)
 - [x] ➕ fix production bug caught by CI's first E2E run: `SUM(calories)` (REAL) scanned into generated `int` — calendar range/summary + dashboard summary 500 on fractional totals. Fixed via `CAST(... AS INTEGER)` in `schema/queries/{calendar,dashboard}.sql` + regeneration + fractional-calories regression test. This is the Task 12 generator-inference flaw manifesting; Task 12 must make inference schema-aware
-- [ ] push a branch and verify every ci.yml job goes green before merging (PR #24 open; Go/Go WASM/Web/Build all green; E2E fix pushed, awaiting re-run)
+- [x] push a branch and verify every ci.yml job goes green before merging — ✅ 2026-07-20, run 29750087786: Go, Go WASM, Web, E2E (8m30s), WASM E2E (2m03s), Build Web, Build Binaries all pass on PR #24
 - [x] verify `just test`, `just lint` pass locally with the same package scope CI uses (Go tests PASS, vitest 38/38 PASS, lint pending the ➕ scripts fixes)
 
 ### Task 2: Diagnose and fix the Deploy Demo workflow
