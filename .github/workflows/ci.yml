@@ -46,7 +46,7 @@ jobs:
         with:
           # pinned to match the local toolchain (v6/latest resolves to a
           # Go 1.24-built v1.x that rejects go.mod's 1.25.4)
-          version: v2.10.1
+          version: v2.12.2
 
       - name: Check adapter parity
         run: go run ./scripts/check-adapter-parity
