@@ -186,11 +186,11 @@ Built first so Task 5's fix can be verified red → green.
 - Modify: `internal/api/handlers/webhooks.go`
 - Modify: `internal/api/handlers/webhooks_test.go`
 
-- [ ] for `create` events, pass `context.Background()` (not the 5-min-timeout ctx that `defer cancel()` kills as `processEvent` returns) to the async `Importer.Start`, matching `import.go:115`; keep bounded contexts for the synchronous `update`/`delete` paths — the audit must not blindly strip timeouts from sync work
-- [ ] refuse to process events when `WebhookSubscriptionID` is unconfigured (0): log and drop, never act on unverifiable events — closes the forged-delete hole
-- [ ] acquire the semaphore before spawning the per-event goroutine, but only after the 2xx response is written — a saturated semaphore must never delay Strava's delivery ack (Strava retries/drops subscriptions on slow endpoints)
-- [ ] write tests: create event starts an import that is not cancelled; events dropped when subscription ID unset; subscription ID mismatch rejected; delete only processed for verified subscription; handler responds 2xx promptly even when workers are saturated
-- [ ] run tests — must pass before next task
+- [x] for `create` events, pass `context.Background()` to the async `Importer.Start`; `update`/`delete` keep the bounded 5-min ctx; other `Importer.Start` call sites audited (already correct)
+- [x] refuse events when `WebhookSubscriptionID` is unconfigured: warn + 200-ack + drop (an error response would make Strava disable the subscription); mismatch still 403
+- [x] ack first, then non-blocking semaphore admission: only admitted events spawn goroutines; saturated events warn + drop (scheduled pull sync is the catch-up path) — no goroutine pileup, ack never delayed
+- [x] write tests: import context outlives handler; unconfigured-subscription drop; mismatch rejection; verified-delete; prompt 2xx under saturation — all race-enabled
+- [x] run tests — pass with -race, lint 0 issues
 
 ### Task 9: Fix SSE lifetime and rate-limit progress parity
 
