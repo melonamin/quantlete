@@ -18,6 +18,7 @@ const serverBaseURL = isInDocker
   ? `http://host.docker.internal:${e2ePort}`
   : `http://localhost:${e2ePort}`
 const wasmBaseURL = 'http://localhost:4174'
+const wasmPersistBaseURL = 'http://localhost:4175'
 
 // Playwright runs every configured project when --project is omitted. Only
 // expose the opt-in WASM project (and its static server) when it is requested,
@@ -64,21 +65,39 @@ export default defineConfig({
           {
             name: 'wasm',
             testDir: './tests/e2e/wasm',
+            testIgnore: 'persistence.spec.ts',
             use: {
               ...devices['Desktop Chrome'],
               baseURL: wasmBaseURL,
+            },
+          },
+          {
+            name: 'wasm-persist',
+            testDir: './tests/e2e/wasm',
+            testMatch: 'persistence.spec.ts',
+            use: {
+              ...devices['Desktop Chrome'],
+              baseURL: wasmPersistBaseURL,
             },
           },
         ]
       : []),
   ],
   webServer: wasmProjectRequested
-    ? {
-        command: 'npx vite preview --outDir dist-demo --host localhost --port 4174 --strictPort',
-        url: wasmBaseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
-      }
+    ? [
+        {
+          command: 'npx vite preview --outDir dist-demo --host localhost --port 4174 --strictPort',
+          url: wasmBaseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+        },
+        {
+          command: 'npx vite preview --outDir dist-wasm --host localhost --port 4175 --strictPort',
+          url: wasmPersistBaseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+        },
+      ]
     : undefined,
   // set timeout for each test
   timeout: Number(process.env.PLAYWRIGHT_TIMEOUT ?? 30_000),

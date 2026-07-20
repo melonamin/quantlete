@@ -143,13 +143,13 @@ Built first so Task 5's fix can be verified red → green.
 - Modify: `web/src/lib/data/wasm/go-provider.ts`
 - Create: `web/src/lib/wasm/db/sql-js.test.ts` (or extend existing)
 
-- [ ] mark the database dirty from the Go write path (hook the go-sqlite3-js bridge wiring in `go-storage.ts:172-186`, or make the 30s persist timer unconditional in `sql-js.ts:121-127`)
-- [ ] call `persistDatabase()` in `importCompleteCallback` (`go-provider.ts:~1869-1880`) and after every mutating `GoWasmProvider` method
-- [ ] add a `pagehide`/`visibilitychange` flush so tab close cannot lose in-memory writes
-- [ ] take a Web Lock (`navigator.locks`) around init and persist so concurrent tabs cannot interleave OPFS writes (lock-only scope; the second-tab read-only UX is deferred to a ➕ follow-up task — it implies UI states and its own E2E)
-- [ ] write unit tests: dirty-flag set on Go-path write, persist called on import complete, persist called on pagehide (success + failure paths)
-- [ ] remove the TODO from Task 4's persistence spec and verify it now passes; add it to the CI gate
-- [ ] run tests — must pass before next task
+- [x] mark the database dirty from the Go write path — Proxy bridge wrapping the sql.js Database handed to go-sqlite3-js: `Statement.run` and (conservatively) `Database.exec` mark dirty
+- [x] call `persistDatabase()` in `importCompleteCallback` (incl. failed imports with partial data) and after every mutating `GoWasmProvider` method via a `persistAfter` wrapper
+- [x] add a `pagehide`/`visibilitychange` flush (registered at init, cleaned up on provider dispose — disposal wired through the React data-provider lifecycle)
+- [x] take a Web Lock around init and persist (feature-detected; lock-only scope; second-tab UX still deferred). Persist clears `dirty` before the async save and restores it on failure so in-flight writes aren't lost
+- [x] write unit tests: 43 vitest cases across bridge dirtying, mutations, import completion, pagehide/disposal, lock scope
+- [x] remove the TODO from Task 4's persistence spec and verify it now passes — ➕ required splitting the harness: the demo build intentionally never persists, so a second `wasm-persist` Playwright project now serves the REAL WASM build (dist-wasm, port 4175, empty OPFS); the spec uses the settings unit toggle (only Go-write reachable pre-import, verified by live probe) → toggle, reload, survives. Passes; demonstrably failed pre-fix
+- [x] run tests — vitest 43 PASS, WASM projects 3 pass/1 fixme-skip, server suite re-run 266/266 (provider lifecycle shared with server mode)
 
 ### Task 6: Fix go-sqlite3-js float truncation
 

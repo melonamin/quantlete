@@ -164,10 +164,10 @@ _stub-web-assets:
         echo '<!doctype html><!-- placeholder for go:embed; the WASM tests use web/dist-demo -->' > web/dist/index.html
     fi
 
-# Run Playwright E2E tests against the static demo/WASM build
-# builds generators, demo database, Go WASM, and the demo web bundle first
-test-e2e-wasm: _stub-web-assets build-demo
-    cd web && WASM_E2E=1 npx playwright test --project=wasm
+# Run Playwright E2E tests against the static demo and real WASM builds
+# builds generators, demo database, Go WASM, and both web bundles first
+test-e2e-wasm: _stub-web-assets build-demo build-web-wasm
+    cd web && WASM_E2E=1 npx playwright test --project=wasm --project=wasm-persist
 
 # ============================================================================
 # Linting & Formatting

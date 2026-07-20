@@ -240,13 +240,17 @@ jobs:
         working-directory: web
         run: yarn build:demo
 
+      - name: Build WASM site
+        working-directory: web
+        run: yarn build:wasm
+
       - name: Install Playwright browsers
         working-directory: web
         run: npx playwright install chromium --with-deps
 
       - name: Run WASM E2E tests
         working-directory: web
-        run: npx playwright test --project=wasm
+        run: npx playwright test --project=wasm --project=wasm-persist
         env:
           CI: true
           WASM_E2E: "1"
