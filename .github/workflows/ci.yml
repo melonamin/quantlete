@@ -161,7 +161,9 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run E2E tests
-        timeout-minutes: 15
+        # 266 tests on a single worker (parallel workers share one server/DB
+        # and need the de-flake pass first); 15 min killed the suite mid-run
+        timeout-minutes: 30
         run: ./scripts/e2e-setup.sh bash -c 'cd web && npx playwright test'
         env:
           CI: true
