@@ -4,6 +4,7 @@ package pagination
 import (
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // Pagination defaults and limits.
@@ -93,7 +94,7 @@ const (
 // ParseOrderDir parses a direction string into an OrderDirection.
 // Returns OrderAsc for "asc" and OrderDesc for "desc" or unknown values.
 func ParseOrderDir(dir string) OrderDirection {
-	if dir == "asc" {
+	if strings.EqualFold(dir, "asc") {
 		return OrderAsc
 	}
 	return OrderDesc

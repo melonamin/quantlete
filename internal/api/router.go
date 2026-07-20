@@ -238,7 +238,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	maintenanceHandler := handlers.NewMaintenanceHandler(registry.MaintenanceService, stravaClient)
 	photosHandler := handlers.NewPhotosHandler(registry.PhotosService, stravaClient)
 	challengesHandler := handlers.NewChallengesHandler(registry.ChallengesService, stravaClient, cfg.Storage.DataDir)
-	exportHandler := handlers.NewExportHandler(registry.Activities(), stravaClient)
+	exportHandler := handlers.NewExportHandler(registry.ActivityService, stravaClient)
 	weatherHandler := handlers.NewWeatherHandler(weatherRepo, registry.Activities(), registry.Streams(), stravaClient, slog.Default())
 	setupHandler := handlers.NewSetupHandler(cfg, registry.AppState(), stravaClient)
 	badgesHandler := handlers.NewBadgesHandler(registry.Stats(), registry.Settings(), stravaClient)

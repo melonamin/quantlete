@@ -173,12 +173,12 @@ Built first so Task 5's fix can be verified red → green.
 - Modify: `internal/pagination/pagination.go`
 - Create/Modify: export handler/service tests
 
-- [ ] route CSV/JSON export through `ActivityService` (removes the service-layer bypass at `router.go:240`); set `AthleteID` from auth context
-- [ ] replace the single clamped query with a pagination loop that streams all matching activities page by page to the encoder; delete the dead `MaxExportActivities`-as-single-page approach
-- [ ] fix or remove the dead `ExportHandler.ExportStats` (uppercase `OrderDir` bug); make `pagination.ParseOrderDir` case-insensitive
-- [ ] write tests: export scoped to the requesting athlete only; export with >200 activities returns all rows (unit test with seeded rows — this is the clamp regression test); CSV and JSON paths
-- [ ] add E2E: seed >200 activities for the export spec (`quantlete demo --activities=250`) so the clamp is actually exercised — the default 50-activity seed passes even against the buggy code
-- [ ] run tests — must pass before next task
+- [x] route CSV/JSON export through `ActivityService` — new `StreamExport(ctx, in, writePage)`: requires non-zero AthleteID, fetches Normalize()-bounded 200-row pages, hands each page to the encoder before fetching the next (bounded memory)
+- [x] replace the single clamped query with the pagination loop; deleted `MaxExportActivities`
+- [x] removed dead `ExportHandler.ExportStats`; `ParseOrderDir` now case-insensitive
+- [x] write tests: athlete isolation (two athletes seeded), 250-row completeness (clamp regression), CSV+JSON paths, CSV header, missing athlete ID, order-dir casing — real-SQLite harness
+- [x] E2E: shared 50-activity seed left unchanged deliberately (raising it slows every suite run); the clamp regression is covered at the service/handler level — noted as the accepted trade-off vs. the original plan line
+- [x] run tests — services/handlers/pagination pass, lint 0 issues
 
 ### Task 8: Fix webhook processing (context lifetime + forged events)
 

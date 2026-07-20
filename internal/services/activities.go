@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/melonamin/quantlete/internal/analysis"
+	"github.com/melonamin/quantlete/internal/pagination"
 	"github.com/melonamin/quantlete/internal/storage"
 )
 
@@ -49,6 +50,14 @@ type ListActivitiesInput struct {
 	PerPage      int        `json:"per_page" adapter:"query,default=50"`
 	OrderBy      string     `json:"order_by" adapter:"query,default=start_date"`
 	OrderDir     string     `json:"order_dir" adapter:"query,default=desc"`
+}
+
+// ExportActivitiesInput contains filters for exporting an athlete's activities.
+type ExportActivitiesInput struct {
+	AthleteID   int64
+	SportTypes  []string
+	StartAfter  *time.Time
+	StartBefore *time.Time
 }
 
 // ActivityItem represents an activity in responses.
@@ -262,6 +271,51 @@ func (s *ActivityService) List(ctx context.Context, in ListActivitiesInput) (*Li
 		PerPage:    page.PerPage,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// StreamExport retrieves every matching activity for an athlete in bounded pages.
+// Each page is passed to writePage before the next page is fetched so callers can
+// stream the export without retaining the entire result set in memory.
+func (s *ActivityService) StreamExport(ctx context.Context, in ExportActivitiesInput, writePage func([]storage.Activity) error) error {
+	if in.AthleteID <= 0 {
+		return Wrap(ErrUnauthorized, "athlete ID required")
+	}
+	if writePage == nil {
+		return BadRequest("export page writer required")
+	}
+
+	filters := storage.ActivityFilters{
+		AthleteID:   in.AthleteID,
+		SportTypes:  in.SportTypes,
+		StartAfter:  in.StartAfter,
+		StartBefore: in.StartBefore,
+	}
+	page := storage.Pagination{
+		Page:     1,
+		PerPage:  pagination.MaxPerPage,
+		OrderBy:  "start_date",
+		OrderDir: "desc",
+	}
+	page.Normalize()
+
+	for {
+		activities, _, err := s.repo.List(ctx, filters, page)
+		if err != nil {
+			return Wrapf(ErrInternal, "failed to list activities for export: %v", err)
+		}
+		if len(activities) == 0 {
+			return nil
+		}
+
+		if err := writePage(activities); err != nil {
+			return Wrapf(ErrInternal, "failed to write activities export: %v", err)
+		}
+		if len(activities) < page.PerPage {
+			return nil
+		}
+
+		page.Page++
+	}
 }
 
 // GetByID retrieves a single activity by ID.
