@@ -568,7 +568,10 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
+  async getEddingtonHistory(
+    sportType?: string,
+    sportGroup?: string
+  ): Promise<EddingtonHistoryPoint[]> {
     this.assertInitialized()
     this.getAthleteId()
 

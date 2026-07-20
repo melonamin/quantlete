@@ -18,7 +18,7 @@ export interface Migration {
 export const migrations: Migration[] = [
   {
     version: 1,
-    name: "initial",
+    name: 'initial',
     sql: `-- Quantlete: Complete SQLite Schema
 -- Consolidated schema with all tables, views, and indexes
 
@@ -746,7 +746,7 @@ CREATE INDEX IF NOT EXISTS idx_gear_athlete_source
   },
   {
     version: 2,
-    name: "fix_timezone_views",
+    name: 'fix_timezone_views',
     sql: `-- Fix timezone handling: use start_date_local for activity grouping
 -- This ensures activities are grouped by their local calendar date, not UTC
 
@@ -841,7 +841,7 @@ GROUP BY athlete_id, DATE(start_date_local);
   },
   {
     version: 3,
-    name: "maintenance_log_unique",
+    name: 'maintenance_log_unique',
     sql: `-- Add unique constraint for maintenance_log to support ON CONFLICT clause
 -- This prevents duplicate maintenance entries for the same component at the same time
 
@@ -851,7 +851,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_log_component_completed
   },
   {
     version: 4,
-    name: "notification_history",
+    name: 'notification_history',
     sql: `-- Notification history table to track which achievements have been notified
 -- This prevents duplicate notifications when the same achievements are detected during re-import
 
@@ -874,7 +874,7 @@ CREATE INDEX IF NOT EXISTS idx_notification_history_athlete
   },
   {
     version: 5,
-    name: "zone_distribution",
+    name: 'zone_distribution',
     sql: `-- Activity zone distribution table to store HR zone time per activity
 -- Enables fast aggregation for zone trend charts without recalculating from HR streams
 
@@ -901,7 +901,7 @@ CREATE INDEX IF NOT EXISTS idx_zone_dist_zone_def ON activity_zone_distributions
   },
   {
     version: 6,
-    name: "calendar_intensity",
+    name: 'calendar_intensity',
     sql: `-- Add intensity metric to calendar view for heatmap coloring
 -- Uses suffer_score from activities (relative effort from Strava)
 
@@ -920,5 +920,5 @@ SELECT
 FROM activities
 GROUP BY athlete_id, DATE(start_date_local);
 `,
-  }
+  },
 ]

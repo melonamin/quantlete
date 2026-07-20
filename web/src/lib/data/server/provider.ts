@@ -240,7 +240,10 @@ export class ServerProvider implements DataProvider {
     return get<EddingtonResult>(`/stats/eddington${query}`)
   }
 
-  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
+  async getEddingtonHistory(
+    sportType?: string,
+    sportGroup?: string
+  ): Promise<EddingtonHistoryPoint[]> {
     const params = new URLSearchParams()
     if (sportType) params.set('sport_type', sportType)
     if (sportGroup) params.set('sport_group', sportGroup)

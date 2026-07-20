@@ -71,9 +71,7 @@ export function WeeklyTrends() {
     switch (metric) {
       case 'distance':
         // Value is already in display units (km or mi), convert back to meters for formatting
-        return formatDistance(
-          unitSystem === 'imperial' ? value * 1609.344 : value * 1000
-        )
+        return formatDistance(unitSystem === 'imperial' ? value * 1609.344 : value * 1000)
       case 'time':
         return formatDuration(value * 3600)
       case 'elevation':

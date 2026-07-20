@@ -8,8 +8,8 @@ import { useSettingsStore } from '@/stores/settings'
  */
 export function useEffectiveTheme(): 'dark' | 'light' {
   const theme = useSettingsStore((s) => s.theme)
-  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
-    window.matchMedia('(prefers-color-scheme: dark)').matches
+  const [systemPrefersDark, setSystemPrefersDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
   )
 
   useEffect(() => {

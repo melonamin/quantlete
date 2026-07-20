@@ -3055,4 +3055,3 @@ export interface HRZoneDefinition {
   method: string
   zones: unknown
 }
-

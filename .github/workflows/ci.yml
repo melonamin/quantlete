@@ -42,9 +42,11 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          # pinned to match the local toolchain (v6/latest resolves to a
+          # Go 1.24-built v1.x that rejects go.mod's 1.25.4)
+          version: v2.10.1
 
       - name: Check adapter parity
         run: go run ./scripts/check-adapter-parity

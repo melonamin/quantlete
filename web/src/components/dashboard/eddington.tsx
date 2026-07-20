@@ -24,7 +24,11 @@ const DEFAULT_DEFS = [
 export function EddingtonWidget() {
   const { data: settings } = useAppSettings()
   const { provider, initialized } = useDataProviderStatus()
-  const { data: compareData, isLoading: compareLoading, isError: compareError } = useEddingtonCompare()
+  const {
+    data: compareData,
+    isLoading: compareLoading,
+    isError: compareError,
+  } = useEddingtonCompare()
 
   // Get custom definitions that have custom sport types (not matching predefined groups)
   const customDefs = (
@@ -38,10 +42,12 @@ export function EddingtonWidget() {
     if (d.id === 'all') return false
     // Only show truly custom definitions (not the default rides/runs which are covered by compare)
     const isDefaultDef = DEFAULT_DEFS.some(
-      (def) => def.id === d.id ||
-      (def.sport_types && d.sport_types &&
-       def.sport_types.length === d.sport_types.length &&
-       def.sport_types.every((t) => d.sport_types?.includes(t)))
+      (def) =>
+        def.id === d.id ||
+        (def.sport_types &&
+          d.sport_types &&
+          def.sport_types.length === d.sport_types.length &&
+          def.sport_types.every((t) => d.sport_types?.includes(t)))
     )
     return !isDefaultDef
   })
@@ -102,9 +108,7 @@ export function EddingtonWidget() {
               className="flex items-center justify-between rounded-md border border-border px-3 py-2"
             >
               <div className="text-sm font-medium">{item.name}</div>
-              <div className="text-sm tabular-nums text-muted-foreground">
-                {item.number}
-              </div>
+              <div className="text-sm tabular-nums text-muted-foreground">{item.number}</div>
             </div>
           ))}
 

@@ -97,12 +97,7 @@ export function ActivityFiltersPanel({ filters, onFiltersChange, onReset }: Acti
     if (filters.max_duration_s === undefined && localMaxDuration !== '') {
       setLocalMaxDuration('')
     }
-  }, [
-    filters.min_duration_s,
-    filters.max_duration_s,
-    localMinDuration,
-    localMaxDuration,
-  ])
+  }, [filters.min_duration_s, filters.max_duration_s, localMinDuration, localMaxDuration])
 
   // Debounce search
   useEffect(() => {

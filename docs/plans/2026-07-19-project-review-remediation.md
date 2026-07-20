@@ -83,8 +83,9 @@ Findings come from the 2026-07-19 review; all file references below were re-veri
 - [x] widen the justfile `test-go`/`test-go-cover`/`lint-go` recipes from `./cmd/... ./internal/...` to `./...` so `scripts/*` (home of Task 12's generator tests) is covered locally; ci.yml already runs `./...`
 - [x] extract the E2E setup shared by CI and `just test-e2e` so the two harnesses stop drifting (CI runs Playwright natively, local runs via `docker-playwright.sh` — extraction, not forcing CI into Docker; shared script: `scripts/e2e-setup.sh`)
 - [x] ➕ stub `web/dist` in the ci.yml `go` job before build/test — root `embed.go` (`go:embed web/dist/*`) fails to compile on a fresh checkout without it (same failure class as the Deploy Demo breakage)
-- [x] ➕ fix 43 pre-existing lint issues in `scripts/*` surfaced by the `./...` widening (errcheck, gosec, gocritic, staticcheck, gofmt, unused, ineffassign) — CI lint job fails without this
-- [ ] push a branch and verify every ci.yml job goes green before merging
+- [x] ➕ fix 43 pre-existing lint issues in `scripts/*` surfaced by the `./...` widening (errcheck, gosec, gocritic, staticcheck, gofmt, unused, ineffassign) — CI lint job fails without this; 6 were in `internal/` (OAuth redirect leak, cookie Secure, multipart cap, path containment, importer ctx annotation) and shipped with tests
+- [x] ➕ first-run CI fixes: pin golangci-lint-action@v8 + linter v2.10.1 (v6/latest installs a Go 1.24-built v1.x that rejects go.mod 1.25.4); prettier --write 14 web files that never had `prettier --check` enforced (includes committed `*.gen.ts` — generators emitting non-prettier output is a latent issue for Task 12)
+- [ ] push a branch and verify every ci.yml job goes green before merging (PR #24 open; first run: Go WASM/Build Web pass, Go+Web fixed above, E2E pending re-run)
 - [x] verify `just test`, `just lint` pass locally with the same package scope CI uses (Go tests PASS, vitest 38/38 PASS, lint pending the ➕ scripts fixes)
 
 ### Task 2: Diagnose and fix the Deploy Demo workflow
@@ -92,11 +93,11 @@ Findings come from the 2026-07-19 review; all file references below were re-veri
 **Files:**
 - Modify: `.github/workflows/demo.yml` (and/or `deploy.yml` — determine from failure logs)
 
-- [ ] pull logs for the last failed runs (`gh run list --workflow=demo.yml`, `gh run view <id> --log-failed`) and identify the root cause
-- [ ] fix the workflow (or the deploy target config) accordingly
-- [ ] trigger a manual run and verify it succeeds end to end
-- [ ] verify demo.quantlete.fit serves the freshly deployed demo
-- [ ] add a failure notification (e.g. workflow failure → GitHub issue or email) so silent weekly failures cannot recur
+- [x] pull logs for the last failed runs and identify the root cause — "Generate demo database" compiles the root package via `go run ./cmd/quantlete`, but `embed.go` (`go:embed web/dist/*`) fails on a fresh checkout; every run since 2026-01-25 died there in ~40s. Bonus finding: GitHub auto-disabled the weekly cron after 60 days of repo inactivity (no runs since 2026-03-29)
+- [x] fix the workflow (or the deploy target config) accordingly — stub `web/dist` before the demo-DB step (deployed site builds to `dist-demo`, embed assets unused)
+- [ ] trigger a manual run and verify it succeeds end to end (after merge to master; also re-enable the auto-disabled schedule: `gh workflow enable demo.yml`)
+- [ ] verify demo.quantlete.fit serves the freshly deployed demo (post-merge)
+- [x] add a failure notification (e.g. workflow failure → GitHub issue or email) so silent weekly failures cannot recur — `if: failure()` step comments on/creates a "Deploy Demo workflow failed" issue with minimal `issues: write` permission
 
 ### Task 3: Working-tree hygiene and TODO refresh
 
