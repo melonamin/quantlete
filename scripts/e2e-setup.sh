@@ -30,19 +30,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# port is overridable so local runs don't collide with a developer's own
+# server instance on 8081 (CI uses the default)
+E2E_PORT="${E2E_PORT:-8081}"
+
 echo "Generating demo database..."
 QUANTLETE_STORAGE_DATA_DIR="${TEST_DATA_DIR}" QUANTLETE_STORAGE_DB_FILE=test.db \
   ./bin/quantlete demo --activities=50 --months=6 --athlete="E2E Test User"
 
-echo "Starting Go server..."
+echo "Starting Go server on port ${E2E_PORT}..."
 QUANTLETE_STORAGE_DATA_DIR="${TEST_DATA_DIR}" QUANTLETE_STORAGE_DB_FILE=test.db \
-QUANTLETE_SERVER_PORT=8081 QUANTLETE_SERVER_DEV_MODE=true \
+QUANTLETE_SERVER_PORT="${E2E_PORT}" QUANTLETE_SERVER_DEV_MODE=true \
   ./bin/quantlete serve &
 SERVER_PID=$!
 
 echo "Waiting for server..."
 for attempt in {1..30}; do
-  if curl --fail --silent http://localhost:8081/api/v1/auth/status >/dev/null 2>&1; then
+  if curl --fail --silent "http://localhost:${E2E_PORT}/api/v1/auth/status" >/dev/null 2>&1; then
     echo "Server ready"
     break
   fi

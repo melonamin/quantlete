@@ -126,12 +126,14 @@ Built first so Task 5's fix can be verified red → green.
 - Create: `web/tests/e2e/wasm/` (specs + fixtures)
 - Modify: `web/playwright.config.ts`, `justfile`, `.github/workflows/ci.yml`
 
-- [ ] add a Playwright project that serves the WASM build (demo DB seed) — Chromium only (OPFS support)
-- [ ] smoke specs: app boots, dashboard renders, activities list renders
-- [ ] persistence spec: perform a mutation (e.g. dashboard config change), reload the page, assert it survived — written now, expected to FAIL until Task 5 lands; mark with a TODO referencing Task 5 and exclude from the CI gate until then
-- [ ] float-value spec: assert a known non-integral value from the demo seed (e.g. `average_speed`) renders with its fractional part — expected to FAIL until Task 6; same TODO treatment
-- [ ] wire into `justfile` (`test-e2e-wasm`) and add to ci.yml
-- [ ] run the smoke specs — must pass (persistence/float specs red-by-design) before next task
+- [x] add a Playwright project that serves the WASM build (demo DB seed) — Chromium only (OPFS support); keyed on `WASM_E2E=1` env (argv sniffing breaks in Playwright worker processes)
+- [x] smoke specs: app boots, dashboard renders, activities list renders
+- [x] persistence spec: dashboard widget toggle → reload → assert survival — complete test, `test.fixme()` with TODO(Task 5)
+- [x] float-value spec: non-integral value assertion — `test.fixme()` with TODO(Task 6)
+- [x] wire into `justfile` (`test-e2e-wasm`) and add to ci.yml (`wasm-e2e` job)
+- [x] run the smoke specs — 2 passed, 2 fixme-skipped as designed
+- [x] ➕ repair the stale server-mode E2E suite (found when CI first ran it): 93/266 failing from UI drift since January — `[class*="card"]` ambiguous vs shadcn data-slots (63 uses), badges navigating the backend `/badges` route, badge/filter class-token false positives, power dropdown left open, demo-mode import controls. Two Codex rounds + DOM-snapshot evidence → 266/266 pass, 0 flaky locally
+- [x] ➕ make E2E server port configurable (`E2E_PORT`, default 8081) so local runs don't collide with a developer's live instance
 
 ### Task 5: WASM persistence — Go writes must reach OPFS
 

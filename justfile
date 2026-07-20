@@ -155,6 +155,20 @@ test-e2e: generate-sql generate-adapters generate-wasm-registration
 
     echo "E2E tests completed successfully"
 
+# Create the placeholder required when Go compiles from a clean checkout.
+_stub-web-assets:
+    #!/usr/bin/env bash
+    set -e
+    if [ ! -f web/dist/index.html ]; then
+        mkdir -p web/dist
+        echo '<!doctype html><!-- placeholder for go:embed; the WASM tests use web/dist-demo -->' > web/dist/index.html
+    fi
+
+# Run Playwright E2E tests against the static demo/WASM build
+# builds generators, demo database, Go WASM, and the demo web bundle first
+test-e2e-wasm: _stub-web-assets build-demo
+    cd web && WASM_E2E=1 npx playwright test --project=wasm
+
 # ============================================================================
 # Linting & Formatting
 # ============================================================================

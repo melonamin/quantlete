@@ -11,9 +11,21 @@ const parsedWorkersOverride = workersOverride
 // in Docker, use host.docker.internal to reach host machine services
 // E2E_IN_DOCKER is explicitly set by docker-playwright.sh
 const isInDocker = process.env.E2E_IN_DOCKER === 'true'
-const baseURL = isInDocker
-  ? 'http://host.docker.internal:8081'
-  : 'http://localhost:8081'
+// E2E_PORT must match scripts/e2e-setup.sh (overridable so local runs can
+// avoid a developer's own server on 8081)
+const e2ePort = process.env.E2E_PORT ?? '8081'
+const serverBaseURL = isInDocker
+  ? `http://host.docker.internal:${e2ePort}`
+  : `http://localhost:${e2ePort}`
+const wasmBaseURL = 'http://localhost:4174'
+
+// Playwright runs every configured project when --project is omitted. Only
+// expose the opt-in WASM project (and its static server) when it is requested,
+// so the existing server-mode CI command keeps its current scope.
+// Keyed on an env var (not argv): worker processes re-evaluate this config
+// with different argv, and a project that exists only in the runner breaks
+// with "Project not found in the worker process".
+const wasmProjectRequested = process.env.WASM_E2E === '1'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -32,7 +44,7 @@ export default defineConfig({
     : [['list', { printSteps: true }]],
   // shared settings for all projects
   use: {
-    baseURL,
+    baseURL: serverBaseURL,
     // collect trace on first retry
     trace: 'on-first-retry',
     // take screenshot on failure
@@ -44,9 +56,30 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: '**/wasm/**',
       use: { ...devices['Desktop Chrome'] },
     },
+    ...(wasmProjectRequested
+      ? [
+          {
+            name: 'wasm',
+            testDir: './tests/e2e/wasm',
+            use: {
+              ...devices['Desktop Chrome'],
+              baseURL: wasmBaseURL,
+            },
+          },
+        ]
+      : []),
   ],
+  webServer: wasmProjectRequested
+    ? {
+        command: 'npx vite preview --outDir dist-demo --host localhost --port 4174 --strictPort',
+        url: wasmBaseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      }
+    : undefined,
   // set timeout for each test
   timeout: Number(process.env.PLAYWRIGHT_TIMEOUT ?? 30_000),
   // expect timeout
