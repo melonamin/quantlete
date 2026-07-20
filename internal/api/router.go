@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -482,9 +483,18 @@ func (r *Router) serveDataFile(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Construct the full file path
-	filePath := filepath.Join(r.cfg.Storage.DataDir, urlPath)
+	dataDir, err := filepath.Abs(r.cfg.Storage.DataDir)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	dataDir = filepath.Clean(dataDir)
+	cleaned := filepath.Clean(filepath.Join(dataDir, urlPath))
+	if !strings.HasPrefix(cleaned, dataDir+string(os.PathSeparator)) {
+		http.NotFound(w, req)
+		return
+	}
 
 	// Serve the file
-	http.ServeFile(w, req, filePath)
+	http.ServeFile(w, req, cleaned)
 }

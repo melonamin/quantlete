@@ -65,6 +65,8 @@ type importResponse struct {
 	Imported int `json:"imported"`
 }
 
+const challengeImportBodyLimit int64 = 32 << 20
+
 // Import handles POST /api/v1/challenges/import
 // Supports multipart HTML upload (field: file) and JSON body with { "html": "..." }.
 func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +79,8 @@ func (h *ChallengesHandler) Import(w http.ResponseWriter, r *http.Request) {
 	var htmlBytes []byte
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "multipart/form-data") {
-		if err := r.ParseMultipartForm(32 << 20); err != nil {
+		r.Body = http.MaxBytesReader(w, r.Body, challengeImportBodyLimit)
+		if err := r.ParseMultipartForm(challengeImportBodyLimit); err != nil {
 			shared.WriteJSONResponse(w, http.StatusBadRequest, shared.ErrorMessage("invalid multipart form"))
 			return
 		}

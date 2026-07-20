@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -16,11 +15,6 @@ import (
 	"github.com/melonamin/quantlete/internal/storage"
 	"github.com/melonamin/quantlete/internal/strava"
 )
-
-// urlEncode encodes a string for safe use in URL query parameters.
-func urlEncode(s string) string {
-	return url.QueryEscape(s)
-}
 
 // encodeJSON encodes data as JSON and logs any encoding errors.
 func encodeJSON(w http.ResponseWriter, data any) {
@@ -149,8 +143,8 @@ func (h *AuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	token, athlete, err := h.strava.ExchangeCode(r.Context(), code)
 	if err != nil {
 		slog.Error("failed to exchange code", "error", err)
-		// Redirect to frontend with error message for better UX
-		errorRedirect := "/settings?auth_error=" + urlEncode(err.Error())
+		// Redirect to frontend - in dev mode redirect to Vite dev server
+		errorRedirect := "/oauth/callback?error=token_exchange_failed"
 		if h.cfg.Server.DevMode {
 			errorRedirect = "http://localhost:5173" + errorRedirect
 		}
@@ -297,30 +291,32 @@ func generateStateToken() (string, error) {
 }
 
 func (h *AuthHandler) setStateCookie(w http.ResponseWriter, r *http.Request, state string) {
-	secure := !h.cfg.Server.DevMode && r.TLS != nil
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is request-derived so plain-HTTP LAN deployments remain supported
 		Name:     oauthStateCookieName,
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   isRequestSecure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(oauthStateTTL.Seconds()),
 	})
 }
 
 func (h *AuthHandler) clearStateCookie(w http.ResponseWriter, r *http.Request) {
-	secure := !h.cfg.Server.DevMode && r.TLS != nil
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure is request-derived so plain-HTTP LAN deployments remain supported
 		Name:     oauthStateCookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   isRequestSecure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
 	})
+}
+
+func isRequestSecure(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 func cookieValueOrEmpty(c *http.Cookie) string {
