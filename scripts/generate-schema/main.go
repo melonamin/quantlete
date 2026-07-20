@@ -136,9 +136,9 @@ export const migrations: Migration[] = [
 			sb.WriteString(",\n")
 		}
 		sb.WriteString("  {\n")
-		sb.WriteString(fmt.Sprintf("    version: %d,\n", m.Version))
-		sb.WriteString(fmt.Sprintf("    name: %q,\n", m.Name))
-		sb.WriteString(fmt.Sprintf("    sql: `%s`,\n", escapeForTS(m.SQL)))
+		fmt.Fprintf(&sb, "    version: %d,\n", m.Version)
+		fmt.Fprintf(&sb, "    name: %q,\n", m.Name)
+		fmt.Fprintf(&sb, "    sql: `%s`,\n", escapeForTS(m.SQL))
 		sb.WriteString("  }")
 	}
 

@@ -667,7 +667,7 @@ func toPascalCase(s string) string {
 	var result []string
 
 	for _, p := range parts {
-		if len(p) == 0 {
+		if p == "" {
 			continue
 		}
 
@@ -693,7 +693,7 @@ func toPascalCase(s string) string {
 		}
 
 		for _, word := range words {
-			if len(word) > 0 {
+			if word != "" {
 				upperWord := strings.ToUpper(word)
 				if upperWord == "ID" || upperWord == "URL" || upperWord == "API" || upperWord == "HR" {
 					result = append(result, upperWord)
@@ -814,14 +814,14 @@ func generateTypeScript(structs []GoStruct, output string, ctx *ParserContext) e
 		fileStructs := fileGroups[fileName]
 
 		buf.WriteString("// ============================================================================\n")
-		buf.WriteString(fmt.Sprintf("// From %s\n", fileName))
+		fmt.Fprintf(&buf, "// From %s\n", fileName)
 		buf.WriteString("// ============================================================================\n\n")
 
 		for _, s := range fileStructs {
 			if s.Comment != "" {
-				buf.WriteString(fmt.Sprintf("/** %s */\n", s.Comment))
+				fmt.Fprintf(&buf, "/** %s */\n", s.Comment)
 			}
-			buf.WriteString(fmt.Sprintf("export interface %s {\n", s.Name))
+			fmt.Fprintf(&buf, "export interface %s {\n", s.Name)
 
 			for _, f := range s.Fields {
 				tsType := goTypeToTS(f.GoType, ctx)
@@ -833,16 +833,16 @@ func generateTypeScript(structs []GoStruct, output string, ctx *ParserContext) e
 				if needsQuoting(fieldName) {
 					fieldName = fmt.Sprintf("'%s'", fieldName)
 				}
-				buf.WriteString(fmt.Sprintf("  %s%s: %s\n", fieldName, optionalMark, tsType))
+				fmt.Fprintf(&buf, "  %s%s: %s\n", fieldName, optionalMark, tsType)
 			}
 
 			buf.WriteString("}\n\n")
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec // G301: generated source directories should be traversable by all users.
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec
+	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec // G306: generated TypeScript source should be readable by all users.
 }

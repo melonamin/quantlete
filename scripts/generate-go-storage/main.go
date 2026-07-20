@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -112,11 +113,13 @@ var (
 )
 
 func parseWasmFunctions(wasmDir string) ([]WasmFunc, error) {
+	wasmFS := os.DirFS(wasmDir)
+
 	// First, try registration.gen.go, then fall back to main.go
-	registrations, err := parseRegistrations(filepath.Join(wasmDir, "registration.gen.go"))
+	registrations, err := parseRegistrations(wasmFS, "registration.gen.go")
 	if err != nil {
 		// Try main.go as fallback
-		registrations, err = parseRegistrations(filepath.Join(wasmDir, "main.go"))
+		registrations, err = parseRegistrations(wasmFS, "main.go")
 		if err != nil {
 			return nil, fmt.Errorf("parsing registrations: %w", err)
 		}
@@ -134,7 +137,7 @@ func parseWasmFunctions(wasmDir string) ([]WasmFunc, error) {
 			continue
 		}
 
-		details, err := parseFunctionDetails(filepath.Join(wasmDir, entry.Name()))
+		details, err := parseFunctionDetails(wasmFS, entry.Name())
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", entry.Name(), err)
 		}
@@ -169,15 +172,14 @@ func parseWasmFunctions(wasmDir string) ([]WasmFunc, error) {
 	return result, nil
 }
 
-func parseRegistrations(mainPath string) (map[string]string, error) {
-	file, err := os.Open(mainPath) //nolint:gosec
+func parseRegistrations(wasmFS fs.FS, name string) (map[string]string, error) {
+	content, err := fs.ReadFile(wasmFS, name)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
 
 	registrations := make(map[string]string)
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -191,9 +193,9 @@ func parseRegistrations(mainPath string) (map[string]string, error) {
 	return registrations, scanner.Err()
 }
 
-func parseFunctionDetails(filePath string) (map[string]WasmFunc, error) {
+func parseFunctionDetails(wasmFS fs.FS, name string) (map[string]WasmFunc, error) {
 	// Read entire file to allow look-ahead for function body analysis
-	content, err := os.ReadFile(filePath) //nolint:gosec
+	content, err := fs.ReadFile(wasmFS, name)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +248,6 @@ func parseFunctionDetails(filePath string) (map[string]WasmFunc, error) {
 			// Parse the collected comments
 			var comment string
 			var params []Param
-			returnType := "string" // Default
 
 			for _, cl := range commentLines {
 				cl = strings.TrimSpace(cl)
@@ -268,7 +269,7 @@ func parseFunctionDetails(filePath string) (map[string]WasmFunc, error) {
 			}
 
 			// Infer return type from function name
-			returnType = inferReturnType(goName)
+			returnType := inferReturnType(goName)
 
 			// Use wasmCategory if set, otherwise use currentCategory
 			category := currentCategory
@@ -540,12 +541,12 @@ export interface GoStorageInterface {
 
 	for _, cat := range categoryOrder {
 		fns := categories[cat]
-		buf.WriteString(fmt.Sprintf("\n  // %s\n", cat))
+		fmt.Fprintf(&buf, "\n  // %s\n", cat)
 
 		for _, f := range fns {
 			// Write JSDoc comment
 			if f.Comment != "" {
-				buf.WriteString(fmt.Sprintf("  /** %s */\n", f.Comment))
+				fmt.Fprintf(&buf, "  /** %s */\n", f.Comment)
 			}
 
 			// Write method signature
@@ -561,7 +562,7 @@ export interface GoStorageInterface {
 				paramStr += fmt.Sprintf("%s%s: %s", p.Name, optMarker, p.Type)
 			}
 
-			buf.WriteString(fmt.Sprintf("  %s(%s): %s\n", f.JSName, paramStr, f.ReturnType))
+			fmt.Fprintf(&buf, "  %s(%s): %s\n", f.JSName, paramStr, f.ReturnType)
 		}
 	}
 
@@ -577,11 +578,11 @@ export { goStorage }
 `)
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec // G301: generated source directories should be traversable by all users.
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec
+	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec // G306: generated TypeScript source should be readable by all users.
 }
 
 // generateWrappers creates TypeScript wrapper functions
@@ -711,9 +712,9 @@ export function callGoStorageVoid(
 `)
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil { //nolint:gosec // G301: generated source directories should be traversable by all users.
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec
+	return os.WriteFile(output, buf.Bytes(), 0o644) //nolint:gosec // G306: generated TypeScript source should be readable by all users.
 }

@@ -8,10 +8,12 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode"
@@ -138,18 +140,17 @@ var (
 )
 
 func parseQueryFile(path string) ([]Query, error) {
-	file, err := os.Open(path) //nolint:gosec // G304: input path is from controlled source
+	content, err := fs.ReadFile(os.DirFS(filepath.Dir(path)), filepath.Base(path))
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
 
 	var queries []Query
 	var current *Query
 	var sqlLines []string
 	var comments []string
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -231,9 +232,11 @@ func extractParams(sql string) []string {
 	}
 	// Sort numerically, not alphabetically (otherwise "10" < "2")
 	sort.Slice(params, func(i, j int) bool {
-		var a, b int
-		fmt.Sscanf(params[i], "%d", &a)
-		fmt.Sscanf(params[j], "%d", &b)
+		a, aErr := strconv.Atoi(params[i])
+		b, bErr := strconv.Atoi(params[j])
+		if aErr != nil || bErr != nil {
+			return params[i] < params[j]
+		}
 		return a < b
 	})
 	return params
@@ -320,7 +323,7 @@ func splitColumns(s string) []string {
 
 // parseColumn parses a single column expression.
 // fullSQL is passed for context (e.g., to detect gear table queries).
-func parseColumn(col string, fullSQL string) Column {
+func parseColumn(col, fullSQL string) Column {
 	col = strings.TrimSpace(col)
 
 	// Normalize whitespace (replace newlines and multiple spaces with single space)
@@ -784,7 +787,7 @@ func inferTypeFromColumnName(colName string) string {
 func toPascalCase(s string) string {
 	parts := strings.Split(s, "_")
 	for i, p := range parts {
-		if len(p) > 0 {
+		if p != "" {
 			// Handle common abbreviations
 			upper := strings.ToUpper(p)
 			if upper == "ID" || upper == "URL" || upper == "API" || upper == "SQL" ||

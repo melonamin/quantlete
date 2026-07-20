@@ -137,15 +137,15 @@ func generateTSConstants(values map[string]any, output string) error {
 		if arr, ok := value.([]any); ok {
 			ints, isInt := toIntSlice(arr)
 			if isInt {
-				buf.WriteString(fmt.Sprintf("export const %s = [%s] as const\n", key, joinIntSlice(ints)))
+				fmt.Fprintf(&buf, "export const %s = [%s] as const\n", key, joinIntSlice(ints))
 				continue
 			}
 			floats := toFloatSlice(arr)
-			buf.WriteString(fmt.Sprintf("export const %s = [%s] as const\n", key, joinFloatSlice(floats)))
+			fmt.Fprintf(&buf, "export const %s = [%s] as const\n", key, joinFloatSlice(floats))
 			continue
 		}
 		if num, ok := value.(float64); ok {
-			buf.WriteString(fmt.Sprintf("export const %s = %s\n", key, formatNumber(num)))
+			fmt.Fprintf(&buf, "export const %s = %s\n", key, formatNumber(num))
 			continue
 		}
 		return fmt.Errorf("unsupported constant type for %s", key)
