@@ -22,6 +22,7 @@ go.work.sum
 
 # Generated code (Go)
 *.gen.go
+*.unformatted
 # Note: *.gen.ts files are committed for IDE type support
 
 # IDE
@@ -100,8 +101,10 @@ algorithms/.yarn/*
 
 # ===== Landing =====
 landing/node_modules/
-quantlete
-wasm
+# root build binaries only — unanchored patterns would ignore new files
+# under cmd/quantlete/ and cmd/wasm/
+/quantlete
+/wasm
 
 # Git worktrees
 .worktrees/

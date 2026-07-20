@@ -108,12 +108,12 @@ Most root artifacts are already gitignored/untracked — this is local cleanup p
 - Untrack + delete (git-tracked): `internal/storage/queries.gen.go.unformatted`, `cmd/wasm/rewind_extract.txt`
 - Modify: `.gitignore`, `TODO.md`, `justfile`
 
-- [ ] delete the untracked stale artifacts and the cancelled-session plan
-- [ ] `git rm internal/storage/queries.gen.go.unformatted cmd/wasm/rewind_extract.txt`; add an ignore pattern for `*.unformatted`
-- [ ] point `just test-go-cover` output at `tmp/` (gitignored) instead of repo root
-- [ ] update `TODO.md` to reality: mark 13.3 Zone Trend done (merged via PR #8), 13.1 gear-price service layer done (frontend items remain), 13.2 insights done on master, check off the completed Documentation Milestones
-- [ ] verify `just build` still succeeds
-- [ ] run full test suite — must pass before Phase 1
+- [x] delete the untracked stale artifacts and the cancelled-session plan
+- [x] `git rm internal/storage/queries.gen.go.unformatted cmd/wasm/rewind_extract.txt`; add an ignore pattern for `*.unformatted`
+- [x] point `just test-go-cover` output at `tmp/` (gitignored) instead of repo root (+ `mkdir -p tmp` for fresh clones)
+- [x] update `TODO.md` to reality: 13.3 merged (PR #8), 13.1 backend AND most frontend done (verified against web/src — only `GearROISummary` remains), Documentation Milestones checked off where docs exist
+- [x] verify `just build` still succeeds (build-go verified)
+- [x] run full test suite — must pass before Phase 1 (Go ./... PASS, vitest PASS)
 
 ## Phase 1 — Data integrity
 

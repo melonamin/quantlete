@@ -133,8 +133,9 @@ test-go:
 
 # Run Go tests with coverage
 test-go-cover:
-    go test -v -coverprofile=coverage.out ./...
-    go tool cover -html=coverage.out -o coverage.html
+    @mkdir -p tmp
+    go test -v -coverprofile=tmp/coverage.out ./...
+    go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 
 # Run React unit tests
 test-web:

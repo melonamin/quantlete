@@ -17,7 +17,7 @@ This document tracks remaining implementation work. Completed phases (0-11) have
 
 | Branch | Feature | Status |
 | ------ | ------- | ------ |
-| `zone_trend_analysis` | Zone Trend Analysis (13.3) | Ready to merge |
+| `zone_trend_analysis` | Zone Trend Analysis (13.3) | Merged to master (PR #8) |
 | `insights_rule_engine` | Advanced Smart Coach rules | In progress |
 
 ---
@@ -46,15 +46,15 @@ Add UI to input gear purchase prices and display cost/km.
 **Database**: None (columns exist: `purchase_price`, `purchase_currency`)
 
 **Backend**:
-- [ ] Add `UpdateGearPrice` query to `schema/queries/gear.sql`
-- [ ] Add `UpdatePrice()` to `internal/storage/gear.go`
-- [ ] Add `UpdateGearPrice` service method to `internal/services/gear.go`
+- [x] Add `UpdateGearPrice` query to `schema/queries/gear.sql`
+- [x] Add `UpdatePrice()` to `internal/storage/gear.go`
+- [x] Add `UpdateGearPrice` service method to `internal/services/gear.go`
 
 **Frontend**:
-- [ ] Add `useUpdateGearPrice` mutation hook
-- [ ] Create `PriceEditModal` component in `web/src/pages/gear.tsx`
-- [ ] Add cost/km calculation and display to `GearCard`
-- [ ] Add "Edit Price" button for Strava gear
+- [x] Add `useUpdateGearPrice` mutation hook
+- [x] Create `PriceEditModal` component in `web/src/pages/gear.tsx`
+- [x] Add cost/km calculation and display to `GearCard`
+- [x] Add "Edit Price" button for Strava gear
 - [ ] Create `GearROISummary` component (total investment, avg cost/km)
 
 ### 13.2 Smart Coach Insights ✓
@@ -87,7 +87,7 @@ Rule-based text alerts from training data (TSB, streaks, CTL trends).
 
 Stacked area chart showing % training time in HR zones over 52 weeks.
 
-**Status**: Fully implemented in `zone_trend_analysis` branch. Needs merge to master.
+**Status**: Fully implemented and merged to master via PR #8 (`dbb24c9`).
 
 **Database**:
 - [x] Create migration `005_zone_distribution.sql`
@@ -237,9 +237,11 @@ Create `web/src/lib/geo/tiles.ts`:
 
 ## Documentation Milestones
 
-- [ ] README with quick start
-- [ ] Deployment guide (Docker, binary)
-- [ ] Configuration reference
+- [x] README with quick start
+- [x] Deployment guide (Docker, binary)
+- [x] Configuration reference
+- [x] CLI reference
+- [x] Testing guide
 - [ ] Development setup guide
 - [ ] API documentation
 - [ ] WASM mode documentation
