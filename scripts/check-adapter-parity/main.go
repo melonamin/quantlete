@@ -6,7 +6,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,13 +46,13 @@ func main() {
 	}
 
 	allowedWasmOnly := map[methodKey]bool{
-		{Service: "ActivityService", Method: "SaveActivity"}:        true,
-		{Service: "ActivityService", Method: "SaveStream"}:          true,
-		{Service: "GearService", Method: "SaveGear"}:                true,
-		{Service: "PhotosService", Method: "SavePhoto"}:             true,
-		{Service: "SegmentsService", Method: "SaveSegment"}:         true,
-		{Service: "SegmentsService", Method: "SaveSegmentEffort"}:   true,
-		{Service: "StatsService", Method: "SaveBestEfforts"}:        true,
+		{Service: "ActivityService", Method: "SaveActivity"}:      true,
+		{Service: "ActivityService", Method: "SaveStream"}:        true,
+		{Service: "GearService", Method: "SaveGear"}:              true,
+		{Service: "PhotosService", Method: "SavePhoto"}:           true,
+		{Service: "SegmentsService", Method: "SaveSegment"}:       true,
+		{Service: "SegmentsService", Method: "SaveSegmentEffort"}: true,
+		{Service: "StatsService", Method: "SaveBestEfforts"}:      true,
 	}
 	allowedHTTPOnly := map[methodKey]bool{}
 
@@ -131,14 +133,18 @@ func parseAdapters(servicesDir string) (map[methodKey]adapterFlags, error) {
 	}
 
 	methods := make(map[methodKey]adapterFlags)
+	servicesFS := os.DirFS(servicesDir)
 
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		filePath := filepath.Join(servicesDir, name)
-		if err := parseAdapterFile(filePath, methods); err != nil {
+		content, err := fs.ReadFile(servicesFS, name)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", name, err)
+		}
+		if err := parseAdapterFile(content, methods); err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", name, err)
 		}
 	}
@@ -146,17 +152,11 @@ func parseAdapters(servicesDir string) (map[methodKey]adapterFlags, error) {
 	return methods, nil
 }
 
-func parseAdapterFile(path string, methods map[methodKey]adapterFlags) error {
-	file, err := os.Open(path) //nolint:gosec
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
+func parseAdapterFile(content []byte, methods map[methodKey]adapterFlags) error {
 	var pendingWasm bool
 	var pendingHTTP bool
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if wasmRe.MatchString(line) {

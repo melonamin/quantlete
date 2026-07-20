@@ -84,8 +84,13 @@ func (h *StravaWebhookHandler) Receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate subscription ID if configured (recommended for production)
-	if h.cfg.Strava.WebhookSubscriptionID != 0 && e.SubscriptionID != h.cfg.Strava.WebhookSubscriptionID {
+	if h.cfg.Strava.WebhookSubscriptionID == 0 {
+		slog.Warn("webhook: subscription ID not configured; dropping event", "got", e.SubscriptionID)
+		writeJSON(w, http.StatusOK, map[string]bool{"received": true})
+		return
+	}
+
+	if e.SubscriptionID != h.cfg.Strava.WebhookSubscriptionID {
 		slog.Warn("webhook: subscription ID mismatch", "expected", h.cfg.Strava.WebhookSubscriptionID, "got", e.SubscriptionID)
 		shared.WriteJSONResponse(w, http.StatusForbidden, shared.ErrorMessage("invalid subscription"))
 		return
@@ -94,12 +99,18 @@ func (h *StravaWebhookHandler) Receive(w http.ResponseWriter, r *http.Request) {
 	// Acknowledge quickly; Strava expects a fast 2xx response.
 	writeJSON(w, http.StatusOK, map[string]bool{"received": true})
 
-	// Process asynchronously with bounded concurrency
-	go func() {
-		h.workerSem <- struct{}{}        // acquire
-		defer func() { <-h.workerSem }() // release
-		h.processEvent(e)
-	}()
+	// Admit work only when a worker is immediately available. This check happens
+	// after the acknowledgement and never blocks, so delivery responses stay fast
+	// without accumulating goroutines behind a saturated semaphore.
+	select {
+	case h.workerSem <- struct{}{}:
+		go func() {
+			defer func() { <-h.workerSem }()
+			h.processEvent(e)
+		}()
+	default:
+		slog.Warn("webhook: workers saturated; dropping event", "object_id", e.ObjectID, "aspect_type", e.AspectType)
+	}
 }
 
 func (h *StravaWebhookHandler) processEvent(e StravaWebhookEvent) {
@@ -140,8 +151,9 @@ func (h *StravaWebhookHandler) processEvent(e StravaWebhookEvent) {
 
 	switch e.AspectType {
 	case "create":
-		// Trigger an incremental sync (uses watermark).
-		if err := h.importer.Start(ctx, importer.ImportOptions{}); err != nil {
+		// Trigger an incremental sync (uses watermark). Importer.Start is
+		// asynchronous, so its context must outlive this event processor.
+		if err := h.importer.Start(context.Background(), importer.ImportOptions{}); err != nil {
 			slog.Info("webhook create: sync not started", "activity_id", e.ObjectID, "error", err)
 		}
 	case "update":

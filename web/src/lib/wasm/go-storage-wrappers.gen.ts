@@ -49,10 +49,7 @@ export function parseGoResult<T>(result: string, operation?: string): GoStorageR
  * Note: Go WASM wraps responses in {"ok": true, "data": <result>},
  * so we extract .data when present.
  */
-export function callGoStorage<T>(
-  fn: () => string,
-  operation: string
-): T {
+export function callGoStorage<T>(fn: () => string, operation: string): T {
   if (!initialized) {
     throw new Error('Go storage not initialized')
   }
@@ -71,10 +68,7 @@ export function callGoStorage<T>(
 /**
  * Helper for calling Go storage functions that return arrays in .data.
  */
-export function callGoStorageArray<T>(
-  fn: () => string,
-  operation: string
-): T[] {
+export function callGoStorageArray<T>(fn: () => string, operation: string): T[] {
   if (!initialized) {
     throw new Error('Go storage not initialized')
   }
@@ -105,10 +99,7 @@ export function callGoStorageValue<T extends number | string | boolean>(
 /**
  * Helper for calling Go storage functions that don't return data.
  */
-export function callGoStorageVoid(
-  fn: () => string,
-  operation: string
-): void {
+export function callGoStorageVoid(fn: () => string, operation: string): void {
   if (!initialized) {
     throw new Error('Go storage not initialized')
   }
@@ -117,4 +108,3 @@ export function callGoStorageVoid(
     throw new Error(result.error || `Failed to ${operation}`)
   }
 }
-

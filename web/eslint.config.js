@@ -27,4 +27,12 @@ export default defineConfig([
       ],
     },
   },
+  // disable react-hooks rules for playwright test files (use() is a playwright fixture function)
+  {
+    files: ['tests/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

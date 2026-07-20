@@ -84,6 +84,9 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
   })
 
   useEffect(() => {
+    let disposed = false
+    let providerToDispose: DataProvider | null = null
+
     async function initialize() {
       try {
         if (isDemoMode()) {
@@ -94,22 +97,39 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
             demoMode: true,
             demoDatabaseUrl: getDemoDbUrl(),
           })
+          providerToDispose = provider
           setState((s) => ({ ...s, loadingMessage: 'Initializing...' }))
           await provider.initialize()
+          if (disposed) {
+            provider.dispose()
+            return
+          }
           setState({ provider, initialized: true, error: null, loadingMessage: null })
         } else if (isWasmMode()) {
           // Lazy load Go WASM provider to avoid bundling in server mode
           const { GoWasmProvider } = await import('./wasm/go-provider')
           const provider = new GoWasmProvider()
+          providerToDispose = provider
           await provider.initialize()
+          if (disposed) {
+            provider.dispose()
+            return
+          }
           setState({ provider, initialized: true, error: null, loadingMessage: null })
         } else {
           // Server mode - use ServerProvider
           const { ServerProvider } = await import('./server/provider')
           const provider = new ServerProvider()
+          providerToDispose = provider
+          if (disposed) {
+            return
+          }
           setState({ provider, initialized: true, error: null, loadingMessage: null })
         }
       } catch (err) {
+        if (disposed) {
+          return
+        }
         console.error('[DataProvider] Failed to initialize:', err)
         setState({
           provider: null,
@@ -120,7 +140,12 @@ export function DataProviderWrapper({ children }: DataProviderWrapperProps) {
       }
     }
 
-    initialize()
+    void initialize()
+
+    return () => {
+      disposed = true
+      providerToDispose?.dispose?.()
+    }
   }, [])
 
   // Show loading screen for demo mode

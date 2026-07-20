@@ -73,9 +73,8 @@ export function EddingtonPage() {
   const def = defs.find((d) => d.id === effectiveDefId) ?? defs[0]
 
   // Determine sport type and sport group based on view mode
-  const sportType = viewMode === 'custom' && def?.sport_types?.length
-    ? def.sport_types.join(',')
-    : undefined
+  const sportType =
+    viewMode === 'custom' && def?.sport_types?.length ? def.sport_types.join(',') : undefined
   const sportGroup = viewMode === 'sport-group' ? selectedSportGroup : undefined
 
   const { data, isLoading, error } = useEddington(sportType, sportGroup)
@@ -239,7 +238,9 @@ function SportComparisonCard({
     <Card className="mb-6">
       <CardHeader>
         <CardTitle>Sport Comparison</CardTitle>
-        <CardDescription>Eddington numbers across sport groups (click to view details)</CardDescription>
+        <CardDescription>
+          Eddington numbers across sport groups (click to view details)
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">

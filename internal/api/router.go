@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -237,7 +238,7 @@ func NewRouter(cfg *config.Config, stravaClient *strava.Client, db *storage.DB, 
 	maintenanceHandler := handlers.NewMaintenanceHandler(registry.MaintenanceService, stravaClient)
 	photosHandler := handlers.NewPhotosHandler(registry.PhotosService, stravaClient)
 	challengesHandler := handlers.NewChallengesHandler(registry.ChallengesService, stravaClient, cfg.Storage.DataDir)
-	exportHandler := handlers.NewExportHandler(registry.Activities(), stravaClient)
+	exportHandler := handlers.NewExportHandler(registry.ActivityService, stravaClient)
 	weatherHandler := handlers.NewWeatherHandler(weatherRepo, registry.Activities(), registry.Streams(), stravaClient, slog.Default())
 	setupHandler := handlers.NewSetupHandler(cfg, registry.AppState(), stravaClient)
 	badgesHandler := handlers.NewBadgesHandler(registry.Stats(), registry.Settings(), stravaClient)
@@ -482,9 +483,18 @@ func (r *Router) serveDataFile(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Construct the full file path
-	filePath := filepath.Join(r.cfg.Storage.DataDir, urlPath)
+	dataDir, err := filepath.Abs(r.cfg.Storage.DataDir)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	dataDir = filepath.Clean(dataDir)
+	cleaned := filepath.Clean(filepath.Join(dataDir, urlPath))
+	if !strings.HasPrefix(cleaned, dataDir+string(os.PathSeparator)) {
+		http.NotFound(w, req)
+		return
+	}
 
 	// Serve the file
-	http.ServeFile(w, req, filePath)
+	http.ServeFile(w, req, cleaned)
 }

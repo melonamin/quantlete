@@ -11,14 +11,19 @@
  * Parse results with JSON.parse() and check for errors.
  */
 export interface GoStorageInterface {
-
   // Algorithms - Training Load
   /** Algorithm Functions - Training Load */
   calculateTrainingLoad(dailyTss: number[], ctlTau: number, atlTau: number): string
 
   // Other
   /** calculateTrainingLoadWithInitialFn calculates training load from existing CTL/ATL */
-  calculateTrainingLoadWithInitial(dailyTss: number[], initialCtl: number, initialAtl: number, ctlTau: number, atlTau: number): string
+  calculateTrainingLoadWithInitial(
+    dailyTss: number[],
+    initialCtl: number,
+    initialAtl: number,
+    ctlTau: number,
+    atlTau: number
+  ): string
   /** cancelImport cancels the currently running import. */
   cancelImport(): string
   /** clearImportState clears the saved import state. */
@@ -58,7 +63,13 @@ export interface GoStorageInterface {
   /** logMaintenance logs a maintenance event for a component */
   logMaintenance(logJSON: string): string
   /** predictAfterWorkoutFn calculates predicted TSB after a planned workout */
-  predictAfterWorkout(currentCtl: number, currentAtl: number, plannedTss: number, ctlTau: number, atlTau: number): string
+  predictAfterWorkout(
+    currentCtl: number,
+    currentAtl: number,
+    plannedTss: number,
+    ctlTau: number,
+    atlTau: number
+  ): string
   /** rollingMaxAverageFn finds the maximum rolling average over a given window */
   rollingMaxAverage(values: number[], windowSeconds: number): string
   /** saveStravaCredentials stores Strava API credentials */
@@ -68,7 +79,13 @@ export interface GoStorageInterface {
   /** trainingStressScoreFn calculates TSS */
   trainingStressScore(durationSeconds: number, np: number, ftp: number): string
   /** tssForTargetTsbFn calculates TSS needed to reach a target TSB */
-  tssForTargetTsb(currentCtl: number, currentAtl: number, targetTsb: number, ctlTau: number, atlTau: number): string
+  tssForTargetTsb(
+    currentCtl: number,
+    currentAtl: number,
+    targetTsb: number,
+    ctlTau: number,
+    atlTau: number
+  ): string
   /** updateAppSettings updates the athlete's app settings */
   updateAppSettings(settingsJSON: string): string
   /** updateCustomGear updates an existing custom gear item */

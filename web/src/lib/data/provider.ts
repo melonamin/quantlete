@@ -105,6 +105,9 @@ import type { SyncRun, SyncWatermark } from '@/lib/api/import'
 import type { DataEventListener } from './events'
 
 export interface DataProvider {
+  /** Release provider-specific browser resources when the provider is unmounted. */
+  dispose?(): void
+
   // ============================================================================
   // Auth
   // ============================================================================

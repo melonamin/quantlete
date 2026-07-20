@@ -129,20 +129,45 @@ test: test-go test-web
 
 # Run Go tests
 test-go:
-    go test -v ./cmd/... ./internal/...
+    go test -v ./...
 
 # Run Go tests with coverage
 test-go-cover:
-    go test -v -coverprofile=coverage.out ./cmd/... ./internal/...
-    go tool cover -html=coverage.out -o coverage.html
+    @mkdir -p tmp
+    go test -v -coverprofile=tmp/coverage.out ./...
+    go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 
 # Run React unit tests
 test-web:
     cd web && yarn test:unit
 
-# Run Playwright E2E tests
-test-e2e:
-    cd web && yarn test
+# Run Playwright E2E tests in Docker
+# seeds demo database, starts Go server, runs Playwright tests, cleans up
+test-e2e: generate-sql generate-adapters generate-wasm-registration
+    #!/usr/bin/env bash
+    set -e
+
+    # ensure we have a built web frontend for server mode
+    echo "Building web frontend..."
+    cd web && yarn build:server && cd ..
+
+    ./scripts/e2e-setup.sh ./docker-playwright.sh test
+
+    echo "E2E tests completed successfully"
+
+# Create the placeholder required when Go compiles from a clean checkout.
+_stub-web-assets:
+    #!/usr/bin/env bash
+    set -e
+    if [ ! -f web/dist/index.html ]; then
+        mkdir -p web/dist
+        echo '<!doctype html><!-- placeholder for go:embed; the WASM tests use web/dist-demo -->' > web/dist/index.html
+    fi
+
+# Run Playwright E2E tests against the static demo and real WASM builds
+# builds generators, demo database, Go WASM, and both web bundles first
+test-e2e-wasm: _stub-web-assets build-demo build-web-wasm
+    cd web && WASM_E2E=1 npx playwright test --project=wasm --project=wasm-persist
 
 # ============================================================================
 # Linting & Formatting
@@ -153,7 +178,7 @@ lint: lint-go lint-web
 
 # Lint Go code
 lint-go:
-    golangci-lint run ./cmd/... ./internal/...
+    golangci-lint run ./...
 
 # Lint React code
 lint-web:

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   go:
@@ -22,16 +22,31 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Generate Go code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
+
+      # embed.go requires web/dist to exist for any build of the root package;
+      # this job never builds the real web bundle, so stub it
+      - name: Stub web assets for go:embed
+        run: |
+          mkdir -p web/dist
+          echo '<!doctype html><!-- placeholder for go:embed; real assets are built in the web job -->' > web/dist/index.html
+
       - name: Build
-        run: CGO_ENABLED=1 go build -v ./...
+        run: go build -v ./...
 
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          # pinned to match the local toolchain (v6/latest resolves to a
+          # Go 1.24-built v1.x that rejects go.mod's 1.25.4)
+          version: v2.12.2
 
       - name: Check adapter parity
         run: go run ./scripts/check-adapter-parity
@@ -47,6 +62,12 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+
+      - name: Generate Go code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
 
       - name: Build WASM
         run: |
@@ -76,6 +97,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Unit tests
+        run: yarn test:unit
+
       - name: Typecheck
         run: yarn typecheck
 
@@ -93,4 +117,150 @@ jobs:
         with:
           name: web-dist
           path: web/dist/
+          retention-days: 7
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [go, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Generate Go code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Download web build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
+
+      - name: Install Playwright dependencies
+        working-directory: web
+        run: yarn install --immutable
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        # 266 tests on a single worker (parallel workers share one server/DB
+        # and need the de-flake pass first); 15 min killed the suite mid-run
+        timeout-minutes: 30
+        run: ./scripts/e2e-setup.sh bash -c 'cd web && npx playwright test'
+        env:
+          CI: true
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7
+
+  wasm-e2e:
+    name: WASM E2E Tests
+    runs-on: ubuntu-latest
+    needs: [go, web]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install web dependencies
+        working-directory: web
+        run: yarn install --immutable
+
+      - name: Generate code
+        run: |
+          go run ./scripts/generate-sql
+          go run ./scripts/generate-schema
+          go run ./scripts/generate-ts-types
+          go run ./scripts/generate-adapters
+          go run ./scripts/generate-wasm-registration
+          go run ./scripts/generate-go-storage
+
+      - name: Stub web assets for go:embed
+        run: |
+          mkdir -p web/dist
+          echo '<!doctype html><!-- placeholder for go:embed; the WASM tests use web/dist-demo -->' > web/dist/index.html
+
+      - name: Generate demo database
+        run: |
+          mkdir -p web/public/data
+          rm -f /tmp/demo.db
+          QUANTLETE_STORAGE_DATA_DIR=/tmp QUANTLETE_STORAGE_DB_FILE=demo.db \
+            go run ./cmd/quantlete demo --activities=274 --months=24 --athlete="Demo User"
+          cp /tmp/demo.db web/public/data/demo.db
+
+      - name: Build Go WASM
+        run: |
+          mkdir -p web/public/wasm
+          GOOS=js GOARCH=wasm go build -o web/public/wasm/quantlete.wasm ./cmd/wasm/
+          if [ -f "$(go env GOROOT)/lib/wasm/wasm_exec.js" ]; then
+            cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/public/wasm/
+          else
+            cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/public/wasm/
+          fi
+
+      - name: Build demo site
+        working-directory: web
+        run: yarn build:demo
+
+      - name: Build WASM site
+        working-directory: web
+        run: yarn build:wasm
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+
+      - name: Run WASM E2E tests
+        working-directory: web
+        run: npx playwright test --project=wasm --project=wasm-persist
+        env:
+          CI: true
+          WASM_E2E: "1"
+
+      - name: Upload WASM test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-wasm-report
+          path: |
+            web/playwright-report/
+            web/test-results/
           retention-days: 7

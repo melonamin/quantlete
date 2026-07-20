@@ -87,6 +87,22 @@ func New(
 	}
 }
 
+// newCronRunner builds the cron instance used by Start. Kept separate so tests
+// can run scheduler config logic against a real cron without the reconcile
+// loop that Start spawns (the loop clears jobs when no athlete is connected,
+// racing any test that asserts on entry identity).
+func newCronRunner(logger *slog.Logger) *cron.Cron {
+	parser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	return cron.New(
+		cron.WithParser(parser),
+		cron.WithLogger(slogCronLogger{logger: logger}),
+		cron.WithChain(
+			cron.SkipIfStillRunning(cron.DiscardLogger),
+			cron.Recover(cron.DiscardLogger),
+		),
+	)
+}
+
 func (s *Scheduler) Start(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -95,15 +111,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return nil
 	}
 
-	parser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
-	s.cron = cron.New(
-		cron.WithParser(parser),
-		cron.WithLogger(slogCronLogger{logger: s.logger}),
-		cron.WithChain(
-			cron.SkipIfStillRunning(cron.DiscardLogger),
-			cron.Recover(cron.DiscardLogger),
-		),
-	)
+	s.cron = newCronRunner(s.logger)
 	s.cron.Start()
 
 	loopCtx, cancel := context.WithCancel(ctx)

@@ -13,6 +13,7 @@
 
 - Reference
   - [Calculations](calculations.md)
+  - [Testing](testing.md)
 
 - CLI Reference
   - [Overview](cli/README.md)

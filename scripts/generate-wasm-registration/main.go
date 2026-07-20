@@ -22,6 +22,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -106,6 +107,7 @@ func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
 
 	// Use map to deduplicate: generated adapters override manual implementations
 	funcMap := make(map[string]WasmFunc)
+	wasmFS := os.DirFS(wasmDir)
 
 	// First pass: parse manual files (non-generated)
 	for _, entry := range entries {
@@ -114,7 +116,7 @@ func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
 			continue
 		}
 
-		fileFuncs, err := parseFile(filepath.Join(wasmDir, name))
+		fileFuncs, err := parseFile(wasmFS, name)
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", name, err)
 		}
@@ -124,9 +126,8 @@ func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
 	}
 
 	// Second pass: parse adapters.gen.go (these override manual implementations)
-	adaptersPath := filepath.Join(wasmDir, "adapters.gen.go")
-	if _, err := os.Stat(adaptersPath); err == nil {
-		adapterFuncs, err := parseFile(adaptersPath)
+	if _, err := fs.Stat(wasmFS, "adapters.gen.go"); err == nil {
+		adapterFuncs, err := parseFile(wasmFS, "adapters.gen.go")
 		if err != nil {
 			return nil, fmt.Errorf("parsing adapters.gen.go: %w", err)
 		}
@@ -144,19 +145,18 @@ func parseExportedFunctions(wasmDir string) ([]WasmFunc, error) {
 	return funcs, nil
 }
 
-func parseFile(filePath string) ([]WasmFunc, error) {
-	file, err := os.Open(filePath) //nolint:gosec
+func parseFile(wasmFS fs.FS, name string) ([]WasmFunc, error) {
+	content, err := fs.ReadFile(wasmFS, name)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
 
 	var funcs []WasmFunc
-	var pendingExport string     // JS name from //wasm:export
-	var currentCategory string   // Current category from //wasm:category
+	var pendingExport string   // JS name from //wasm:export
+	var currentCategory string // Current category from //wasm:category
 	var hasExport bool
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
@@ -258,9 +258,9 @@ var wasmFunctions = map[string]interface{}{
 `)
 
 	for _, cat := range categories {
-		buf.WriteString(fmt.Sprintf("\t// %s\n", cat))
+		fmt.Fprintf(&buf, "\t// %s\n", cat)
 		for _, f := range byCategory[cat] {
-			buf.WriteString(fmt.Sprintf("\t%q: js.FuncOf(%s),\n", f.JSName, f.GoName))
+			fmt.Fprintf(&buf, "\t%q: js.FuncOf(%s),\n", f.JSName, f.GoName)
 		}
 		buf.WriteString("\n")
 	}
@@ -273,5 +273,5 @@ func RegisterAll() {
 }
 `)
 
-	return os.WriteFile(outputPath, buf.Bytes(), 0o644)
+	return os.WriteFile(outputPath, buf.Bytes(), 0o644) //nolint:gosec // G306: generated Go source should be readable by all users.
 }

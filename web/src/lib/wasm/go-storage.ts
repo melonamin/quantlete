@@ -12,6 +12,7 @@
 
 import { initializeDatabase, getDatabase, type WasmDatabaseOptions } from './db'
 import { stravaFetch } from './strava'
+import type { Database } from 'sql.js'
 import type { GoStorageInterface } from './go-storage.gen'
 import {
   setInitialized as setWrappersInitialized,
@@ -113,6 +114,74 @@ declare global {
 
 let initialized = false
 
+type Callable = (...args: unknown[]) => unknown
+
+function bindMethod(target: object, property: string | symbol): Callable | undefined {
+  const method = Reflect.get(target, property, target)
+  if (typeof method !== 'function') {
+    return undefined
+  }
+  return (...args: unknown[]) => Reflect.apply(method, target, args)
+}
+
+function wrapStatementForGo(statement: object, markDirty: () => void): object {
+  const bridgeStatement = new Proxy(statement, {
+    get(target, property) {
+      const method = bindMethod(target, property)
+      if (!method) {
+        return Reflect.get(target, property, target)
+      }
+      if (property !== 'run') {
+        return method
+      }
+
+      return (...args: unknown[]) => {
+        const result = method(...args)
+        markDirty()
+        return result === target ? bridgeStatement : result
+      }
+    },
+  })
+  return bridgeStatement
+}
+
+/**
+ * Wrap the shared sql.js database at the boundary used by go-sqlite3-js.
+ * Prepared reads use bind/step and remain clean. Statement.run is the driver's
+ * mutation path, while Database.exec may contain arbitrary multi-statement SQL,
+ * so exec is conservatively treated as a write rather than parsing SQL here.
+ */
+export function createGoDatabaseBridge(database: Database, markDirty: () => void): Database {
+  return new Proxy(database, {
+    get(target, property) {
+      const method = bindMethod(target, property)
+      if (!method) {
+        return Reflect.get(target, property, target)
+      }
+
+      if (property === 'prepare') {
+        return (...args: unknown[]) => {
+          const statement = method(...args)
+          if ((typeof statement !== 'object' && typeof statement !== 'function') || !statement) {
+            return statement
+          }
+          return wrapStatementForGo(statement, markDirty)
+        }
+      }
+
+      if (property === 'exec') {
+        return (...args: unknown[]) => {
+          const result = method(...args)
+          markDirty()
+          return result
+        }
+      }
+
+      return method
+    },
+  })
+}
+
 // ============================================================================
 // WASM Connection Lifecycle
 // ============================================================================
@@ -170,11 +239,12 @@ export async function initGoStorage(options?: WasmDatabaseOptions): Promise<void
   }
 
   const OriginalDatabase = sqlJs.Database
+  const goDatabase = createGoDatabaseBridge(internalDb, () => wasmDb.markDirty())
   const wrappedSqlJs = {
     ...sqlJs,
     Database: function (data?: Uint8Array | string) {
       if (data === ':memory:' || data === 'file::memory:' || data === '') {
-        return internalDb
+        return goDatabase
       }
       return new OriginalDatabase(data as Uint8Array)
     } as unknown as typeof sqlJs.Database,
@@ -183,7 +253,7 @@ export async function initGoStorage(options?: WasmDatabaseOptions): Promise<void
 
   window._go_sqlite = wrappedSqlJs as SqlJsStatic
   window._go_sqlite_dbs = new Map()
-  window._go_sqlite_dbs.set(':memory:', internalDb as unknown as SqlJsDatabase)
+  window._go_sqlite_dbs.set(':memory:', goDatabase as unknown as SqlJsDatabase)
 
   // Expose stravaFetch via namespaced, non-configurable object for Go WASM to call.
   // This prevents easy XSS interception compared to a simple window property.

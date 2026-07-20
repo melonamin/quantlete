@@ -28,6 +28,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -174,8 +175,13 @@ func parseServices(servicesDir string) ([]AdapterMethod, map[string]InputType, e
 }
 
 func parseServiceFile(filePath string) ([]AdapterMethod, map[string]InputType, error) {
+	fileData, err := fs.ReadFile(os.DirFS(filepath.Dir(filePath)), filepath.Base(filePath))
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading file: %w", err)
+	}
+
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
+	file, err := parser.ParseFile(fset, filePath, fileData, parser.ParseComments)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing file: %w", err)
 	}
@@ -210,11 +216,6 @@ func parseServiceFile(filePath string) ([]AdapterMethod, map[string]InputType, e
 
 	// Second pass: collect adapter methods from comments
 	// Read file line by line to find comments before func declarations
-	fileData, err := os.ReadFile(filePath) //nolint:gosec
-	if err != nil {
-		return nil, nil, err
-	}
-
 	scanner := bufio.NewScanner(bytes.NewReader(fileData))
 	var pendingWasm, pendingHTTPMethod, pendingHTTPPath, pendingCategory string
 	lineNum := 0
@@ -453,9 +454,9 @@ var (
 `)
 
 	for _, cat := range categories {
-		buf.WriteString(fmt.Sprintf("// ============================================================================\n"))
-		buf.WriteString(fmt.Sprintf("// %s\n", cat))
-		buf.WriteString(fmt.Sprintf("// ============================================================================\n\n"))
+		buf.WriteString("// ============================================================================\n")
+		fmt.Fprintf(&buf, "// %s\n", cat)
+		buf.WriteString("// ============================================================================\n\n")
 
 		for _, m := range byCategory[cat] {
 			inputType := inputTypes[m.InputType]
@@ -463,22 +464,22 @@ var (
 		}
 	}
 
-	return os.WriteFile(outputPath, buf.Bytes(), 0o644)
+	return os.WriteFile(outputPath, buf.Bytes(), 0o644) //nolint:gosec // G306: generated Go source should be readable by all users.
 }
 
 func generateWasmMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType) {
 	// Function comment
-	buf.WriteString(fmt.Sprintf("// gen%s wraps %s.%s\n", capitalize(m.WasmName), m.ServiceName, m.MethodName))
-	buf.WriteString(fmt.Sprintf("//wasm:export %s\n", m.WasmName))
+	fmt.Fprintf(buf, "// gen%s wraps %s.%s\n", capitalize(m.WasmName), m.ServiceName, m.MethodName)
+	fmt.Fprintf(buf, "//wasm:export %s\n", m.WasmName)
 	if m.Category != "" {
-		buf.WriteString(fmt.Sprintf("//wasm:category %s\n", m.Category))
+		fmt.Fprintf(buf, "//wasm:category %s\n", m.Category)
 	}
 
 	// Function signature using wrapper pattern
-	buf.WriteString(fmt.Sprintf("var gen%s = wrapWasmAthlete(%q, func(wc *WasmContext) interface{} {\n", capitalize(m.WasmName), m.WasmName))
+	fmt.Fprintf(buf, "var gen%s = wrapWasmAthlete(%q, func(wc *WasmContext) interface{} {\n", capitalize(m.WasmName), m.WasmName)
 
 	// Initialize input
-	buf.WriteString(fmt.Sprintf("\tvar input services.%s\n", m.InputType))
+	fmt.Fprintf(buf, "\tvar input services.%s\n", m.InputType)
 
 	// Check if we need to parse JSON (any non-context fields)
 	hasNonContextFields := false
@@ -503,12 +504,12 @@ func generateWasmMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType)
 		if f.Default != "" && f.Source != "context" && !f.IsPointer {
 			switch f.Type {
 			case "int":
-				buf.WriteString(fmt.Sprintf("\tif input.%s == 0 {\n", f.Name))
-				buf.WriteString(fmt.Sprintf("\t\tinput.%s = %s\n", f.Name, f.Default))
+				fmt.Fprintf(buf, "\tif input.%s == 0 {\n", f.Name)
+				fmt.Fprintf(buf, "\t\tinput.%s = %s\n", f.Name, f.Default)
 				buf.WriteString("\t}\n")
 			case "string":
-				buf.WriteString(fmt.Sprintf("\tif input.%s == \"\" {\n", f.Name))
-				buf.WriteString(fmt.Sprintf("\t\tinput.%s = %q\n", f.Name, f.Default))
+				fmt.Fprintf(buf, "\tif input.%s == \"\" {\n", f.Name)
+				fmt.Fprintf(buf, "\t\tinput.%s = %q\n", f.Name, f.Default)
 				buf.WriteString("\t}\n")
 			case "bool":
 				// For bool defaults, only apply if default is "true" (false is zero value)
@@ -530,7 +531,7 @@ func generateWasmMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType)
 	}
 
 	// Call service via registry using wrapper context
-	buf.WriteString(fmt.Sprintf("\n\tresult, err := wc.Registry.%s.%s(wc.Ctx, input)\n", m.ServiceName, m.MethodName))
+	fmt.Fprintf(buf, "\n\tresult, err := wc.Registry.%s.%s(wc.Ctx, input)\n", m.ServiceName, m.MethodName)
 	buf.WriteString("\tif err != nil {\n")
 	buf.WriteString("\t\treturn errorJSON(err)\n")
 	buf.WriteString("\t}\n\n")
@@ -593,14 +594,14 @@ var (
 		}
 	}
 
-	return os.WriteFile(outputPath, buf.Bytes(), 0o644)
+	return os.WriteFile(outputPath, buf.Bytes(), 0o644) //nolint:gosec // G306: generated Go source should be readable by all users.
 }
 
 func generateHTTPMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType) {
 	handlerName := fmt.Sprintf("Gen%s%s", m.ServiceName, m.MethodName)
 
-	buf.WriteString(fmt.Sprintf("// %s handles %s %s\n", handlerName, m.HTTPMethod, m.HTTPPath))
-	buf.WriteString(fmt.Sprintf("func %s(svc *services.%s, strava *strava.Client) http.HandlerFunc {\n", handlerName, m.ServiceName))
+	fmt.Fprintf(buf, "// %s handles %s %s\n", handlerName, m.HTTPMethod, m.HTTPPath)
+	fmt.Fprintf(buf, "func %s(svc *services.%s, strava *strava.Client) http.HandlerFunc {\n", handlerName, m.ServiceName)
 	buf.WriteString("\treturn func(w http.ResponseWriter, r *http.Request) {\n")
 
 	// Auth check
@@ -611,7 +612,7 @@ func generateHTTPMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType)
 	buf.WriteString("\t\t}\n\n")
 
 	// Initialize input
-	buf.WriteString(fmt.Sprintf("\t\tvar input services.%s\n", m.InputType))
+	fmt.Fprintf(buf, "\t\tvar input services.%s\n", m.InputType)
 
 	// Set context fields
 	for _, f := range inputType.Fields {
@@ -631,11 +632,11 @@ func generateHTTPMethod(buf *bytes.Buffer, m AdapterMethod, inputType InputType)
 				paramName = strings.ToLower(f.Name)
 			}
 			if f.Type == "string" {
-				buf.WriteString(fmt.Sprintf("\t\tinput.%s = chi.URLParam(r, %q)\n", f.Name, paramName))
+				fmt.Fprintf(buf, "\t\tinput.%s = chi.URLParam(r, %q)\n", f.Name, paramName)
 			} else if f.Type == "int64" {
-				buf.WriteString(fmt.Sprintf("\t\tif idStr := chi.URLParam(r, %q); idStr != \"\" {\n", paramName))
-				buf.WriteString(fmt.Sprintf("\t\t\tif parsed, err := strconv.ParseInt(idStr, 10, 64); err == nil {\n"))
-				buf.WriteString(fmt.Sprintf("\t\t\t\tinput.%s = parsed\n", f.Name))
+				fmt.Fprintf(buf, "\t\tif idStr := chi.URLParam(r, %q); idStr != \"\" {\n", paramName)
+				buf.WriteString("\t\t\tif parsed, err := strconv.ParseInt(idStr, 10, 64); err == nil {\n")
+				fmt.Fprintf(buf, "\t\t\t\tinput.%s = parsed\n", f.Name)
 				buf.WriteString("\t\t\t}\n")
 				buf.WriteString("\t\t}\n")
 			}
@@ -691,14 +692,14 @@ func generateQueryParamParsing(buf *bytes.Buffer, f InputField) {
 	case f.Type == "int" || f.Type == "*int":
 		// Apply default first if specified
 		if f.Default != "" && !f.IsPointer {
-			buf.WriteString(fmt.Sprintf("\t\tinput.%s = %s\n", f.Name, f.Default))
+			fmt.Fprintf(buf, "\t\tinput.%s = %s\n", f.Name, f.Default)
 		}
-		buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
+		fmt.Fprintf(buf, "\t\tif v := q.Get(%q); v != \"\" {\n", queryName)
 		buf.WriteString("\t\t\tif parsed, err := strconv.Atoi(v); err == nil {\n")
 		if f.IsPointer {
-			buf.WriteString(fmt.Sprintf("\t\t\t\tinput.%s = &parsed\n", f.Name))
+			fmt.Fprintf(buf, "\t\t\t\tinput.%s = &parsed\n", f.Name)
 		} else {
-			buf.WriteString(fmt.Sprintf("\t\t\t\tinput.%s = parsed\n", f.Name))
+			fmt.Fprintf(buf, "\t\t\t\tinput.%s = parsed\n", f.Name)
 		}
 		buf.WriteString("\t\t\t}\n")
 		buf.WriteString("\t\t}\n")
@@ -706,63 +707,38 @@ func generateQueryParamParsing(buf *bytes.Buffer, f InputField) {
 	case f.Type == "bool" || f.Type == "*bool":
 		// Apply default first if specified
 		if f.Default != "" && !f.IsPointer {
-			buf.WriteString(fmt.Sprintf("\t\tinput.%s = %s\n", f.Name, f.Default))
+			fmt.Fprintf(buf, "\t\tinput.%s = %s\n", f.Name, f.Default)
 		}
-		buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
+		fmt.Fprintf(buf, "\t\tif v := q.Get(%q); v != \"\" {\n", queryName)
 		buf.WriteString("\t\t\tparsed := v == \"true\" || v == \"1\"\n")
 		if f.IsPointer {
-			buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = &parsed\n", f.Name))
+			fmt.Fprintf(buf, "\t\t\tinput.%s = &parsed\n", f.Name)
 		} else {
-			buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = parsed\n", f.Name))
+			fmt.Fprintf(buf, "\t\t\tinput.%s = parsed\n", f.Name)
 		}
 		buf.WriteString("\t\t}\n")
 
 	case f.Type == "string":
 		if f.Default != "" {
 			// Use query value if present, otherwise default
-			buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
-			buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = v\n", f.Name))
+			fmt.Fprintf(buf, "\t\tif v := q.Get(%q); v != \"\" {\n", queryName)
+			fmt.Fprintf(buf, "\t\t\tinput.%s = v\n", f.Name)
 			buf.WriteString("\t\t} else {\n")
-			buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = %q\n", f.Name, f.Default))
+			fmt.Fprintf(buf, "\t\t\tinput.%s = %q\n", f.Name, f.Default)
 			buf.WriteString("\t\t}\n")
 		} else {
-			buf.WriteString(fmt.Sprintf("\t\tinput.%s = q.Get(%q)\n", f.Name, queryName))
+			fmt.Fprintf(buf, "\t\tinput.%s = q.Get(%q)\n", f.Name, queryName)
 		}
 
 	case f.IsSlice && f.SplitChar != "":
-		buf.WriteString(fmt.Sprintf("\t\tif v := q.Get(%q); v != \"\" {\n", queryName))
-		buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = strings.Split(v, %q)\n", f.Name, f.SplitChar))
+		fmt.Fprintf(buf, "\t\tif v := q.Get(%q); v != \"\" {\n", queryName)
+		fmt.Fprintf(buf, "\t\t\tinput.%s = strings.Split(v, %q)\n", f.Name, f.SplitChar)
 		buf.WriteString("\t\t}\n")
 
 	case strings.HasPrefix(f.Type, "*time.Time"):
-		buf.WriteString(fmt.Sprintf("\t\tif t, ok := shared.ParseDateParam(q.Get(%q)); ok {\n", queryName))
-		buf.WriteString(fmt.Sprintf("\t\t\tinput.%s = &t\n", f.Name))
+		fmt.Fprintf(buf, "\t\tif t, ok := shared.ParseDateParam(q.Get(%q)); ok {\n", queryName)
+		fmt.Fprintf(buf, "\t\t\tinput.%s = &t\n", f.Name)
 		buf.WriteString("\t\t}\n")
-	}
-}
-
-func serviceVarName(serviceName string) string {
-	// Map service names to their global variable names
-	switch serviceName {
-	case "ActivityService":
-		return "activityService"
-	case "GearService":
-		return "gearService"
-	case "StatsService":
-		return "statsService"
-	case "DashboardService":
-		return "dashboardService"
-	case "SegmentsService":
-		return "segmentsService"
-	case "PhotosService":
-		return "photosService"
-	case "MaintenanceService":
-		return "maintenanceService"
-	case "ChallengesService":
-		return "challengesService"
-	default:
-		// Default: lowercase first letter
-		return strings.ToLower(serviceName[:1]) + serviceName[1:]
 	}
 }
 

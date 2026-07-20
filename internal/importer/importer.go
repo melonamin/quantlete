@@ -315,7 +315,7 @@ func (i *Importer) Start(ctx context.Context, opts ImportOptions) error {
 	i.eventMu.Unlock()
 
 	// Run import in background
-	go func() {
+	go func() { //nolint:gosec // import runs beyond the request lifetime by design; ctx comes from the caller (see Start contract)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("import panicked", "panic", r)

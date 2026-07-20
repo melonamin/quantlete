@@ -145,6 +145,17 @@ export class GoWasmProvider implements DataProvider {
   private athleteId: number | null = null
   private options: GoWasmProviderOptions
   private demoAthlete: { id: number; firstname: string; lastname: string } | null = null
+  private persistenceListenersRegistered = false
+
+  private readonly handlePageHide = (): void => {
+    this.persistBestEffort('pagehide')
+  }
+
+  private readonly handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') {
+      this.persistBestEffort('visibilitychange')
+    }
+  }
 
   constructor(options: GoWasmProviderOptions = {}) {
     this.options = options
@@ -181,6 +192,40 @@ export class GoWasmProvider implements DataProvider {
         }
       }
     }
+
+    this.registerPersistenceListeners()
+  }
+
+  private registerPersistenceListeners(): void {
+    if (this.persistenceListenersRegistered) {
+      return
+    }
+
+    window.addEventListener('pagehide', this.handlePageHide)
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
+    this.persistenceListenersRegistered = true
+  }
+
+  private persistBestEffort(reason: string): void {
+    void this.persistDatabase().catch((error: unknown) => {
+      console.error(`[GoWasmProvider] Failed to persist database on ${reason}:`, error)
+    })
+  }
+
+  private async persistAfter<T>(mutation: () => T | Promise<T>): Promise<T> {
+    const result = await mutation()
+    await this.persistDatabase()
+    return result
+  }
+
+  dispose(): void {
+    if (!this.persistenceListenersRegistered) {
+      return
+    }
+
+    window.removeEventListener('pagehide', this.handlePageHide)
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
+    this.persistenceListenersRegistered = false
   }
 
   private assertInitialized(): void {
@@ -495,7 +540,7 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.updateDashboardConfig(config)
+    const result = await this.persistAfter(() => goStorage.updateDashboardConfig(config))
     return {
       version: result.version,
       widgets: result.widgets.map((w) => ({
@@ -568,7 +613,10 @@ export class GoWasmProvider implements DataProvider {
     }
   }
 
-  async getEddingtonHistory(sportType?: string, sportGroup?: string): Promise<EddingtonHistoryPoint[]> {
+  async getEddingtonHistory(
+    sportType?: string,
+    sportGroup?: string
+  ): Promise<EddingtonHistoryPoint[]> {
     this.assertInitialized()
     this.getAthleteId()
 
@@ -784,12 +832,14 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.upsertHrZoneDefinition({
-      sport_type: def.sport_type,
-      effective_from: def.effective_from,
-      method: def.method,
-      zones: def.zones,
-    })
+    await this.persistAfter(() =>
+      goStorage.upsertHrZoneDefinition({
+        sport_type: def.sport_type,
+        effective_from: def.effective_from,
+        method: def.method,
+        zones: def.zones,
+      })
+    )
     return { status: 'ok' }
   }
 
@@ -800,10 +850,12 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.deleteHrZoneDefinition({
-      sport_type: sportType,
-      effective_from: effectiveFrom,
-    })
+    await this.persistAfter(() =>
+      goStorage.deleteHrZoneDefinition({
+        sport_type: sportType,
+        effective_from: effectiveFrom,
+      })
+    )
     return { status: 'ok' }
   }
 
@@ -1035,13 +1087,15 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.createCustomGear({
-      name: req.name,
-      hashtag: req.hashtag,
-      retired: req.retired,
-      purchase_price: req.purchase_price ?? undefined,
-      purchase_currency: req.purchase_currency,
-    })
+    const result = await this.persistAfter(() =>
+      goStorage.createCustomGear({
+        name: req.name,
+        hashtag: req.hashtag,
+        retired: req.retired,
+        purchase_price: req.purchase_price ?? undefined,
+        purchase_currency: req.purchase_currency,
+      })
+    )
 
     return {
       id: result.id,
@@ -1059,14 +1113,16 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.updateCustomGear({
-      id,
-      name: patch.name,
-      hashtag: patch.hashtag,
-      retired: patch.retired,
-      purchase_price: patch.purchase_price,
-      purchase_currency: patch.purchase_currency,
-    })
+    const result = await this.persistAfter(() =>
+      goStorage.updateCustomGear({
+        id,
+        name: patch.name,
+        hashtag: patch.hashtag,
+        retired: patch.retired,
+        purchase_price: patch.purchase_price,
+        purchase_currency: patch.purchase_currency,
+      })
+    )
 
     return {
       id: result.id,
@@ -1084,7 +1140,7 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.deleteCustomGear(id, force)
+    const result = await this.persistAfter(() => goStorage.deleteCustomGear(id, force))
     if (result.has_activities && !force) {
       throw new Error(result.message || 'Gear has activities, use force to delete')
     }
@@ -1115,11 +1171,13 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.updateGearPrice({
-      gear_id: id,
-      purchase_price: price,
-      purchase_currency: currency,
-    })
+    const result = await this.persistAfter(() =>
+      goStorage.updateGearPrice({
+        gear_id: id,
+        purchase_price: price,
+        purchase_currency: currency,
+      })
+    )
 
     return mapGearItemToGear(result)
   }
@@ -1290,13 +1348,15 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    // Update cycling and running FTP separately
-    goStorage.updateFtpHistory(
-      body.cycling.map((e) => ({ recorded_at: e.recorded_at, value: e.value }))
-    )
-    goStorage.updateFtpRunningHistory(
-      body.running.map((e) => ({ recorded_at: e.recorded_at, value: e.value }))
-    )
+    await this.persistAfter(() => {
+      // Update cycling and running FTP separately, then persist one snapshot.
+      goStorage.updateFtpHistory(
+        body.cycling.map((e) => ({ recorded_at: e.recorded_at, value: e.value }))
+      )
+      goStorage.updateFtpRunningHistory(
+        body.running.map((e) => ({ recorded_at: e.recorded_at, value: e.value }))
+      )
+    })
     return body
   }
 
@@ -1317,11 +1377,13 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.updateWeightHistory(
-      body.points.map((e) => ({
-        recorded_at: e.recorded_at,
-        value: e.value,
-      }))
+    await this.persistAfter(() =>
+      goStorage.updateWeightHistory(
+        body.points.map((e) => ({
+          recorded_at: e.recorded_at,
+          value: e.value,
+        }))
+      )
     )
     return body
   }
@@ -1466,13 +1528,15 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.updateTrainingGoals({
-      sports: config.sports.map((s) => ({
-        name: s.name,
-        sport_types: s.sport_types,
-        targets: s.targets,
-      })),
-    })
+    await this.persistAfter(() =>
+      goStorage.updateTrainingGoals({
+        sports: config.sports.map((s) => ({
+          name: s.name,
+          sport_types: s.sport_types,
+          targets: s.targets,
+        })),
+      })
+    )
     return config
   }
 
@@ -1558,16 +1622,18 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.createComponent({
-      gear_id: gearId,
-      name: req.name,
-      image_url: req.image_url,
-      maintenance_hashtag: req.maintenance_hashtag,
-      rules: req.rules?.map((r) => ({
-        type: r.type,
-        threshold_value: r.threshold_value,
-      })),
-    })
+    const result = await this.persistAfter(() =>
+      goStorage.createComponent({
+        gear_id: gearId,
+        name: req.name,
+        image_url: req.image_url,
+        maintenance_hashtag: req.maintenance_hashtag,
+        rules: req.rules?.map((r) => ({
+          type: r.type,
+          threshold_value: r.threshold_value,
+        })),
+      })
+    )
 
     return {
       id: result.id,
@@ -1583,16 +1649,18 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    const result = goStorage.updateComponent({
-      id,
-      name: req.name,
-      image_url: req.image_url,
-      maintenance_hashtag: req.maintenance_hashtag,
-      rules: req.rules?.map((r) => ({
-        type: r.type,
-        threshold_value: r.threshold_value,
-      })),
-    })
+    const result = await this.persistAfter(() =>
+      goStorage.updateComponent({
+        id,
+        name: req.name,
+        image_url: req.image_url,
+        maintenance_hashtag: req.maintenance_hashtag,
+        rules: req.rules?.map((r) => ({
+          type: r.type,
+          threshold_value: r.threshold_value,
+        })),
+      })
+    )
 
     return {
       id: result.id,
@@ -1608,7 +1676,7 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.deleteComponent(id)
+    await this.persistAfter(() => goStorage.deleteComponent(id))
     return { deleted: true }
   }
 
@@ -1619,11 +1687,13 @@ export class GoWasmProvider implements DataProvider {
     this.assertInitialized()
     this.getAthleteId()
 
-    goStorage.logMaintenance({
-      component_id: componentId,
-      activity_id: req?.activity_id,
-      completed_at: req?.completed_at,
-    })
+    await this.persistAfter(() =>
+      goStorage.logMaintenance({
+        component_id: componentId,
+        activity_id: req?.activity_id,
+        completed_at: req?.completed_at,
+      })
+    )
     return { logged: true }
   }
 
@@ -1640,7 +1710,9 @@ export class GoWasmProvider implements DataProvider {
   async updateAppSettings(settings: AppSettings): Promise<AppSettings> {
     this.assertInitialized()
 
-    goStorage.updateAppSettings(settings as unknown as goStorage.AppSettings)
+    await this.persistAfter(() =>
+      goStorage.updateAppSettings(settings as unknown as goStorage.AppSettings)
+    )
     return settings
   }
 
@@ -1722,36 +1794,38 @@ export class GoWasmProvider implements DataProvider {
       throw new Error('Not authenticated. Please log in first.')
     }
 
-    goStorage.goStartImport(
-      {
-        full_sync: req?.full_sync,
-        resume: req?.resume,
-        skip_streams: req?.skip_streams,
-        skip_segments: req?.skip_segments,
-        skip_best_efforts: req?.skip_best_efforts,
-        skip_photos: req?.skip_photos,
-      },
-      {
-        id: athlete.id,
-        username: athlete.username,
-        first_name: athlete.firstname,
-        last_name: athlete.lastname,
-        profile_medium: athlete.profile,
-      }
+    await this.persistAfter(() =>
+      goStorage.goStartImport(
+        {
+          full_sync: req?.full_sync,
+          resume: req?.resume,
+          skip_streams: req?.skip_streams,
+          skip_segments: req?.skip_segments,
+          skip_best_efforts: req?.skip_best_efforts,
+          skip_photos: req?.skip_photos,
+        },
+        {
+          id: athlete.id,
+          username: athlete.username,
+          first_name: athlete.firstname,
+          last_name: athlete.lastname,
+          profile_medium: athlete.profile,
+        }
+      )
     )
     return { message: 'Import started' }
   }
 
   async cancelImport(): Promise<{ message: string }> {
     this.assertInitialized()
-    goStorage.goCancelImport()
+    await this.persistAfter(() => goStorage.goCancelImport())
     return { message: 'Import cancelled' }
   }
 
   async pauseImport(): Promise<{ message: string }> {
     // Go importer uses cancel for pause - state is persisted for resume
     this.assertInitialized()
-    goStorage.goCancelImport()
+    await this.persistAfter(() => goStorage.goCancelImport())
     return { message: 'Import paused' }
   }
 
@@ -1867,6 +1941,9 @@ export class GoWasmProvider implements DataProvider {
     }
 
     importCompleteCallback = (resultJson: string) => {
+      // Import failures can still leave valid partial progress, so flush every
+      // completion outcome rather than only successful imports.
+      this.persistBestEffort('import completion')
       try {
         const result = JSON.parse(resultJson) as { success: boolean; error?: string }
         listener(createSyncCompleteEvent(result.success ? 'completed' : 'failed', result.error))

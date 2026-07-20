@@ -62,7 +62,20 @@ export function WrappedPage() {
   const months = useMemo(() => report?.months ?? [], [report?.months])
   // Convert month format "YYYY-MM" to abbreviated month names ("Jan", "Feb", etc.)
   const monthLabels = useMemo(() => {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]
     return months.map((m) => {
       const monthIndex = parseInt(m.month.slice(5), 10) - 1
       return monthNames[monthIndex] ?? m.month.slice(5)
@@ -241,11 +254,7 @@ export function WrappedPage() {
                   <CardTitle>Activities by Month</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <BarChart
-                    data={activitiesData}
-                    height={260}
-                    uniformColor={chartColors.primary}
-                  />
+                  <BarChart data={activitiesData} height={260} uniformColor={chartColors.primary} />
                 </CardContent>
               </Card>
               <Card>

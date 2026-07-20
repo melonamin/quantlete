@@ -5,6 +5,10 @@ public/wasm/sql-wasm.wasm
 # Vite
 dist-ssr
 
+# Playwright test artifacts
+playwright-report/
+test-results/
+
 # Visual Studio
 *.suo
 *.ntvs*
