@@ -8,6 +8,16 @@
 import type { Database, SqlJsStatic } from 'sql.js'
 import { getStorageBackend, type OPFSStorage, type IndexedDBStorage } from './opfs-storage'
 
+export const DATABASE_LOCK_NAME = 'quantlete-opfs-database'
+
+async function withDatabaseLock<T>(callback: () => Promise<T>): Promise<T> {
+  if (typeof navigator === 'undefined' || !navigator.locks) {
+    return callback()
+  }
+
+  return navigator.locks.request(DATABASE_LOCK_NAME, callback)
+}
+
 // Lazy load sql.js to handle ESM import issues
 async function loadSqlJs(): Promise<
   (config?: { locateFile?: (file: string) => string }) => Promise<SqlJsStatic>
@@ -73,6 +83,10 @@ export class WasmDatabase {
    * any existing persisted data.
    */
   async initialize(): Promise<void> {
+    await withDatabaseLock(() => this.initializeUnlocked())
+  }
+
+  private async initializeUnlocked(): Promise<void> {
     // Load sql.js
     const initSqlJs = await loadSqlJs()
     this.SQL = await initSqlJs({
@@ -131,6 +145,10 @@ export class WasmDatabase {
    * Persist database to storage.
    */
   async persist(): Promise<void> {
+    await withDatabaseLock(() => this.persistUnlocked())
+  }
+
+  private async persistUnlocked(): Promise<void> {
     if (this.demoMode) {
       // Skip persistence in demo mode - data is ephemeral
       return
@@ -141,8 +159,23 @@ export class WasmDatabase {
     }
 
     const data = this.db.export()
-    await this.storage.save(data)
+    // Clear before the async save so a write that arrives while persistence is
+    // in flight can mark the next snapshot dirty instead of being overwritten.
     this.dirty = false
+    try {
+      await this.storage.save(data)
+    } catch (error) {
+      this.dirty = true
+      throw error
+    }
+  }
+
+  /**
+   * Mark the in-memory database as needing persistence.
+   * Used by the Go WASM bridge, which writes directly through sql.js.
+   */
+  markDirty(): void {
+    this.dirty = true
   }
 
   /**
