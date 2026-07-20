@@ -12,9 +12,6 @@ interface SqlJsDatabase {
 test('activity speed preserves the fractional REAL value from the demo database', async ({
   page,
 }) => {
-  // TODO(Task 6): sql.js driver truncates REAL columns
-  test.fixme()
-
   const activity = await page.evaluate(() => {
     const databases = (
       globalThis as unknown as {

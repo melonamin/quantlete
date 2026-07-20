@@ -157,13 +157,13 @@ Built first so Task 5's fix can be verified red → green.
 - Create: fork/vendored patch of `github.com/matrix-org/go-sqlite3-js`
 - Modify: `go.mod`, `go.sum`
 
-- [ ] reproduce first: in demo/WASM mode confirm `average_speed`/lat/lng come back truncated (validates the finding before patching; Task 4's red float spec is the harness)
-- [ ] decide fork hosting explicitly: hosted GitHub fork + pseudo-version vs. in-repo vendored directory + relative `replace` — the choice affects reproducible CI builds; record the decision and rationale here
-- [ ] patch the scan path (`sqlite3.go:~197`) to return float64 when the JS number is non-integral (`v != math.Trunc(v)`), int64 otherwise; keep the fork one-commit-minimal for upstream rebases
-- [ ] add the `replace` directive in `go.mod`; document the fork's reason in the fork README
-- [ ] audit blast radius: grep Go scan destinations typed `int`/`int64` over REAL columns — values that previously "worked" via truncation may now fail `database/sql` float64→int64 conversion (only exact values convert); fix destinations to float64 where the column is REAL
-- [ ] verification is E2E-based (CI's WASM job only builds; `GOOS=js` tests would need a browser-like sql.js harness we are not building here): remove the TODO from Task 4's float spec, extend it to sweep representative values (floats, bools, nulls, big ints, dates), and run the FULL WASM E2E suite — all green
-- [ ] run tests — must pass before next task
+- [x] reproduce first: confirmed via Task 4's red float spec (demo seed speed 8.28298918... rendered truncated pre-fix)
+- [x] decide fork hosting: in-repo vendored `third_party/go-sqlite3-js/` + relative `replace` — reproducible CI, no external repo to maintain; rationale + upstream commit recorded in its README
+- [x] patch the scan path: `js.TypeNumber` → float64 when fractional, int64 otherwise; single commented change against frozen upstream
+- [x] add the `replace` directive in `go.mod` (+ `go mod tidy` — vendored module's test deps entered go.sum)
+- [x] audit blast radius: 52 REAL columns across 13 tables enumerated; all generated and hand-written scan destinations float-capable; the four int calorie aggregates already CAST — no further fixes needed
+- [x] verification: float spec fixme removed and PASSES against the rebuilt WASM binary; full WASM suite 4/4 green (no fixmes remain)
+- [x] run tests — go build (native + js/wasm), vet, lint 0 issues (third_party excluded as nested module), internal tests pass
 
 ### Task 7: Fix export endpoints (athlete scoping + truncation)
 
